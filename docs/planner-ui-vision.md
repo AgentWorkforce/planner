@@ -82,7 +82,9 @@ Plans (filtered by tags) → Versions → Steps
 
 ## Creating a Plan
 
-Multiple entry paths via [+ New]:
+Planner accepts any expression of intent—from vague ideas to detailed specs. The AI helps refine.
+
+**Entry via [+ New]:**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -91,24 +93,75 @@ Multiple entry paths via [+ New]:
 │                                                                         │
 │  What do you want to accomplish?                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │ Add dark mode support to the application                        │   │
+│  │ I want to make the app faster                                    │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│  [Create Plan]                                                          │
+│  [Continue →]                                                           │
 │                                                                         │
 │  ─────────────────────── or ───────────────────────                     │
 │                                                                         │
-│  [Import from document]  [From template]  [Start blank]                 │
+│  [Import from document]  [From template]                                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**If input is vague, AI helps scope:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Create Plan                                                       [×]  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  "I want to make the app faster"                                        │
+│                                                                         │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│  AI: Let me help you scope this.                                        │
+│                                                                         │
+│  What kind of "faster"?                                                 │
+│  ○ Page load time (user-facing)                                         │
+│  ○ API response time (backend)                                          │
+│  ○ Build/deploy time (developer)                                        │
+│  ○ I'm not sure yet                                                     │
+│                                                                         │
+│  Do you have data on what's slow?                                       │
+│  ○ Yes, I have metrics                                                  │
+│  ○ I have hunches but no data                                           │
+│  ○ No, investigation needed first                                       │
+│                                                                         │
+│  [Continue →]                                                           │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**If input is specific, AI drafts multi-scope plan:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Create Plan                                                       [×]  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  "Add user authentication with OAuth"                                   │
+│                                                                         │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│  This will affect:                                                      │
+│  ☑ api-service                                                          │
+│  ☑ web-frontend                                                         │
+│  ☐ mobile-app (detected - include?)                                     │
+│  ☑ infrastructure                                                       │
+│                                                                         │
+│  [Generate Plan]                                                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Entry | When to Use | What Happens |
 |-------|-------------|--------------|
-| **Goal text** | Vague idea | AI drafts full plan |
+| **Vague goal** | "improve UX", "make it faster" | AI asks clarifying questions, helps scope |
+| **Specific goal** | "add dark mode toggle" | AI identifies scopes, drafts plan |
 | **Import** | Have PRD/spec | AI extracts steps from pasted text |
 | **Template** | Common pattern | Select template, customize |
-| **Blank** | Know exactly what you want | Manual step entry |
 
 ---
 
@@ -123,13 +176,15 @@ Click any field to edit. No modals for simple changes.
 │                                                                         │
 │  Title: [Design auth flow                              ] ← click to edit│
 │                                                                         │
+│  Scope: api-service                                                     │
+│                                                                         │
 │  Description:                                                           │
 │  [Create sequence diagrams for login, logout, and refresh flows.     ] │
 │  [Include error handling and edge cases.                             ] │
 │                                                                         │
 │  Owner: [Architect ▼]                                                   │
 │                                                                         │
-│  Depends on: [Step 1 ×]  [+ Add]                                       │
+│  After: Research approaches (AI-inferred)              [override]       │
 │                                                                         │
 │  Acceptance criteria:                                                   │
 │  ☑ [Flow diagram covers all paths                                    ] │
@@ -141,46 +196,47 @@ Click any field to edit. No modals for simple changes.
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+**Note:** Dependencies ("After") are AI-inferred from step descriptions. Humans express intent ("this needs to happen before that"), AI builds the DAG. Override is available but rarely needed.
+
 ### Adding Steps
 
-[+ Add Step] with smart positioning:
+[+ Add Step] — describe what you need, AI places it:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  Add Step                                                          [×]  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Title: [                                                         ]     │
+│  What needs to happen?                                                  │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ Add rate limiting to the API                                     │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│  Position:                                                              │
-│  ○ After step 2 (Design flow)                                          │
-│  ○ After step 3 (Backend)                                              │
-│  ● At end                                                               │
-│                                                                         │
-│  AI suggests: "Based on position, this step should depend on Step 2"   │
+│  Scope: [api-service ▼]                                                 │
 │                                                                         │
 │  [Add Step]                                                             │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+AI automatically places the step in the right position and infers dependencies based on context.
+
 ### Deleting Steps
 
-Handle dependencies gracefully:
+AI handles dependency adjustment:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  Delete Step 2?                                                    [×]  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  "Design auth flow" has dependent steps:                               │
-│    • Step 3: Backend implementation                                     │
-│    • Step 4: Frontend implementation                                    │
+│  "Design auth flow" will be removed.                                   │
 │                                                                         │
-│  What should these steps depend on instead?                            │
-│  [Step 1: Research ▼]                                                  │
+│  AI will adjust dependencies for affected steps:                       │
+│    • Backend implementation                                             │
+│    • Frontend implementation                                            │
 │                                                                         │
-│  [Delete and redirect dependencies]  [Cancel]                          │
+│  [Delete]  [Cancel]                                                     │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

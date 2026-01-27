@@ -1,84 +1,109 @@
-# Planner: Handling Scale
+# Planner: Multi-Scope Plans
 
-How Planner handles large plans (building entire applications, multi-month projects).
-
----
-
-## The Challenge
-
-A plan to "add dark mode" might have 5-7 steps. A plan to "build an e-commerce application" might have 100+ steps across multiple domains.
-
-**Problems with flat plans at scale:**
-- Visual overwhelm (100 steps on screen)
-- Cognitive overload (can't hold it all in mind)
-- Parallel work coordination (many teams/agents)
-- Progress tracking (where are we?)
-- Review burden (approving 100 steps at once)
+Real work crosses boundaries. A feature typically touches multiple repos, teams, or domains. **Multi-scope plans are the norm, not the exception.**
 
 ---
 
-## Solution: Compound Steps
+## The Reality
 
-A step can be either **primitive** (actual work) or **compound** (expands into a sub-plan).
+A plan to "add user authentication" doesn't just live in one place:
+
+```
+"Add user authentication"
+├── api-service          ← backend changes
+├── web-frontend         ← login UI
+├── mobile-app           ← maybe
+└── infrastructure       ← secrets, config
+```
+
+This is typical. The "single flat plan in one context" is actually rare.
+
+---
+
+## Scopes: The Primary Structure
+
+**Scopes** group steps by context: repository, team, or domain.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Build E-commerce Application                                           │
+│  Add user authentication                                                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  ┌─ 1. User Authentication ───────────────────────── 📦 compound ────┐ │
-│  │  8 steps · 0/8 complete · Owner: Backend Team                     │ │
-│  │  [Expand] [View Sub-plan]                                         │ │
-│  └───────────────────────────────────────────────────────────────────┘ │
-│           │                                                             │
-│           ▼                                                             │
-│  ┌─ 2. Product Catalog ───────────────────────────── 📦 compound ────┐ │
-│  │  12 steps · 0/12 complete · Owner: Full-stack Team                │ │
-│  └───────────────────────────────────────────────────────────────────┘ │
-│           │                                                             │
-│     ┌─────┴─────┐                                                       │
-│     ▼           ▼                                                       │
-│  ┌─ 3. Cart ──┐  ┌─ 4. Checkout ─┐                                     │
-│  │  📦 6 steps│  │  📦 15 steps  │                                     │
-│  └────────────┘  └───────────────┘                                     │
+│  api-service                                                            │
+│  ├── Add OAuth endpoints                                                │
+│  ├── Add user model                                                     │
+│  └── Add session middleware                                             │
+│                                                                         │
+│  web-frontend                                                           │
+│  ├── Add login page                                                     │
+│  ├── Add auth state management                                          │
+│  └── Add protected routes                                               │
+│                                                                         │
+│  infrastructure                                                         │
+│  └── Add OAuth secrets to config                                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Model
+**The AI's job:**
+1. Identify which scopes are affected by the goal
+2. Generate steps per scope
+3. Infer dependencies across scopes
+
+**Dependencies are AI-inferred**, not manually wired. If "web-frontend login" needs "api-service OAuth endpoints", the AI figures that out.
+
+---
+
+## Data Model
 
 ```typescript
 interface Step {
   step_id: string;
   title: string;
+
+  // AI-inferred (displayed but rarely edited)
   dependencies: string[];
 
-  // Type determines which fields apply
-  type: 'primitive' | 'compound';
+  // Scope context
+  scope?: string;  // "api-service", "web-frontend", etc.
 
-  // Primitive step fields
+  // What humans care about
   description?: string;
   owner_role?: string;
   acceptance_criteria?: AcceptanceCriterion[];
-  gate?: Gate;
+  gate?: { type: 'human_approval'; approver_role?: string; };
 
-  // Compound step fields
-  sub_plan_id?: string;  // Reference to another PlanVersion
+  // For nested complexity (sub-plan reference)
+  sub_plan_id?: string;
 }
 ```
 
-### How It Works
+---
 
-1. **Top-level plan** has compound steps (major phases/features)
-2. Each compound step **references a sub-plan** (another PlanVersion)
-3. Sub-plans can have their own compound steps (recursion)
-4. **Depth limit**: Recommend max 3 levels (practical, not technical)
+## Nested Complexity: Sub-Plans
+
+For very large initiatives, steps can reference **sub-plans** (another PlanVersion):
 
 ```
-Level 0: Application Plan
-         ├── Level 1: Feature Plans
-         │            ├── Level 2: Component Plans
-         │            │            └── Level 3: Task-level (primitive steps)
+"Build e-commerce application"
+├── User Authentication    → [sub-plan: auth-v2]
+├── Product Catalog        → [sub-plan: catalog-v1]
+├── Shopping Cart          → [sub-plan: cart-v1]
+└── Checkout & Payments    → [sub-plan: checkout-v1]
+```
+
+Each sub-plan is a full plan with its own scopes, steps, and approval flow.
+
+1. A step with `sub_plan_id` references another PlanVersion
+2. Sub-plans are full plans with their own scopes and steps
+3. Sub-plans can reference their own sub-plans (recursion)
+4. **Depth limit**: Recommend max 3 levels
+
+```
+Level 0: Initiative Plan (e.g., "Build e-commerce")
+         ├── Level 1: Feature Plans (auth, catalog, cart)
+         │            ├── Level 2: Component Plans (if needed)
+         │            │            └── Level 3: Task-level steps
 ```
 
 ---
@@ -341,20 +366,25 @@ If a plan has > 20 steps at one level, consider:
 
 ### Anti-Patterns
 
-❌ **100 primitive steps** - Split into compound steps
+❌ **100 steps flat** - Use scopes and sub-plans
 ❌ **5 levels deep** - Flatten or restructure
 ❌ **Circular references** - Plan A references B which references A
 ❌ **Orphan sub-plans** - Sub-plans not referenced by any parent
+❌ **Manual dependency wiring** - Let AI infer from context
 
 ---
 
 ## Summary
 
-| Scale | Approach |
-|-------|----------|
-| Small (5-10 steps) | Flat plan, all primitive steps |
-| Medium (10-30 steps) | Mix of primitive and compound |
-| Large (30-100 steps) | Hierarchical with sub-plans |
-| Very Large (100+ steps) | Multi-level hierarchy, phased approval |
+| Situation | Structure |
+|-----------|-----------|
+| Single context | One scope, flat steps |
+| Cross-repo feature | Multiple scopes (api, frontend, infra) |
+| Large initiative | Scopes + sub-plans for major features |
+| Enterprise project | Multi-level hierarchy, phased approval |
 
-**Core principle**: Keep any single view manageable (15-20 items). Use hierarchy to organize complexity without losing oversight.
+**Core principles:**
+- Multi-scope is the default (real work crosses boundaries)
+- Dependencies are AI-inferred (humans express intent)
+- Keep any single view manageable (15-20 items per scope)
+- Use sub-plans for nested complexity

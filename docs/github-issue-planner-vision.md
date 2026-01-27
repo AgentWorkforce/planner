@@ -67,20 +67,44 @@ flowchart TB
 
 | Layer | Responsibility | Examples/Candidates |
 |-------|---------------|---------------------|
-| **Intake/Discovery** | Transform messy input (Slack, email, meetings) into structured goals | Custom, Linear webhooks |
+| **Intake/Discovery** | Monitor channels (Slack, email, GitHub), detect requests, route to Planner | Custom, Linear webhooks |
 | **Triage/Portfolio** | Prioritize and sequence initiatives | Custom, WSJF-based |
-| **Planner** | Create versioned, approvable plans from goals | **This repo** |
+| **Planner** | Accept any expression of intent, help refine, produce versioned plans | **This repo** |
 | **Orchestrator** | Execute approved plans, dispatch to agents | LangGraph, CrewAI, Temporal |
 | **Agent Relay** | Agent-to-agent messaging and coordination | Existing relay infrastructure |
 
 ### Integration Points
+
+**Planner Input Contract:**
+
+Planner accepts any expression of intent—from vague ideas to detailed specs. The AI helps refine vague input into structured plans.
+
+```typescript
+interface PlanInput {
+  goal: string;              // Required - can be vague or specific
+  context?: string;          // Background, constraints
+  source?: {                 // Where this came from (if routed from Intake)
+    channel: 'slack' | 'email' | 'github' | 'direct';
+    reference?: string;
+  };
+  attachments?: {            // Supporting material
+    type: 'prd' | 'spec' | 'design' | 'document';
+    content: string;
+  }[];
+}
+```
+
+**Examples of valid input:**
+- `{ goal: "improve user experience" }` — vague, AI helps scope
+- `{ goal: "add dark mode toggle" }` — specific, AI drafts plan
+- `{ goal: "implement auth", attachments: [spec] }` — detailed, AI uses spec
 
 **Upstream → Planner:**
 ```
 POST /plans
 {
   goal: "Implement dark mode for the application",
-  context: { constraints: [...], preferences: [...] }
+  context: "Must work on mobile and desktop"
 }
 ```
 
@@ -132,12 +156,14 @@ Individual units of work in a plan:
 interface Step {
   step_id: string;
   title: string;
-  dependencies: string[];  // DAG structure
 
-  // Step type: primitive (actual work) or compound (expands to sub-plan)
-  type: 'primitive' | 'compound';
+  // AI-inferred, not user-specified (displayed but rarely edited)
+  dependencies: string[];
 
-  // Primitive step fields
+  // Scope context (which repo/team/domain this step belongs to)
+  scope?: string;
+
+  // What humans care about
   description?: string;
   owner_role?: string;
   acceptance_criteria?: AcceptanceCriterion[];
@@ -146,12 +172,18 @@ interface Step {
     approver_role?: string;
   };
 
-  // Compound step fields (for large plans)
-  sub_plan_id?: string;  // Reference to another PlanVersion
+  // For nested complexity (sub-plan reference)
+  sub_plan_id?: string;
 }
 ```
 
-See [planner-scale.md](./planner-scale.md) for handling large plans with hierarchical structure.
+**Key points:**
+- Dependencies are AI-inferred from step descriptions and context
+- Humans express intent ("X before Y"), AI builds the DAG
+- Scopes group steps by repo/team/domain
+- Most plans are multi-scope (real work crosses boundaries)
+
+See [planner-scale.md](./planner-scale.md) for handling multi-scope and hierarchical plans.
 
 ### Plan Lifecycle
 
@@ -191,11 +223,13 @@ stateDiagram-v2
 
 ### Core Capabilities
 
-1. **Plan Creation** — Transform goal + context into a DAG of steps
-2. **Versioning** — Track every meaningful change with structural diffs
-3. **Approval Workflow** — Manage draft → approved → published lifecycle
-4. **Validation** — Ensure plans are structurally sound (acyclic DAG, valid references)
-5. **Export** — Produce canonical JSON for orchestrators, Markdown for humans
+1. **Accept Any Intent** — From vague ideas to detailed specs
+2. **Refine & Scope** — AI helps brainstorm, clarify, and structure
+3. **Plan Creation** — Produce multi-scope plans with AI-inferred dependencies
+4. **Versioning** — Track every meaningful change with structural diffs
+5. **Approval Workflow** — Manage draft → approved → published lifecycle
+6. **Validation** — Ensure plans are structurally sound (acyclic DAG, valid references)
+7. **Export** — Produce canonical JSON for orchestrators, Markdown for humans
 
 ### What Planner Does NOT Do
 
@@ -203,7 +237,7 @@ stateDiagram-v2
 - ❌ Manage retries, timeouts, or concurrency
 - ❌ Coordinate agent communication
 - ❌ Prioritize between plans (that's Portfolio)
-- ❌ Interpret messy input (that's Intake)
+- ❌ Monitor channels for requests (that's Intake)
 
 ---
 

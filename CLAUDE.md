@@ -6,20 +6,26 @@ This repository implements the **Planner** layer of a three-tier agentic archite
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           HUMAN / INTAKE                                │
-│        (goals, context, constraints, messy requirements)                │
+│                              INTAKE                                     │
+│                                                                         │
+│  • Monitors channels (Slack, email, GitHub) for requests                │
+│  • Detects "this looks like a request" vs. noise                        │
+│  • Routes to Planner                                                    │
+│                                                                         │
+│  Does NOT: help brainstorm, refine scope, or structure plans            │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         PLANNER (this repo)                             │
 │                                                                         │
-│  • Receives goal + context + constraints                                │
-│  • Produces versioned, reviewable PlanVersions                          │
+│  • Accepts any expression of intent (vague idea to detailed spec)       │
+│  • AI helps brainstorm, refine, and scope                               │
+│  • Produces versioned, multi-scope PlanVersions                         │
 │  • Manages approval workflow (draft → approved → published)             │
 │  • Outputs immutable plan_ref for Orchestrator consumption              │
 │                                                                         │
-│  Does NOT: spawn agents, send tasks, retry, schedule, run anything      │
+│  Does NOT: spawn agents, send tasks, retry, schedule, monitor channels  │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │ plan_ref (approved JSON)
                                 ▼
@@ -84,24 +90,23 @@ interface PlanVersion {
 interface Step {
   step_id: string;  // stable within version
   title: string;
-  dependencies: string[];  // step_ids this depends on (DAG structure)
 
-  // Step type: primitive (actual work) or compound (expands to sub-plan)
-  type: 'primitive' | 'compound';
+  // AI-inferred from step descriptions and context (displayed, rarely edited)
+  dependencies: string[];
 
-  // Primitive step fields
+  // Scope context (which repo/team/domain)
+  scope?: string;
+
+  // What humans care about
   description?: string;
   owner_role?: string;  // e.g., "backend:Coder" - NOT a specific agent
-  priority?: 1 | 2 | 3;
   acceptance_criteria?: AcceptanceCriterion[];
   gate?: {
-    type: 'human_approval' | 'approval_required';
+    type: 'human_approval';
     approver_role?: string;
   };
-  estimates?: { effort?: string; };
-  notes?: string;
 
-  // Compound step fields (for large plans)
+  // For nested complexity
   sub_plan_id?: string;  // Reference to another PlanVersion
 }
 
@@ -157,11 +162,14 @@ interface AcceptanceCriterion {
 
 ## What Planner Does
 
-1. **Create and edit plans**: Steps + dependencies (DAG), notes, acceptance criteria, gates
-2. **Version everything**: Every meaningful change produces a new version with diffs
-3. **Approval workflow**: Approve to lock; approved versions are immutable
-4. **Publish**: Export plan artifacts (JSON canonical + Markdown render) and return stable `plan_ref`
-5. **Optional run overlay**: Show execution status per step if Orchestrator provides it (read-only)
+1. **Accept any intent**: From vague ideas ("improve UX") to detailed specs
+2. **Refine and scope**: AI helps brainstorm, clarify, and structure through conversation
+3. **Create multi-scope plans**: Real work crosses repos/teams/domains—this is the default
+4. **Infer dependencies**: AI builds the DAG from step descriptions, humans express intent
+5. **Version everything**: Every meaningful change produces a new version with diffs
+6. **Approval workflow**: Approve to lock; approved versions are immutable
+7. **Publish**: Export plan artifacts (JSON canonical + Markdown render) and return stable `plan_ref`
+8. **Optional run overlay**: Show execution status per step if Orchestrator provides it (read-only)
 
 ## What Planner Does NOT Do
 
@@ -172,6 +180,7 @@ interface AcceptanceCriterion {
 - No "run engine"
 - No portfolio governance logic (that's a separate concern)
 - No mutation of approved versions
+- No monitoring channels for requests (that's Intake)
 
 ## Integration Points
 
@@ -266,25 +275,37 @@ Based on ecosystem analysis (matching relay stack):
 8. Agents execute, communicate via Relay
 ```
 
-## Handling Scale
+## Multi-Scope Plans (The Default)
 
-Steps can be **primitive** (actual work) or **compound** (expands into a sub-plan). This enables hierarchical plans for large projects.
+Real work crosses boundaries. A feature typically touches multiple repos, teams, or domains. Multi-scope plans are the norm, not the exception.
 
 ```
-Level 0: Application Plan
-         ├── Level 1: Feature Plans (compound steps)
-         │            ├── Level 2: Component Plans
-         │            │            └── Level 3: Task-level (primitive steps)
+"Add user authentication"
+├── api-service (scope)
+│   ├── Add OAuth endpoints
+│   └── Add session middleware
+├── web-frontend (scope)
+│   ├── Add login page
+│   └── Add protected routes
+└── infrastructure (scope)
+    └── Add OAuth secrets
 ```
+
+**Scopes** group steps by context (repo, team, domain). The AI:
+1. Identifies which scopes are affected by the goal
+2. Generates steps per scope
+3. Infers dependencies across scopes
+
+For nested complexity, steps can reference **sub-plans** (another PlanVersion).
 
 See [docs/planner-scale.md](./docs/planner-scale.md) for details on:
-- Compound steps data model
-- Hierarchical plan navigation (zoom levels, breadcrumbs)
+- Multi-scope plan structure
+- Hierarchical navigation (zoom levels, breadcrumbs)
 - Approval flow at scale (bottom-up, top-down, phased)
 - Progress rollup from sub-plans to parent
 
 **Recommended limits**:
-- 15-20 steps per plan level (cognitive manageability)
+- 15-20 steps per scope (cognitive manageability)
 - 3 levels max hierarchy depth (practical navigation)
 
 ## HTN/PDDL Strategy

@@ -15,9 +15,11 @@ After analyzing the blueprint conversation, the relay ecosystem, and the orchest
 ┌───────────────────────────────▼─────────────────────────────────────────┐
 │                         INTAKE (future)                                 │
 │                                                                         │
-│  • Captures messy inbound into structured initiatives                   │
-│  • Normalizes requests                                                  │
-│  • RLM-style context workbench                                          │
+│  • Monitors channels (Slack, email, GitHub) for requests                │
+│  • Detects "this looks like a request" vs. noise                        │
+│  • Routes to Planner                                                    │
+│                                                                         │
+│  KEY: Channel aggregation. No brainstorming or structuring.             │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼─────────────────────────────────────────┐
@@ -31,12 +33,13 @@ After analyzing the blueprint conversation, the relay ecosystem, and the orchest
 ┌───────────────────────────────▼─────────────────────────────────────────┐
 │                         PLANNER (this repo)                             │
 │                                                                         │
-│  • Receives goal + context + constraints                                │
-│  • Produces versioned PlanVersions (DAG of steps)                       │
+│  • Accepts any expression of intent (vague idea to detailed spec)       │
+│  • AI helps brainstorm, refine, and scope                               │
+│  • Produces versioned multi-scope PlanVersions                          │
 │  • Manages approval workflow (draft → approved → published)             │
 │  • Outputs immutable plan_ref                                           │
 │                                                                         │
-│  KEY: Plan-only. No execution.                                          │
+│  KEY: Intent → Plan. No execution.                                      │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │ plan_ref
 ┌───────────────────────────────▼─────────────────────────────────────────┐
@@ -79,11 +82,14 @@ Relay does NOT provide:
 
 **Relay doesn't care what messages mean** — it just delivers them. This is a feature, not a bug.
 
-### Planner is Intent, Not Execution
+### Planner is Intent → Plan
 
 Planner provides:
-- Structured plans (steps, dependencies, acceptance criteria)
-- Versioning with diffs
+- Accept any expression of intent (vague to detailed)
+- AI-assisted brainstorming and scoping
+- Multi-scope plans (real work crosses boundaries)
+- AI-inferred dependencies (humans express intent, AI builds DAG)
+- Versioning with structural diffs
 - Approval workflow (human-in-the-loop)
 - Immutable approved artifacts
 
@@ -92,8 +98,9 @@ Planner does NOT provide:
 - Task dispatch
 - Retry logic
 - Execution monitoring
+- Channel monitoring (that's Intake)
 
-**Planner doesn't run anything** — it produces artifacts that describe what should happen.
+**Planner doesn't run anything** — it helps humans develop intent into structured plans.
 
 ### Orchestrator is Execution, Not Planning
 
@@ -362,21 +369,30 @@ interface PlanVersion {
 interface Step {
   step_id: string;
   title: string;
-  dependencies: string[];
-  type: 'primitive' | 'compound';
 
-  // Primitive step fields
+  // AI-inferred (displayed but rarely edited)
+  dependencies: string[];
+
+  // Scope context (repo/team/domain)
+  scope?: string;
+
+  // What humans care about
   description?: string;
   owner_role?: string;
   acceptance_criteria?: AcceptanceCriterion[];
   gate?: { type: 'human_approval'; approver_role?: string; };
 
-  // Compound step fields (for large plans)
-  sub_plan_id?: string;  // Reference to another PlanVersion
+  // For nested complexity
+  sub_plan_id?: string;
 }
 ```
 
-See [planner-scale.md](./planner-scale.md) for handling large plans with compound steps.
+**Key design points:**
+- Dependencies are AI-inferred, not user-specified
+- Scopes group steps by context (repo, team, domain)
+- Multi-scope plans are the norm, not the exception
+
+See [planner-scale.md](./planner-scale.md) for handling multi-scope and hierarchical plans.
 
 ### Phase 2: REST API Contract
 ```
