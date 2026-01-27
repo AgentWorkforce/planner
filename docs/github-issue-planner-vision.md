@@ -14,7 +14,7 @@ Planner is the **source of truth for intent** in an agentic AI system. It transf
        goals                   plans                  execution
 ```
 
-**Planner does one thing well**: it takes a goal and produces a versioned, reviewable, approvable specification for execution. It doesn't execute plans, spawn agents, or manage coordination—it produces the contract that other systems consume.
+**Planner does one thing well**: it takes a goal and produces a versioned, reviewable, approvable specification for execution. It spawns planning agents (via Relay) to help draft plans, but doesn't execute plans or manage implementation—it produces the contract that other systems consume.
 
 ---
 
@@ -53,8 +53,8 @@ flowchart TB
         R[Agent Relay]
     end
 
-    I -->|structured goal| P
-    P -->|prioritized initiative| PL
+    I -->|detected request| P
+    P -->|prioritized goal| PL
     PL --> V
     V --> A
     A -->|approved plan| O
@@ -67,7 +67,7 @@ flowchart TB
 
 | Layer | Responsibility | Examples/Candidates |
 |-------|---------------|---------------------|
-| **Intake/Discovery** | Monitor channels (Slack, email, GitHub), detect requests, route to Planner | Custom, Linear webhooks |
+| **Intake/Discovery** | Monitor channels (Slack, email, GitHub), detect requests, route to Portfolio/Planner | Custom, Linear webhooks |
 | **Triage/Portfolio** | Prioritize and sequence initiatives | Custom, WSJF-based |
 | **Planner** | Accept any expression of intent, help refine, produce versioned plans | **This repo** |
 | **Orchestrator** | Execute approved plans, dispatch to agents | LangGraph, CrewAI, Temporal |
@@ -188,22 +188,17 @@ See [planner-scale.md](./planner-scale.md) for handling multi-scope and hierarch
 ### Plan Lifecycle
 
 ```mermaid
-stateDiagram-v2
-    [*] --> draft: create
+flowchart TB
+    start(( )) -->|create| working
 
-    state draft {
-        working --> submitted: submit
-        submitted --> working: withdraw
-    }
+    subgraph draft["DRAFT — editable, AI improves continuously"]
+        working[working] -->|submit| submitted[submitted]
+        submitted -->|withdraw| working
+    end
 
-    draft --> approved: approve
-    approved --> published: publish
-    published --> [*]: (orchestrator fetches)
-
-    note right of draft: AI reviews continuously
-    note right of submitted: Ready for Portfolio review
-    note right of approved: Immutable, locked
-    note right of published: Consumable by orchestrator
+    submitted -->|approve| approved["APPROVED — locked"]
+    approved -->|publish| published["PUBLISHED"]
+    published -.->|plan_ref| orch["Orchestrator"]
 ```
 
 **Three states + submitted flag**:
@@ -233,9 +228,9 @@ stateDiagram-v2
 
 ### What Planner Does NOT Do
 
-- ❌ Execute plans or spawn agents
+- ❌ Execute plans or spawn implementation agents
 - ❌ Manage retries, timeouts, or concurrency
-- ❌ Coordinate agent communication
+- ❌ Dispatch tasks to agents (that's Orchestrator)
 - ❌ Prioritize between plans (that's Portfolio)
 - ❌ Monitor channels for requests (that's Intake)
 
@@ -309,7 +304,7 @@ Each orchestrator translates the universal format into its native execution mode
 ## Open Questions
 
 - [ ] **Decomposition methods**: Should Planner support a "methods library" for common task decompositions (HTN-style)?
-- [ ] **AI-assisted planning**: Should Planner integrate LLM-based plan generation, or receive plans from external AI?
+- [x] **AI-assisted planning**: Yes — Planner spawns planning agents via Relay. Agents use MCP tools to read/write plan state. AI helps brainstorm, refine vague input, generate steps, and infer dependencies.
 - [ ] **Run overlay**: Should Planner display execution status from orchestrators, or stay purely plan-focused?
 - [ ] **Template support**: Should Planner support reusable plan templates?
 
@@ -319,9 +314,10 @@ Each orchestrator translates the universal format into its native execution mode
 
 Planner is designed to integrate with:
 
-- **Agent Relay** — For optional planning agent collaboration and handoff meetings
-- **Future Orchestrator** — As the consumer of approved plans
-- **Future Intake/Portfolio** — As the producer of structured initiatives
+- **Agent Relay** — Planner spawns planning agents via Relay; agents use MCP tools to read/write plan state
+- **Future Orchestrator** — Fetches approved plans, spawns implementation agents via Relay
+- **Future Intake** — Monitors channels, routes detected requests to Planner
+- **Future Portfolio** — Prioritizes initiatives, decides what gets planned when
 
 The plan format serves as the **contract** between these layers. Planner owns the contract; other systems produce or consume it.
 
