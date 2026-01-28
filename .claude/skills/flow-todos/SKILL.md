@@ -5,7 +5,7 @@ user-invocable: false
 ---
 # Todos: Plan → Executable Tasks
 
-Use your built-in todo tools (TaskCreate, TaskUpdate, TaskList) to create and manage todos.
+Create todos using TaskCreate, TaskUpdate, TaskList - these are tools you invoke directly, not CLI commands.
 
 ## The Process
 
