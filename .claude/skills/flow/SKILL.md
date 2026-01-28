@@ -20,7 +20,7 @@ When invoked, launch the flow subagent to handle the request.
 | `/flow discover` | Analyze codebase → create features |
 | `/flow brainstorm` | New feature from rough idea |
 | `/flow planner` | Create implementation plan |
-| `/flow todos` | Create executable todos from plan |
+| `/flow tasks` | Create executable tasks from plan |
 | `/flow feature` | Document user flow |
 | `/flow validate` | Validate UI/UX |
 | `/flow test` | Design test coverage |
@@ -33,7 +33,7 @@ The flow subagent has full context of:
 - flow-discover (codebase → catalog)
 - flow-brainstorm (idea → catalog)
 - flow-planner (feature → implementation plan)
-- flow-todos (plan → executable tasks with PRE/IMPL/POST/VERIFY/DOC)
+- flow-tasks (plan → executable tasks with PRE/IMPL/POST/VERIFY/DOC)
 - flow-feature (feature → user flow)
 - flow-visualize (status diagrams)
 - flow-ui-ux-validation (validate in real UI)

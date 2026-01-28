@@ -12,7 +12,7 @@ skills:
   - flow-test-designer
   - flow-change-request
   - flow-visualize
-  - flow-todos
+  - flow-tasks
 ---
 
 You have all flow skills preloaded. Use them to manage the feature lifecycle.
@@ -53,7 +53,7 @@ Central entry point for all flow skills:
 | `/flow discover` | Analyze codebase → create features |
 | `/flow brainstorm` | New feature from rough idea |
 | `/flow planner` | Create implementation plan |
-| `/flow todos` | Create executable todos from plan |
+| `/flow tasks` | Create executable tasks from plan |
 | `/flow feature` | Document user flow |
 | `/flow validate` | Validate UI/UX |
 | `/flow test` | Design test coverage |
@@ -70,7 +70,7 @@ When user provides `/flow <text>`, detect appropriate skill:
 | "dag", "dependencies", "blocking", "what's blocking" | flow-visualize (DAG view) |
 | "analyze", "map", "discover", "what exists", "traverse" | flow-discover |
 | "plan", "implement", "how to build" | flow-planner |
-| "todos", "tasks", "ready to build", "let's build" | flow-todos |
+| "tasks", "tasks", "ready to build", "let's build" | flow-tasks |
 | "flow", "steps", "behavior", "what happens when" | flow-feature |
 | "validate", "check UI", "test the UI", "looks like" | flow-ui-ux-validation |
 | "test", "coverage", "test cases" | flow-test-designer |
@@ -105,7 +105,7 @@ Use feature DAG (dependencies + priority) to determine work order:
 |-------|------------|
 | No catalog | "Run /flow discover (existing project) or /flow brainstorm (new project)" |
 | Features missing summary | "Complete /flow brainstorm or /flow discover" |
-| Features with plan but no todos | "Create todos with /flow todos" |
+| Features with plan but no tasks | "Create tasks with /flow tasks" |
 | Unblocked features missing sections | "Next: [feature] (priority: X) - needs [section]" |
 | All unblocked complete, blocked remain | "Blocked features: X, Y depend on Z" |
 | All sections complete | "All features complete. Review or publish." |
@@ -114,7 +114,7 @@ Use feature DAG (dependencies + priority) to determine work order:
 
 ```
 discover ──┐
-           ├──→ planner ──→ todos ──→ [implement]
+           ├──→ planner ──→ tasks ──→ [implement]
 brainstorm ┘        │
      │              │
      └───→ feature ─┴─→ ui-ux-validation
@@ -124,7 +124,7 @@ brainstorm ┘        │
 
 - **discover** or **brainstorm** first (creates catalog + summaries)
 - **planner** creates implementation steps
-- **todos** creates executable tasks with PRE/IMPL/POST/VERIFY/DOC
+- **tasks** creates executable tasks with PRE/IMPL/POST/VERIFY/DOC
 - **feature** can run in parallel with planner
 - **ui-ux-validation** and **test-designer** require user_flow
 - All can be re-run via **change-request** if requirements change
@@ -141,7 +141,7 @@ Indicators: "actually we need...", "change X to Y", "add/remove requirement"
 - Plans are immutable once approved
 - If implementation diverges → use `/flow change-request`
 - Never silently modify approved plans
-- Progress is tracked in todos, not in plan files
+- Progress is tracked in tasks, not in plan files
 
 ## Rules
 
