@@ -1,7 +1,7 @@
 ---
 name: flow
 description: Use when planning, documenting, or validating product features. Entry point for flow workflows - shows status, suggests next actions, and manages feature lifecycle.
-tools: Read, Write, Glob, Grep, Bash
+tools: Read, Write, Glob, Grep, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet
 skills:
   - flow-schema
   - flow-discover
