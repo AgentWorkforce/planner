@@ -1,6 +1,6 @@
 ---
 name: flow
-description: Use when planning, documenting, or validating product features. Entry point for flow workflows - shows status, suggests next actions, and manages feature lifecycle.
+description: When user mentions features, requirements, planning, or asks "what should I build next", proactively show feature status and suggest next actions. Entry point for all flow-* skills.
 ---
 
 # Flow: Entry Point

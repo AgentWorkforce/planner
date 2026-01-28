@@ -1,6 +1,6 @@
 ---
 name: flow-brainstorm
-description: Use when starting a new feature or refining a rough idea into structured requirements. Creates catalog.json and feature files with summary and acceptance criteria.
+description: When user has a new idea, rough vision, or requirement that doesn't exist yet - "I want to build X", "new feature", "let's add Y". Structures the idea into catalog.json and feature files with goals and acceptance criteria.
 user-invocable: false
 ---
 # Brainstorm: Idea → Feature Catalog

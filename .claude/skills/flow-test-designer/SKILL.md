@@ -1,6 +1,6 @@
 ---
 name: flow-test-designer
-description: Use when designing test coverage for features. Fills plan_tests section with coverage strategy, test cases, and data requirements. Does not generate test code.
+description: When feature has user_flow and user needs test planning - "what tests do we need?", "design test coverage". Analyzes flows to create test cases (happy/edge/error), coverage strategy, and data requirements. Does not generate test code.
 user-invocable: false
 ---
 # Test Designer: Feature → Test Design

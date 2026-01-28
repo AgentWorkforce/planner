@@ -1,6 +1,6 @@
 ---
 name: flow-change-request
-description: Use when requirements change for existing features. Updates affected features and identifies cascade effects requiring re-runs of dependent skills.
+description: Use when user says "actually we need", "change X to Y", "add/remove this requirement", or implementation diverged from plan. Updates features and cascades to dependents.
 user-invocable: false
 ---
 # Change Request: Update Requirements

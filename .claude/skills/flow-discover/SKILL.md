@@ -1,6 +1,6 @@
 ---
 name: flow-discover
-description: Use when analyzing an existing codebase to map its features. Traverses code to create catalog.json and feature files from what exists.
+description: When user asks "what features exist?", "map the codebase", or wants to document an existing project that has no docs/flow/ files yet. Traverses code to create catalog.json and feature files from what's already built.
 user-invocable: false
 ---
 # Discover: Codebase → Feature Catalog

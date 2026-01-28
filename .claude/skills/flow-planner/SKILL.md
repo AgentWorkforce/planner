@@ -1,6 +1,6 @@
 ---
 name: flow-planner
-description: Use when planning how to implement a feature. Creates implementation plans with scoped steps, dependencies, roles, and approval gates.
+description: When feature has summary but needs implementation steps - "how do I build this?", "plan the implementation", or feature.plan_implementation.steps is empty. Creates multi-scope implementation plans with dependencies, roles, and approval gates.
 user-invocable: false
 ---
 # Planner: Feature → Implementation Plan
