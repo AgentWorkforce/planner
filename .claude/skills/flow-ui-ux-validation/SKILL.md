@@ -1,6 +1,6 @@
 ---
 name: flow-ui-ux-validation
-description: Use when validating user flows in a running UI. Fills validation_uiux section with evidence-based checks (present, designed, holistic) using browser automation.
+description: When feature has user_flow and user wants to verify it works in a real browser - "validate the UI", "check if it looks right", "test the flow". Uses browser automation to check present/designed/holistic for each step.
 user-invocable: false
 ---
 # UI/UX Validation: Validate in Real UI

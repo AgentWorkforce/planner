@@ -1,6 +1,6 @@
 ---
 name: flow-feature
-description: Use when documenting feature behavior as testable user flows. Fills user_flow section with atomic steps ([action], [assert], [system]).
+description: When user needs to document behavior as testable steps - "what happens when user does X?", "describe the user flow", or feature needs user_flow for testing. Creates atomic [action], [assert], [system] steps that are observable and verifiable.
 user-invocable: false
 ---
 # Feature Flow: Feature → User Flow

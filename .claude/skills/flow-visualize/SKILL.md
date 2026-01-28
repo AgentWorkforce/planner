@@ -1,6 +1,6 @@
 ---
 name: flow-visualize
-description: Use when needing to see feature status at a glance. Generates ASCII diagrams showing catalog state, section completion, and dependencies.
+description: Use when user asks "show status", "what's the progress?", "visualize", or needs to see feature completion at a glance. Generates ASCII status diagrams and dependency graphs.
 user-invocable: false
 ---
 # Visualize: Feature Status Diagram
