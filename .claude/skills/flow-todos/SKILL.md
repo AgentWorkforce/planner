@@ -16,6 +16,20 @@ Transform implementation plan into executable todos with verification checkpoint
 - VERIFY: Check acceptance criteria, run tests
 - DOC: Compare to plan, flag divergence
 
+## CRITICAL: This Skill Only Creates Todos
+
+**DO NOT implement anything.** This skill:
+- ✅ Reads the feature's plan_implementation.steps
+- ✅ Creates todos using TaskCreate tool
+- ✅ Sets up todo dependencies using TaskUpdate
+- ✅ Shows the created todos using TaskList
+- ❌ Does NOT run npm/yarn/pnpm commands
+- ❌ Does NOT create files or directories
+- ❌ Does NOT write code
+- ❌ Does NOT execute any implementation steps
+
+After creating todos, STOP and let the user start implementation.
+
 ## Prerequisites
 
 Requires: feature with `plan_implementation.steps` section.
