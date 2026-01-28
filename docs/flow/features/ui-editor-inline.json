@@ -1,0 +1,120 @@
+{
+  "feature_id": "ui-editor-inline",
+  "title": "Inline Editing",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["api-plan-crud"],
+
+  "summary": {
+    "goal": "Enable click-to-edit for all plan fields without modals or page navigation",
+    "context": "Editing happens in place. Click to edit, blur to save. No modal for simple changes. The plan is always visible while you work on it. Progressive disclosure: expand for complex edits.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Click on plan title enters edit mode" },
+      { "id": "ac2", "description": "Click on goal enters edit mode" },
+      { "id": "ac3", "description": "Click on step title/description enters edit mode" },
+      { "id": "ac4", "description": "Blur or Enter saves the change" },
+      { "id": "ac5", "description": "Escape cancels the change" },
+      { "id": "ac6", "description": "Optimistic UI updates immediately, rollback on error" },
+      { "id": "ac7", "description": "Keyboard shortcuts: Cmd+S to save, Cmd+Z to undo" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uei001",
+        "title": "Create EditableText component",
+        "scope": "planner-ui",
+        "description": "Reusable component for inline text editing. Shows text, click enters edit mode, blur/enter saves.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Click enters edit mode with input" },
+          { "id": "ac2", "description": "Enter or blur commits change" },
+          { "id": "ac3", "description": "Escape cancels and reverts" },
+          { "id": "ac4", "description": "onChange callback fires on commit" }
+        ]
+      },
+      {
+        "step_id": "uei002",
+        "title": "Create EditableTextarea component",
+        "scope": "planner-ui",
+        "description": "Like EditableText but for multi-line content (descriptions, goals).",
+        "dependencies": ["uei001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Textarea grows with content" },
+          { "id": "ac2", "description": "Cmd+Enter commits (Enter adds newline)" },
+          { "id": "ac3", "description": "Escape cancels" }
+        ]
+      },
+      {
+        "step_id": "uei003",
+        "title": "Create PlanHeader component with inline editing",
+        "scope": "planner-ui",
+        "description": "Plan header with editable title and goal using EditableText/Textarea.",
+        "dependencies": ["uei001", "uei002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Title editable inline" },
+          { "id": "ac2", "description": "Goal editable inline" },
+          { "id": "ac3", "description": "Changes call API to save" }
+        ]
+      },
+      {
+        "step_id": "uei004",
+        "title": "Implement optimistic updates",
+        "scope": "planner-ui",
+        "description": "Update UI immediately on edit, rollback on API error with toast notification.",
+        "dependencies": ["uei003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "UI updates before API response" },
+          { "id": "ac2", "description": "On error, value reverts to previous" },
+          { "id": "ac3", "description": "Error toast shows failure message" }
+        ]
+      },
+      {
+        "step_id": "uei005",
+        "title": "Implement undo functionality",
+        "scope": "planner-ui",
+        "description": "Track edit history, Cmd+Z undoes last change locally.",
+        "dependencies": ["uei004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cmd+Z undoes last edit" },
+          { "id": "ac2", "description": "Cmd+Shift+Z redoes" },
+          { "id": "ac3", "description": "Undo syncs with API" }
+        ]
+      },
+      {
+        "step_id": "uei006",
+        "title": "Add visual feedback for editable fields",
+        "scope": "planner-ui",
+        "description": "Subtle hover states indicating fields are editable. Cursor changes, slight highlight.",
+        "dependencies": ["uei003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Hover shows edit cursor" },
+          { "id": "ac2", "description": "Subtle background change on hover" },
+          { "id": "ac3", "description": "Focus ring on edit mode" }
+        ]
+      },
+      {
+        "step_id": "uei007",
+        "title": "Add tests for inline editing",
+        "scope": "planner-ui",
+        "description": "Unit tests for editable components, integration tests for edit flows.",
+        "dependencies": ["uei004", "uei005", "uei006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "EditableText tests pass" },
+          { "id": "ac2", "description": "Optimistic update tests pass" },
+          { "id": "ac3", "description": "Undo/redo tests pass" }
+        ]
+      }
+    ]
+  }
+}

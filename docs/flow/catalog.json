@@ -1,0 +1,63 @@
+{
+  "project_id": "planner",
+  "status": "approved",
+
+  "components": [
+    {
+      "id": "planner-core",
+      "name": "Planner Core API",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "src/",
+      "description": "Backend service providing REST API, MCP tools, domain model, and storage for plan management"
+    },
+    {
+      "id": "planner-ui",
+      "name": "Planner UI",
+      "tech": ["TypeScript", "React"],
+      "path": "packages/planner-ui/",
+      "description": "Frontend application for plan creation, editing, approval workflow, and execution visibility"
+    }
+  ],
+
+  "features": [
+    { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
+    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved" },
+    { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved" },
+    { "id": "domain-versioning", "title": "Versioning and Diffs", "type": "feature", "status": "approved" },
+
+    { "id": "storage", "title": "Storage Layer", "type": "epic", "status": "approved" },
+    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved" },
+
+    { "id": "rest-api", "title": "REST API", "type": "epic", "status": "approved" },
+    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved" },
+    { "id": "api-workflow", "title": "Workflow Endpoints", "type": "feature", "status": "approved" },
+    { "id": "api-change-requests", "title": "Change Request Endpoint", "type": "feature", "status": "approved" },
+
+    { "id": "mcp-server", "title": "MCP Server", "type": "epic", "status": "approved" },
+    { "id": "mcp-tools", "title": "MCP Planning Tools", "type": "feature", "status": "approved" },
+
+    { "id": "ui-plan-creation", "title": "Plan Creation", "type": "epic", "status": "approved" },
+    { "id": "ui-plan-create-goal", "title": "Create from Goal", "type": "feature", "status": "approved" },
+    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "approved" },
+
+    { "id": "ui-plan-editor", "title": "Plan Editor", "type": "epic", "status": "approved" },
+    { "id": "ui-editor-inline", "title": "Inline Editing", "type": "feature", "status": "approved" },
+    { "id": "ui-editor-steps", "title": "Step Editor", "type": "feature", "status": "approved" },
+    { "id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "type": "feature", "status": "approved" },
+
+    { "id": "ui-approval-workflow", "title": "Approval Workflow", "type": "epic", "status": "approved" },
+    { "id": "ui-submit-review", "title": "Submit for Review", "type": "feature", "status": "approved" },
+    { "id": "ui-review-comments", "title": "Review Comments", "type": "feature", "status": "approved" },
+    { "id": "ui-approve", "title": "Approval Ceremony", "type": "feature", "status": "approved" },
+    { "id": "ui-publish", "title": "Publish to Orchestrator", "type": "feature", "status": "approved" },
+
+    { "id": "ui-execution", "title": "Execution Visibility", "type": "epic", "status": "approved" },
+    { "id": "ui-execution-status", "title": "Execution Status Overlay", "type": "feature", "status": "approved" },
+    { "id": "ui-gate-approval", "title": "Gate Approval UI", "type": "feature", "status": "approved" },
+    { "id": "ui-change-request-ui", "title": "Change Request Handling", "type": "feature", "status": "approved" },
+
+    { "id": "ui-ai-integration", "title": "AI Integration", "type": "epic", "status": "approved" },
+    { "id": "ui-ai-chat", "title": "AI Chat", "type": "feature", "status": "approved" },
+    { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" }
+  ]
+}

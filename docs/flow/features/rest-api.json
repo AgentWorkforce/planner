@@ -1,0 +1,34 @@
+{
+  "feature_id": "rest-api",
+  "title": "REST API",
+  "type": "epic",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["storage"],
+
+  "summary": {
+    "goal": "Expose Planner functionality via REST API for UI and Orchestrator integration",
+    "context": "Express-based REST API matching relay server patterns. Provides endpoints for plan CRUD, workflow transitions, and orchestrator feedback.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Plan CRUD endpoints are available" },
+      { "id": "ac2", "description": "Workflow endpoints (submit, approve, publish) work" },
+      { "id": "ac3", "description": "Orchestrator can fetch plans and submit change requests" },
+      { "id": "ac4", "description": "API returns proper error responses" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Planner Vision - Integration Points", "path": "docs/github-issue-planner-vision.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "api-plan-crud", "title": "Plan CRUD Endpoints", "ref": "api-plan-crud.json" },
+    { "feature_id": "api-workflow", "title": "Workflow Endpoints", "ref": "api-workflow.json" },
+    { "feature_id": "api-change-requests", "title": "Change Request Endpoint", "ref": "api-change-requests.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": []
+  }
+}

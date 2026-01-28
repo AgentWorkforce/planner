@@ -1,0 +1,36 @@
+{
+  "feature_id": "domain-model",
+  "title": "Domain Model",
+  "type": "epic",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Define the core domain entities (Plan, PlanVersion, Step) that form the foundation of the Planner system",
+    "context": "The domain model represents intent as structured, versioned specifications. Plans are immutable after approval, versions track changes, and steps form a DAG with AI-inferred dependencies.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Plan and PlanVersion entities are defined with TypeScript interfaces" },
+      { "id": "ac2", "description": "Step entity supports scopes, dependencies, acceptance criteria, and gates" },
+      { "id": "ac3", "description": "Version status transitions (draft -> approved -> published) are enforced" },
+      { "id": "ac4", "description": "Approved versions are immutable" },
+      { "id": "ac5", "description": "Structural diffs can be computed between versions" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Planner Vision", "path": "docs/github-issue-planner-vision.md" },
+    { "type": "spec", "title": "Architecture Overview", "path": "docs/github-issue-architecture-overview.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "domain-plan", "title": "Plan Entity", "ref": "domain-plan.json" },
+    { "feature_id": "domain-step", "title": "Step Entity", "ref": "domain-step.json" },
+    { "feature_id": "domain-versioning", "title": "Versioning and Diffs", "ref": "domain-versioning.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": []
+  }
+}

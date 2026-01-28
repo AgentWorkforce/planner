@@ -1,0 +1,107 @@
+{
+  "feature_id": "ui-execution-status",
+  "title": "Execution Status Overlay",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["ui-publish"],
+
+  "summary": {
+    "goal": "Display real-time execution status on published plans (read-only overlay)",
+    "context": "If orchestrator provides status, steps show progress (done, running, waiting, blocked). This is read-only in Planner - execution is orchestrator's domain - but visibility keeps humans in the loop.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Published plans fetch execution status from orchestrator" },
+      { "id": "ac2", "description": "Step cards show status: done, running, waiting, blocked" },
+      { "id": "ac3", "description": "Visual indicators (icons/colors) for each status" },
+      { "id": "ac4", "description": "Overall progress shown at plan level" },
+      { "id": "ac5", "description": "Status updates in near real-time (polling or websocket)" },
+      { "id": "ac6", "description": "Clear indication this is read-only view" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "ues001",
+        "title": "Define execution status types",
+        "scope": "planner-ui",
+        "description": "Define TypeScript types for step status: done, running, waiting, blocked.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "StepExecutionStatus type defined" },
+          { "id": "ac2", "description": "Includes all status values" },
+          { "id": "ac3", "description": "Type guards for status checking" }
+        ]
+      },
+      {
+        "step_id": "ues002",
+        "title": "Create execution status API client",
+        "scope": "planner-ui",
+        "description": "API client to fetch execution status from orchestrator endpoint.",
+        "dependencies": ["ues001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Fetch status by plan_ref" },
+          { "id": "ac2", "description": "Returns status per step" },
+          { "id": "ac3", "description": "Handles missing status gracefully" }
+        ]
+      },
+      {
+        "step_id": "ues003",
+        "title": "Add status indicators to step cards",
+        "scope": "planner-ui",
+        "description": "Visual indicators on step cards showing execution status.",
+        "dependencies": ["ues002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Done: checkmark, green" },
+          { "id": "ac2", "description": "Running: spinner, blue" },
+          { "id": "ac3", "description": "Waiting: clock, gray" },
+          { "id": "ac4", "description": "Blocked: warning, yellow" }
+        ]
+      },
+      {
+        "step_id": "ues004",
+        "title": "Show overall progress on plan header",
+        "scope": "planner-ui",
+        "description": "Progress bar and step count on plan header showing overall execution progress.",
+        "dependencies": ["ues003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Progress bar in header" },
+          { "id": "ac2", "description": "Shows N/M steps complete" },
+          { "id": "ac3", "description": "Per-scope breakdown if expanded" }
+        ]
+      },
+      {
+        "step_id": "ues005",
+        "title": "Implement polling for status updates",
+        "scope": "planner-ui",
+        "description": "Poll orchestrator for status updates at regular interval.",
+        "dependencies": ["ues002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Polls every N seconds" },
+          { "id": "ac2", "description": "Updates UI on change" },
+          { "id": "ac3", "description": "Stops polling on unmount" },
+          { "id": "ac4", "description": "Graceful handling of errors" }
+        ]
+      },
+      {
+        "step_id": "ues006",
+        "title": "Add read-only mode indicator",
+        "scope": "planner-ui",
+        "description": "Clear visual indication that execution view is read-only.",
+        "dependencies": ["ues003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Read-only banner or badge" },
+          { "id": "ac2", "description": "Edit buttons hidden in this mode" },
+          { "id": "ac3", "description": "Link to create new version if needed" }
+        ]
+      }
+    ]
+  }
+}

@@ -377,6 +377,35 @@ packages/
 └── planner-relay/    # Relay integration adapter
 ```
 
+## Development Workflow (Flow System)
+
+**Use `/flow` for all planning and implementation work in this repo.** The flow system provides structured feature lifecycle management that aligns with this project's philosophy.
+
+| Command | When to Use |
+|---------|-------------|
+| `/flow` | Show status, get next action suggestion |
+| `/flow discover` | Map existing codebase features |
+| `/flow brainstorm` | New feature from idea |
+| `/flow planner` | Create implementation plan |
+| `/flow todos` | Create executable tasks from plan |
+| `/flow feature` | Document user flows |
+| `/flow validate` | Validate UI/UX in browser |
+| `/flow test` | Design test coverage |
+| `/flow change` | Handle requirement changes |
+
+**Key principles (mirrors Planner design):**
+- Plans are immutable once approved
+- Progress is tracked in todos, not plan files
+- Divergence from plan triggers `/flow change`, not silent updates
+- All feature data persists to `docs/flow/` (catalog.json + feature files)
+
+**Todo checkpoints:**
+- **PRE**: Analyze existing code before implementation
+- **IMPL**: Execute the planned work
+- **POST**: PR-style review of changes (bugs, logic errors, slop)
+- **VERIFY**: Check acceptance criteria, run tests
+- **DOC**: Compare to plan, flag divergence for `/flow change`
+
 ## References
 
 - [Agent Relay](https://github.com/agentworkforce/relay) - Transport layer

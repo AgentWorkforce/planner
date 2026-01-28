@@ -1,0 +1,33 @@
+{
+  "feature_id": "ui-execution",
+  "title": "Execution Visibility",
+  "type": "epic",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["ui-approval-workflow"],
+
+  "summary": {
+    "goal": "Show execution status and handle orchestrator feedback in the Planner UI",
+    "context": "Once published, plans connect to execution. Status is read-only in Planner (execution is orchestrator's domain) but visibility keeps humans in the loop. Gates and change requests surface for action.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Published plans can show execution status" },
+      { "id": "ac2", "description": "Gates awaiting approval are surfaced" },
+      { "id": "ac3", "description": "Change requests appear for review" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Experience 4", "path": "docs/ui-vision.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "ui-execution-status", "title": "Execution Status Overlay", "ref": "ui-execution-status.json" },
+    { "feature_id": "ui-gate-approval", "title": "Gate Approval UI", "ref": "ui-gate-approval.json" },
+    { "feature_id": "ui-change-request-ui", "title": "Change Request Handling", "ref": "ui-change-request-ui.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "feature_id": "ui-publish",
+  "title": "Publish to Orchestrator",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["ui-approve"],
+
+  "summary": {
+    "goal": "Allow publishing approved plans for orchestrator consumption",
+    "context": "Publish releases the plan for execution. Produces a plan_ref that orchestrator fetches. UI shows 'Ready for execution' badge on published plans.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Publish button visible on approved plans" },
+      { "id": "ac2", "description": "Publish shows confirmation with orchestrator context" },
+      { "id": "ac3", "description": "After publish, plan status changes to 'published'" },
+      { "id": "ac4", "description": "UI shows plan_ref for orchestrator" },
+      { "id": "ac5", "description": "Published plans show 'Ready for execution' badge" },
+      { "id": "ac6", "description": "Published plans link to execution view (if available)" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "upb001",
+        "title": "Add Publish button to plan toolbar",
+        "scope": "planner-ui",
+        "description": "Publish button visible on approved plans. Indicates next step after approval.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Publish button in toolbar" },
+          { "id": "ac2", "description": "Only on approved plans" },
+          { "id": "ac3", "description": "Prominent placement" }
+        ]
+      },
+      {
+        "step_id": "upb002",
+        "title": "Create publish confirmation dialog",
+        "scope": "planner-ui",
+        "description": "Dialog explaining what publishing means - plan available to orchestrator for execution.",
+        "dependencies": ["upb001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Explains orchestrator will execute" },
+          { "id": "ac2", "description": "Shows plan summary" },
+          { "id": "ac3", "description": "Confirm and Cancel buttons" }
+        ]
+      },
+      {
+        "step_id": "upb003",
+        "title": "Call publish API endpoint",
+        "scope": "planner-ui",
+        "description": "Submit publish to API, receive plan_ref in response.",
+        "dependencies": ["upb002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "API called on confirm" },
+          { "id": "ac2", "description": "plan_ref received and stored" },
+          { "id": "ac3", "description": "Plan status updated to published" }
+        ]
+      },
+      {
+        "step_id": "upb004",
+        "title": "Display plan_ref in UI",
+        "scope": "planner-ui",
+        "description": "Show plan_ref for orchestrator integration. Copyable format.",
+        "dependencies": ["upb003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "plan_ref displayed in info section" },
+          { "id": "ac2", "description": "Copy button for plan_ref" },
+          { "id": "ac3", "description": "Explanation of plan_ref purpose" }
+        ]
+      },
+      {
+        "step_id": "upb005",
+        "title": "Show 'Ready for execution' badge",
+        "scope": "planner-ui",
+        "description": "Published plans show prominent badge indicating ready for orchestrator.",
+        "dependencies": ["upb003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Badge visible on published plans" },
+          { "id": "ac2", "description": "Green/success styling" },
+          { "id": "ac3", "description": "Shows in plan list and detail" }
+        ]
+      },
+      {
+        "step_id": "upb006",
+        "title": "Add execution status link placeholder",
+        "scope": "planner-ui",
+        "description": "Link to execution view if orchestrator provides status endpoint.",
+        "dependencies": ["upb005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Link to execution view" },
+          { "id": "ac2", "description": "Graceful handling if no status" },
+          { "id": "ac3", "description": "Placeholder for future integration" }
+        ]
+      }
+    ]
+  }
+}

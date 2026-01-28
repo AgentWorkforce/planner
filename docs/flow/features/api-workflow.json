@@ -1,0 +1,135 @@
+{
+  "feature_id": "api-workflow",
+  "title": "Workflow Endpoints",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["api-plan-crud"],
+
+  "summary": {
+    "goal": "Implement REST endpoints for plan workflow transitions (submit, approve, publish)",
+    "context": "These endpoints enforce the plan lifecycle state machine. Submit marks ready for review, approve locks the plan, publish releases for orchestrator.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "POST /plans/:id/versions/:v/submit marks version as submitted" },
+      { "id": "ac2", "description": "POST /plans/:id/versions/:v/approve transitions to approved (locks version)" },
+      { "id": "ac3", "description": "POST /plans/:id/versions/:v/publish transitions to published" },
+      { "id": "ac4", "description": "Invalid transitions return 400 with explanation" },
+      { "id": "ac5", "description": "Approval records approver and timestamp" },
+      { "id": "ac6", "description": "Published version returns plan_ref for orchestrator" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "aw001",
+        "title": "Define workflow state machine",
+        "scope": "planner-core",
+        "description": "Create src/domain/workflow.ts with state transition logic and validation.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Valid transitions: draft->submitted, submitted->approved, approved->published" },
+          { "id": "ac2", "description": "Invalid transitions throw specific errors" },
+          { "id": "ac3", "description": "canTransition(from, to) function for validation" }
+        ]
+      },
+      {
+        "step_id": "aw002",
+        "title": "Add submitted flag to version schema",
+        "scope": "planner-core",
+        "description": "Extend PlanVersion with submitted_at timestamp for draft versions ready for review.",
+        "dependencies": ["aw001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersion has optional submitted_at: string" },
+          { "id": "ac2", "description": "Storage updated to persist submitted_at" }
+        ]
+      },
+      {
+        "step_id": "aw003",
+        "title": "Add approval metadata to version schema",
+        "scope": "planner-core",
+        "description": "Extend PlanVersion with approval_info: { approver, approved_at } for accountability.",
+        "dependencies": ["aw001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersion has optional approval_info object" },
+          { "id": "ac2", "description": "approval_info has approver: string, approved_at: string" },
+          { "id": "ac3", "description": "Storage updated to persist approval_info" }
+        ]
+      },
+      {
+        "step_id": "aw004",
+        "title": "Implement POST /plans/:id/versions/:v/submit",
+        "scope": "planner-core",
+        "description": "Create endpoint to mark draft version as submitted for review.",
+        "dependencies": ["aw002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sets submitted_at timestamp" },
+          { "id": "ac2", "description": "Returns 400 if version is not draft" },
+          { "id": "ac3", "description": "Returns 200 with updated version" }
+        ]
+      },
+      {
+        "step_id": "aw005",
+        "title": "Implement POST /plans/:id/versions/:v/approve",
+        "scope": "planner-core",
+        "description": "Create endpoint to approve and lock a version.",
+        "dependencies": ["aw003", "aw004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Transitions status to 'approved'" },
+          { "id": "ac2", "description": "Records approver (from request or auth)" },
+          { "id": "ac3", "description": "Records approved_at timestamp" },
+          { "id": "ac4", "description": "Returns 400 if version is not submitted draft" },
+          { "id": "ac5", "description": "Returns 200 with approved version" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" }
+      },
+      {
+        "step_id": "aw006",
+        "title": "Implement POST /plans/:id/versions/:v/publish",
+        "scope": "planner-core",
+        "description": "Create endpoint to publish approved version for orchestrator consumption.",
+        "dependencies": ["aw005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Transitions status to 'published'" },
+          { "id": "ac2", "description": "Returns 400 if version is not approved" },
+          { "id": "ac3", "description": "Returns plan_ref in response for orchestrator" },
+          { "id": "ac4", "description": "plan_ref format: plan_id:version" }
+        ]
+      },
+      {
+        "step_id": "aw007",
+        "title": "Implement immutability enforcement",
+        "scope": "planner-core",
+        "description": "Ensure approved/published versions cannot be modified via PUT endpoint.",
+        "dependencies": ["aw005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PUT /plans/:id returns 400 if latest version is approved" },
+          { "id": "ac2", "description": "PUT /plans/:id returns 400 if latest version is published" },
+          { "id": "ac3", "description": "Error message explains immutability" }
+        ]
+      },
+      {
+        "step_id": "aw008",
+        "title": "Add integration tests for workflow endpoints",
+        "scope": "planner-core",
+        "description": "Write integration tests for all workflow transitions including error cases.",
+        "dependencies": ["aw004", "aw005", "aw006", "aw007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests cover happy path transitions" },
+          { "id": "ac2", "description": "Tests verify invalid transition errors" },
+          { "id": "ac3", "description": "Tests verify immutability enforcement" },
+          { "id": "ac4", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

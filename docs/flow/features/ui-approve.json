@@ -1,0 +1,126 @@
+{
+  "feature_id": "ui-approve",
+  "title": "Approval Ceremony",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["api-workflow", "ui-review-comments"],
+
+  "summary": {
+    "goal": "Provide approval UI that reflects the gravity of signing off on a plan",
+    "context": "Approval is ceremony - not just clicking a button. UI shows exactly what's being approved, makes the commitment explicit, records accountability, and makes immutability clear.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Approve button visible on submitted plans for approvers" },
+      { "id": "ac2", "description": "Clicking opens approval dialog with full context" },
+      { "id": "ac3", "description": "Dialog shows: plan title, version, step count, scope count, gates" },
+      { "id": "ac4", "description": "Dialog explains: locks version, records approval, enables publishing" },
+      { "id": "ac5", "description": "Approver must confirm with explicit action" },
+      { "id": "ac6", "description": "After approval, plan shows locked state clearly" },
+      { "id": "ac7", "description": "Approval record shows who approved and when" },
+      { "id": "ac8", "description": "Edit attempts on approved version show clear message" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Approval Ceremony", "path": "docs/ui-vision.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uap001",
+        "title": "Add Approve button to plan toolbar",
+        "scope": "planner-ui",
+        "description": "Approve button visible on submitted plans. Only visible to users with approval permission.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Approve button in toolbar" },
+          { "id": "ac2", "description": "Only on submitted plans" },
+          { "id": "ac3", "description": "Disabled if unresolved comments exist" }
+        ]
+      },
+      {
+        "step_id": "uap002",
+        "title": "Create ApprovalCeremonyDialog",
+        "scope": "planner-ui",
+        "description": "Full-screen or prominent dialog showing everything being approved.",
+        "dependencies": ["uap001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows plan title and version" },
+          { "id": "ac2", "description": "Shows scope count and step count" },
+          { "id": "ac3", "description": "Shows gates that will require approval" },
+          { "id": "ac4", "description": "Explains consequences clearly" }
+        ]
+      },
+      {
+        "step_id": "uap003",
+        "title": "Add commitment explanation section",
+        "scope": "planner-ui",
+        "description": "Section explaining: locks version, records approval, enables publishing.",
+        "dependencies": ["uap002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Clear bullet points of what happens" },
+          { "id": "ac2", "description": "Emphasized that version becomes immutable" },
+          { "id": "ac3", "description": "Links to help if needed" }
+        ]
+      },
+      {
+        "step_id": "uap004",
+        "title": "Implement explicit confirm action",
+        "scope": "planner-ui",
+        "description": "Require typing 'APPROVE' or clicking prominent button to confirm.",
+        "dependencies": ["uap003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Primary action button prominent" },
+          { "id": "ac2", "description": "Clear 'Cancel' alternative" },
+          { "id": "ac3", "description": "Optional: type confirmation word" }
+        ]
+      },
+      {
+        "step_id": "uap005",
+        "title": "Call approve API and update state",
+        "scope": "planner-ui",
+        "description": "Submit approval to API, update plan to locked state on success.",
+        "dependencies": ["uap004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "API called on confirm" },
+          { "id": "ac2", "description": "Plan state updated to approved" },
+          { "id": "ac3", "description": "Success message shown" }
+        ]
+      },
+      {
+        "step_id": "uap006",
+        "title": "Display locked state in UI",
+        "scope": "planner-ui",
+        "description": "Approved plans show clear locked indicator. Approval info visible.",
+        "dependencies": ["uap005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Lock icon on approved plans" },
+          { "id": "ac2", "description": "Shows who approved" },
+          { "id": "ac3", "description": "Shows when approved" },
+          { "id": "ac4", "description": "Visual styling indicates locked" }
+        ]
+      },
+      {
+        "step_id": "uap007",
+        "title": "Block editing on approved plans",
+        "scope": "planner-ui",
+        "description": "Edit actions disabled on approved plans with clear message.",
+        "dependencies": ["uap006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Edit buttons disabled" },
+          { "id": "ac2", "description": "Tooltip explains plan is locked" },
+          { "id": "ac3", "description": "Suggest creating new version" }
+        ]
+      }
+    ]
+  }
+}

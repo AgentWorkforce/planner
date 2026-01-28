@@ -1,0 +1,126 @@
+{
+  "feature_id": "ui-editor-multiscope",
+  "title": "Multi-Scope Visualization",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["ui-editor-steps"],
+
+  "summary": {
+    "goal": "Visualize plans with multiple scopes showing steps grouped by scope with cross-scope dependencies",
+    "context": "Real work crosses boundaries. Steps group by scope (repo/team/domain). Cross-scope dependencies are AI-inferred and visually connected. Users see the whole system, not isolated tasks.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Steps grouped into scope sections" },
+      { "id": "ac2", "description": "Scope sections are collapsible" },
+      { "id": "ac3", "description": "Cross-scope dependencies shown as visual connectors" },
+      { "id": "ac4", "description": "Dependency arrows indicate direction (depends-on)" },
+      { "id": "ac5", "description": "Zoom levels: Overview (collapsed), Expanded (1-level), Full Detail" },
+      { "id": "ac6", "description": "Progress indicators per scope (N/M complete)" },
+      { "id": "ac7", "description": "Add step button within each scope section" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Multi-Scope Plans - UX", "path": "docs/planner-scale.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uem001",
+        "title": "Create ScopeSection component",
+        "scope": "planner-ui",
+        "description": "Collapsible section for a scope containing its steps. Header with scope name and progress.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Section header shows scope name" },
+          { "id": "ac2", "description": "Collapse/expand toggle works" },
+          { "id": "ac3", "description": "Steps rendered inside section" },
+          { "id": "ac4", "description": "Progress indicator (N/M)" }
+        ]
+      },
+      {
+        "step_id": "uem002",
+        "title": "Group steps by scope in plan view",
+        "scope": "planner-ui",
+        "description": "Organize plan view to display steps grouped into ScopeSections.",
+        "dependencies": ["uem001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Steps grouped by scope property" },
+          { "id": "ac2", "description": "Each scope in its own section" },
+          { "id": "ac3", "description": "Unscoped steps in 'General' section" }
+        ]
+      },
+      {
+        "step_id": "uem003",
+        "title": "Implement dependency connector lines",
+        "scope": "planner-ui",
+        "description": "Draw SVG lines connecting dependent steps, including cross-scope connections.",
+        "dependencies": ["uem002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Lines drawn between dependent steps" },
+          { "id": "ac2", "description": "Lines update on scroll/resize" },
+          { "id": "ac3", "description": "Cross-scope lines visible" },
+          { "id": "ac4", "description": "Arrow indicates direction" }
+        ]
+      },
+      {
+        "step_id": "uem004",
+        "title": "Implement zoom levels",
+        "scope": "planner-ui",
+        "description": "View toggle: Overview (scopes collapsed), Expanded (scopes open, steps collapsed), Full (everything expanded).",
+        "dependencies": ["uem002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Zoom control in toolbar" },
+          { "id": "ac2", "description": "Overview collapses all" },
+          { "id": "ac3", "description": "Expanded shows steps, not details" },
+          { "id": "ac4", "description": "Full shows everything" }
+        ]
+      },
+      {
+        "step_id": "uem005",
+        "title": "Add step button per scope",
+        "scope": "planner-ui",
+        "description": "Add button in each scope section to create new step in that scope.",
+        "dependencies": ["uem001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Add button in scope section footer" },
+          { "id": "ac2", "description": "Click creates step with scope preset" },
+          { "id": "ac3", "description": "New step appears in section" }
+        ]
+      },
+      {
+        "step_id": "uem006",
+        "title": "Add new scope functionality",
+        "scope": "planner-ui",
+        "description": "Allow adding new scopes to a plan. New scope section appears.",
+        "dependencies": ["uem002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Add Scope button available" },
+          { "id": "ac2", "description": "Input for new scope name" },
+          { "id": "ac3", "description": "New section created and visible" }
+        ]
+      },
+      {
+        "step_id": "uem007",
+        "title": "Add tests for multi-scope view",
+        "scope": "planner-ui",
+        "description": "Tests for scope grouping, connectors, zoom levels.",
+        "dependencies": ["uem003", "uem004", "uem005", "uem006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Scope grouping tests pass" },
+          { "id": "ac2", "description": "Zoom level tests pass" },
+          { "id": "ac3", "description": "Add step/scope tests pass" }
+        ]
+      }
+    ]
+  }
+}

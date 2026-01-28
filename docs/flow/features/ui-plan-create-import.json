@@ -1,0 +1,109 @@
+{
+  "feature_id": "ui-plan-create-import",
+  "title": "Import from Document",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["ui-plan-create-goal"],
+
+  "summary": {
+    "goal": "Allow users to create a plan by importing a PRD, spec, or other document",
+    "context": "Users with detailed specs can paste or upload documents. AI extracts structure, identifies steps and scopes, and produces a draft plan for review.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Text area accepts pasted document content" },
+      { "id": "ac2", "description": "File upload accepts .md, .txt, .pdf formats" },
+      { "id": "ac3", "description": "AI extracts steps from document structure" },
+      { "id": "ac4", "description": "AI identifies scopes from document context" },
+      { "id": "ac5", "description": "Preview shows extracted structure before creating" },
+      { "id": "ac6", "description": "User can adjust extraction before creating plan" },
+      { "id": "ac7", "description": "Source document linked in plan metadata" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uci001",
+        "title": "Add import tab to NewPlanPage",
+        "scope": "planner-ui",
+        "description": "Add tab navigation between 'From Goal' and 'From Document' modes on plan creation page.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tab navigation between modes" },
+          { "id": "ac2", "description": "Import tab shows document input options" },
+          { "id": "ac3", "description": "State preserved when switching tabs" }
+        ]
+      },
+      {
+        "step_id": "uci002",
+        "title": "Create document paste textarea",
+        "scope": "planner-ui",
+        "description": "Large textarea for pasting document content with character counter.",
+        "dependencies": ["uci001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Large textarea for document content" },
+          { "id": "ac2", "description": "Character/word count displayed" },
+          { "id": "ac3", "description": "Paste preserves formatting" }
+        ]
+      },
+      {
+        "step_id": "uci003",
+        "title": "Implement file upload",
+        "scope": "planner-ui",
+        "description": "Add file upload with drag-drop support. Accept .md, .txt, read content into textarea.",
+        "dependencies": ["uci002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "File picker for .md, .txt files" },
+          { "id": "ac2", "description": "Drag-drop zone for files" },
+          { "id": "ac3", "description": "File content loaded into textarea" },
+          { "id": "ac4", "description": "Filename shown after upload" }
+        ]
+      },
+      {
+        "step_id": "uci004",
+        "title": "Create extraction preview component",
+        "scope": "planner-ui",
+        "description": "Show preview of extracted structure before creating plan. List of detected scopes and steps.",
+        "dependencies": ["uci003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Preview shows detected scopes" },
+          { "id": "ac2", "description": "Preview shows extracted steps" },
+          { "id": "ac3", "description": "Steps grouped by scope" },
+          { "id": "ac4", "description": "User can remove unwanted items" }
+        ]
+      },
+      {
+        "step_id": "uci005",
+        "title": "Connect to API for document processing",
+        "scope": "planner-ui",
+        "description": "Call API to process document and create plan with extracted structure.",
+        "dependencies": ["uci004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "API call with document content" },
+          { "id": "ac2", "description": "Loading state during extraction" },
+          { "id": "ac3", "description": "Preview populated from API response" },
+          { "id": "ac4", "description": "Create button generates final plan" }
+        ]
+      },
+      {
+        "step_id": "uci006",
+        "title": "Add document reference to plan",
+        "scope": "planner-ui",
+        "description": "Store reference to source document in plan metadata for traceability.",
+        "dependencies": ["uci005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Source filename stored in plan metadata" },
+          { "id": "ac2", "description": "Source reference visible in plan view" },
+          { "id": "ac3", "description": "Link to original content if available" }
+        ]
+      }
+    ]
+  }
+}
