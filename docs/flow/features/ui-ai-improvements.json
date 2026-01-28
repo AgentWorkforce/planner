@@ -1,0 +1,127 @@
+{
+  "feature_id": "ui-ai-improvements",
+  "title": "Silent AI Improvements",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["mcp-tools", "ui-editor-steps"],
+
+  "summary": {
+    "goal": "Enable AI to continuously improve plans in the background without interrupting user",
+    "context": "AI adds missing acceptance criteria, fixes dependencies, clarifies descriptions. User sees a subtle 'N improvements' badge they can expand if curious. AI only surfaces what needs human decision.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "AI analyzes plan periodically in background" },
+      { "id": "ac2", "description": "Silent improvements: criteria, dependencies, descriptions" },
+      { "id": "ac3", "description": "Badge shows count of improvements made" },
+      { "id": "ac4", "description": "Badge expands to show improvement details" },
+      { "id": "ac5", "description": "User can undo any AI improvement" },
+      { "id": "ac6", "description": "Flagged concerns shown inline with steps (not silent)" },
+      { "id": "ac7", "description": "Improvement activity visible in plan history" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Silent Improvements", "path": "docs/ui-vision.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uai001",
+        "title": "Create background improvement service",
+        "scope": "planner-ui",
+        "description": "Service that triggers AI analysis periodically while plan is open.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Service starts when plan opened" },
+          { "id": "ac2", "description": "Triggers after user idle period" },
+          { "id": "ac3", "description": "Respects rate limits" },
+          { "id": "ac4", "description": "Stops when plan closed" }
+        ]
+      },
+      {
+        "step_id": "uai002",
+        "title": "Define improvement types",
+        "scope": "planner-ui",
+        "description": "TypeScript types for different improvement categories.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ImprovementType enum" },
+          { "id": "ac2", "description": "Categories: criteria, dependencies, descriptions" },
+          { "id": "ac3", "description": "Improvement record with before/after" }
+        ]
+      },
+      {
+        "step_id": "uai003",
+        "title": "Create improvement badge component",
+        "scope": "planner-ui",
+        "description": "Subtle badge showing count of AI improvements made.",
+        "dependencies": ["uai002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Badge in plan toolbar" },
+          { "id": "ac2", "description": "Shows count if > 0" },
+          { "id": "ac3", "description": "Subtle styling, not distracting" },
+          { "id": "ac4", "description": "Click expands to details" }
+        ]
+      },
+      {
+        "step_id": "uai004",
+        "title": "Create improvement details panel",
+        "scope": "planner-ui",
+        "description": "Panel showing list of improvements made with undo options.",
+        "dependencies": ["uai003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "List of improvements" },
+          { "id": "ac2", "description": "Each shows what changed" },
+          { "id": "ac3", "description": "Undo button per improvement" },
+          { "id": "ac4", "description": "Link to affected step" }
+        ]
+      },
+      {
+        "step_id": "uai005",
+        "title": "Implement undo functionality",
+        "scope": "planner-ui",
+        "description": "Undo button reverts AI improvement to original state.",
+        "dependencies": ["uai004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Undo reverts change" },
+          { "id": "ac2", "description": "API updated with original value" },
+          { "id": "ac3", "description": "Improvement removed from list" }
+        ]
+      },
+      {
+        "step_id": "uai006",
+        "title": "Create flagged concern component",
+        "scope": "planner-ui",
+        "description": "Inline warnings for issues that need human decision (not auto-fixed).",
+        "dependencies": ["uai002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Warning icon on affected steps" },
+          { "id": "ac2", "description": "Tooltip shows concern" },
+          { "id": "ac3", "description": "Click opens detail with options" },
+          { "id": "ac4", "description": "User can dismiss or act" }
+        ]
+      },
+      {
+        "step_id": "uai007",
+        "title": "Add improvements to plan activity log",
+        "scope": "planner-ui",
+        "description": "AI improvements visible in plan activity/history.",
+        "dependencies": ["uai004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Activity log shows AI changes" },
+          { "id": "ac2", "description": "Distinct from user changes" },
+          { "id": "ac3", "description": "Timestamp and details included" }
+        ]
+      }
+    ]
+  }
+}

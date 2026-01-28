@@ -1,0 +1,148 @@
+{
+  "feature_id": "api-plan-crud",
+  "title": "Plan CRUD Endpoints",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["storage-sqlite"],
+
+  "summary": {
+    "goal": "Implement REST endpoints for creating, reading, updating, and listing plans",
+    "context": "Core API surface for plan management. Supports creating new plans, fetching by ID, updating drafts, and listing with filters.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "POST /plans creates new plan with draft version" },
+      { "id": "ac2", "description": "GET /plans lists plans with optional status filter" },
+      { "id": "ac3", "description": "GET /plans/:id returns latest version" },
+      { "id": "ac4", "description": "GET /plans/:id/versions lists all versions" },
+      { "id": "ac5", "description": "GET /plans/:id/versions/:version returns specific version" },
+      { "id": "ac6", "description": "PUT /plans/:id updates draft version (rejects if approved)" },
+      { "id": "ac7", "description": "POST /plans/:id/versions creates new version from existing" },
+      { "id": "ac8", "description": "All endpoints return proper status codes and JSON responses" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "ac001",
+        "title": "Set up Express server structure",
+        "scope": "planner-core",
+        "description": "Create src/api/ directory with Express app setup, middleware (JSON parsing, error handling).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Express app created with JSON middleware" },
+          { "id": "ac2", "description": "Error handling middleware returns consistent JSON errors" },
+          { "id": "ac3", "description": "CORS configured for development" }
+        ]
+      },
+      {
+        "step_id": "ac002",
+        "title": "Define request/response schemas",
+        "scope": "planner-core",
+        "description": "Create Zod schemas for API request bodies and response shapes.",
+        "dependencies": ["ac001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreatePlanRequest schema: goal (required), context (optional)" },
+          { "id": "ac2", "description": "UpdatePlanRequest schema: goal, context, steps changes" },
+          { "id": "ac3", "description": "Response schemas for plan, version, error" }
+        ]
+      },
+      {
+        "step_id": "ac003",
+        "title": "Implement POST /plans endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to create new plan with initial draft version.",
+        "dependencies": ["ac002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Accepts goal and optional context in body" },
+          { "id": "ac2", "description": "Creates plan and version in storage" },
+          { "id": "ac3", "description": "Returns 201 with created plan and version" },
+          { "id": "ac4", "description": "Validates request body with Zod" }
+        ]
+      },
+      {
+        "step_id": "ac004",
+        "title": "Implement GET /plans endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to list plans with optional status filter.",
+        "dependencies": ["ac001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Returns array of plans" },
+          { "id": "ac2", "description": "Supports ?status= query parameter" },
+          { "id": "ac3", "description": "Returns 200 with empty array if no plans" }
+        ]
+      },
+      {
+        "step_id": "ac005",
+        "title": "Implement GET /plans/:id endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to get plan with its latest version.",
+        "dependencies": ["ac001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Returns plan with latest version attached" },
+          { "id": "ac2", "description": "Returns 404 if plan not found" },
+          { "id": "ac3", "description": "Includes full version with steps" }
+        ]
+      },
+      {
+        "step_id": "ac006",
+        "title": "Implement version list and get endpoints",
+        "scope": "planner-core",
+        "description": "Create GET /plans/:id/versions and GET /plans/:id/versions/:version endpoints.",
+        "dependencies": ["ac005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "List returns all versions for plan" },
+          { "id": "ac2", "description": "Get returns specific version by number" },
+          { "id": "ac3", "description": "Returns 404 if version not found" }
+        ]
+      },
+      {
+        "step_id": "ac007",
+        "title": "Implement PUT /plans/:id endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to update draft version of a plan.",
+        "dependencies": ["ac005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Updates goal, context, or steps of draft version" },
+          { "id": "ac2", "description": "Returns 400 if latest version is approved/published" },
+          { "id": "ac3", "description": "Returns 200 with updated version" }
+        ]
+      },
+      {
+        "step_id": "ac008",
+        "title": "Implement POST /plans/:id/versions endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to create new version from existing version.",
+        "dependencies": ["ac006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Creates new draft version based on latest" },
+          { "id": "ac2", "description": "Increments version number" },
+          { "id": "ac3", "description": "Returns 201 with new version" }
+        ]
+      },
+      {
+        "step_id": "ac009",
+        "title": "Add integration tests for CRUD endpoints",
+        "scope": "planner-core",
+        "description": "Write integration tests using supertest for all CRUD endpoints.",
+        "dependencies": ["ac003", "ac004", "ac005", "ac006", "ac007", "ac008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests cover all endpoints" },
+          { "id": "ac2", "description": "Tests verify correct status codes" },
+          { "id": "ac3", "description": "Tests verify error responses" },
+          { "id": "ac4", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

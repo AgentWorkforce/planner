@@ -1,0 +1,140 @@
+{
+  "feature_id": "domain-plan",
+  "title": "Plan Entity",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Define Plan and PlanVersion entities that capture intent and track version history",
+    "context": "A Plan is a container for versions. Each PlanVersion is a snapshot with goal, steps, and metadata. Versions progress through draft -> approved -> published states.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Plan entity has plan_id, created_at, updated_at" },
+      { "id": "ac2", "description": "PlanVersion has version number (monotonic within plan), status, summary, steps array" },
+      { "id": "ac3", "description": "Summary includes goal and optional context" },
+      { "id": "ac4", "description": "Status enum includes: draft, approved, published" },
+      { "id": "ac5", "description": "Zod schemas validate all fields" },
+      { "id": "ac6", "description": "Factory functions create valid Plan and PlanVersion instances" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Planner Vision - PlanVersion", "path": "docs/github-issue-planner-vision.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "dp001",
+        "title": "Create project structure and dependencies",
+        "scope": "planner-core",
+        "description": "Initialize TypeScript project with Zod, vitest. Create src/domain/ directory structure.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "package.json has typescript, zod, vitest dependencies" },
+          { "id": "ac2", "description": "tsconfig.json configured for strict mode" },
+          { "id": "ac3", "description": "src/domain/ directory exists" }
+        ]
+      },
+      {
+        "step_id": "dp002",
+        "title": "Define PlanStatus enum and schema",
+        "scope": "planner-core",
+        "description": "Create src/domain/status.ts with PlanStatus enum (draft, approved, published) and Zod schema.",
+        "dependencies": ["dp001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanStatus enum exported with three values" },
+          { "id": "ac2", "description": "PlanStatusSchema validates enum values" },
+          { "id": "ac3", "description": "Type inference works correctly" }
+        ]
+      },
+      {
+        "step_id": "dp003",
+        "title": "Define Summary interface and schema",
+        "scope": "planner-core",
+        "description": "Create Summary type with goal (required) and context (optional). Define Zod schema.",
+        "dependencies": ["dp001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Summary interface has goal: string, context?: string" },
+          { "id": "ac2", "description": "SummarySchema validates correctly" }
+        ]
+      },
+      {
+        "step_id": "dp004",
+        "title": "Define Plan interface and schema",
+        "scope": "planner-core",
+        "description": "Create src/domain/plan.ts with Plan interface: plan_id, created_at, updated_at. Include Zod schema.",
+        "dependencies": ["dp001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Plan interface has plan_id: string" },
+          { "id": "ac2", "description": "Plan interface has created_at: string (ISO date)" },
+          { "id": "ac3", "description": "Plan interface has updated_at: string (ISO date)" },
+          { "id": "ac4", "description": "PlanSchema validates all fields" }
+        ]
+      },
+      {
+        "step_id": "dp005",
+        "title": "Define PlanVersion interface and schema",
+        "scope": "planner-core",
+        "description": "Create PlanVersion interface: plan_id, version (number), status, summary, steps[], created_at, updated_at. Include Zod schema.",
+        "dependencies": ["dp002", "dp003", "dp004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersion has plan_id referencing Plan" },
+          { "id": "ac2", "description": "PlanVersion has version: number (monotonic)" },
+          { "id": "ac3", "description": "PlanVersion has status: PlanStatus" },
+          { "id": "ac4", "description": "PlanVersion has summary: Summary" },
+          { "id": "ac5", "description": "PlanVersion has steps: Step[] (empty array for now)" },
+          { "id": "ac6", "description": "PlanVersionSchema validates all fields" }
+        ]
+      },
+      {
+        "step_id": "dp006",
+        "title": "Create Plan factory function",
+        "scope": "planner-core",
+        "description": "Implement createPlan() factory that generates plan_id (UUID), sets timestamps. Validate with schema.",
+        "dependencies": ["dp004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createPlan() generates unique plan_id" },
+          { "id": "ac2", "description": "created_at and updated_at are set to current time" },
+          { "id": "ac3", "description": "Returned Plan passes schema validation" }
+        ]
+      },
+      {
+        "step_id": "dp007",
+        "title": "Create PlanVersion factory function",
+        "scope": "planner-core",
+        "description": "Implement createPlanVersion(plan_id, goal, context?) factory. Sets version=1, status=draft, timestamps.",
+        "dependencies": ["dp005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createPlanVersion() requires plan_id and goal" },
+          { "id": "ac2", "description": "Version is set to 1 for new versions" },
+          { "id": "ac3", "description": "Status is set to 'draft'" },
+          { "id": "ac4", "description": "Returned PlanVersion passes schema validation" }
+        ]
+      },
+      {
+        "step_id": "dp008",
+        "title": "Add unit tests for Plan entities",
+        "scope": "planner-core",
+        "description": "Write vitest tests for Plan, PlanVersion schemas and factory functions.",
+        "dependencies": ["dp006", "dp007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests verify schema validation (valid and invalid inputs)" },
+          { "id": "ac2", "description": "Tests verify factory functions produce valid entities" },
+          { "id": "ac3", "description": "Tests verify timestamps are set correctly" },
+          { "id": "ac4", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

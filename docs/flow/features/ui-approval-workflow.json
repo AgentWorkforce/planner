@@ -1,0 +1,35 @@
+{
+  "feature_id": "ui-approval-workflow",
+  "title": "Approval Workflow",
+  "type": "epic",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["ui-plan-editor"],
+
+  "summary": {
+    "goal": "Implement the full approval workflow from submit through publish",
+    "context": "Approval is ceremony, not just clicking a button. Submit signals ready for review. Approve locks the plan with accountability. Publish releases to orchestrator.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Submit for review works" },
+      { "id": "ac2", "description": "Reviewers can comment on steps" },
+      { "id": "ac3", "description": "Approval ceremony shows commitment clearly" },
+      { "id": "ac4", "description": "Publish connects to orchestrator" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Experience 3", "path": "docs/ui-vision.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "ui-submit-review", "title": "Submit for Review", "ref": "ui-submit-review.json" },
+    { "feature_id": "ui-review-comments", "title": "Review Comments", "ref": "ui-review-comments.json" },
+    { "feature_id": "ui-approve", "title": "Approval Ceremony", "ref": "ui-approve.json" },
+    { "feature_id": "ui-publish", "title": "Publish to Orchestrator", "ref": "ui-publish.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  }
+}

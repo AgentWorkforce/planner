@@ -1,0 +1,222 @@
+{
+  "feature_id": "mcp-tools",
+  "title": "MCP Planning Tools",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["api-plan-crud", "api-workflow"],
+
+  "summary": {
+    "goal": "Implement MCP tools for AI agents to interact with Planner",
+    "context": "Tools enable AI agents to: read plans, add/edit steps, infer dependencies, add acceptance criteria, submit for review. This is how AI becomes a planning partner.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "read_plan tool returns plan with current version" },
+      { "id": "ac2", "description": "create_plan tool creates new plan from goal" },
+      { "id": "ac3", "description": "add_step tool adds step to draft version" },
+      { "id": "ac4", "description": "edit_step tool modifies existing step" },
+      { "id": "ac5", "description": "infer_dependencies tool analyzes steps and suggests dependencies" },
+      { "id": "ac6", "description": "add_criteria tool adds acceptance criteria to step" },
+      { "id": "ac7", "description": "submit_plan tool marks plan as submitted for review" },
+      { "id": "ac8", "description": "All tools return structured responses suitable for AI consumption" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Agentic Behavior", "path": "docs/planner-agentic-behavior.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "mt001",
+        "title": "Set up MCP server infrastructure",
+        "scope": "planner-core",
+        "description": "Create src/mcp/ directory with MCP server setup using @modelcontextprotocol/sdk.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "MCP SDK dependency added" },
+          { "id": "ac2", "description": "MCP server can be started" },
+          { "id": "ac3", "description": "Tools can be registered with server" }
+        ]
+      },
+      {
+        "step_id": "mt002",
+        "title": "Create tool response schema",
+        "scope": "planner-core",
+        "description": "Define consistent response format for all tools: success/error, data, message.",
+        "dependencies": ["mt001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ToolResponse type defined: { success, data?, error? }" },
+          { "id": "ac2", "description": "Error responses include actionable message" },
+          { "id": "ac3", "description": "Successful responses include relevant data" }
+        ]
+      },
+      {
+        "step_id": "mt003",
+        "title": "Implement read_plan tool",
+        "scope": "planner-core",
+        "description": "Create tool to read plan with current version. Input: plan_id. Output: full plan with version and steps.",
+        "dependencies": ["mt002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Accepts plan_id parameter" },
+          { "id": "ac2", "description": "Returns plan with latest version" },
+          { "id": "ac3", "description": "Includes all steps with full details" },
+          { "id": "ac4", "description": "Returns error if plan not found" }
+        ]
+      },
+      {
+        "step_id": "mt004",
+        "title": "Implement create_plan tool",
+        "scope": "planner-core",
+        "description": "Create tool to create new plan. Input: goal, context?. Output: created plan with draft version.",
+        "dependencies": ["mt002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Accepts goal (required) and context (optional)" },
+          { "id": "ac2", "description": "Creates plan via storage layer" },
+          { "id": "ac3", "description": "Returns created plan with plan_id" }
+        ]
+      },
+      {
+        "step_id": "mt005",
+        "title": "Implement add_step tool",
+        "scope": "planner-core",
+        "description": "Create tool to add step to draft version. Input: plan_id, title, scope?, description?, dependencies[].",
+        "dependencies": ["mt003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Adds step to latest draft version" },
+          { "id": "ac2", "description": "Generates unique step_id" },
+          { "id": "ac3", "description": "Returns error if version is not draft" },
+          { "id": "ac4", "description": "Returns updated version with new step" }
+        ]
+      },
+      {
+        "step_id": "mt006",
+        "title": "Implement edit_step tool",
+        "scope": "planner-core",
+        "description": "Create tool to modify existing step. Input: plan_id, step_id, changes object.",
+        "dependencies": ["mt005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Updates specified fields on step" },
+          { "id": "ac2", "description": "Preserves unchanged fields" },
+          { "id": "ac3", "description": "Returns error if step not found" },
+          { "id": "ac4", "description": "Returns error if version is not draft" }
+        ]
+      },
+      {
+        "step_id": "mt007",
+        "title": "Implement remove_step tool",
+        "scope": "planner-core",
+        "description": "Create tool to remove step from plan. Input: plan_id, step_id.",
+        "dependencies": ["mt005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Removes step from version" },
+          { "id": "ac2", "description": "Removes step_id from other steps' dependencies" },
+          { "id": "ac3", "description": "Returns error if step not found" },
+          { "id": "ac4", "description": "Returns error if version is not draft" }
+        ]
+      },
+      {
+        "step_id": "mt008",
+        "title": "Implement set_dependencies tool",
+        "scope": "planner-core",
+        "description": "Create tool to set dependencies for a step. Input: plan_id, step_id, dependencies[].",
+        "dependencies": ["mt006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sets dependencies array on step" },
+          { "id": "ac2", "description": "Validates all dependency step_ids exist" },
+          { "id": "ac3", "description": "Validates no cycles would be created" },
+          { "id": "ac4", "description": "Returns error for invalid dependencies" }
+        ]
+      },
+      {
+        "step_id": "mt009",
+        "title": "Implement add_criteria tool",
+        "scope": "planner-core",
+        "description": "Create tool to add acceptance criterion to step. Input: plan_id, step_id, description, type?.",
+        "dependencies": ["mt006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Adds criterion to step's acceptance_criteria array" },
+          { "id": "ac2", "description": "Generates unique criterion id" },
+          { "id": "ac3", "description": "Returns updated step with new criterion" }
+        ]
+      },
+      {
+        "step_id": "mt010",
+        "title": "Implement add_gate tool",
+        "scope": "planner-core",
+        "description": "Create tool to add human approval gate to step. Input: plan_id, step_id, approver_role?.",
+        "dependencies": ["mt006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sets gate on step" },
+          { "id": "ac2", "description": "Gate type is 'human_approval'" },
+          { "id": "ac3", "description": "Optional approver_role is set" }
+        ]
+      },
+      {
+        "step_id": "mt011",
+        "title": "Implement submit_plan tool",
+        "scope": "planner-core",
+        "description": "Create tool to submit plan for review. Input: plan_id.",
+        "dependencies": ["mt003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Marks latest draft version as submitted" },
+          { "id": "ac2", "description": "Returns error if no draft version" },
+          { "id": "ac3", "description": "Returns updated version with submitted_at" }
+        ]
+      },
+      {
+        "step_id": "mt012",
+        "title": "Implement list_plans tool",
+        "scope": "planner-core",
+        "description": "Create tool to list plans. Input: status? filter. Output: array of plan summaries.",
+        "dependencies": ["mt002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Returns list of plans" },
+          { "id": "ac2", "description": "Supports optional status filter" },
+          { "id": "ac3", "description": "Returns plan_id, goal, status for each" }
+        ]
+      },
+      {
+        "step_id": "mt013",
+        "title": "Add tool documentation",
+        "scope": "planner-core",
+        "description": "Add comprehensive descriptions to all tools for AI consumption.",
+        "dependencies": ["mt003", "mt004", "mt005", "mt006", "mt007", "mt008", "mt009", "mt010", "mt011", "mt012"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Each tool has clear description" },
+          { "id": "ac2", "description": "Parameter types and requirements documented" },
+          { "id": "ac3", "description": "Return value format documented" },
+          { "id": "ac4", "description": "Error conditions documented" }
+        ]
+      },
+      {
+        "step_id": "mt014",
+        "title": "Add unit tests for MCP tools",
+        "scope": "planner-core",
+        "description": "Write tests for all MCP tools using mock storage.",
+        "dependencies": ["mt013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests cover all tools" },
+          { "id": "ac2", "description": "Tests verify correct responses" },
+          { "id": "ac3", "description": "Tests verify error handling" },
+          { "id": "ac4", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "feature_id": "api-change-requests",
+  "title": "Change Request Endpoint",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["api-workflow"],
+
+  "summary": {
+    "goal": "Implement endpoint for Orchestrator to submit change requests during execution",
+    "context": "When Orchestrator discovers the plan is inadequate (missing steps, wrong dependencies), it can request changes. This creates a new draft version, NOT mutation of approved version.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "POST /runs/:run_id/change-requests accepts change request" },
+      { "id": "ac2", "description": "Change request includes reason and suggested_changes" },
+      { "id": "ac3", "description": "Creates new draft version based on published version" },
+      { "id": "ac4", "description": "Links new draft to change request for traceability" },
+      { "id": "ac5", "description": "Returns change_request_id and new_version_id" },
+      { "id": "ac6", "description": "Original approved version remains immutable" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "cr001",
+        "title": "Define ChangeRequest entity",
+        "scope": "planner-core",
+        "description": "Create src/domain/change-request.ts with ChangeRequest interface and schema.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ChangeRequest has id, run_id, plan_id, reason" },
+          { "id": "ac2", "description": "ChangeRequest has suggested_changes object" },
+          { "id": "ac3", "description": "suggested_changes supports add_steps, modify_steps, remove_steps" },
+          { "id": "ac4", "description": "ChangeRequest has status: pending, applied, rejected" },
+          { "id": "ac5", "description": "Zod schema validates all fields" }
+        ]
+      },
+      {
+        "step_id": "cr002",
+        "title": "Add change request storage",
+        "scope": "planner-core",
+        "description": "Extend SQLite storage with change_requests table and CRUD operations.",
+        "dependencies": ["cr001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "change_requests table created with schema" },
+          { "id": "ac2", "description": "Foreign key to plans table" },
+          { "id": "ac3", "description": "createChangeRequest, getChangeRequest, listChangeRequests implemented" }
+        ]
+      },
+      {
+        "step_id": "cr003",
+        "title": "Link versions to change requests",
+        "scope": "planner-core",
+        "description": "Add change_request_id field to PlanVersion to track which change request triggered it.",
+        "dependencies": ["cr002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersion has optional change_request_id: string" },
+          { "id": "ac2", "description": "Storage updated to persist change_request_id" },
+          { "id": "ac3", "description": "Query to find versions by change_request_id" }
+        ]
+      },
+      {
+        "step_id": "cr004",
+        "title": "Implement POST /runs/:run_id/change-requests endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to accept change requests from Orchestrator.",
+        "dependencies": ["cr003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Accepts reason and suggested_changes in body" },
+          { "id": "ac2", "description": "Creates ChangeRequest record" },
+          { "id": "ac3", "description": "Creates new draft version from latest published" },
+          { "id": "ac4", "description": "Links new version to change request" },
+          { "id": "ac5", "description": "Returns 201 with change_request_id and new_version" }
+        ]
+      },
+      {
+        "step_id": "cr005",
+        "title": "Apply suggested changes to new version",
+        "scope": "planner-core",
+        "description": "Implement logic to apply suggested_changes to the new draft version.",
+        "dependencies": ["cr004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "add_steps adds new steps to version" },
+          { "id": "ac2", "description": "modify_steps updates existing steps" },
+          { "id": "ac3", "description": "remove_steps removes steps by step_id" },
+          { "id": "ac4", "description": "Original published version is unchanged" }
+        ]
+      },
+      {
+        "step_id": "cr006",
+        "title": "Add change request query endpoints",
+        "scope": "planner-core",
+        "description": "Create GET endpoints to query change requests by plan or run.",
+        "dependencies": ["cr004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /plans/:id/change-requests lists requests for plan" },
+          { "id": "ac2", "description": "GET /runs/:run_id/change-requests lists requests for run" },
+          { "id": "ac3", "description": "Includes linked version info in response" }
+        ]
+      },
+      {
+        "step_id": "cr007",
+        "title": "Add integration tests for change requests",
+        "scope": "planner-core",
+        "description": "Write integration tests for change request creation and application.",
+        "dependencies": ["cr005", "cr006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests verify change request creation" },
+          { "id": "ac2", "description": "Tests verify new version is created" },
+          { "id": "ac3", "description": "Tests verify suggested changes are applied" },
+          { "id": "ac4", "description": "Tests verify original version unchanged" },
+          { "id": "ac5", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

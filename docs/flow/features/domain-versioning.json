@@ -1,0 +1,129 @@
+{
+  "feature_id": "domain-versioning",
+  "title": "Versioning and Diffs",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["domain-plan", "domain-step"],
+
+  "summary": {
+    "goal": "Implement version management and structural diff computation between plan versions",
+    "context": "Every meaningful change produces a new version. Diffs are structural (step added/removed/modified), not just text. Supports field-level change tracking and RFC 6902-style patches.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "New version can be created from existing version" },
+      { "id": "ac2", "description": "Version numbers are monotonically increasing within a plan" },
+      { "id": "ac3", "description": "Structural diff detects: steps added, removed, modified" },
+      { "id": "ac4", "description": "Field-level changes tracked for modified steps" },
+      { "id": "ac5", "description": "Dependency edge changes are tracked" },
+      { "id": "ac6", "description": "Diff output is machine-readable (JSON patch format)" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Planner Vision - Versioning", "path": "docs/github-issue-planner-vision.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "dv001",
+        "title": "Define VersionDiff interface",
+        "scope": "planner-core",
+        "description": "Create src/domain/diff.ts with VersionDiff interface capturing structural changes between versions.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "VersionDiff has from_version: number, to_version: number" },
+          { "id": "ac2", "description": "VersionDiff has steps_added: StepChange[]" },
+          { "id": "ac3", "description": "VersionDiff has steps_removed: StepChange[]" },
+          { "id": "ac4", "description": "VersionDiff has steps_modified: StepModification[]" },
+          { "id": "ac5", "description": "VersionDiff has summary_changed: boolean" }
+        ]
+      },
+      {
+        "step_id": "dv002",
+        "title": "Define StepChange and StepModification types",
+        "scope": "planner-core",
+        "description": "Define types for step additions/removals and modifications with field-level changes.",
+        "dependencies": ["dv001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "StepChange captures step_id and step snapshot" },
+          { "id": "ac2", "description": "StepModification has step_id and field_changes array" },
+          { "id": "ac3", "description": "FieldChange captures field name, old value, new value" }
+        ]
+      },
+      {
+        "step_id": "dv003",
+        "title": "Implement createVersionFrom function",
+        "scope": "planner-core",
+        "description": "Create function to create new version from existing version. Increments version number, sets status to draft.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "New version has incremented version number" },
+          { "id": "ac2", "description": "New version status is 'draft'" },
+          { "id": "ac3", "description": "New version copies steps from source version" },
+          { "id": "ac4", "description": "New version has fresh timestamps" }
+        ]
+      },
+      {
+        "step_id": "dv004",
+        "title": "Implement computeDiff function",
+        "scope": "planner-core",
+        "description": "Create computeDiff(oldVersion, newVersion) that returns VersionDiff with all structural changes.",
+        "dependencies": ["dv001", "dv002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Detects steps added (new step_id not in old version)" },
+          { "id": "ac2", "description": "Detects steps removed (old step_id not in new version)" },
+          { "id": "ac3", "description": "Detects steps modified (same step_id, different content)" },
+          { "id": "ac4", "description": "Tracks field-level changes for modified steps" }
+        ]
+      },
+      {
+        "step_id": "dv005",
+        "title": "Implement dependency edge diff tracking",
+        "scope": "planner-core",
+        "description": "Extend diff computation to track dependency changes separately for visibility.",
+        "dependencies": ["dv004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "VersionDiff includes dependencies_added: EdgeChange[]" },
+          { "id": "ac2", "description": "VersionDiff includes dependencies_removed: EdgeChange[]" },
+          { "id": "ac3", "description": "EdgeChange captures from_step_id and to_step_id" }
+        ]
+      },
+      {
+        "step_id": "dv006",
+        "title": "Implement toJsonPatch function",
+        "scope": "planner-core",
+        "description": "Convert VersionDiff to RFC 6902 JSON Patch format for machine consumption.",
+        "dependencies": ["dv004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Output is valid JSON Patch array" },
+          { "id": "ac2", "description": "Add operations for new steps" },
+          { "id": "ac3", "description": "Remove operations for deleted steps" },
+          { "id": "ac4", "description": "Replace operations for modified fields" }
+        ]
+      },
+      {
+        "step_id": "dv007",
+        "title": "Add unit tests for versioning",
+        "scope": "planner-core",
+        "description": "Write vitest tests for version creation and diff computation.",
+        "dependencies": ["dv003", "dv004", "dv005", "dv006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests verify version increment is correct" },
+          { "id": "ac2", "description": "Tests verify diff detects all change types" },
+          { "id": "ac3", "description": "Tests verify JSON patch output is valid" },
+          { "id": "ac4", "description": "Tests verify dependency edge tracking" },
+          { "id": "ac5", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

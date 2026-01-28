@@ -1,0 +1,27 @@
+{
+  "feature_id": "mcp-server",
+  "title": "MCP Server",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["rest-api"],
+
+  "summary": {
+    "goal": "Expose Planner functionality via MCP tools for AI agent integration",
+    "context": "MCP (Model Context Protocol) tools allow AI agents to interact with Planner programmatically. This enables AI-native planning where agents can create, read, and modify plans.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "MCP server exposes planning tools" },
+      { "id": "ac2", "description": "Tools integrate with existing REST API layer" },
+      { "id": "ac3", "description": "AI agents can use tools to manage plans" }
+    ]
+  },
+
+  "sub_features": [
+    { "feature_id": "mcp-tools", "title": "MCP Planning Tools", "ref": "mcp-tools.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": []
+  }
+}

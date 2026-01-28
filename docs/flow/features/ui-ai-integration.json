@@ -1,0 +1,33 @@
+{
+  "feature_id": "ui-ai-integration",
+  "title": "AI Integration",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["ui-plan-editor"],
+
+  "summary": {
+    "goal": "Integrate AI as a continuous planning partner in the UI",
+    "context": "AI works continuously - silent improvements in background, flagged concerns for decision, on-demand chat for questions. AI handles tedious structure, humans handle accountability and judgment.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "AI chat available on-demand" },
+      { "id": "ac2", "description": "Silent improvements run in background" },
+      { "id": "ac3", "description": "AI surfaces concerns that need human decision" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Experience 2", "path": "docs/ui-vision.md" },
+    { "type": "spec", "title": "Agentic Behavior", "path": "docs/planner-agentic-behavior.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "ui-ai-chat", "title": "AI Chat", "ref": "ui-ai-chat.json" },
+    { "feature_id": "ui-ai-improvements", "title": "Silent AI Improvements", "ref": "ui-ai-improvements.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  }
+}

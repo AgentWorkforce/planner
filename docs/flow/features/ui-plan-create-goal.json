@@ -1,0 +1,114 @@
+{
+  "feature_id": "ui-plan-create-goal",
+  "title": "Create from Goal",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["api-plan-crud"],
+
+  "summary": {
+    "goal": "Allow users to create a new plan by expressing a goal in natural language",
+    "context": "Intent-first planning: user types what they want to achieve, AI identifies affected scopes, drafts multi-scope plan with steps, dependencies, and acceptance criteria. User refines and adds gates.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Text input accepts goal description (1-500 chars)" },
+      { "id": "ac2", "description": "AI processes goal and identifies affected scopes" },
+      { "id": "ac3", "description": "AI generates draft plan with steps grouped by scope" },
+      { "id": "ac4", "description": "AI infers dependencies between steps" },
+      { "id": "ac5", "description": "AI adds acceptance criteria to steps" },
+      { "id": "ac6", "description": "Loading state shows while AI processes" },
+      { "id": "ac7", "description": "Generated plan opens in editor for refinement" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Developing Intent", "path": "docs/ui-vision.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "ucg001",
+        "title": "Set up React project structure",
+        "scope": "planner-ui",
+        "description": "Initialize React project with TypeScript, configure routing, set up API client for planner-core.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "React + TypeScript project initialized" },
+          { "id": "ac2", "description": "React Router configured" },
+          { "id": "ac3", "description": "API client module created for REST endpoints" }
+        ]
+      },
+      {
+        "step_id": "ucg002",
+        "title": "Create NewPlanPage component",
+        "scope": "planner-ui",
+        "description": "Create page component with goal input textarea, context optional field, and create button.",
+        "dependencies": ["ucg001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Page renders with prominent goal input" },
+          { "id": "ac2", "description": "Goal input validates 1-500 chars" },
+          { "id": "ac3", "description": "Optional context textarea available" },
+          { "id": "ac4", "description": "Create Plan button enabled when goal is valid" }
+        ]
+      },
+      {
+        "step_id": "ucg003",
+        "title": "Implement plan creation API call",
+        "scope": "planner-ui",
+        "description": "Connect create button to POST /plans API, handle loading and error states.",
+        "dependencies": ["ucg002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Click calls POST /plans with goal and context" },
+          { "id": "ac2", "description": "Loading spinner shows during API call" },
+          { "id": "ac3", "description": "Error toast shows on failure" },
+          { "id": "ac4", "description": "Success navigates to plan editor" }
+        ]
+      },
+      {
+        "step_id": "ucg004",
+        "title": "Design AI generation loading state",
+        "scope": "planner-ui",
+        "description": "Create engaging loading experience while AI generates plan structure (animated steps appearing).",
+        "dependencies": ["ucg003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Loading state shows AI is working" },
+          { "id": "ac2", "description": "Progressive reveal of detected scopes" },
+          { "id": "ac3", "description": "Skeleton steps appear as generated" },
+          { "id": "ac4", "description": "Clear messaging about what's happening" }
+        ]
+      },
+      {
+        "step_id": "ucg005",
+        "title": "Add keyboard shortcuts",
+        "scope": "planner-ui",
+        "description": "Implement Cmd+Enter to submit, Tab for focus management.",
+        "dependencies": ["ucg002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cmd+Enter submits form" },
+          { "id": "ac2", "description": "Tab moves focus correctly" },
+          { "id": "ac3", "description": "Keyboard shortcuts documented" }
+        ]
+      },
+      {
+        "step_id": "ucg006",
+        "title": "Add unit and integration tests",
+        "scope": "planner-ui",
+        "description": "Write tests for NewPlanPage component and API integration.",
+        "dependencies": ["ucg003", "ucg004", "ucg005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component renders correctly" },
+          { "id": "ac2", "description": "Form validation tested" },
+          { "id": "ac3", "description": "API call mocked and tested" },
+          { "id": "ac4", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

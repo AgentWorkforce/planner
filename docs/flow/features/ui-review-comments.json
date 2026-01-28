@@ -1,0 +1,108 @@
+{
+  "feature_id": "ui-review-comments",
+  "title": "Review Comments",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["ui-submit-review"],
+
+  "summary": {
+    "goal": "Enable step-level commenting during plan review (like code review)",
+    "context": "Reviewers need to give feedback on specific steps. Comments are persistent, threaded, and can be resolved. This creates a review dialogue before approval.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Comment icon visible on each step" },
+      { "id": "ac2", "description": "Click opens comment thread for that step" },
+      { "id": "ac3", "description": "Comments show author, timestamp, content" },
+      { "id": "ac4", "description": "Comments can be replied to (threaded)" },
+      { "id": "ac5", "description": "Comments can be marked resolved" },
+      { "id": "ac6", "description": "Unresolved comment count shown on step and plan" },
+      { "id": "ac7", "description": "Comments persist across sessions" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui", "planner-core"],
+    "steps": [
+      {
+        "step_id": "urc001",
+        "title": "Add comment storage to backend",
+        "scope": "planner-core",
+        "description": "Create comments table and API endpoints for CRUD operations on comments.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "comments table: id, plan_id, step_id, author, content, created_at, resolved" },
+          { "id": "ac2", "description": "parent_id for threading" },
+          { "id": "ac3", "description": "GET/POST/PATCH endpoints" }
+        ]
+      },
+      {
+        "step_id": "urc002",
+        "title": "Add comment icon to step cards",
+        "scope": "planner-ui",
+        "description": "Comment bubble icon on each step. Badge shows count of unresolved comments.",
+        "dependencies": ["urc001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Comment icon visible on steps" },
+          { "id": "ac2", "description": "Badge shows count if > 0" },
+          { "id": "ac3", "description": "Click opens comment panel" }
+        ]
+      },
+      {
+        "step_id": "urc003",
+        "title": "Create CommentThread component",
+        "scope": "planner-ui",
+        "description": "Slide-out panel showing comment thread for a step. Input for new comments.",
+        "dependencies": ["urc002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Panel shows existing comments" },
+          { "id": "ac2", "description": "Comments show author, time, content" },
+          { "id": "ac3", "description": "Input field for new comment" },
+          { "id": "ac4", "description": "Submit posts to API" }
+        ]
+      },
+      {
+        "step_id": "urc004",
+        "title": "Implement reply threading",
+        "scope": "planner-ui",
+        "description": "Reply button on comments to create threaded replies.",
+        "dependencies": ["urc003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Reply button on each comment" },
+          { "id": "ac2", "description": "Replies indented under parent" },
+          { "id": "ac3", "description": "Reply input in context" }
+        ]
+      },
+      {
+        "step_id": "urc005",
+        "title": "Implement comment resolution",
+        "scope": "planner-ui",
+        "description": "Resolve button marks comment thread as resolved. Resolved threads collapsed.",
+        "dependencies": ["urc003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Resolve button on threads" },
+          { "id": "ac2", "description": "Resolved threads collapsed by default" },
+          { "id": "ac3", "description": "Can expand to see resolved" },
+          { "id": "ac4", "description": "Resolution persisted to API" }
+        ]
+      },
+      {
+        "step_id": "urc006",
+        "title": "Show unresolved count on plan header",
+        "scope": "planner-ui",
+        "description": "Plan header shows total unresolved comments across all steps.",
+        "dependencies": ["urc005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Count in plan header" },
+          { "id": "ac2", "description": "Click filters to steps with comments" },
+          { "id": "ac3", "description": "Updates when comments resolved" }
+        ]
+      }
+    ]
+  }
+}

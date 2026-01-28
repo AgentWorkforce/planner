@@ -1,0 +1,156 @@
+{
+  "feature_id": "storage-sqlite",
+  "title": "SQLite Storage",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["domain-plan", "domain-step"],
+
+  "summary": {
+    "goal": "Implement SQLite-based persistence for plans and versions using better-sqlite3",
+    "context": "Matches relay ecosystem stack. Provides simple, file-based storage that can run without external database dependencies.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Database schema created for plans, versions, steps" },
+      { "id": "ac2", "description": "CRUD operations: create, read, update, delete plans" },
+      { "id": "ac3", "description": "Version queries: get latest, get by version number, list all" },
+      { "id": "ac4", "description": "Steps stored with full structure (criteria, gates, dependencies)" },
+      { "id": "ac5", "description": "Migrations support schema evolution" },
+      { "id": "ac6", "description": "Transactions ensure data integrity" }
+    ]
+  },
+
+  "references": [
+    { "type": "doc", "title": "better-sqlite3", "url": "https://github.com/WiseLibs/better-sqlite3" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "ss001",
+        "title": "Add better-sqlite3 dependency",
+        "scope": "planner-core",
+        "description": "Add better-sqlite3 and @types/better-sqlite3 to package.json. Create src/storage/ directory.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "better-sqlite3 installed and importable" },
+          { "id": "ac2", "description": "Type definitions work correctly" }
+        ]
+      },
+      {
+        "step_id": "ss002",
+        "title": "Define storage interface",
+        "scope": "planner-core",
+        "description": "Create src/storage/interface.ts with PlanStorage interface defining all required operations.",
+        "dependencies": ["ss001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanStorage interface has createPlan, getPlan, updatePlan, deletePlan" },
+          { "id": "ac2", "description": "PlanStorage has listPlans with optional status filter" },
+          { "id": "ac3", "description": "PlanStorage has createVersion, getVersion, getLatestVersion, listVersions" },
+          { "id": "ac4", "description": "All methods return proper types from domain model" }
+        ]
+      },
+      {
+        "step_id": "ss003",
+        "title": "Create database schema",
+        "scope": "planner-core",
+        "description": "Define SQLite schema: plans table, versions table, steps table (with JSON for arrays). Create migration file.",
+        "dependencies": ["ss002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "plans table: plan_id (PK), created_at, updated_at" },
+          { "id": "ac2", "description": "versions table: plan_id, version (composite PK), status, summary (JSON), created_at, updated_at" },
+          { "id": "ac3", "description": "steps table: plan_id, version, step_id (composite), step_data (JSON)" },
+          { "id": "ac4", "description": "Foreign key constraints enforce referential integrity" }
+        ]
+      },
+      {
+        "step_id": "ss004",
+        "title": "Implement database initialization",
+        "scope": "planner-core",
+        "description": "Create initDatabase(path) function that creates/opens database and runs migrations.",
+        "dependencies": ["ss003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Creates database file if not exists" },
+          { "id": "ac2", "description": "Runs all pending migrations" },
+          { "id": "ac3", "description": "Returns database connection" },
+          { "id": "ac4", "description": "Enables foreign keys" }
+        ]
+      },
+      {
+        "step_id": "ss005",
+        "title": "Implement plan CRUD operations",
+        "scope": "planner-core",
+        "description": "Implement createPlan, getPlan, updatePlan, deletePlan, listPlans in SQLite storage.",
+        "dependencies": ["ss004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createPlan inserts plan and returns created entity" },
+          { "id": "ac2", "description": "getPlan returns plan by ID or null if not found" },
+          { "id": "ac3", "description": "updatePlan updates timestamps" },
+          { "id": "ac4", "description": "deletePlan removes plan and all versions/steps (cascade)" },
+          { "id": "ac5", "description": "listPlans supports optional status filter" }
+        ]
+      },
+      {
+        "step_id": "ss006",
+        "title": "Implement version operations",
+        "scope": "planner-core",
+        "description": "Implement createVersion, getVersion, getLatestVersion, listVersions, updateVersionStatus.",
+        "dependencies": ["ss005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createVersion inserts version with steps" },
+          { "id": "ac2", "description": "getVersion returns specific version with steps" },
+          { "id": "ac3", "description": "getLatestVersion returns highest version number" },
+          { "id": "ac4", "description": "listVersions returns all versions for a plan" },
+          { "id": "ac5", "description": "updateVersionStatus only works for valid transitions" }
+        ]
+      },
+      {
+        "step_id": "ss007",
+        "title": "Implement step storage",
+        "scope": "planner-core",
+        "description": "Implement step storage with JSON serialization for arrays (dependencies, criteria).",
+        "dependencies": ["ss006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Steps stored with full JSON structure" },
+          { "id": "ac2", "description": "Steps retrieved and parsed correctly" },
+          { "id": "ac3", "description": "Dependencies and criteria arrays preserved" },
+          { "id": "ac4", "description": "Gate objects stored correctly" }
+        ]
+      },
+      {
+        "step_id": "ss008",
+        "title": "Implement transaction support",
+        "scope": "planner-core",
+        "description": "Wrap multi-step operations in transactions for data integrity.",
+        "dependencies": ["ss006", "ss007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createVersion with steps is atomic" },
+          { "id": "ac2", "description": "deletePlan cascades atomically" },
+          { "id": "ac3", "description": "Failed operations roll back completely" }
+        ]
+      },
+      {
+        "step_id": "ss009",
+        "title": "Add unit tests for storage",
+        "scope": "planner-core",
+        "description": "Write vitest tests for all storage operations using in-memory database.",
+        "dependencies": ["ss008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests use in-memory SQLite for isolation" },
+          { "id": "ac2", "description": "Tests cover all CRUD operations" },
+          { "id": "ac3", "description": "Tests verify transaction rollback on error" },
+          { "id": "ac4", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

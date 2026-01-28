@@ -1,0 +1,93 @@
+{
+  "feature_id": "ui-submit-review",
+  "title": "Submit for Review",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["api-workflow", "ui-editor-inline"],
+
+  "summary": {
+    "goal": "Allow plan authors to submit a draft for portfolio/reviewer review",
+    "context": "Submit is a coordination signal - 'this is ready for review'. The plan moves from working draft to submitted state but remains editable until approved.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Submit button visible on draft plans" },
+      { "id": "ac2", "description": "Submit shows confirmation dialog with summary" },
+      { "id": "ac3", "description": "Plan status changes to 'submitted' after submit" },
+      { "id": "ac4", "description": "UI shows who submitted and when" },
+      { "id": "ac5", "description": "Author can still edit after submit (until approved)" },
+      { "id": "ac6", "description": "Reviewers are notified (if notification system exists)" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "usr001",
+        "title": "Add Submit button to plan toolbar",
+        "scope": "planner-ui",
+        "description": "Submit button visible when viewing draft plan. Disabled for non-draft versions.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Submit button in plan toolbar" },
+          { "id": "ac2", "description": "Button disabled if not draft" },
+          { "id": "ac3", "description": "Tooltip explains purpose" }
+        ]
+      },
+      {
+        "step_id": "usr002",
+        "title": "Create submit confirmation dialog",
+        "scope": "planner-ui",
+        "description": "Dialog showing plan summary and asking for confirmation before submit.",
+        "dependencies": ["usr001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Dialog shows plan title, goal, step count" },
+          { "id": "ac2", "description": "Explains what submit means" },
+          { "id": "ac3", "description": "Cancel and Submit buttons" }
+        ]
+      },
+      {
+        "step_id": "usr003",
+        "title": "Call submit API endpoint",
+        "scope": "planner-ui",
+        "description": "Connect Submit button to POST /plans/:id/versions/:v/submit API.",
+        "dependencies": ["usr002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "API called on confirm" },
+          { "id": "ac2", "description": "Loading state during call" },
+          { "id": "ac3", "description": "Success updates plan state" },
+          { "id": "ac4", "description": "Error shows toast" }
+        ]
+      },
+      {
+        "step_id": "usr004",
+        "title": "Display submitted status in UI",
+        "scope": "planner-ui",
+        "description": "Show 'Submitted' badge on plan, with submitter and timestamp.",
+        "dependencies": ["usr003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Submitted badge visible" },
+          { "id": "ac2", "description": "Shows who submitted" },
+          { "id": "ac3", "description": "Shows when submitted" }
+        ]
+      },
+      {
+        "step_id": "usr005",
+        "title": "Maintain edit capability after submit",
+        "scope": "planner-ui",
+        "description": "Ensure editing still works after submit (until approved).",
+        "dependencies": ["usr003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Edit buttons remain enabled" },
+          { "id": "ac2", "description": "Edits save correctly" },
+          { "id": "ac3", "description": "Note that edits may require re-review" }
+        ]
+      }
+    ]
+  }
+}

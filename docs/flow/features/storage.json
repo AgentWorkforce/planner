@@ -1,0 +1,32 @@
+{
+  "feature_id": "storage",
+  "title": "Storage Layer",
+  "type": "epic",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["domain-model"],
+
+  "summary": {
+    "goal": "Provide persistence layer for plans and versions using SQLite",
+    "context": "Storage follows the relay ecosystem pattern using better-sqlite3. Designed for simplicity first with potential to scale to other backends later.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Storage interface is defined abstractly (allows future backends)" },
+      { "id": "ac2", "description": "SQLite implementation persists plans and versions" },
+      { "id": "ac3", "description": "CRUD operations for plans work correctly" },
+      { "id": "ac4", "description": "Version history is queryable" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Planner Vision - Technology", "path": "docs/github-issue-planner-vision.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "storage-sqlite", "title": "SQLite Storage", "ref": "storage-sqlite.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": []
+  }
+}

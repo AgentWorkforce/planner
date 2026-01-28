@@ -1,0 +1,94 @@
+{
+  "feature_id": "ui-gate-approval",
+  "title": "Gate Approval UI",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["ui-execution-status"],
+
+  "summary": {
+    "goal": "Surface gates awaiting human approval during plan execution",
+    "context": "Steps with human_approval gates pause execution until approved. These gates surface prominently in the UI so approvers can unblock execution.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Gates awaiting approval shown prominently (top-level attention item)" },
+      { "id": "ac2", "description": "Gate shows: step context, what's being approved, who can approve" },
+      { "id": "ac3", "description": "Approve/Reject actions available for authorized users" },
+      { "id": "ac4", "description": "Approval records who approved and when" },
+      { "id": "ac5", "description": "After approval, execution continues automatically" },
+      { "id": "ac6", "description": "Gate history visible on step" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uga001",
+        "title": "Create pending gates notification area",
+        "scope": "planner-ui",
+        "description": "Top-level area showing gates awaiting approval. Attention-grabbing.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Banner or card at top of plan view" },
+          { "id": "ac2", "description": "Shows count of pending gates" },
+          { "id": "ac3", "description": "Prominent styling" }
+        ]
+      },
+      {
+        "step_id": "uga002",
+        "title": "Create GateApprovalCard component",
+        "scope": "planner-ui",
+        "description": "Card showing gate details with approve/reject actions.",
+        "dependencies": ["uga001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows step title and context" },
+          { "id": "ac2", "description": "Shows what gate is checking for" },
+          { "id": "ac3", "description": "Shows who can approve" },
+          { "id": "ac4", "description": "Approve and Reject buttons" }
+        ]
+      },
+      {
+        "step_id": "uga003",
+        "title": "Implement gate approval API call",
+        "scope": "planner-ui",
+        "description": "Connect approve/reject buttons to orchestrator API.",
+        "dependencies": ["uga002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Approve calls orchestrator API" },
+          { "id": "ac2", "description": "Reject calls orchestrator API" },
+          { "id": "ac3", "description": "Loading state during call" },
+          { "id": "ac4", "description": "Success removes from pending list" }
+        ]
+      },
+      {
+        "step_id": "uga004",
+        "title": "Show gate approval history on steps",
+        "scope": "planner-ui",
+        "description": "Steps with gates show approval history in expanded view.",
+        "dependencies": ["uga003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Gate history section in step detail" },
+          { "id": "ac2", "description": "Shows who approved/rejected" },
+          { "id": "ac3", "description": "Shows when action was taken" }
+        ]
+      },
+      {
+        "step_id": "uga005",
+        "title": "Add gate status to step indicators",
+        "scope": "planner-ui",
+        "description": "Visual indicator on step cards showing gate awaiting approval.",
+        "dependencies": ["uga001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Gate icon on steps with gates" },
+          { "id": "ac2", "description": "Pulsing or attention indicator if pending" },
+          { "id": "ac3", "description": "Click jumps to gate approval" }
+        ]
+      }
+    ]
+  }
+}
