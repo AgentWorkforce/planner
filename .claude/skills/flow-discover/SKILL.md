@@ -224,7 +224,7 @@ Identify project components by scanning for:
 | **flow-discover** | `summary` (from code) + `components` |
 | flow-brainstorm | `summary` (from ideas) |
 | flow-planner | `plan_implementation` |
-| flow-todos | Creates executable tasks from plan |
+| flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
 | flow-ui-ux-validation | `validation_uiux` |
 | flow-test-designer | `plan_tests` |
