@@ -30,6 +30,28 @@ Transform implementation plan into executable todos with verification checkpoint
 
 After creating todos, STOP and let the user start implementation.
 
+## Multiple Features: Hierarchical Approach
+
+When asked to handle multiple features (e.g., "all features", "do everything"):
+
+**Step 1: Create feature-level todos first**
+```
+[TODO] Implement domain-plan (8 steps, critical, no deps)
+[TODO] Implement domain-step (7 steps, critical, blocked by domain-plan)
+[TODO] Implement domain-versioning (7 steps, high, blocked by domain-step)
+...
+```
+
+**Step 2: Work one feature at a time**
+When starting a feature-level todo:
+1. Mark feature todo as in_progress
+2. Create detailed PRE/IMPL/POST/VERIFY/DOC todos for that feature only
+3. Complete all checkpoints
+4. Mark feature todo as completed
+5. Move to next feature
+
+This prevents context overload and ensures proper sequencing.
+
 ## Prerequisites
 
 Requires: feature with `plan_implementation.steps` section.
