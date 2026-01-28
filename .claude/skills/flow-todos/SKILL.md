@@ -161,17 +161,28 @@ Group steps by scope or logical phase. Each group gets:
 
 ### 3. Create Todos
 
-Use TaskCreate for each todo. Include in description:
+Use the **TaskCreate tool** (not a CLI command). TaskCreate is a built-in Claude Code tool that you call directly, like Read or Write.
 
-```json
-{
-  "flow_ref": {
-    "feature_id": "auth-login",
-    "step_id": "i001",
-    "file": "docs/flow/features/authentication.json"
-  }
-}
+Example TaskCreate call:
 ```
+TaskCreate:
+  subject: "[IMPL] Create Plan interface"
+  description: |
+    ## Flow Reference
+    - Feature: domain-plan
+    - Step: dp002
+    - File: docs/flow/features/domain-plan.json
+
+    ## Task
+    Create TypeScript interface for Plan entity.
+
+    ## Acceptance Criteria
+    - [ ] Plan has plan_id, created_at, updated_at
+    - [ ] Zod schema validates Plan
+  activeForm: "Creating Plan interface"
+```
+
+**Important**: TaskCreate is a tool you invoke, not a bash command. Do NOT run `claude task create` or similar CLI commands.
 
 ### 4. Set Dependencies
 
