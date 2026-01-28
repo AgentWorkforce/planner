@@ -20,9 +20,8 @@ Transform implementation plan into executable todos with verification checkpoint
 
 **DO NOT implement anything.** This skill:
 - ✅ Reads the feature's plan_implementation.steps
-- ✅ Creates todos using TaskCreate tool
-- ✅ Sets up todo dependencies using TaskUpdate
-- ✅ Shows the created todos using TaskList
+- ✅ Creates todos using the todo tool
+- ✅ Shows the created todos
 - ❌ Does NOT run npm/yarn/pnpm commands
 - ❌ Does NOT create files or directories
 - ❌ Does NOT write code
@@ -161,28 +160,25 @@ Group steps by scope or logical phase. Each group gets:
 
 ### 3. Create Todos
 
-Use the **TaskCreate tool** (not a CLI command). TaskCreate is a built-in Claude Code tool that you call directly, like Read or Write.
+Create a todo for each task. Each todo should have:
+- **subject**: Brief title like "[IMPL] Create Plan interface"
+- **description**: Flow reference, task details, acceptance criteria
+- **activeForm**: Present tense like "Creating Plan interface"
 
-Example TaskCreate call:
+Include in each description:
 ```
-TaskCreate:
-  subject: "[IMPL] Create Plan interface"
-  description: |
-    ## Flow Reference
-    - Feature: domain-plan
-    - Step: dp002
-    - File: docs/flow/features/domain-plan.json
+## Flow Reference
+- Feature: domain-plan
+- Step: dp002
+- File: docs/flow/features/domain-plan.json
 
-    ## Task
-    Create TypeScript interface for Plan entity.
+## Task
+Create TypeScript interface for Plan entity.
 
-    ## Acceptance Criteria
-    - [ ] Plan has plan_id, created_at, updated_at
-    - [ ] Zod schema validates Plan
-  activeForm: "Creating Plan interface"
+## Acceptance Criteria
+- [ ] Plan has plan_id, created_at, updated_at
+- [ ] Zod schema validates Plan
 ```
-
-**Important**: TaskCreate is a tool you invoke, not a bash command. Do NOT run `claude task create` or similar CLI commands.
 
 ### 4. Set Dependencies
 
