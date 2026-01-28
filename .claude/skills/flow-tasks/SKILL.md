@@ -1,6 +1,6 @@
 ---
 name: flow-tasks
-description: Use when user says "create tasks", "make todos", "ready to implement", or "let's build this" after a plan exists. Creates Claude Code tasks with PRE/IMPL/POST/VERIFY/DOC checkpoints.
+description: Use when user says "create tasks", "make tasks", "ready to implement", or "let's build this" after a plan exists. Creates Claude Code tasks with PRE/IMPL/POST/VERIFY/DOC checkpoints.
 user-invocable: false
 ---
 # Tasks: Plan → Executable Tasks
