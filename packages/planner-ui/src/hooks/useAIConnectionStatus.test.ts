@@ -8,7 +8,23 @@ vi.mock('@/api/chat', () => ({
   createSession: vi.fn(),
 }));
 
-import { getSessionStatus, createSession } from '@/api/chat';
+import { getSessionStatus, createSession, type CreateSessionResponse, type AlreadyConnectedResponse } from '@/api/chat';
+
+// Helper to create inactive session status
+const inactiveSession = () => ({
+  active: false,
+  session_id: null,
+  agent_id: null,
+  created_at: null,
+});
+
+// Helper to create active session status
+const activeSession = (sessionId = 'session-123', agentId = 'agent-456') => ({
+  active: true,
+  session_id: sessionId,
+  agent_id: agentId,
+  created_at: new Date().toISOString(),
+});
 
 describe('useAIConnectionStatus', () => {
   beforeEach(() => {
@@ -17,7 +33,7 @@ describe('useAIConnectionStatus', () => {
 
   describe('initial state', () => {
     it('starts in loading state', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123'));
 
       expect(result.current.status).toBe('loading');
@@ -45,11 +61,7 @@ describe('useAIConnectionStatus', () => {
 
   describe('status checking', () => {
     it('shows connected when session is active', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({
-        active: true,
-        session_id: 'session-123',
-        agent_id: 'agent-456',
-      });
+      vi.mocked(getSessionStatus).mockResolvedValue(activeSession());
 
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123'));
 
@@ -62,7 +74,7 @@ describe('useAIConnectionStatus', () => {
     });
 
     it('shows demo when session is not active', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
 
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123'));
 
@@ -96,7 +108,7 @@ describe('useAIConnectionStatus', () => {
     });
 
     it('polls at the specified interval', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
 
       const { unmount } = renderHook(() => useAIConnectionStatus('plan-123', 5000));
 
@@ -130,7 +142,7 @@ describe('useAIConnectionStatus', () => {
 
   describe('refresh', () => {
     it('manually triggers a status check', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
 
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123', 0)); // disable polling
 
@@ -155,12 +167,8 @@ describe('useAIConnectionStatus', () => {
   describe('connect', () => {
     it('creates a session and refreshes status on success', async () => {
       vi.mocked(getSessionStatus)
-        .mockResolvedValueOnce({ active: false })
-        .mockResolvedValueOnce({
-          active: true,
-          session_id: 'new-session',
-          agent_id: 'new-agent',
-        });
+        .mockResolvedValueOnce(inactiveSession())
+        .mockResolvedValueOnce(activeSession('new-session', 'new-agent'));
 
       vi.mocked(createSession).mockResolvedValue({
         session_id: 'new-session',
@@ -190,18 +198,12 @@ describe('useAIConnectionStatus', () => {
 
     it('handles already connected response', async () => {
       vi.mocked(getSessionStatus)
-        .mockResolvedValueOnce({ active: false })
-        .mockResolvedValueOnce({
-          active: true,
-          session_id: 'existing-session',
-          agent_id: 'existing-agent',
-        });
+        .mockResolvedValueOnce(inactiveSession())
+        .mockResolvedValueOnce(activeSession('existing-session', 'existing-agent'));
 
       vi.mocked(createSession).mockResolvedValue({
         alreadyConnected: true,
-        session_id: 'existing-session',
-        agent_id: 'existing-agent',
-        started_at: new Date().toISOString(),
+        session: activeSession('existing-session', 'existing-agent'),
       });
 
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123', 0));
@@ -221,7 +223,7 @@ describe('useAIConnectionStatus', () => {
     });
 
     it('sets error on connect failure', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
       vi.mocked(createSession).mockRejectedValue(new Error('AI service unavailable'));
 
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123', 0));
@@ -240,13 +242,13 @@ describe('useAIConnectionStatus', () => {
     });
 
     it('tracks isConnecting during connection attempt', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
 
       // Create a deferred promise to control timing
-      let resolveCreate!: (value: unknown) => void;
+      let resolveCreate!: (value: CreateSessionResponse | AlreadyConnectedResponse) => void;
       vi.mocked(createSession).mockImplementation(
         () =>
-          new Promise((resolve) => {
+          new Promise<CreateSessionResponse | AlreadyConnectedResponse>((resolve) => {
             resolveCreate = resolve;
           })
       );
@@ -277,11 +279,7 @@ describe('useAIConnectionStatus', () => {
     });
 
     it('does not connect when already connected', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({
-        active: true,
-        session_id: 'existing',
-        agent_id: 'existing',
-      });
+      vi.mocked(getSessionStatus).mockResolvedValue(activeSession('existing', 'existing'));
 
       const { result, unmount } = renderHook(() => useAIConnectionStatus('plan-123', 0));
 
@@ -314,13 +312,13 @@ describe('useAIConnectionStatus', () => {
     });
 
     it('does not connect when already connecting', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
 
       // Create a deferred promise to control timing
-      let resolveCreate!: (value: unknown) => void;
+      let resolveCreate!: (value: CreateSessionResponse | AlreadyConnectedResponse) => void;
       vi.mocked(createSession).mockImplementation(
         () =>
-          new Promise((resolve) => {
+          new Promise<CreateSessionResponse | AlreadyConnectedResponse>((resolve) => {
             resolveCreate = resolve;
           })
       );
@@ -358,7 +356,7 @@ describe('useAIConnectionStatus', () => {
 
   describe('plan change', () => {
     it('resets to loading state on plan change', async () => {
-      vi.mocked(getSessionStatus).mockResolvedValue({ active: false });
+      vi.mocked(getSessionStatus).mockResolvedValue(inactiveSession());
 
       const { result, rerender, unmount } = renderHook(
         ({ planId }) => useAIConnectionStatus(planId, 0),
