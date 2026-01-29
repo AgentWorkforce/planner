@@ -2,7 +2,7 @@
   "feature_id": "relay-session-management",
   "title": "Planning Session Management",
   "type": "feature",
-  "status": "complete",
+  "status": "approved",
   "priority": "high",
   "dependencies": ["relay-planning-agent", "relay-mcp-bridge"],
 

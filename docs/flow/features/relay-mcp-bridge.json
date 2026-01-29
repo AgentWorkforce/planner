@@ -2,7 +2,7 @@
   "feature_id": "relay-mcp-bridge",
   "title": "MCP Bridge for Planning Agents",
   "type": "feature",
-  "status": "completed",
+  "status": "approved",
   "priority": "critical",
   "dependencies": ["relay-planning-agent", "mcp-tools"],
 
