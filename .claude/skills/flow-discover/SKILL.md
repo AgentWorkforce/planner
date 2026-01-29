@@ -234,6 +234,6 @@ Identify project components by scanning for:
 ## Suggested Next Steps
 
 After discovery:
-- Review and validate discovered features
+- Run `/flow audit` to verify code matches discovered docs
 - Run `/flow brainstorm` to add missing features
 - Run `/flow feature` to document user flows

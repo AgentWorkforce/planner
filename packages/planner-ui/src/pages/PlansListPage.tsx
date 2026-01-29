@@ -88,6 +88,13 @@ export function PlansListPage() {
                   <h2 className="plan-goal">{plan.goal || 'Untitled Plan'}</h2>
                   <span className={getStatusBadgeClass(plan.status)}>{plan.status}</span>
                 </div>
+                {plan.scopes && plan.scopes.length > 0 && (
+                  <div className="plan-scopes">
+                    {plan.scopes.map((scope) => (
+                      <span key={scope} className="scope-tag">{scope}</span>
+                    ))}
+                  </div>
+                )}
                 <div className="plan-meta">
                   <span className="plan-version">v{plan.latest_version}</span>
                   <span className="plan-date">

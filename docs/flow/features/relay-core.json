@@ -1,0 +1,188 @@
+{
+  "feature_id": "relay-core",
+  "title": "Relay Core Infrastructure",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "critical",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Add relay SDK dependency and establish connection infrastructure to relay-daemon",
+    "context": "The @agent-relay/sdk package provides agent spawning, messaging, and MCP integration. Planner needs to connect to relay-daemon (via Unix Domain Socket) to spawn and communicate with planning agents.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "@agent-relay/sdk is added as dependency" },
+      { "id": "ac2", "description": "Relay client can connect to relay-daemon" },
+      { "id": "ac3", "description": "Connection health check endpoint exists at GET /api/health/relay" },
+      { "id": "ac4", "description": "Graceful fallback when relay-daemon is not running (mock mode)" },
+      { "id": "ac5", "description": "Environment configuration for relay socket path (RELAY_SOCKET_PATH)" },
+      { "id": "ac6", "description": "Automatic reconnection when daemon becomes available" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "rc001",
+        "title": "Add relay SDK dependency",
+        "scope": "planner-core",
+        "description": "Add @agent-relay/sdk to package.json dependencies. This package provides the client for connecting to relay-daemon.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "@agent-relay/sdk is in dependencies" },
+          { "id": "ac2", "description": "npm install succeeds" },
+          { "id": "ac3", "description": "TypeScript can import from @agent-relay/sdk/client" }
+        ]
+      },
+      {
+        "step_id": "rc002",
+        "title": "Create relay configuration module",
+        "scope": "planner-core",
+        "description": "Create src/relay/config.ts that exports relay configuration: socket path from RELAY_SOCKET_PATH env var with sensible default (e.g., /tmp/relay.sock or ~/.relay/daemon.sock).",
+        "dependencies": ["rc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports getRelayConfig() returning { socketPath: string, reconnectInterval: number, maxReconnectAttempts: number }" },
+          { "id": "ac2", "description": "RELAY_SOCKET_PATH env var overrides default" },
+          { "id": "ac3", "description": "Default path works when env var not set" }
+        ]
+      },
+      {
+        "step_id": "rc003",
+        "title": "Create relay client wrapper",
+        "scope": "planner-core",
+        "description": "Create src/relay/client.ts that wraps @agent-relay/sdk/client. Export: connect(), disconnect(), isConnected(), getClient(). Handle connection errors gracefully - catch and log, don't throw.",
+        "dependencies": ["rc002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "connect() establishes connection to daemon socket" },
+          { "id": "ac2", "description": "disconnect() cleanly closes connection" },
+          { "id": "ac3", "description": "isConnected() returns boolean connection status" },
+          { "id": "ac4", "description": "Connection errors are caught and logged, not thrown" },
+          { "id": "ac5", "description": "getClient() returns null when not connected" }
+        ]
+      },
+      {
+        "step_id": "rc004",
+        "title": "Create relay availability service",
+        "scope": "planner-core",
+        "description": "Create src/relay/service.ts that provides isRelayAvailable() check. This is the single source of truth for whether relay features are active. When unavailable, AI features should fall back to mock responses.",
+        "dependencies": ["rc003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "isRelayAvailable() returns true only when connected to daemon" },
+          { "id": "ac2", "description": "Exports RelayMode type: 'connected' | 'disconnected' | 'mock'" },
+          { "id": "ac3", "description": "getRelayMode() returns current mode" },
+          { "id": "ac4", "description": "onModeChange(callback) allows subscribing to mode changes" }
+        ]
+      },
+      {
+        "step_id": "rc005",
+        "title": "Add relay health check endpoint",
+        "scope": "planner-core",
+        "description": "Add GET /api/health/relay endpoint that returns { status: 'connected' | 'disconnected' | 'error', socketPath: string, message?: string }. This allows UI and monitoring to check relay status.",
+        "dependencies": ["rc004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /api/health/relay returns JSON: { status: 'connected' | 'disconnected' | 'error', socketPath: string, message?: string }" },
+          { "id": "ac2", "description": "Returns 'connected' when daemon is running and connected" },
+          { "id": "ac3", "description": "Returns 'disconnected' when daemon not available" },
+          { "id": "ac4", "description": "Includes socketPath in response" }
+        ]
+      },
+      {
+        "step_id": "rc006",
+        "title": "Implement automatic reconnection",
+        "scope": "planner-core",
+        "description": "Add reconnection logic to relay client. When connection lost, attempt to reconnect at configurable interval. When daemon starts after Planner, client should eventually connect.",
+        "dependencies": ["rc003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Reconnection attempts occur at configured interval (default 5s)" },
+          { "id": "ac2", "description": "Max reconnect attempts configurable (default unlimited)" },
+          { "id": "ac3", "description": "Successful reconnection updates relay mode to 'connected'" },
+          { "id": "ac4", "description": "Reconnection attempts logged but not noisy (backoff)" }
+        ]
+      },
+      {
+        "step_id": "rc007",
+        "title": "Initialize relay on server startup",
+        "scope": "planner-core",
+        "description": "Modify src/server.ts to attempt relay connection on startup. Log connection status. Do NOT fail if relay unavailable - the server should start in mock mode.",
+        "dependencies": ["rc003", "rc005", "rc006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Server attempts relay connection on startup" },
+          { "id": "ac2", "description": "Server starts successfully even if relay unavailable" },
+          { "id": "ac3", "description": "Console logs show relay connection status" },
+          { "id": "ac4", "description": "Graceful shutdown disconnects relay" }
+        ]
+      },
+      {
+        "step_id": "rc008",
+        "title": "Export relay module from index",
+        "scope": "planner-core",
+        "description": "Create src/relay/index.ts that re-exports public API: connect, disconnect, isConnected, isRelayAvailable, getRelayMode, getRelayConfig. Update src/index.ts if needed.",
+        "dependencies": ["rc004", "rc006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/relay/index.ts exports public relay API" },
+          { "id": "ac2", "description": "Other modules can import from './relay/index.js'" }
+        ]
+      },
+      {
+        "step_id": "rc009",
+        "title": "Add unit tests for relay module",
+        "scope": "planner-core",
+        "description": "Create src/relay/relay.test.ts with tests for: config loading, client connect/disconnect behavior, availability service, reconnection logic. Mock the @agent-relay/sdk to test without actual daemon.",
+        "dependencies": ["rc008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for config module with/without env var" },
+          { "id": "ac2", "description": "Tests for client wrapper with mocked SDK" },
+          { "id": "ac3", "description": "Tests for availability service" },
+          { "id": "ac4", "description": "Tests for reconnection logic" },
+          { "id": "ac5", "description": "All tests pass with npm test" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "critical",
+    "cases": [
+      { "type": "happy", "description": "Config loads with default socket path when RELAY_SOCKET_PATH not set" },
+      { "type": "happy", "description": "Config loads with custom socket path from RELAY_SOCKET_PATH env var" },
+      { "type": "happy", "description": "Client connects to daemon when socket available" },
+      { "type": "happy", "description": "Client disconnects cleanly" },
+      { "type": "happy", "description": "isConnected() returns true when connected, false when disconnected" },
+      { "type": "happy", "description": "getClient() returns client instance when connected" },
+      { "type": "happy", "description": "isRelayAvailable() returns true when connected to daemon" },
+      { "type": "happy", "description": "getRelayMode() returns 'connected' when daemon running" },
+      { "type": "happy", "description": "GET /api/health/relay returns { status: 'connected', socketPath } when connected" },
+      { "type": "happy", "description": "Successful reconnection after disconnect updates mode to 'connected'" },
+      { "type": "happy", "description": "Server starts and attempts relay connection on startup" },
+      { "type": "happy", "description": "Graceful shutdown calls disconnect()" },
+      { "type": "edge", "description": "connect() with invalid socket path logs error but does not throw" },
+      { "type": "edge", "description": "getClient() returns null when not connected" },
+      { "type": "edge", "description": "isRelayAvailable() returns false before connect() called" },
+      { "type": "edge", "description": "getRelayMode() returns 'disconnected' when daemon not running" },
+      { "type": "edge", "description": "onModeChange callback fires on connection state change" },
+      { "type": "edge", "description": "Reconnection uses exponential backoff (not noisy logs)" },
+      { "type": "edge", "description": "Max reconnect attempts respected when configured" },
+      { "type": "edge", "description": "Daemon starts after Planner - client eventually connects via reconnection" },
+      { "type": "error", "description": "Connection failure logs error but server continues starting" },
+      { "type": "error", "description": "Socket permission denied error caught and logged" },
+      { "type": "error", "description": "GET /api/health/relay returns { status: 'disconnected' } when daemon unavailable" },
+      { "type": "error", "description": "GET /api/health/relay returns { status: 'error', message } on connection error" },
+      { "type": "error", "description": "Reconnection attempt failure does not crash server" }
+    ],
+    "data_requirements": [
+      "Mocked @agent-relay/sdk module for unit tests",
+      "Test Unix socket for integration tests (can use mock or temp socket)",
+      "Environment variable manipulation for config tests"
+    ]
+  }
+}

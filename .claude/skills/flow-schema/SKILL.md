@@ -33,6 +33,21 @@ docs/flow/
     }
   ],
 
+  "design_system": {
+    "feel": "professional, minimal",
+    "library": {
+      "name": "shadcn/ui",
+      "docs": "https://ui.shadcn.com"
+    },
+    "patterns": {
+      "forms": "vertical stack, FormField per input",
+      "lists": "Card-based or Table for dense data",
+      "loading": "Skeleton matching content shape",
+      "errors": "inline FormMessage, Toast for actions",
+      "empty": "centered message with action"
+    }
+  },
+
   "features": [
     { "id": "auth", "title": "Authentication", "type": "epic", "status": "approved" },
     { "id": "settings", "title": "User Settings", "type": "feature", "status": "draft" }
@@ -57,7 +72,7 @@ docs/flow/
   "feature_id": "auth",
   "title": "Authentication",
   "type": "epic|feature",
-  "status": "draft|approved|published|deprecated",
+  "status": "draft|approved|implemented|verified|published|deprecated",
   "priority": "critical|high|medium|low",
   "dependencies": ["other-feature-id"],
 
@@ -67,6 +82,25 @@ docs/flow/
     "acceptance_criteria": [
       { "id": "ac1", "description": "Checkable outcome" }
     ]
+  },
+
+  "design_spec": {
+    "views": [
+      {
+        "view_id": "v001",
+        "name": "Login",
+        "layout": "centered Card, max-w-md",
+        "elements": [
+          { "component": "Input", "use": "email", "props": "type=email" },
+          { "component": "Button", "use": "submit", "props": "variant=default size=lg" }
+        ],
+        "states": {
+          "loading": "Button disabled with Loader2 spinning",
+          "error": "FormMessage below invalid field"
+        }
+      }
+    ],
+    "custom_needed": ["PasswordInput - Input with visibility toggle"]
   },
 
   "user_flow": {
@@ -126,6 +160,17 @@ docs/flow/
     }
   },
 
+  "audit": {
+    "last_run": "2026-01-29",
+    "result": "pass|partial|fail",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied|partial|missing", "evidence": "file:line or note" }
+    ],
+    "drift": [
+      { "finding": "Undocumented functionality", "file": "path", "action": "document or remove" }
+    ]
+  },
+
   "references": [
     { "type": "prd", "title": "Auth PRD v2", "url": "https://..." },
     { "type": "design", "title": "Login Figma", "url": "https://..." },
@@ -144,12 +189,16 @@ docs/flow/
 | Section | Skill | Purpose |
 |---------|-------|---------|
 | `summary` | flow-brainstorm/flow-discover | What the feature is |
+| `design_spec` | flow-ui-ux-designer | How it looks (views, components) |
 | `user_flow` | flow-feature | How it behaves (for testing) |
 | `plan_implementation` | flow-planner | How to build it |
 | `plan_tests` | flow-test-designer | Test design/coverage |
 | `validation_uiux` | flow-ui-ux-validation | UI/UX validation results |
+| `audit` | flow-audit | Implementation verification |
 | `references` | Any | Links to external docs |
 | `sub_features` | Any | Nested features (inline or ref) |
+
+Note: `catalog.design_system` is owned by flow-ui-ux-designer (project-level).
 
 ## Status Semantics
 
@@ -157,6 +206,8 @@ docs/flow/
 |--------|---------|
 | `draft` | Incomplete or unclear |
 | `approved` | Stable enough to implement/test |
+| `implemented` | Code complete (claimed) |
+| `verified` | Code verified against docs (by flow-audit) |
 | `published` | Validated baseline |
 | `deprecated` | Intentionally removed |
 

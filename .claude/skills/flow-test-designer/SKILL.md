@@ -1,6 +1,6 @@
 ---
 name: flow-test-designer
-description: When feature has user_flow and user needs test planning - "what tests do we need?", "design test coverage". Analyzes flows to create test cases (happy/edge/error), coverage strategy, and data requirements. Does not generate test code.
+description: When feature needs test planning - "what tests do we need?", "design test coverage". Works with user_flow (UI) or plan_implementation (backend). Creates test cases, coverage strategy, and data requirements. Does not generate test code.
 user-invocable: false
 ---
 # Test Designer: Feature → Test Design
@@ -19,13 +19,15 @@ Does NOT generate test code. Produces the spec for implementation.
 
 ## Prerequisites
 
-Requires: feature file with `user_flow` section.
+Requires: feature file with either:
+- `user_flow` section (UI features), OR
+- `plan_implementation.steps` with acceptance criteria (backend/infra features)
 
-If `user_flow` missing → "Run /flow feature first."
+If neither exists → "Run /flow feature or /flow planner first."
 
 ## Input
 
-- Feature file with `user_flow` section
+- Feature file with `user_flow` OR `plan_implementation`
 - Optional: `validation_uiux` results
 - Optional: existing test files (to identify gaps)
 
@@ -35,27 +37,39 @@ Feature's `plan_tests` section filled.
 
 ## Workflow
 
-### 1. Analyze User Flow
+### 1. Analyze Feature
 
-Read `user_flow` steps:
+**If `user_flow` exists** (UI features):
 - Identify critical paths vs optional branches
 - Note external dependencies (APIs, services, auth)
 
+**If only `plan_implementation` exists** (backend/infra):
+- Extract testable behaviors from step acceptance criteria
+- Identify API contracts, data transformations, error conditions
+
 ### 2. Determine Coverage Level
 
-| Flow characteristic | Coverage |
-|---------------------|----------|
+| Feature type | Coverage |
+|--------------|----------|
 | User-facing critical path | E2E |
-| Internal service interaction | Integration |
-| Complex logic, calculations | Unit |
+| API endpoints | Integration (request/response contracts) |
+| Service-to-service | Integration (mocks/stubs) |
+| Complex logic, algorithms | Unit |
+| Data layer (storage, queries) | Integration |
 | Simple pass-through | Skip or minimal |
 
 ### 3. Design Test Cases
 
-For each significant step, consider:
+For each significant behavior, consider:
 - **Happy path**: Normal successful execution
 - **Edge cases**: Boundary values, empty states, max limits
 - **Error states**: Invalid input, network failure, permission denied
+
+**For APIs specifically**:
+- Request validation (missing fields, wrong types)
+- Response shape matches contract
+- Auth/permissions enforced
+- Idempotency where expected
 
 ### 4. Specify Data Requirements
 
@@ -97,8 +111,8 @@ What test data is needed?
 
 ## Rules
 
-- 1–2 questions per message. Prefer option-based questions.
-- Design for confidence, not coverage percentage
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
+- Design for confidence, not coverage percentage—test representative scenarios, not every permutation
 - Be specific about data requirements—vague specs lead to flaky tests
 - Skip steps that are pure assertions (already tested by prior action)
 - Don't test framework behavior

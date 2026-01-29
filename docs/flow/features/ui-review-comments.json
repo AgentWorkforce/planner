@@ -2,7 +2,7 @@
   "feature_id": "ui-review-comments",
   "title": "Review Comments",
   "type": "feature",
-  "status": "approved",
+  "status": "in_progress",
   "priority": "medium",
   "dependencies": ["ui-submit-review"],
 
@@ -20,6 +20,160 @@
     ]
   },
 
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      {
+        "type": "happy",
+        "description": "CommentThread renders when comment icon clicked on step",
+        "scope": "planner-ui",
+        "relates_to": ["urc003a.ac1"]
+      },
+      {
+        "type": "happy",
+        "description": "Comments fetched from API and displayed in thread",
+        "scope": "planner-ui",
+        "relates_to": ["urc003a.ac2"]
+      },
+      {
+        "type": "happy",
+        "description": "New comment POSTs to API and appears in list",
+        "scope": "planner-ui",
+        "relates_to": ["urc003a.ac3"]
+      },
+      {
+        "type": "happy",
+        "description": "Panel closes on overlay click and close button",
+        "scope": "planner-ui",
+        "relates_to": ["urc003a.ac4"]
+      },
+      {
+        "type": "happy",
+        "description": "Reply creates threaded comment with parent_id",
+        "scope": "planner-ui",
+        "relates_to": ["urc004.ac1", "urc004.ac2"]
+      },
+      {
+        "type": "happy",
+        "description": "Resolve button marks comment as resolved via API",
+        "scope": "planner-ui",
+        "relates_to": ["urc005.ac1", "urc005.ac4"]
+      },
+      {
+        "type": "edge",
+        "description": "Empty comment input disables submit button",
+        "scope": "planner-ui",
+        "relates_to": ["urc003.ac3"]
+      },
+      {
+        "type": "edge",
+        "description": "No comments shows empty state message",
+        "scope": "planner-ui",
+        "relates_to": ["urc003.ac1"]
+      },
+      {
+        "type": "error",
+        "description": "API error on fetch shows error state",
+        "scope": "planner-ui",
+        "relates_to": ["urc003a.ac2"]
+      },
+      {
+        "type": "error",
+        "description": "API error on post shows error feedback",
+        "scope": "planner-ui",
+        "relates_to": ["urc003a.ac3"]
+      }
+    ],
+    "data_requirements": [
+      "Plan with multiple steps",
+      "Comments: mix of resolved and unresolved",
+      "Comments: with and without replies (parent_id)",
+      "Mock API responses for success and error cases"
+    ],
+    "notes": "Focus on integration between CommentThread and PlanEditorPage. Backend API already tested separately."
+  },
+
+  "design_spec": {
+    "pattern": "slide-in-panel",
+    "notes": "Follows existing ChatPanel pattern - right-edge slide-in with overlay",
+    "views": [
+      {
+        "view_id": "v001",
+        "name": "CommentThread Panel",
+        "layout": "fixed right-edge, 400px width, full height, z-index 1000",
+        "trigger": "Click comment icon on step header",
+        "elements": [
+          { "component": "overlay", "use": "semi-transparent backdrop (rgba 0,0,0,0.3)", "behavior": "click to close" },
+          { "component": "panel", "use": "slide-in container", "props": "background white, box-shadow left" },
+          { "component": "header", "use": "title + step name + close button" },
+          { "component": "stats-bar", "use": "unresolved count + toggle resolved link" },
+          { "component": "comment-list", "use": "scrollable, threaded comments", "empty_state": "No comments yet message" },
+          { "component": "comment-item", "use": "author, timestamp, content, reply/resolve buttons" },
+          { "component": "reply-form", "use": "inline textarea under parent when replying" },
+          { "component": "input-footer", "use": "new comment textarea + submit button" }
+        ],
+        "states": {
+          "loading": "Show loading spinner in comment-list area",
+          "empty": "Centered message: No comments yet. Start the conversation!",
+          "error": "Error message with retry option",
+          "submitting": "Button shows Posting..., textarea disabled"
+        },
+        "close_triggers": ["overlay click", "close button", "Escape key"]
+      },
+      {
+        "view_id": "v002",
+        "name": "Step Comment Icon",
+        "layout": "inline in step-editor-header, after scope badge, before actions",
+        "elements": [
+          { "component": "button", "use": "comment trigger", "props": "icon-only, relative positioning for badge" },
+          { "component": "icon", "use": "speech bubble (existing)", "states": "muted gray (no comments), primary blue (has unresolved)" },
+          { "component": "badge", "use": "unresolved count", "props": "absolute positioned, top-right, primary bg, white text, min-width 16px" }
+        ],
+        "states": {
+          "no_comments": "Muted icon, no badge",
+          "has_unresolved": "Primary icon + count badge",
+          "panel_open": "Highlighted/active background"
+        }
+      },
+      {
+        "view_id": "v003",
+        "name": "Plan Header Comments Badge",
+        "layout": "in plan-meta div, after version badge",
+        "elements": [
+          { "component": "badge-comments", "use": "total unresolved count", "props": "amber bg (#fef3c7), amber text (#92400e)" }
+        ],
+        "states": {
+          "no_unresolved": "Badge hidden",
+          "has_unresolved": "Show: N unresolved comments"
+        },
+        "interaction": "Informational only for MVP (no click action)"
+      }
+    ],
+    "panel_coexistence": {
+      "rule": "One panel at a time",
+      "behavior": "Opening CommentThread closes ChatPanel and vice versa",
+      "state": "activePanel: 'chat' | 'comments' | null"
+    },
+    "state_management": {
+      "page_state": [
+        "commentStepId: string | null - which step's comments are showing",
+        "comments: Comment[] - all comments for the plan",
+        "loadingComments: boolean - fetching state"
+      ],
+      "data_flow": [
+        "1. On page load: GET /plans/:id/comments -> comments state",
+        "2. On icon click: set commentStepId, filter comments for that step",
+        "3. On add comment: POST to API, optimistic add to comments array",
+        "4. On resolve: PATCH to API, update comment in array"
+      ]
+    },
+    "keyboard_shortcuts": {
+      "Escape": "Close panel"
+    },
+    "custom_needed": []
+  },
+
   "plan_implementation": {
     "scopes": ["planner-ui", "planner-core"],
     "steps": [
@@ -33,74 +187,118 @@
         "acceptance_criteria": [
           { "id": "ac1", "description": "comments table: id, plan_id, step_id, author, content, created_at, resolved" },
           { "id": "ac2", "description": "parent_id for threading" },
-          { "id": "ac3", "description": "GET/POST/PATCH endpoints" }
+          { "id": "ac3", "description": "GET /plans/:id/comments returns [{ id, plan_id, step_id, author, content, created_at, resolved, parent_id }]" },
+          { "id": "ac4", "description": "POST /plans/:id/comments accepts { step_id, author, content, parent_id? }" },
+          { "id": "ac5", "description": "PATCH /plans/:id/comments/:comment_id accepts { resolved: boolean }" }
         ]
       },
       {
         "step_id": "urc002",
         "title": "Add comment icon to step cards",
         "scope": "planner-ui",
-        "description": "Comment bubble icon on each step. Badge shows count of unresolved comments.",
+        "description": "Comment bubble icon in step-editor-header (per design_spec v002). Icon state varies: muted gray when no comments, primary blue with badge when has unresolved.",
         "dependencies": ["urc001"],
         "owner_role": "frontend:Coder",
+        "design_ref": "design_spec.views.v002",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Comment icon visible on steps" },
-          { "id": "ac2", "description": "Badge shows count if > 0" },
-          { "id": "ac3", "description": "Click opens comment panel" }
+          { "id": "ac1", "description": "Comment icon in step header, after scope badge, before actions" },
+          { "id": "ac2", "description": "Icon muted gray when no comments, primary blue when has unresolved" },
+          { "id": "ac3", "description": "Badge (absolute positioned, top-right, primary bg, white text, min-width 16px) shows unresolved count if > 0" },
+          { "id": "ac4", "description": "Click calls onCommentClick(stepId) prop" },
+          { "id": "ac5", "description": "Highlighted/active background when panel is open for this step" }
         ]
       },
       {
         "step_id": "urc003",
         "title": "Create CommentThread component",
         "scope": "planner-ui",
-        "description": "Slide-out panel showing comment thread for a step. Input for new comments.",
+        "description": "Standalone slide-in panel component (per design_spec v001). Fixed right-edge, 400px width, full height, z-index 1000. Semi-transparent overlay with click-to-close. Contains header, stats bar, scrollable comment list, and input footer.",
         "dependencies": ["urc002"],
         "owner_role": "frontend:Coder",
+        "design_ref": "design_spec.views.v001",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Panel shows existing comments" },
-          { "id": "ac2", "description": "Comments show author, time, content" },
-          { "id": "ac3", "description": "Input field for new comment" },
-          { "id": "ac4", "description": "Submit posts to API" }
+          { "id": "ac1", "description": "Panel: fixed right 0, width 400px, height 100vh, z-index 1000, white background, box-shadow left" },
+          { "id": "ac2", "description": "Overlay: fixed fullscreen, rgba(0,0,0,0.3), click triggers onClose" },
+          { "id": "ac3", "description": "Header: title (Comments), step name, close button (X)" },
+          { "id": "ac4", "description": "Stats bar: unresolved count, toggle for showing resolved" },
+          { "id": "ac5", "description": "Comment list: scrollable area, renders comment-item for each" },
+          { "id": "ac6", "description": "Comment item: author, timestamp, content, reply button, resolve button" },
+          { "id": "ac7", "description": "Input footer: textarea + submit button" },
+          { "id": "ac8", "description": "States: loading (spinner), empty (No comments yet message), error (retry option), submitting (disabled)" },
+          { "id": "ac9", "description": "Close triggers: overlay click, close button, Escape key" },
+          { "id": "ac10", "description": "Props: { stepId, stepTitle, comments, onClose, onAddComment, onResolve }" }
+        ]
+      },
+      {
+        "step_id": "urc003a",
+        "title": "Integrate CommentThread into PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Wire CommentThread into PlanEditorPage with panel coexistence rule (design_spec.panel_coexistence). Implement state management per design_spec.state_management: activePanel tracks which panel is open, commentStepId tracks which step's comments to show. Opening CommentThread must close ChatPanel and vice versa.",
+        "dependencies": ["urc003"],
+        "owner_role": "frontend:Coder",
+        "design_ref": ["design_spec.panel_coexistence", "design_spec.state_management"],
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "State: activePanel: 'chat' | 'comments' | null (replaces separate isChatOpen)" },
+          { "id": "ac2", "description": "State: commentStepId: string | null - which step's comments panel is open" },
+          { "id": "ac3", "description": "State: comments: Comment[] - all comments for the plan" },
+          { "id": "ac4", "description": "State: loadingComments: boolean" },
+          { "id": "ac5", "description": "On page load: GET /plans/:id/comments -> comments state" },
+          { "id": "ac6", "description": "Opening CommentThread sets activePanel='comments', closes ChatPanel" },
+          { "id": "ac7", "description": "Opening ChatPanel sets activePanel='chat', closes CommentThread" },
+          { "id": "ac8", "description": "CommentThread rendered when activePanel='comments' and commentStepId set" },
+          { "id": "ac9", "description": "Comments filtered by commentStepId before passing to CommentThread" },
+          { "id": "ac10", "description": "New comments POST to API, optimistic add to comments array" },
+          { "id": "ac11", "description": "onClose sets activePanel=null, commentStepId=null" },
+          { "id": "ac12", "description": "StepEditor receives onCommentClick prop, commentCount (filtered by step_id), isCommentPanelOpen (for highlight)" }
         ]
       },
       {
         "step_id": "urc004",
         "title": "Implement reply threading",
         "scope": "planner-ui",
-        "description": "Reply button on comments to create threaded replies.",
-        "dependencies": ["urc003"],
+        "description": "Reply button on comments shows inline reply-form (per design_spec v001 reply-form element). Replies created with parent_id, indented in display.",
+        "dependencies": ["urc003a"],
         "owner_role": "frontend:Coder",
+        "design_ref": "design_spec.views.v001.elements.reply-form",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Reply button on each comment" },
-          { "id": "ac2", "description": "Replies indented under parent" },
-          { "id": "ac3", "description": "Reply input in context" }
+          { "id": "ac1", "description": "Reply button on each root comment" },
+          { "id": "ac2", "description": "Click shows inline textarea under the parent comment" },
+          { "id": "ac3", "description": "Submit POSTs with parent_id set to parent comment id" },
+          { "id": "ac4", "description": "Replies rendered indented (margin-left) under parent" },
+          { "id": "ac5", "description": "Cancel button hides reply form" }
         ]
       },
       {
         "step_id": "urc005",
         "title": "Implement comment resolution",
         "scope": "planner-ui",
-        "description": "Resolve button marks comment thread as resolved. Resolved threads collapsed.",
-        "dependencies": ["urc003"],
+        "description": "Resolve button on root comments marks thread as resolved. Stats bar shows unresolved count and toggle to show/hide resolved threads.",
+        "dependencies": ["urc003a"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Resolve button on threads" },
-          { "id": "ac2", "description": "Resolved threads collapsed by default" },
-          { "id": "ac3", "description": "Can expand to see resolved" },
-          { "id": "ac4", "description": "Resolution persisted to API" }
+          { "id": "ac1", "description": "Resolve button on root comments (not replies)" },
+          { "id": "ac2", "description": "PATCH /plans/:id/comments/:comment_id with { resolved: true }" },
+          { "id": "ac3", "description": "Resolved threads hidden by default (showResolved: false state)" },
+          { "id": "ac4", "description": "Toggle link in stats bar: Show resolved (N) / Hide resolved" },
+          { "id": "ac5", "description": "Resolved comments styled with muted opacity or strikethrough" },
+          { "id": "ac6", "description": "Can unresolve by clicking resolve button again" }
         ]
       },
       {
         "step_id": "urc006",
         "title": "Show unresolved count on plan header",
         "scope": "planner-ui",
-        "description": "Plan header shows total unresolved comments across all steps.",
+        "description": "Badge in PlanHeader showing total unresolved comments (per design_spec v003). Amber background (#fef3c7), amber text (#92400e). Hidden when count is 0. Informational only for MVP (no click action).",
         "dependencies": ["urc005"],
         "owner_role": "frontend:Coder",
+        "design_ref": "design_spec.views.v003",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Count in plan header" },
-          { "id": "ac2", "description": "Click filters to steps with comments" },
-          { "id": "ac3", "description": "Updates when comments resolved" }
+          { "id": "ac1", "description": "Badge in plan-meta div, after version badge" },
+          { "id": "ac2", "description": "Text: N unresolved comments" },
+          { "id": "ac3", "description": "Style: amber bg (#fef3c7), amber text (#92400e), badge class" },
+          { "id": "ac4", "description": "Hidden when unresolved count is 0" },
+          { "id": "ac5", "description": "Count derived from comments.filter(c => !c.resolved && !c.parent_id).length" }
         ]
       }
     ]

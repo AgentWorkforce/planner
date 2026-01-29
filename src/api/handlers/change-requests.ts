@@ -9,6 +9,9 @@ import { PlanStatus } from '../../domain/status.js';
 import type { Step } from '../../domain/step.js';
 import type { PlanVersion } from '../../domain/plan.js';
 import { HttpError } from '../middleware.js';
+import { isRelayAvailable } from '../../relay/service.js';
+import { spawnRevisionAgent, terminateAgent } from '../../relay/spawner.js';
+import { getRelayConfig } from '../../relay/config.js';
 
 /**
  * Request schema for creating a change request.
@@ -26,6 +29,10 @@ interface RunIdParams {
 }
 
 interface PlanIdParams {
+  id: string;
+}
+
+interface ChangeRequestIdParams {
   id: string;
 }
 
@@ -75,12 +82,14 @@ export function createChangeRequestHandlers(storage: PlanStorage) {
     /**
      * POST /runs/:run_id/change-requests
      * Create a new change request from Orchestrator.
+     * If relay is available, spawns a revision agent to draft changes.
+     * Otherwise, applies suggested changes directly.
      */
-    create: (
+    create: async (
       req: Request<RunIdParams>,
       res: Response,
       next: NextFunction
-    ): void => {
+    ): Promise<void> => {
       try {
         const runId = req.params.run_id;
         const parsed = CreateChangeRequestSchema.parse(req.body);
@@ -108,7 +117,42 @@ export function createChangeRequestHandlers(storage: PlanStorage) {
         );
         storage.createChangeRequest(changeRequest);
 
-        // Create new draft version from published version with changes applied
+        // Try to spawn revision agent if relay is available
+        if (isRelayAvailable()) {
+          try {
+            const config = getRelayConfig();
+            const result = await spawnRevisionAgent({
+              planId: parsed.plan_id,
+              changeRequest,
+              currentVersion: publishedVersion.version,
+              mcpServerUrl: config.mcpServerUrl,
+            });
+
+            // Update change request with revision session info
+            storage.updateChangeRequestRevisionStatus(
+              changeRequest.change_request_id,
+              result.agentId,
+              'pending'
+            );
+
+            console.log(
+              `[change-requests] Spawned revision agent ${result.agentId} for change request ${changeRequest.change_request_id}`
+            );
+
+            res.status(201).json({
+              change_request: storage.getChangeRequest(changeRequest.change_request_id),
+              revision_agent_spawned: true,
+            });
+            return;
+          } catch (spawnError) {
+            // Log error but don't fail change request creation
+            const message = spawnError instanceof Error ? spawnError.message : String(spawnError);
+            console.error(`[change-requests] Failed to spawn revision agent: ${message}`);
+            // Fall through to manual revision flow
+          }
+        }
+
+        // Fallback: Apply changes directly (manual revision mode)
         const latestVersion = storage.getLatestVersion(parsed.plan_id);
         const newVersionNumber = latestVersion ? latestVersion.version + 1 : 1;
 
@@ -128,16 +172,22 @@ export function createChangeRequestHandlers(storage: PlanStorage) {
 
         storage.createVersion(newVersion);
 
-        // Update change request with result version
+        // Update change request with result version and set revision_status to 'none'
         storage.updateChangeRequestStatus(
           changeRequest.change_request_id,
           'applied',
           newVersionNumber
         );
+        storage.updateChangeRequestRevisionStatus(
+          changeRequest.change_request_id,
+          null,
+          'none'
+        );
 
         res.status(201).json({
           change_request: storage.getChangeRequest(changeRequest.change_request_id),
           new_version: storage.getVersion(parsed.plan_id, newVersionNumber),
+          revision_agent_spawned: false,
         });
       } catch (error) {
         next(error);
@@ -206,6 +256,106 @@ export function createChangeRequestHandlers(storage: PlanStorage) {
         });
 
         res.json({ change_requests: results });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * POST /change-requests/:id/accept-revision
+     * Accept the revision created by the agent.
+     */
+    acceptRevision: async (
+      req: Request<ChangeRequestIdParams>,
+      res: Response,
+      next: NextFunction
+    ): Promise<void> => {
+      try {
+        const changeRequestId = req.params.id;
+
+        const changeRequest = storage.getChangeRequest(changeRequestId);
+        if (!changeRequest) {
+          throw new HttpError(404, 'Change request not found');
+        }
+
+        if (changeRequest.revision_status !== 'drafted') {
+          throw new HttpError(400, `Cannot accept revision: status is '${changeRequest.revision_status}', expected 'drafted'`);
+        }
+
+        // Find the version linked to this change request
+        const version = storage.getVersionByChangeRequest(changeRequestId);
+        if (!version) {
+          throw new HttpError(404, 'No draft version found for this change request');
+        }
+
+        if (version.status !== PlanStatus.Draft) {
+          throw new HttpError(400, `Version is not a draft: status is '${version.status}'`);
+        }
+
+        // Terminate the revision agent if active
+        if (changeRequest.revision_session_id) {
+          try {
+            await terminateAgent(changeRequest.revision_session_id);
+          } catch (err) {
+            console.error(`[change-requests] Failed to terminate revision agent: ${err}`);
+          }
+        }
+
+        // Update change request status
+        storage.updateChangeRequestStatus(changeRequestId, 'applied', version.version);
+        storage.updateChangeRequestRevisionStatus(changeRequestId, null, 'none');
+
+        const updatedChangeRequest = storage.getChangeRequest(changeRequestId);
+
+        res.json({
+          change_request: updatedChangeRequest,
+          version: version,
+          message: 'Revision accepted. The draft version is ready for human review.',
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * POST /change-requests/:id/reject-revision
+     * Reject the revision created by the agent.
+     */
+    rejectRevision: async (
+      req: Request<ChangeRequestIdParams>,
+      res: Response,
+      next: NextFunction
+    ): Promise<void> => {
+      try {
+        const changeRequestId = req.params.id;
+
+        const changeRequest = storage.getChangeRequest(changeRequestId);
+        if (!changeRequest) {
+          throw new HttpError(404, 'Change request not found');
+        }
+
+        if (changeRequest.revision_status !== 'drafted') {
+          throw new HttpError(400, `Cannot reject revision: status is '${changeRequest.revision_status}', expected 'drafted'`);
+        }
+
+        // Terminate the revision agent if active
+        if (changeRequest.revision_session_id) {
+          try {
+            await terminateAgent(changeRequest.revision_session_id);
+          } catch (err) {
+            console.error(`[change-requests] Failed to terminate revision agent: ${err}`);
+          }
+        }
+
+        // Reset change request to pending
+        storage.updateChangeRequestRevisionStatus(changeRequestId, null, 'none');
+
+        const updatedChangeRequest = storage.getChangeRequest(changeRequestId);
+
+        res.json({
+          change_request: updatedChangeRequest,
+          message: 'Revision rejected. Change request has been reset to pending.',
+        });
       } catch (error) {
         next(error);
       }

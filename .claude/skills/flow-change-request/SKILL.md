@@ -83,7 +83,7 @@ Re-run these? [Y/n/select]
 
 ## Rules
 
-- 1–2 questions per message. Prefer option-based questions.
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
 - Show proposed changes before applying
 - Ask confirmation before re-running skills
 - Be surgical—only update what's affected
