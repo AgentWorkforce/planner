@@ -6,6 +6,17 @@ import type { Comment } from '../domain/comment.js';
 import type { Improvement, ImprovementStatus } from '../domain/improvement.js';
 
 /**
+ * Plan data with pre-joined attention signal inputs.
+ * Used by listPlansWithAttention to avoid N+1 queries.
+ */
+export interface PlanWithAttentionData {
+  plan: Plan;
+  latestVersion: PlanVersion;
+  pendingChangeRequestCount: number;
+  unresolvedCommentCount: number;
+}
+
+/**
  * Session status for lifecycle management.
  */
 export type SessionStatus = 'active' | 'completed' | 'timeout' | 'terminated' | 'error';
@@ -36,6 +47,7 @@ export interface PlanStorage {
   updatePlan(planId: string): Plan | null;
   deletePlan(planId: string): boolean;
   listPlans(status?: PlanStatus): Plan[];
+  listPlansWithAttention(status?: PlanStatus): PlanWithAttentionData[];
 
   // Version operations
   createVersion(version: PlanVersion): PlanVersion;

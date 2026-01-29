@@ -11,6 +11,7 @@ import { createSessionHandlers } from './handlers/sessions.js';
 import { createChatHandlers } from './handlers/chat.js';
 import { createImportHandlers } from './handlers/import.js';
 import { createEventsHandler } from './handlers/events.js';
+import { createChannelHandlers } from './handlers/channels.js';
 import { createOptionalMcpAuthMiddleware } from './middleware/mcp-auth.js';
 
 /**
@@ -29,6 +30,7 @@ export function createRouter(storage: PlanStorage): Router {
   const chatHandlers = createChatHandlers(storage);
   const importHandlers = createImportHandlers(storage);
   const eventsHandler = createEventsHandler(storage);
+  const channelHandlers = createChannelHandlers(storage);
   const mcpAuth = createOptionalMcpAuthMiddleware(storage);
 
   // Plan routes
@@ -93,6 +95,11 @@ export function createRouter(storage: PlanStorage): Router {
   // List is public (no auth), call uses optional auth for session context
   router.post('/mcp/tools/list', mcpHandlers.listTools);
   router.post('/mcp/tools/call', mcpAuth, mcpHandlers.callTool);
+
+  // Channel routes (relay messaging)
+  router.get('/channels', channelHandlers.list);
+  router.get('/channels/:id/messages', channelHandlers.messages);
+  router.get('/channels/:id/presence', channelHandlers.presence);
 
   return router;
 }

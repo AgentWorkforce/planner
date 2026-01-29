@@ -1,5 +1,6 @@
 export type {
   PlanStatus,
+  AttentionType,
   AcceptanceCriterion,
   Gate,
   Step,
@@ -42,3 +43,18 @@ export {
   isStepFailed,
   isStepPending,
 } from './plan';
+
+export type {
+  RelayEntityType,
+  RelayConnectionState,
+  ChannelType,
+  Channel,
+  PresenceEntry,
+  RelayMessage,
+  BrowserOutgoingMessage,
+  ServerIncomingMessage,
+  UseRelayConnectionResult,
+  UseChannelsResult,
+  UseChannelMessagesResult,
+  UsePresenceResult,
+} from './relay';

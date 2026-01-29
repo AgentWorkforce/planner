@@ -8,6 +8,7 @@
 import { useState, useCallback } from 'react';
 import { EditableText } from './EditableText';
 import { FormatDetectionBadge, type DocumentFormat } from './FormatDetectionBadge';
+import { DocumentIcon, TrashIcon, ChevronIcon, CloseIcon } from './icons';
 
 export interface ExtractedStep {
   step_id: string;
@@ -58,47 +59,52 @@ function ScopeGroup({ scope, onStepTitleChange, onStepRemove, onScopeRemove }: S
   };
 
   return (
-    <div className={`scope-group${isCollapsed ? ' scope-group--collapsed' : ''}`}>
-      <div className="scope-group-header" onClick={() => setIsCollapsed(!isCollapsed)}>
+    <div className="border border-border-subtle rounded-lg overflow-hidden">
+      <div
+        className="flex items-center gap-3 px-4 py-3 bg-bg-secondary cursor-pointer hover:bg-bg-hover transition-colors"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
         <button
           type="button"
-          className="scope-group-expand"
+          className="p-1 text-text-muted hover:text-text-primary transition-colors"
           aria-expanded={!isCollapsed}
           aria-label={isCollapsed ? 'Expand scope' : 'Collapse scope'}
         >
-          ▼
+          <ChevronIcon direction={isCollapsed ? 'right' : 'down'} size="sm" />
         </button>
-        <span className="scope-group-name">{scope.name || 'General'}</span>
-        <span className="scope-group-count">{scope.steps.length} steps</span>
+        <span className="font-medium text-text-primary flex-1">{scope.name || 'General'}</span>
+        <span className="text-sm text-text-muted">{scope.steps.length} steps</span>
         <button
           type="button"
-          className="scope-group-remove"
+          className="p-1 text-text-muted hover:text-error transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             handleRemoveScope();
           }}
           aria-label={`Remove scope: ${scope.name}`}
         >
-          🗑
+          <TrashIcon size="sm" />
         </button>
       </div>
-      <div className="scope-group-content">
-        {scope.steps.length === 0 ? (
-          <div style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', padding: 'var(--spacing-md)' }}>
-            No steps in this scope
-          </div>
-        ) : (
-          scope.steps.map((step, index) => (
-            <ExtractedStepItem
-              key={step.step_id}
-              step={step}
-              index={index + 1}
-              onTitleChange={(title) => onStepTitleChange(step.step_id, title)}
-              onRemove={() => onStepRemove(step.step_id)}
-            />
-          ))
-        )}
-      </div>
+      {!isCollapsed && (
+        <div className="divide-y divide-border-border-subtle">
+          {scope.steps.length === 0 ? (
+            <div className="text-text-muted italic p-4">
+              No steps in this scope
+            </div>
+          ) : (
+            scope.steps.map((step, index) => (
+              <ExtractedStepItem
+                key={step.step_id}
+                step={step}
+                index={index + 1}
+                onTitleChange={(title) => onStepTitleChange(step.step_id, title)}
+                onRemove={() => onStepRemove(step.step_id)}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -112,22 +118,22 @@ interface ExtractedStepItemProps {
 
 function ExtractedStepItem({ step, index, onTitleChange, onRemove }: ExtractedStepItemProps) {
   return (
-    <div className="extracted-step">
-      <span className="extracted-step-number">{index}.</span>
-      <div className="extracted-step-title">
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-bg-hover/50 transition-colors">
+      <span className="text-sm text-text-muted font-mono w-6">{index}.</span>
+      <div className="flex-1 min-w-0">
         <EditableText
           value={step.title}
-          onChange={onTitleChange}
+          onSave={onTitleChange}
           placeholder="Step title..."
         />
       </div>
       <button
         type="button"
-        className="extracted-step-remove"
+        className="p-1 text-text-muted hover:text-error transition-colors"
         onClick={onRemove}
         aria-label={`Remove step: ${step.title}`}
       >
-        ×
+        <CloseIcon size="sm" />
       </button>
     </div>
   );
@@ -159,20 +165,26 @@ function DocumentSourceCard({
   scopeCount,
 }: DocumentSourceCardProps) {
   return (
-    <div className="document-source-card">
-      <div className="source-info">
-        <span className="source-icon">📄</span>
-        <div className="source-details">
-          <div className="source-name">{filename || 'Pasted content'}</div>
-          <div className="source-meta">
+    <div className="bg-bg-card border border-border-subtle rounded-xl p-6 space-y-6">
+      <div className="flex items-start gap-4">
+        <div className="p-3 bg-bg-secondary rounded-lg text-accent-cyan">
+          <DocumentIcon size="lg" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-text-primary truncate">
+            {filename || 'Pasted content'}
+          </div>
+          <div className="flex items-center gap-3 mt-1 text-sm text-text-muted">
             <FormatDetectionBadge format={format} />
             {charCount !== undefined && <span>{charCount.toLocaleString()} chars</span>}
           </div>
         </div>
       </div>
 
-      <div className="goal-override">
-        <label htmlFor="goal-override">Goal</label>
+      <div className="space-y-2">
+        <label htmlFor="goal-override" className="block text-sm font-medium text-text-secondary">
+          Goal
+        </label>
         <textarea
           id="goal-override"
           value={goal}
@@ -180,20 +192,21 @@ function DocumentSourceCard({
           placeholder="AI will infer goal from document. Override here if needed."
           rows={3}
           disabled={loading}
+          className="w-full px-4 py-3 bg-bg-deep border border-border-subtle rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        <p className="form-hint">
+        <p className="text-xs text-text-muted">
           Leave empty to use the suggested goal from the document.
         </p>
       </div>
 
-      <div style={{ marginBottom: 'var(--spacing-md)', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+      <div className="text-sm text-text-muted">
         {stepCount} steps in {scopeCount} scopes
       </div>
 
-      <div className="source-card-actions">
+      <div className="flex gap-3">
         <button
           type="button"
-          className="btn btn-primary"
+          className="flex-1 px-4 py-2 bg-accent-cyan text-bg-deep font-medium rounded-lg hover:bg-accent-cyan/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onCreatePlan}
           disabled={loading || stepCount === 0}
         >
@@ -201,7 +214,7 @@ function DocumentSourceCard({
         </button>
         <button
           type="button"
-          className="btn btn-secondary"
+          className="px-4 py-2 bg-bg-tertiary text-text-primary font-medium rounded-lg hover:bg-bg-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onCancel}
           disabled={loading}
         >
@@ -271,21 +284,25 @@ export function ExtractionPreview({
   };
 
   return (
-    <div className="extraction-preview">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
       <div>
-        <div className="extraction-preview-header">
-          <h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-text-primary">
             Extracted Structure
-            <span className="extraction-stats">
+            <span className="ml-3 text-sm font-normal text-text-muted">
               {totalSteps} steps in {result.scopes.length} scopes
             </span>
           </h2>
-          <button type="button" className="extraction-back-link" onClick={onBack}>
+          <button
+            type="button"
+            className="text-sm text-accent-cyan hover:text-accent-cyan/80 transition-colors"
+            onClick={onBack}
+          >
             ← Back to edit document
           </button>
         </div>
 
-        <div className="scopes-list">
+        <div className="space-y-4">
           {result.scopes.map((scope) => (
             <ScopeGroup
               key={scope.id}
@@ -296,7 +313,7 @@ export function ExtractionPreview({
             />
           ))}
           {result.scopes.length === 0 && (
-            <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 'var(--spacing-xl)' }}>
+            <div className="text-center text-text-muted py-12">
               No scopes found in document. Go back and try a different document.
             </div>
           )}

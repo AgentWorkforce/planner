@@ -1,4 +1,5 @@
 import type { ChangeRequest, Step, StepModification } from '@/types';
+import { PlusIcon } from './icons';
 
 interface ChangeDiffViewProps {
   /** Change request with suggested changes */
@@ -7,6 +8,44 @@ interface ChangeDiffViewProps {
   currentSteps: Step[];
   /** Callback to close the diff view */
   onClose: () => void;
+}
+
+// Minus icon for remove
+function MinusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+// Tilde icon for modify
+function TildeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12c0-3 2-6 6-6s6 6 12 6 6-3 6-6" />
+    </svg>
+  );
 }
 
 /**
@@ -21,11 +60,11 @@ export function ChangeDiffView({
   const { add_steps, modify_steps, remove_steps } = suggested_changes;
 
   return (
-    <div className="change-diff-view">
-      <div className="change-diff-header">
-        <h3>Change Request Diff</h3>
+    <div className="bg-bg-card border border-border-subtle rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
+        <h3 className="text-lg font-semibold text-text-primary">Change Request Diff</h3>
         <button
-          className="btn btn-sm btn-secondary"
+          className="px-3 py-1.5 text-sm bg-bg-tertiary text-text-primary rounded-lg hover:bg-bg-hover transition-colors"
           onClick={onClose}
           aria-label="Close diff view"
         >
@@ -33,70 +72,76 @@ export function ChangeDiffView({
         </button>
       </div>
 
-      <div className="change-diff-meta">
-        <span className="diff-meta-item">
-          <strong>Run:</strong> {changeRequest.run_id}
+      <div className="px-6 py-3 bg-bg-secondary border-b border-border-subtle flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <span className="text-text-muted">
+          <strong className="text-text-secondary">Run:</strong> {changeRequest.run_id}
         </span>
-        <span className="diff-meta-item">
-          <strong>Reason:</strong> {changeRequest.reason}
+        <span className="text-text-muted">
+          <strong className="text-text-secondary">Reason:</strong> {changeRequest.reason}
         </span>
       </div>
 
-      <div className="change-diff-content">
+      <div className="p-6 space-y-6">
         {/* Steps to Add */}
         {add_steps && add_steps.length > 0 && (
-          <div className="diff-section diff-section-add">
-            <h4 className="diff-section-title">
-              <span className="diff-icon diff-icon-add">+</span>
+          <div className="space-y-3">
+            <h4 className="flex items-center gap-2 text-success font-medium">
+              <PlusIcon size="sm" />
               Steps to Add
             </h4>
-            {add_steps.map((step) => (
-              <StepAddDiff key={step.step_id} step={step} />
-            ))}
+            <div className="space-y-2">
+              {add_steps.map((step) => (
+                <StepAddDiff key={step.step_id} step={step} />
+              ))}
+            </div>
           </div>
         )}
 
         {/* Steps to Modify */}
         {modify_steps && modify_steps.length > 0 && (
-          <div className="diff-section diff-section-modify">
-            <h4 className="diff-section-title">
-              <span className="diff-icon diff-icon-modify">~</span>
+          <div className="space-y-3">
+            <h4 className="flex items-center gap-2 text-warning font-medium">
+              <TildeIcon />
               Steps to Modify
             </h4>
-            {modify_steps.map((modification) => {
-              const originalStep = currentSteps.find(
-                (s) => s.step_id === modification.step_id
-              );
-              return (
-                <StepModifyDiff
-                  key={modification.step_id}
-                  original={originalStep}
-                  modification={modification}
-                />
-              );
-            })}
+            <div className="space-y-2">
+              {modify_steps.map((modification) => {
+                const originalStep = currentSteps.find(
+                  (s) => s.step_id === modification.step_id
+                );
+                return (
+                  <StepModifyDiff
+                    key={modification.step_id}
+                    original={originalStep}
+                    modification={modification}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* Steps to Remove */}
         {remove_steps && remove_steps.length > 0 && (
-          <div className="diff-section diff-section-remove">
-            <h4 className="diff-section-title">
-              <span className="diff-icon diff-icon-remove">-</span>
+          <div className="space-y-3">
+            <h4 className="flex items-center gap-2 text-error font-medium">
+              <MinusIcon />
               Steps to Remove
             </h4>
-            {remove_steps.map((stepId) => {
-              const step = currentSteps.find((s) => s.step_id === stepId);
-              return (
-                <StepRemoveDiff key={stepId} step={step} stepId={stepId} />
-              );
-            })}
+            <div className="space-y-2">
+              {remove_steps.map((stepId) => {
+                const step = currentSteps.find((s) => s.step_id === stepId);
+                return (
+                  <StepRemoveDiff key={stepId} step={step} stepId={stepId} />
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* No changes */}
         {!add_steps?.length && !modify_steps?.length && !remove_steps?.length && (
-          <div className="diff-empty">
+          <div className="text-center text-text-muted py-8">
             No changes suggested.
           </div>
         )}
@@ -111,25 +156,27 @@ interface StepAddDiffProps {
 
 function StepAddDiff({ step }: StepAddDiffProps) {
   return (
-    <div className="diff-step diff-step-add">
-      <div className="diff-step-header">
-        <span className="diff-marker diff-marker-add">+</span>
-        <strong>{step.title}</strong>
-        {step.scope && <span className="diff-step-scope">[{step.scope}]</span>}
-      </div>
-      <div className="diff-step-content">
-        {step.description && (
-          <p className="diff-step-description">{step.description}</p>
+    <div className="bg-success/5 border border-success/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-success font-mono text-sm">+</span>
+        <strong className="text-text-primary">{step.title}</strong>
+        {step.scope && (
+          <span className="text-xs px-2 py-0.5 bg-bg-tertiary text-text-muted rounded">
+            [{step.scope}]
+          </span>
         )}
+      </div>
+      <div className="pl-5 space-y-1 text-sm text-text-secondary">
+        {step.description && <p>{step.description}</p>}
         {step.dependencies && step.dependencies.length > 0 && (
-          <div className="diff-step-dependencies">
-            <span className="diff-label">Dependencies:</span>{' '}
+          <div>
+            <span className="text-text-muted">Dependencies:</span>{' '}
             {step.dependencies.join(', ')}
           </div>
         )}
         {step.owner_role && (
-          <div className="diff-step-role">
-            <span className="diff-label">Owner:</span> {step.owner_role}
+          <div>
+            <span className="text-text-muted">Owner:</span> {step.owner_role}
           </div>
         )}
       </div>
@@ -145,12 +192,12 @@ interface StepModifyDiffProps {
 function StepModifyDiff({ original, modification }: StepModifyDiffProps) {
   if (!original) {
     return (
-      <div className="diff-step diff-step-modify diff-step-error">
-        <div className="diff-step-header">
-          <span className="diff-marker diff-marker-modify">~</span>
-          <strong>Unknown step</strong>
+      <div className="bg-warning/5 border border-warning/20 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-warning font-mono text-sm">~</span>
+          <strong className="text-text-primary">Unknown step</strong>
         </div>
-        <p className="diff-step-error-message">
+        <p className="pl-5 text-sm text-error">
           Original step not found (ID: {modification.step_id})
         </p>
       </div>
@@ -158,13 +205,17 @@ function StepModifyDiff({ original, modification }: StepModifyDiffProps) {
   }
 
   return (
-    <div className="diff-step diff-step-modify">
-      <div className="diff-step-header">
-        <span className="diff-marker diff-marker-modify">~</span>
-        <strong>{original.title}</strong>
-        {original.scope && <span className="diff-step-scope">[{original.scope}]</span>}
+    <div className="bg-warning/5 border border-warning/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-warning font-mono text-sm">~</span>
+        <strong className="text-text-primary">{original.title}</strong>
+        {original.scope && (
+          <span className="text-xs px-2 py-0.5 bg-bg-tertiary text-text-muted rounded">
+            [{original.scope}]
+          </span>
+        )}
       </div>
-      <div className="diff-step-content">
+      <div className="pl-5 space-y-2">
         {/* Title change */}
         {modification.title && modification.title !== original.title && (
           <DiffField
@@ -224,12 +275,12 @@ interface StepRemoveDiffProps {
 function StepRemoveDiff({ step, stepId }: StepRemoveDiffProps) {
   if (!step) {
     return (
-      <div className="diff-step diff-step-remove diff-step-error">
-        <div className="diff-step-header">
-          <span className="diff-marker diff-marker-remove">-</span>
-          <strong>Unknown step</strong>
+      <div className="bg-error/5 border border-error/20 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-error font-mono text-sm">-</span>
+          <strong className="text-text-primary">Unknown step</strong>
         </div>
-        <p className="diff-step-error-message">
+        <p className="pl-5 text-sm text-error">
           Step not found (ID: {stepId})
         </p>
       </div>
@@ -237,19 +288,21 @@ function StepRemoveDiff({ step, stepId }: StepRemoveDiffProps) {
   }
 
   return (
-    <div className="diff-step diff-step-remove">
-      <div className="diff-step-header">
-        <span className="diff-marker diff-marker-remove">-</span>
-        <strong className="diff-strikethrough">{step.title}</strong>
+    <div className="bg-error/5 border border-error/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-error font-mono text-sm">-</span>
+        <strong className="text-text-primary line-through opacity-70">{step.title}</strong>
         {step.scope && (
-          <span className="diff-step-scope diff-strikethrough">[{step.scope}]</span>
+          <span className="text-xs px-2 py-0.5 bg-bg-tertiary text-text-muted rounded line-through opacity-70">
+            [{step.scope}]
+          </span>
         )}
       </div>
-      <div className="diff-step-content diff-step-content-removed">
-        {step.description && (
-          <p className="diff-step-description">{step.description}</p>
-        )}
-      </div>
+      {step.description && (
+        <p className="pl-5 text-sm text-text-muted line-through opacity-70">
+          {step.description}
+        </p>
+      )}
     </div>
   );
 }
@@ -262,16 +315,16 @@ interface DiffFieldProps {
 
 function DiffField({ label, oldValue, newValue }: DiffFieldProps) {
   return (
-    <div className="diff-field">
-      <span className="diff-field-label">{label}:</span>
-      <div className="diff-field-values">
-        <div className="diff-field-old">
-          <span className="diff-marker-inline">-</span>
-          <span className="diff-value-old">{oldValue}</span>
+    <div className="text-sm">
+      <span className="text-text-muted">{label}:</span>
+      <div className="mt-1 space-y-1 font-mono text-xs">
+        <div className="flex items-start gap-2 bg-error/10 rounded px-2 py-1">
+          <span className="text-error">-</span>
+          <span className="text-error/80">{oldValue}</span>
         </div>
-        <div className="diff-field-new">
-          <span className="diff-marker-inline">+</span>
-          <span className="diff-value-new">{newValue}</span>
+        <div className="flex items-start gap-2 bg-success/10 rounded px-2 py-1">
+          <span className="text-success">+</span>
+          <span className="text-success/80">{newValue}</span>
         </div>
       </div>
     </div>

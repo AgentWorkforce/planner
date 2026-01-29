@@ -3,43 +3,57 @@
   "status": "approved",
 
   "design_system": {
-    "feel": "professional, minimal, functional",
+    "feel": "Mission Control - professional dark theme with neon accents, holographic effects for status-critical items, clean functional areas for editing",
     "library": {
-      "name": "custom CSS",
-      "notes": "No component library - custom React components with CSS variables"
+      "name": "Custom + Tailwind CSS 4",
+      "source": "relay-dashboard design system",
+      "notes": "No component library - custom React components with Tailwind utilities + CSS variables"
+    },
+    "typography": {
+      "display": "Outfit (400-800)",
+      "body": "Inter (400-600)",
+      "mono": "IBM Plex Mono (400-600)",
+      "scale": "xs:11px, sm:13px, base:14px, lg:15px, xl:16px, 2xl:18px, 3xl:24px, 4xl:32px"
     },
     "colors": {
-      "primary": "#2563eb (blue-600)",
-      "primary-hover": "#1d4ed8 (blue-700)",
-      "secondary": "#64748b (slate-500)",
-      "success": "#22c55e (green-500)",
-      "error": "#ef4444 (red-500)",
-      "warning": "#f59e0b (amber-500)",
-      "background": "#ffffff",
-      "surface": "#f8fafc (slate-50)",
-      "border": "#e2e8f0 (slate-200)",
-      "text": "#0f172a (slate-900)",
-      "text-muted": "#64748b (slate-500)"
+      "bg-deep": "#0a0a0f",
+      "bg-primary": "#0d0d14",
+      "bg-secondary": "#12121c",
+      "bg-tertiary": "#181824",
+      "bg-card": "#1a1a28",
+      "bg-elevated": "#202030",
+      "text-primary": "#f0f0f5",
+      "text-secondary": "#a0a0b0",
+      "text-muted": "#606070",
+      "accent-cyan": "#00d9ff",
+      "accent-orange": "#ff6b35",
+      "accent-purple": "#a855f7",
+      "accent-green": "#00ffc8",
+      "success": "#00ffc8",
+      "warning": "#ff6b35",
+      "error": "#ff4757",
+      "border-default": "rgba(255,255,255,0.1)",
+      "border-subtle": "rgba(255,255,255,0.06)"
     },
-    "spacing": {
-      "xs": "0.25rem (4px)",
-      "sm": "0.5rem (8px)",
-      "md": "1rem (16px)",
-      "lg": "1.5rem (24px)",
-      "xl": "2rem (32px)"
+    "shadows": {
+      "glow-cyan": "0 0 20px rgba(0,217,255,0.3)",
+      "glow-orange": "0 0 20px rgba(255,107,53,0.3)",
+      "glow-green": "0 0 20px rgba(0,255,200,0.3)",
+      "modal": "0 16px 70px rgba(0,0,0,0.7)"
     },
     "patterns": {
-      "cards": "1px border var(--color-border), radius-md, hover border-color change",
-      "buttons": "btn class + variant (btn-primary, btn-secondary, btn-danger, btn-success)",
-      "badges": "badge class + status variant, uppercase text, small font",
-      "collapsible": "expand icon (triangle), body hidden/shown, border highlight when expanded",
-      "loading": "spinner animation with border-top color, loading-message text",
-      "empty": "centered text with muted color, optional action button",
-      "forms": "form-group with label above, full-width inputs, focus border-color change",
-      "modals": "modal-overlay (backdrop) + modal (centered card max-w 500px), modal-actions for button row",
-      "workflow": "workflow-actions container with workflow-status, workflow-buttons row, workflow-error for inline errors",
-      "slide-in-panel": "fixed right-edge (400-420px width), full height, z-index 1000, semi-transparent overlay (rgba 0,0,0,0.3), click-overlay-to-close, Escape-to-close, slideInRight animation. Used by: ChatPanel, CommentThread. Rule: one panel open at a time."
-    }
+      "cards-clean": "bg-bg-card border-border-subtle rounded-xl, hover:border-border-default transition-colors",
+      "cards-holographic": "bg-gradient-to-br from-bg-card to-bg-elevated border-border-subtle rounded-xl, status glow effect",
+      "buttons-primary": "bg-accent-cyan text-bg-deep font-medium rounded-lg hover:shadow-glow-cyan transition-all",
+      "buttons-secondary": "bg-bg-tertiary text-text-primary border-border-default rounded-lg hover:border-accent-cyan/50",
+      "buttons-danger": "bg-error text-white rounded-lg hover:shadow-[0_0_20px_rgba(255,71,87,0.3)]",
+      "badges": "inline-flex px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide",
+      "forms": "bg-bg-secondary border-border-default rounded-md focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50",
+      "modals": "bg-bg-tertiary border-border-subtle rounded-2xl shadow-modal, overlay bg-black/50",
+      "panels": "fixed right-0 w-[420px] h-full bg-bg-secondary border-l border-border-subtle z-40 animate-slide-in-right",
+      "focus": "focus-visible:outline-2 focus-visible:outline-accent-cyan focus-visible:outline-offset-2"
+    },
+    "icons": "Inline SVG, stroke-based, strokeWidth=2, currentColor, sizes: 14/16/20/24px"
   },
 
   "components": [
@@ -114,11 +128,11 @@
 
     { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "approved" },
 
-    { "id": "ui-design-system-migration", "title": "Design System Migration", "type": "epic", "status": "draft" },
-    { "id": "ui-dsm-audit-relay", "title": "Audit relay-dashboard Design System", "type": "feature", "status": "in_progress" },
-    { "id": "ui-dsm-audit-planner", "title": "Audit planner-ui Components", "type": "feature", "status": "in_progress" },
-    { "id": "ui-dsm-gap-analysis", "title": "Gap Analysis & Migration Plan", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-library-selection", "title": "Component Library Selection (Human Gate)", "type": "feature", "status": "pending" },
+    { "id": "ui-design-system-migration", "title": "Design System Migration", "type": "epic", "status": "approved" },
+    { "id": "ui-dsm-audit-relay", "title": "Audit relay-dashboard Design System", "type": "feature", "status": "completed" },
+    { "id": "ui-dsm-audit-planner", "title": "Audit planner-ui Components", "type": "feature", "status": "completed" },
+    { "id": "ui-dsm-gap-analysis", "title": "Gap Analysis & Migration Plan", "type": "feature", "status": "completed" },
+    { "id": "ui-dsm-library-selection", "title": "Component Library Selection (Human Gate)", "type": "feature", "status": "completed", "decision": "Adopt Tailwind CSS 4, relay-dashboard CSS vars, dark theme, inline SVG icons. Greenfield - replace all existing planner-ui styles." },
     { "id": "ui-dsm-migrate-buttons", "title": "Migrate Button Components", "type": "feature", "status": "pending" },
     { "id": "ui-dsm-migrate-forms", "title": "Migrate Form Components", "type": "feature", "status": "pending" },
     { "id": "ui-dsm-migrate-modals", "title": "Migrate Modal/Dialog Components", "type": "feature", "status": "pending" },
@@ -126,6 +140,16 @@
     { "id": "ui-dsm-migrate-utilities", "title": "Migrate Utility Components", "type": "feature", "status": "pending" },
     { "id": "ui-dsm-testing", "title": "Visual Regression Testing", "type": "feature", "status": "pending" },
     { "id": "ui-dsm-cleanup", "title": "Cleanup Deprecated Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-final-review", "title": "Final Review (Human Gate)", "type": "feature", "status": "pending" }
+    { "id": "ui-dsm-final-review", "title": "Final Review (Human Gate)", "type": "feature", "status": "pending" },
+
+    { "id": "ui-attention-navigation", "title": "Attention-Based Plan Navigation", "type": "epic", "status": "completed" },
+    { "id": "ui-attention-signals", "title": "Attention Signal Computation", "type": "feature", "status": "completed" },
+    { "id": "ui-attention-sections", "title": "Attention Section Components", "type": "feature", "status": "completed" },
+    { "id": "ui-scope-grouping", "title": "Scope-Based Grouping", "type": "feature", "status": "completed" },
+    { "id": "ui-command-palette", "title": "Command Palette Navigation", "type": "feature", "status": "completed" },
+
+    { "id": "ui-relay-messaging", "title": "Relay Channel Messaging", "type": "epic", "status": "completed", "audit_note": "Core messaging implemented. Backend: WebSocket proxy, channel management, REST endpoints, PlannerLead auto-spawn, mock mode. Frontend: 4 hooks (connection, channels, messages, presence), 5 components (ChannelList, ChannelHeader, MessageStream, MessageInput, MessagingSidebar). Gap: @mentions autocomplete not implemented (v2)." },
+    { "id": "ui-relay-messaging-backend", "title": "Relay Messaging Backend Bridge", "type": "feature", "status": "completed", "audit_note": "All 5 backend tasks completed - ws-proxy.ts, channels.ts, planner-lead.ts, channel REST endpoints, mock mode support" },
+    { "id": "ui-relay-messaging-sidebar", "title": "Messaging Sidebar Component", "type": "feature", "status": "completed", "audit_note": "All 12 frontend tasks completed - hooks, components, Layout integration. @mentions not implemented (v2 scope)." }
   ]
 }

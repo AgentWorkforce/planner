@@ -60,6 +60,11 @@ export type UpdatePlanRequest = z.infer<typeof UpdatePlanRequestSchema>;
  */
 export const ListPlansQuerySchema = z.object({
   status: PlanStatusSchema.optional(),
+  /** When true, includes attention_types for each plan */
+  include_attention: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
 });
 
 export type ListPlansQuery = z.infer<typeof ListPlansQuerySchema>;

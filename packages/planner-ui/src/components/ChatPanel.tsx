@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import type { ChatMessage as ChatMessageType, PlanVersion, Step, PlanStatus } from '@/types';
 import { ChatMessage, ChatTypingIndicator } from './ChatMessage';
 import { AIConnectionBadge } from './AIConnectionBadge';
+import { MessageIcon, CloseIcon } from './icons';
 import type { ConnectionStatus } from '@/hooks/useAIConnectionStatus';
 
 interface QuickPrompt {
@@ -10,43 +11,24 @@ interface QuickPrompt {
 }
 
 interface ChatPanelProps {
-  /** Whether the panel is open */
   isOpen: boolean;
-  /** Callback to close the panel */
   onClose: () => void;
-  /** Current plan version for context */
   version: PlanVersion;
-  /** Chat message history */
   messages: ChatMessageType[];
-  /** Whether AI is currently responding */
   isLoading?: boolean;
-  /** Currently selected step (for contextual prompts) */
   selectedStep?: Step;
-  /** AI connection status */
   connectionStatus?: ConnectionStatus;
-  /** Plan status (draft/approved/published) for connection badge */
   planStatus?: PlanStatus;
-  /** Whether connection is in progress */
   isConnecting?: boolean;
-  /** Connection error message */
   connectError?: string | null;
-  /** Callback to initiate AI connection */
   onConnect?: () => void;
-  /** Callback to clear connection error */
   onClearConnectError?: () => void;
-  /** Callback when user sends a message */
   onSendMessage: (content: string) => void;
-  /** Callback when user applies a suggestion */
   onApplySuggestion?: (messageId: string, suggestionId: string) => void;
-  /** Callback when user dismisses a suggestion */
   onDismissSuggestion?: (messageId: string, suggestionId: string) => void;
 }
 
-/**
- * Generate contextual quick prompts based on the current state.
- */
 function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt[] {
-  // If a step is selected, show step-specific prompts
   if (selectedStep) {
     const prompts: QuickPrompt[] = [
       {
@@ -55,7 +37,6 @@ function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt
       },
     ];
 
-    // Add criteria prompt if step has few or no criteria
     if (!selectedStep.acceptance_criteria || selectedStep.acceptance_criteria.length < 2) {
       prompts.push({
         label: 'Add criteria',
@@ -63,7 +44,6 @@ function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt
       });
     }
 
-    // Add dependency prompt if step has no dependencies
     if (selectedStep.dependencies.length === 0) {
       prompts.push({
         label: 'Check dependencies',
@@ -71,7 +51,6 @@ function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt
       });
     }
 
-    // Add scope prompt if step has no scope
     if (!selectedStep.scope) {
       prompts.push({
         label: 'Suggest scope',
@@ -79,19 +58,16 @@ function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt
       });
     }
 
-    return prompts.slice(0, 3); // Limit to 3 prompts
+    return prompts.slice(0, 3);
   }
 
-  // Plan-level prompts
   const prompts: QuickPrompt[] = [];
 
-  // Always show general analysis prompt
   prompts.push({
     label: 'Analyze plan',
     prompt: 'Review my plan and suggest improvements',
   });
 
-  // Show missing criteria prompt if many steps lack criteria
   const stepsWithoutCriteria = version.steps.filter(
     (s) => !s.acceptance_criteria || s.acceptance_criteria.length === 0
   );
@@ -102,13 +78,11 @@ function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt
     });
   }
 
-  // Show dependency prompt
   prompts.push({
     label: 'Review dependencies',
     prompt: 'Are my step dependencies correct? Are there any missing?',
   });
 
-  // Show scope prompt if no scopes defined
   const hasScopes = version.steps.some((s) => s.scope);
   if (!hasScopes && version.steps.length > 3) {
     prompts.push({
@@ -117,13 +91,9 @@ function getQuickPrompts(version: PlanVersion, selectedStep?: Step): QuickPrompt
     });
   }
 
-  return prompts.slice(0, 3); // Limit to 3 prompts
+  return prompts.slice(0, 3);
 }
 
-/**
- * Slide-in panel for AI chat assistance.
- * Provides contextual planning help with message history.
- */
 export function ChatPanel({
   isOpen,
   onClose,
@@ -145,27 +115,23 @@ export function ChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Generate contextual quick prompts
   const quickPrompts = useMemo(
     () => getQuickPrompts(version, selectedStep),
     [version, selectedStep]
   );
 
-  // Focus input when panel opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen]);
 
-  // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  // Handle escape key to close
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && isOpen) {
@@ -186,7 +152,6 @@ export function ChatPanel({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -204,20 +169,22 @@ export function ChatPanel({
   }
 
   return (
-    <div className="chat-panel-overlay" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/30 z-30 animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="chat-panel"
+        className="fixed right-0 top-0 h-full w-[420px] bg-bg-secondary border-l border-border-subtle z-40 flex flex-col animate-slide-in-right"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="AI Chat"
         aria-modal="true"
       >
-        <div className="chat-panel-header">
-          <div className="chat-panel-title">
-            <span className="chat-icon" aria-hidden="true">
-              💬
-            </span>
-            <h3>AI Assistant</h3>
+        {/* Header */}
+        <div className="flex-shrink-0 h-14 border-b border-border-subtle px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageIcon size="lg" className="text-accent-cyan" />
+            <h3 className="font-display text-lg text-text-primary">AI Assistant</h3>
             <AIConnectionBadge
               status={connectionStatus}
               planStatus={planStatus}
@@ -228,26 +195,28 @@ export function ChatPanel({
             />
           </div>
           <button
-            className="chat-panel-close"
+            className="p-2 text-text-muted hover:text-text-primary transition-colors rounded-lg hover:bg-bg-hover"
             onClick={onClose}
             aria-label="Close chat panel"
           >
-            ×
+            <CloseIcon size="lg" />
           </button>
         </div>
 
-        <div className="chat-panel-context">
-          <span className="context-label">Context:</span>
-          <span className="context-goal">
+        {/* Context */}
+        <div className="flex-shrink-0 px-4 py-2 border-b border-border-subtle bg-bg-tertiary/50">
+          <span className="text-xs text-text-muted">Context: </span>
+          <span className="text-xs text-text-secondary">
             {selectedStep ? `Step: ${selectedStep.title}` : version.summary.goal}
           </span>
         </div>
 
-        <div className="chat-panel-messages">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
-            <div className="chat-empty">
-              <p>Ask me anything about your plan!</p>
-              <p className="chat-empty-hint">
+            <div className="text-center py-12">
+              <p className="text-text-secondary">Ask me anything about your plan!</p>
+              <p className="text-sm text-text-muted mt-2">
                 Try: "Is step 3 clear enough?" or "What acceptance criteria should this have?"
               </p>
             </div>
@@ -269,11 +238,11 @@ export function ChatPanel({
 
         {/* Quick prompts */}
         {quickPrompts.length > 0 && !isLoading && (
-          <div className="chat-quick-prompts">
+          <div className="flex-shrink-0 px-4 py-2 border-t border-border-subtle flex flex-wrap gap-2">
             {quickPrompts.map((qp) => (
               <button
                 key={qp.label}
-                className="chat-quick-prompt"
+                className="px-3 py-1.5 text-xs bg-bg-tertiary text-text-secondary rounded-full border border-border-subtle hover:border-accent-cyan hover:text-accent-cyan transition-colors"
                 onClick={() => handleQuickPrompt(qp.prompt)}
                 title={qp.prompt}
               >
@@ -283,7 +252,8 @@ export function ChatPanel({
           </div>
         )}
 
-        <form className="chat-panel-input" onSubmit={handleSubmit}>
+        {/* Input */}
+        <form className="flex-shrink-0 border-t border-border-subtle p-4" onSubmit={handleSubmit}>
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -293,12 +263,13 @@ export function ChatPanel({
             rows={2}
             disabled={isLoading}
             aria-label="Chat message input"
+            className="w-full px-3 py-2 bg-bg-tertiary border border-border-subtle rounded-lg text-text-primary text-sm placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none resize-none"
           />
-          <div className="chat-input-footer">
-            <span className="chat-input-hint">Enter to send, Shift+Enter for new line</span>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-xs text-text-muted">Enter to send, Shift+Enter for new line</span>
             <button
               type="submit"
-              className="btn btn-primary btn-sm"
+              className="px-4 py-1.5 text-sm bg-accent-cyan text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-cyan disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!inputValue.trim() || isLoading}
             >
               Send

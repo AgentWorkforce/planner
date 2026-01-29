@@ -22,14 +22,12 @@ export function EditableText({
   const [previousValue, setPreviousValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync with external value changes
   useEffect(() => {
     if (!isEditing) {
       setEditValue(value);
     }
   }, [value, isEditing]);
 
-  // Focus input when entering edit mode
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -50,7 +48,6 @@ export function EditableText({
       try {
         await onSave(trimmedValue);
       } catch {
-        // Revert on error
         setEditValue(previousValue);
       }
     }
@@ -88,7 +85,7 @@ export function EditableText({
         onChange={(e) => setEditValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
-        className={`editable-text-input ${className}`}
+        className={`w-full px-2 py-1 bg-bg-secondary border border-accent-cyan rounded text-text-primary focus:ring-1 focus:ring-accent-cyan/50 outline-none ${className}`}
         placeholder={placeholder}
       />
     );
@@ -96,7 +93,11 @@ export function EditableText({
 
   return (
     <Tag
-      className={`editable-text ${className} ${disabled ? 'disabled' : ''}`}
+      className={`inline-block rounded px-1 -mx-1 transition-colors ${
+        disabled
+          ? 'cursor-default'
+          : 'cursor-pointer hover:bg-bg-hover'
+      } ${className}`}
       onClick={startEditing}
       role="button"
       tabIndex={disabled ? -1 : 0}
@@ -107,7 +108,7 @@ export function EditableText({
         }
       }}
     >
-      {value || <span className="editable-placeholder">{placeholder}</span>}
+      {value || <span className="text-text-muted italic">{placeholder}</span>}
     </Tag>
   );
 }

@@ -12,6 +12,9 @@ import { connect as connectRelay, destroy as destroyRelay } from './relay/client
 import { getRelayConfig } from './relay/config.js';
 import { getRelayMode } from './relay/service.js';
 import { createSessionTimeoutService } from './relay/session-timeout.js';
+import { initWebSocketProxy } from './relay/ws-proxy.js';
+import { initChannelManagement, syncPlanChannels } from './relay/channels.js';
+import { initPlannerLead, terminatePlannerLead } from './relay/planner-lead.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +48,19 @@ async function start(): Promise<void> {
   const mode = getRelayMode();
   console.log(`[relay] Mode: ${mode}`);
 
+  // Initialize channel management
+  initChannelManagement();
+
+  // Sync plan channels with existing plans
+  if (mode === 'connected') {
+    const plans = storage.listPlans();
+    const planIds = plans.map((p) => p.plan_id);
+    syncPlanChannels(planIds);
+  }
+
+  // Initialize PlannerLead agent
+  initPlannerLead();
+
   // Start session timeout service
   sessionTimeoutService.start();
 
@@ -64,14 +80,30 @@ async function start(): Promise<void> {
     console.log('  POST   /api/plans/:id/versions/:version/approve');
     console.log('  POST   /api/plans/:id/versions/:version/publish');
     console.log('  GET    /api/health/relay');
+    console.log('  GET    /api/channels');
+    console.log('  GET    /api/channels/:id/messages');
+    console.log('  GET    /api/channels/:id/presence');
+    console.log('  WS     /ws/relay');
   });
+
+  // Initialize WebSocket proxy for relay communication
+  const wss = initWebSocketProxy(server);
+  console.log('[ws-proxy] WebSocket proxy attached to HTTP server');
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     console.log(`\n[server] Received ${signal}, shutting down gracefully...`);
 
+    // Terminate PlannerLead agent
+    await terminatePlannerLead();
+
     // Stop session timeout service
     sessionTimeoutService.stop();
+
+    // Close WebSocket server
+    wss.close(() => {
+      console.log('[server] WebSocket server closed');
+    });
 
     // Close HTTP server
     server.close(() => {

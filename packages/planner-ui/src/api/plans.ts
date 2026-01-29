@@ -10,8 +10,18 @@ import type {
 
 // Plan operations
 
-export async function listPlans(status?: PlanStatus): Promise<{ plans: PlanSummary[] }> {
-  const query = status ? `?status=${status}` : '';
+export async function listPlans(
+  status?: PlanStatus,
+  includeAttention: boolean = true
+): Promise<{ plans: PlanSummary[] }> {
+  const params = new URLSearchParams();
+  if (status) {
+    params.set('status', status);
+  }
+  if (includeAttention) {
+    params.set('include_attention', 'true');
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
   return get<{ plans: PlanSummary[] }>(`/plans${query}`);
 }
 

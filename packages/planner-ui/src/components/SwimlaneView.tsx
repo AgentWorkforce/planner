@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import type { Step } from '@/types';
 import { useTopologicalSort } from '@/hooks/useTopologicalSort';
 import { ScopeSummaryStats } from './ScopeSummaryStats';
+import { DependencyIndicator, type ConnectedStep, type DependencyDirection } from './DependencyIndicator';
 
 interface SwimlaneViewProps {
   steps: Step[];
@@ -9,83 +10,128 @@ interface SwimlaneViewProps {
   selectedStepId?: string;
   hoveredStepId?: string;
   onStepHover?: (stepId: string | null) => void;
+  onIndicatorHover?: (direction: DependencyDirection | null) => void;
+  onScrollToStep?: (stepId: string) => void;
 }
 
 interface SwimlaneStepCardProps {
   step: Step;
+  allSteps: Step[];
   onClick: () => void;
   isSelected: boolean;
   isHighlighted: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onIndicatorHover?: (direction: DependencyDirection | null) => void;
+  onScrollToStep?: (stepId: string) => void;
 }
 
 function SwimlaneStepCard({
   step,
+  allSteps,
   onClick,
   isSelected,
   isHighlighted,
   onMouseEnter,
   onMouseLeave,
+  onIndicatorHover,
+  onScrollToStep,
 }: SwimlaneStepCardProps) {
   const status = (step as Step & { execution_status?: string }).execution_status || 'pending';
 
-  const statusColors: Record<string, { bg: string; border: string }> = {
-    done: { bg: '#dcfce7', border: '#22c55e' },
-    completed: { bg: '#dcfce7', border: '#22c55e' },
-    running: { bg: '#dbeafe', border: '#3b82f6' },
-    in_progress: { bg: '#dbeafe', border: '#3b82f6' },
-    blocked: { bg: '#fef3c7', border: '#f59e0b' },
-    failed: { bg: '#fee2e2', border: '#ef4444' },
-    pending: { bg: 'var(--color-background)', border: 'var(--color-border)' },
+  // Compute dependency info for indicators
+  const { incomingSteps, outgoingSteps, hasCrossScopeIncoming, hasCrossScopeOutgoing } = useMemo(() => {
+    const incoming: ConnectedStep[] = [];
+    const outgoing: ConnectedStep[] = [];
+    let crossScopeIn = false;
+    let crossScopeOut = false;
+
+    const stepScope = step.scope || '';
+
+    // Incoming: steps this step depends on
+    for (const depId of step.dependencies || []) {
+      const depStep = allSteps.find((s) => s.step_id === depId);
+      if (depStep) {
+        incoming.push({
+          stepId: depStep.step_id,
+          title: depStep.title,
+          scope: depStep.scope,
+        });
+        if ((depStep.scope || '') !== stepScope) {
+          crossScopeIn = true;
+        }
+      }
+    }
+
+    // Outgoing: steps that depend on this step
+    for (const s of allSteps) {
+      if (s.dependencies?.includes(step.step_id)) {
+        outgoing.push({
+          stepId: s.step_id,
+          title: s.title,
+          scope: s.scope,
+        });
+        if ((s.scope || '') !== stepScope) {
+          crossScopeOut = true;
+        }
+      }
+    }
+
+    return {
+      incomingSteps: incoming,
+      outgoingSteps: outgoing,
+      hasCrossScopeIncoming: crossScopeIn,
+      hasCrossScopeOutgoing: crossScopeOut,
+    };
+  }, [step, allSteps]);
+
+  const statusClasses: Record<string, string> = {
+    done: 'bg-success/10 border-success',
+    completed: 'bg-success/10 border-success',
+    running: 'bg-accent-cyan/10 border-accent-cyan',
+    in_progress: 'bg-accent-cyan/10 border-accent-cyan',
+    blocked: 'bg-warning/10 border-warning',
+    failed: 'bg-error/10 border-error',
+    pending: 'bg-bg-card border-border-subtle',
   };
 
-  const { bg, border } = statusColors[status] || statusColors.pending;
+  const baseClasses = statusClasses[status] || statusClasses.pending;
 
   return (
     <div
-      className={`swimlane-step-card${isSelected ? ' swimlane-step-card--selected' : ''}${isHighlighted ? ' swimlane-step-card--highlighted' : ''}`}
+      className={`relative w-44 min-h-20 p-3 border rounded-lg cursor-pointer flex flex-col gap-1 transition-all duration-200 ${baseClasses} ${
+        isSelected || isHighlighted
+          ? 'border-accent-cyan ring-2 ring-accent-cyan/50'
+          : ''
+      } ${isSelected ? 'bg-bg-elevated' : ''}`}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      style={{
-        width: '180px',
-        minHeight: '80px',
-        padding: 'var(--spacing-sm) var(--spacing-md)',
-        border: `1px solid ${isSelected || isHighlighted ? 'var(--color-primary)' : border}`,
-        borderRadius: 'var(--radius-md)',
-        backgroundColor: isSelected ? 'var(--color-surface)' : bg,
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--spacing-xs)',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-        boxShadow: isHighlighted ? '0 0 0 2px var(--color-primary)' : 'none',
-      }}
     >
-      <div
-        className="swimlane-step-title"
-        style={{
-          fontWeight: 500,
-          fontSize: '0.875rem',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          lineHeight: 1.3,
-        }}
-      >
+      {/* Dependency Indicators */}
+      <DependencyIndicator
+        direction="incoming"
+        count={incomingSteps.length}
+        hasCrossScope={hasCrossScopeIncoming}
+        connectedSteps={incomingSteps}
+        onHover={(hovered) => onIndicatorHover?.(hovered ? 'incoming' : null)}
+        onClick={() => incomingSteps[0] && onScrollToStep?.(incomingSteps[0].stepId)}
+        isParentHovered={isHighlighted}
+      />
+      <DependencyIndicator
+        direction="outgoing"
+        count={outgoingSteps.length}
+        hasCrossScope={hasCrossScopeOutgoing}
+        connectedSteps={outgoingSteps}
+        onHover={(hovered) => onIndicatorHover?.(hovered ? 'outgoing' : null)}
+        onClick={() => outgoingSteps[0] && onScrollToStep?.(outgoingSteps[0].stepId)}
+        isParentHovered={isHighlighted}
+      />
+
+      <div className="text-sm font-medium text-text-primary line-clamp-2 leading-tight">
         {step.title}
       </div>
-      <div
-        className="swimlane-step-status"
-        style={{
-          fontSize: '0.75rem',
-          color: 'var(--color-text-muted)',
-          marginTop: 'auto',
-        }}
-      >
+      <div className="text-xs text-text-muted mt-auto capitalize">
         {status.replace('_', ' ')}
       </div>
     </div>
@@ -95,21 +141,27 @@ function SwimlaneStepCard({
 interface SwimlaneLaneProps {
   scope: string;
   steps: Step[];
+  allSteps: Step[];
   columnMap: Map<string, number>;
   onStepClick: (step: Step) => void;
   selectedStepId?: string;
   hoveredStepId?: string;
   onStepHover: (stepId: string | null) => void;
+  onIndicatorHover?: (direction: DependencyDirection | null) => void;
+  onScrollToStep?: (stepId: string) => void;
 }
 
 function SwimlaneLane({
   scope,
   steps,
+  allSteps,
   columnMap,
   onStepClick,
   selectedStepId,
   hoveredStepId,
   onStepHover,
+  onIndicatorHover,
+  onScrollToStep,
 }: SwimlaneLaneProps) {
   // Sort steps by their column (topological order)
   const sortedSteps = [...steps].sort((a, b) => {
@@ -119,72 +171,33 @@ function SwimlaneLane({
   });
 
   return (
-    <div
-      className="swimlane-lane"
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        borderBottom: '1px solid var(--color-border)',
-        minHeight: '120px',
-        padding: 'var(--spacing-md) 0',
-      }}
-    >
+    <div className="flex items-start border-b border-border-subtle min-h-32 py-4">
       {/* Fixed left label */}
-      <div
-        className="swimlane-lane-label"
-        style={{
-          width: '160px',
-          flexShrink: 0,
-          position: 'sticky',
-          left: 0,
-          backgroundColor: 'var(--color-background)',
-          zIndex: 5,
-          padding: 'var(--spacing-md)',
-          borderRight: '1px solid var(--color-border)',
-        }}
-      >
-        <div
-          style={{
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            marginBottom: 'var(--spacing-xs)',
-          }}
-        >
+      <div className="w-40 flex-shrink-0 sticky left-0 bg-bg-primary z-10 p-4 border-r border-border-subtle">
+        <div className="text-sm font-semibold text-text-primary mb-1">
           {scope || 'General'}
         </div>
         <ScopeSummaryStats steps={steps} compact />
       </div>
 
       {/* Steps area */}
-      <div
-        className="swimlane-steps-area"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacing-lg)',
-          padding: 'var(--spacing-md)',
-          minWidth: 'fit-content',
-        }}
-      >
+      <div className="flex items-center gap-4 p-4 min-w-fit">
         {sortedSteps.map((step) => (
           <SwimlaneStepCard
             key={step.step_id}
             step={step}
+            allSteps={allSteps}
             onClick={() => onStepClick(step)}
             isSelected={selectedStepId === step.step_id}
             isHighlighted={hoveredStepId === step.step_id}
             onMouseEnter={() => onStepHover(step.step_id)}
             onMouseLeave={() => onStepHover(null)}
+            onIndicatorHover={onIndicatorHover}
+            onScrollToStep={onScrollToStep}
           />
         ))}
         {sortedSteps.length === 0 && (
-          <div
-            style={{
-              color: 'var(--color-text-muted)',
-              fontSize: '0.875rem',
-              fontStyle: 'italic',
-            }}
-          >
+          <div className="text-sm text-text-muted italic">
             No steps in this scope
           </div>
         )}
@@ -199,6 +212,8 @@ export function SwimlaneView({
   selectedStepId,
   hoveredStepId,
   onStepHover,
+  onIndicatorHover,
+  onScrollToStep,
 }: SwimlaneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columnMap = useTopologicalSort(steps);
@@ -231,38 +246,25 @@ export function SwimlaneView({
   return (
     <div
       ref={containerRef}
-      className="swimlane-container"
-      style={{
-        overflowX: 'auto',
-        overflowY: 'visible',
-        position: 'relative',
-        minHeight: '400px',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-      }}
+      className="overflow-x-auto overflow-y-visible relative min-h-96 border border-border-subtle rounded-xl bg-bg-primary"
     >
       {sortedScopes.map((scope) => (
         <SwimlaneLane
           key={scope || '__general__'}
           scope={scope}
           steps={scopeGroups.get(scope)!}
+          allSteps={steps}
           columnMap={columnMap}
           onStepClick={onStepClick}
           selectedStepId={selectedStepId}
           hoveredStepId={effectiveHoveredId ?? undefined}
           onStepHover={handleStepHover}
+          onIndicatorHover={onIndicatorHover}
+          onScrollToStep={onScrollToStep}
         />
       ))}
       {sortedScopes.length === 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '200px',
-            color: 'var(--color-text-muted)',
-          }}
-        >
+        <div className="flex items-center justify-center min-h-48 text-text-muted">
           No steps to display
         </div>
       )}

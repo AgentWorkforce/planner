@@ -1,26 +1,16 @@
+import { CheckIcon, CloseIcon } from './icons';
 import type { ConnectionStatus } from '@/hooks/useAIConnectionStatus';
 import type { PlanStatus } from '@/types';
 
 interface AIConnectionBadgeProps {
-  /** Current connection status */
   status: ConnectionStatus;
-  /** Plan status - used to determine if connect button should be shown */
   planStatus?: PlanStatus;
-  /** Whether connection is in progress */
   isConnecting?: boolean;
-  /** Error message from connection attempt */
   connectError?: string | null;
-  /** Callback to initiate connection */
   onConnect?: () => void;
-  /** Callback to clear error */
   onClearError?: () => void;
 }
 
-/**
- * Badge showing AI connection status with optional Connect button.
- * Shows 'AI Connected' when connected, 'Demo Mode' + Connect button when not.
- * Only draft plans can have AI sessions.
- */
 export function AIConnectionBadge({
   status,
   planStatus = 'draft',
@@ -34,37 +24,37 @@ export function AIConnectionBadge({
   const showConnectButton = status === 'demo' && canConnect && onConnect;
 
   return (
-    <div className="ai-connection-badge-container">
+    <div className="flex items-center gap-2">
       <div
-        className={`ai-connection-badge ai-connection-badge--${status} ${isConnecting ? 'connecting' : ''}`}
+        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+          status === 'connected'
+            ? 'bg-success/10 text-success'
+            : status === 'loading' || isConnecting
+            ? 'bg-accent-cyan/10 text-accent-cyan'
+            : 'bg-bg-tertiary text-text-muted'
+        }`}
       >
         {showSpinner ? (
           <>
-            <span className="ai-connection-spinner" aria-hidden="true" />
-            <span className="ai-connection-text">
-              {isConnecting ? 'Connecting...' : 'Loading...'}
-            </span>
+            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            <span>{isConnecting ? 'Connecting...' : 'Loading...'}</span>
           </>
         ) : status === 'connected' ? (
           <>
-            <span className="ai-connection-icon ai-connection-icon--connected" aria-hidden="true">
-              ✓
-            </span>
-            <span className="ai-connection-text">AI Connected</span>
+            <CheckIcon size="sm" />
+            <span>AI Connected</span>
           </>
         ) : (
           <>
-            <span className="ai-connection-icon ai-connection-icon--demo" aria-hidden="true">
-              ○
-            </span>
-            <span className="ai-connection-text">Demo Mode</span>
+            <span className="w-2 h-2 rounded-full border border-current" aria-hidden="true" />
+            <span>Demo Mode</span>
           </>
         )}
       </div>
 
       {showConnectButton && (
         <button
-          className="ai-connection-connect-btn"
+          className="px-2 py-0.5 text-xs bg-accent-cyan text-bg-deep font-medium rounded transition-all duration-150 hover:shadow-glow-cyan disabled:opacity-50"
           onClick={onConnect}
           disabled={isConnecting}
           title={canConnect ? 'Connect to AI planning agent' : 'Only draft plans support AI'}
@@ -75,7 +65,7 @@ export function AIConnectionBadge({
 
       {status === 'demo' && !canConnect && (
         <span
-          className="ai-connection-hint"
+          className="text-xs text-text-muted"
           title="Only draft plans can have AI sessions. Approved/published plans are read-only."
         >
           (Read-only)
@@ -83,15 +73,15 @@ export function AIConnectionBadge({
       )}
 
       {connectError && (
-        <div className="ai-connection-error">
-          <span className="ai-connection-error-text">{connectError}</span>
+        <div className="flex items-center gap-1 px-2 py-1 bg-error/10 text-error text-xs rounded">
+          <span>{connectError}</span>
           {onClearError && (
             <button
-              className="ai-connection-error-dismiss"
+              className="p-0.5 hover:bg-error/20 rounded transition-colors"
               onClick={onClearError}
               aria-label="Dismiss error"
             >
-              ×
+              <CloseIcon size="sm" />
             </button>
           )}
         </div>

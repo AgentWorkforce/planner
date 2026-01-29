@@ -1,0 +1,36 @@
+{
+  "feature_id": "ui-attention-navigation",
+  "title": "Attention-Based Plan Navigation",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Replace flat plan listing with attention-based navigation that surfaces actionable items, organizes active work, and provides quick access to the full catalog - enabling 'Inbox Zero' mental model at scale.",
+    "context": "Currently /plans shows a simple list with status filters. At scale (hundreds/thousands of plans), users need attention-based organization that surfaces what needs action, not just taxonomy. The system already has rich attention signals: change requests, pending gates, submitted drafts, execution status, comments - these should drive navigation priority.",
+    "out_of_scope": [
+      "Portfolio/project hierarchy (separate feature)",
+      "Notifications/alerts system (separate feature)",
+      "Saved searches/smart folders (future enhancement)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Plans list page shows 'Needs Attention' section at top with actionable items grouped by attention type" },
+      { "id": "ac2", "description": "Plans list page shows 'Working On' section with user's active drafts and running executions" },
+      { "id": "ac3", "description": "Plans list page shows collapsible 'All Plans' section with scope grouping" },
+      { "id": "ac4", "description": "Each attention item shows clear action indicator and time context" },
+      { "id": "ac5", "description": "Attention counts are visible in section headers" },
+      { "id": "ac6", "description": "Empty attention state shows encouraging message, not error" },
+      { "id": "ac7", "description": "Navigation remains fast with large plan counts (pagination/virtualization where needed)" }
+    ]
+  },
+
+  "sub_features": [
+    { "feature_id": "ui-attention-signals", "title": "Attention Signal Computation", "type": "feature" },
+    { "feature_id": "ui-attention-sections", "title": "Attention Section Components", "type": "feature" },
+    { "feature_id": "ui-scope-grouping", "title": "Scope-Based Grouping", "type": "feature" },
+    { "feature_id": "ui-command-palette", "title": "Command Palette Navigation", "type": "feature" }
+  ],
+
+  "references": []
+}

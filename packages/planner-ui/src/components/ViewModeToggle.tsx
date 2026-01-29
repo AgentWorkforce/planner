@@ -7,32 +7,15 @@ interface ViewModeToggleProps {
 
 export function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
   return (
-    <div
-      className="view-mode-toggle"
-      style={{
-        display: 'inline-flex',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--color-border)',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="inline-flex rounded-lg border border-border-subtle overflow-hidden">
       <button
         type="button"
         onClick={() => onChange('list')}
-        className={`view-mode-btn${value === 'list' ? ' active' : ''}`}
-        style={{
-          padding: 'var(--spacing-xs) var(--spacing-sm)',
-          border: 'none',
-          background: value === 'list' ? 'var(--color-primary)' : 'var(--color-background)',
-          color: value === 'list' ? 'white' : 'var(--color-text)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacing-xs)',
-          fontSize: '0.75rem',
-          fontWeight: 500,
-          transition: 'background-color 0.2s, color 0.2s',
-        }}
+        className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors ${
+          value === 'list'
+            ? 'bg-accent-cyan text-bg-deep'
+            : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+        }`}
         title="List View"
       >
         <svg
@@ -54,21 +37,11 @@ export function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
       <button
         type="button"
         onClick={() => onChange('swimlane')}
-        className={`view-mode-btn${value === 'swimlane' ? ' active' : ''}`}
-        style={{
-          padding: 'var(--spacing-xs) var(--spacing-sm)',
-          border: 'none',
-          borderLeft: '1px solid var(--color-border)',
-          background: value === 'swimlane' ? 'var(--color-primary)' : 'var(--color-background)',
-          color: value === 'swimlane' ? 'white' : 'var(--color-text)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacing-xs)',
-          fontSize: '0.75rem',
-          fontWeight: 500,
-          transition: 'background-color 0.2s, color 0.2s',
-        }}
+        className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 border-l border-border-subtle transition-colors ${
+          value === 'swimlane'
+            ? 'bg-accent-cyan text-bg-deep'
+            : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+        }`}
         title="Swimlane View"
       >
         <svg
