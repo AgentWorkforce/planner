@@ -2,7 +2,7 @@
   "feature_id": "relay-integration",
   "title": "Agent Relay Integration",
   "type": "epic",
-  "status": "draft",
+  "status": "approved",
   "priority": "high",
   "dependencies": ["mcp-tools", "ui-ai-chat", "ui-ai-improvements", "api-change-requests"],
 

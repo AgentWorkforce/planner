@@ -2,7 +2,7 @@
   "feature_id": "ui-review-comments",
   "title": "Review Comments",
   "type": "feature",
-  "status": "in_progress",
+  "status": "approved",
   "priority": "medium",
   "dependencies": ["ui-submit-review"],
 

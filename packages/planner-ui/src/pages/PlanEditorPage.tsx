@@ -7,6 +7,9 @@ import { StepEditor } from '@/components/StepEditor';
 import { ChatPanel } from '@/components/ChatPanel';
 import { CommentThread } from '@/components/CommentThread';
 import { WorkflowActions } from '@/components/WorkflowActions';
+import { SwimlaneView } from '@/components/SwimlaneView';
+import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
+import { DependencyLinesOverlay } from '@/components/DependencyLinesOverlay';
 import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
 
 /** Panel type for coexistence - only one panel can be open at a time */
@@ -36,6 +39,11 @@ export function PlanEditorPage() {
   // Comment state
   const [commentStepId, setCommentStepId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+
+  // View mode state (list vs swimlane)
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [hoveredStepId, setHoveredStepId] = useState<string | null>(null);
+  const stepsContainerRef = useRef<HTMLDivElement>(null);
 
   // AI connection status - check if planning agent is active
   const {
@@ -386,75 +394,101 @@ export function PlanEditorPage() {
       )}
 
       <div className="plan-steps">
-        <h2>Steps ({version.steps.length})</h2>
+        <div className="plan-steps-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
+          <h2 style={{ margin: 0 }}>Steps ({version.steps.length})</h2>
+          {version.steps.length > 0 && (
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          )}
+        </div>
         {version.steps.length === 0 ? (
           <div className="empty-state">
             <p>No steps yet. Add steps to define the work needed to achieve your goal.</p>
           </div>
         ) : (
-          <div className="steps-list">
-            {version.steps.map((step) => {
-              const hasSubPlan = !!step.sub_plan_id;
-              const isExpanded = expandedStepId === step.step_id;
-              const isSelected = selectedStep?.step_id === step.step_id;
-              const isEditable = version.status === 'draft';
-              const unresolvedComments = getUnresolvedCount(step.step_id);
+          <div ref={stepsContainerRef} className="steps-container" style={{ position: 'relative' }}>
+            {viewMode === 'list' ? (
+              <div className="steps-list">
+                {version.steps.map((step) => {
+                  const hasSubPlan = !!step.sub_plan_id;
+                  const isExpanded = expandedStepId === step.step_id;
+                  const isSelected = selectedStep?.step_id === step.step_id;
+                  const isEditable = version.status === 'draft';
+                  const unresolvedComments = getUnresolvedCount(step.step_id);
 
-              // Sub-plan steps render as links
-              if (hasSubPlan) {
-                const newParents: ParentPlanInfo[] = [
-                  ...parents,
-                  { plan_id: plan.plan_id, goal: version.summary.goal },
-                ];
+                  // Sub-plan steps render as links
+                  if (hasSubPlan) {
+                    const newParents: ParentPlanInfo[] = [
+                      ...parents,
+                      { plan_id: plan.plan_id, goal: version.summary.goal },
+                    ];
 
-                return (
-                  <div key={step.step_id} className="step-item has-subplan">
-                    <Link
-                      to={`/plans/${step.sub_plan_id}`}
-                      className="step-subplan-link"
-                      state={{ parents: newParents }}
-                      aria-label={`Navigate to sub-plan: ${step.title}`}
-                    >
-                      <div className="step-header">
-                        <span className="step-title">{step.title}</span>
-                        {step.scope && <span className="step-scope">{step.scope}</span>}
-                        <span className="badge badge-subplan">Sub-plan</span>
+                    return (
+                      <div key={step.step_id} className="step-item has-subplan" data-step-id={step.step_id}>
+                        <Link
+                          to={`/plans/${step.sub_plan_id}`}
+                          className="step-subplan-link"
+                          state={{ parents: newParents }}
+                          aria-label={`Navigate to sub-plan: ${step.title}`}
+                        >
+                          <div className="step-header">
+                            <span className="step-title">{step.title}</span>
+                            {step.scope && <span className="step-scope">{step.scope}</span>}
+                            <span className="badge badge-subplan">Sub-plan</span>
+                          </div>
+                        </Link>
                       </div>
-                    </Link>
-                  </div>
-                );
-              }
+                    );
+                  }
 
-              // Regular steps use StepEditor
-              return (
-                <div
-                  key={step.step_id}
-                  className={`step-item${isSelected ? ' step-item--selected' : ''}`}
-                  onClick={(e) => {
-                    // Don't toggle selection if clicking interactive elements (buttons, inputs, etc.)
-                    const target = e.target as HTMLElement;
-                    const isInteractive = target.closest('button, input, select, textarea, a, [role="button"]');
-                    if (!isInteractive) {
-                      setSelectedStep(isSelected ? undefined : step);
-                    }
-                  }}
-                >
-                  <StepEditor
-                    step={step}
-                    allSteps={version.steps}
-                    onUpdate={handleStepUpdate}
-                    onDelete={handleStepDelete}
-                    disabled={!isEditable}
-                    isExpanded={isExpanded}
-                    onToggleExpand={() =>
-                      setExpandedStepId(isExpanded ? null : step.step_id)
-                    }
-                    commentCount={unresolvedComments}
-                    onOpenComments={openCommentsPanel}
-                  />
-                </div>
-              );
-            })}
+                  // Regular steps use StepEditor
+                  return (
+                    <div
+                      key={step.step_id}
+                      data-step-id={step.step_id}
+                      className={`step-item${isSelected ? ' step-item--selected' : ''}`}
+                      onClick={(e) => {
+                        // Don't toggle selection if clicking interactive elements (buttons, inputs, etc.)
+                        const target = e.target as HTMLElement;
+                        const isInteractive = target.closest('button, input, select, textarea, a, [role="button"]');
+                        if (!isInteractive) {
+                          setSelectedStep(isSelected ? undefined : step);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredStepId(step.step_id)}
+                      onMouseLeave={() => setHoveredStepId(null)}
+                    >
+                      <StepEditor
+                        step={step}
+                        allSteps={version.steps}
+                        onUpdate={handleStepUpdate}
+                        onDelete={handleStepDelete}
+                        disabled={!isEditable}
+                        isExpanded={isExpanded}
+                        onToggleExpand={() =>
+                          setExpandedStepId(isExpanded ? null : step.step_id)
+                        }
+                        commentCount={unresolvedComments}
+                        onOpenComments={openCommentsPanel}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <SwimlaneView
+                steps={version.steps}
+                onStepClick={(step) => setSelectedStep(step)}
+                selectedStepId={selectedStep?.step_id}
+                hoveredStepId={hoveredStepId}
+                onStepHover={setHoveredStepId}
+              />
+            )}
+            <DependencyLinesOverlay
+              steps={version.steps}
+              containerRef={stepsContainerRef}
+              hoveredStepId={hoveredStepId}
+              viewMode={viewMode}
+            />
           </div>
         )}
       </div>

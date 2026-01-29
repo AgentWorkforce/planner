@@ -2,7 +2,7 @@
   "feature_id": "relay-ai-improvements",
   "title": "Connect Silent Improvements to Planning Agent",
   "type": "feature",
-  "status": "draft",
+  "status": "approved",
   "priority": "medium",
   "dependencies": ["relay-session-management", "ui-ai-improvements"],
 

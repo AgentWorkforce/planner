@@ -2,7 +2,7 @@
   "feature_id": "ui-ai-improvements",
   "title": "Silent AI Improvements",
   "type": "feature",
-  "status": "completed",
+  "status": "approved",
   "priority": "medium",
   "dependencies": ["mcp-tools", "ui-editor-steps"],
 

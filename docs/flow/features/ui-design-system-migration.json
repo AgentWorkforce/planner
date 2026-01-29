@@ -1,0 +1,59 @@
+{
+  "feature_id": "ui-design-system-migration",
+  "title": "Design System Migration",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": [],
+  "summary": {
+    "goal": "Migrate planner-ui to use the same design system and component patterns as relay-dashboard, enabling direct code reuse and visual consistency across the agentworkforce package ecosystem.",
+    "in_scope": [
+      "Audit relay-dashboard design system (colors, typography, components, patterns)",
+      "Audit planner-ui current components and styles",
+      "Gap analysis between the two systems",
+      "Component library selection (adopt whatever relay-dashboard uses)",
+      "Incremental migration of all UI components",
+      "Visual regression testing",
+      "Cleanup of deprecated styles and components"
+    ],
+    "out_of_scope": [
+      "Functionality changes (pure visual/structural migration)",
+      "New features during migration",
+      "Backend changes"
+    ],
+    "constraints": [
+      "Must match relay-dashboard visual appearance",
+      "Prefer direct code reuse where feasible",
+      "Incremental migration to avoid big-bang risk",
+      "Human approval gates at key decision points"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "planner-ui uses the same component library as relay-dashboard" },
+      { "id": "ac2", "description": "Color palette matches relay-dashboard design tokens" },
+      { "id": "ac3", "description": "Typography system matches relay-dashboard" },
+      { "id": "ac4", "description": "All Button components use shared/consistent implementation" },
+      { "id": "ac5", "description": "All Form components (inputs, selects, checkboxes) use shared/consistent implementation" },
+      { "id": "ac6", "description": "All Modal/Dialog components use shared/consistent implementation" },
+      { "id": "ac7", "description": "All Card and layout components use shared/consistent implementation" },
+      { "id": "ac8", "description": "No deprecated custom CSS remains for migrated components" },
+      { "id": "ac9", "description": "Visual regression tests pass for all pages" }
+    ]
+  },
+  "sub_features": [
+    "ui-dsm-audit-relay",
+    "ui-dsm-audit-planner",
+    "ui-dsm-gap-analysis",
+    "ui-dsm-library-selection",
+    "ui-dsm-migrate-buttons",
+    "ui-dsm-migrate-forms",
+    "ui-dsm-migrate-modals",
+    "ui-dsm-migrate-cards",
+    "ui-dsm-migrate-utilities",
+    "ui-dsm-testing",
+    "ui-dsm-cleanup"
+  ],
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  }
+}

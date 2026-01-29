@@ -2,7 +2,7 @@
   "feature_id": "relay-session-connect",
   "title": "On-Demand AI Session Connection",
   "type": "feature",
-  "status": "verified",
+  "status": "approved",
   "priority": "high",
   "dependencies": ["relay-session-management", "relay-ai-chat"],
 

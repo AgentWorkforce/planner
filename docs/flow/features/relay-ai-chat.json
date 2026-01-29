@@ -2,7 +2,7 @@
   "feature_id": "relay-ai-chat",
   "title": "Connect AI Chat to Planning Agent",
   "type": "feature",
-  "status": "draft",
+  "status": "approved",
   "priority": "high",
   "dependencies": ["relay-session-management", "ui-ai-chat"],
 
