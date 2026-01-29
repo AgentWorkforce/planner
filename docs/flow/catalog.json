@@ -78,20 +78,20 @@
 
     { "id": "ui-plan-creation", "title": "Plan Creation", "type": "epic", "status": "approved" },
     { "id": "ui-plan-create-goal", "title": "Create from Goal", "type": "feature", "status": "approved" },
-    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "approved", "change_request": "Added backend implementation steps (uci007-uci010) for document parsing, format detection, and import API endpoint" },
+    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "approved", "audit_note": "Complete - TabNavigation, DocumentTextarea, UploadDropZone, FormatDetectionBadge, ExtractionPreview integrated. PDF not supported (only .md/.txt/.yaml/.json)" },
 
     { "id": "ui-plan-editor", "title": "Plan Editor", "type": "epic", "status": "approved" },
     { "id": "ui-editor-inline", "title": "Inline Editing", "type": "feature", "status": "approved" },
     { "id": "ui-editor-steps", "title": "Step Editor", "type": "feature", "status": "approved" },
-    { "id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "type": "feature", "status": "partial", "audit_note": "Scope filtering exists but full multi-scope visualization not implemented - 17/26 criteria met" },
+    { "id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "type": "feature", "status": "approved", "audit_note": "SwimlaneView integrated - 8/11 criteria met. Missing: collapsible sections, zoom levels, per-scope add button" },
     { "id": "ui-subplan-navigation", "title": "Sub-Plan Navigation", "type": "feature", "status": "approved" },
 
     { "id": "ui-approval-workflow", "title": "Approval Workflow", "type": "epic", "status": "approved" },
     { "id": "ui-submit-review", "title": "Submit for Review", "type": "feature", "status": "approved" },
-    { "id": "ui-review-comments", "title": "Review Comments", "type": "feature", "status": "partial", "audit_note": "CommentThread.tsx (346 lines) never integrated into UI - backend complete but component orphaned" },
+    { "id": "ui-review-comments", "title": "Review Comments", "type": "feature", "status": "approved" },
     { "id": "ui-approve", "title": "Approval Ceremony", "type": "feature", "status": "approved" },
     { "id": "ui-publish", "title": "Publish to Orchestrator", "type": "feature", "status": "approved" },
-    { "id": "ui-workflow-integration", "title": "Workflow Actions Integration", "type": "feature", "status": "draft", "audit_note": "WorkflowActions.tsx (170 lines) exists but never imported - connects submit/approve/publish buttons to API" },
+    { "id": "ui-workflow-integration", "title": "Workflow Actions Integration", "type": "feature", "status": "approved" },
 
     { "id": "ui-execution", "title": "Execution Visibility", "type": "epic", "status": "approved" },
     { "id": "ui-execution-status", "title": "Execution Status Overlay", "type": "feature", "status": "approved" },
@@ -102,16 +102,30 @@
     { "id": "ui-ai-chat", "title": "AI Chat", "type": "feature", "status": "approved" },
     { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" },
 
-    { "id": "relay-integration", "title": "Agent Relay Integration", "type": "epic", "status": "in_progress", "notes": "All backend work complete. Frontend UI tasks pending." },
+    { "id": "relay-integration", "title": "Agent Relay Integration", "type": "epic", "status": "approved" },
     { "id": "relay-core", "title": "Relay Core Infrastructure", "type": "feature", "status": "approved" },
     { "id": "relay-planning-agent", "title": "Planning Agent Spawning", "type": "feature", "status": "approved" },
     { "id": "relay-mcp-bridge", "title": "MCP Bridge for Planning Agents", "type": "feature", "status": "approved" },
     { "id": "relay-session-management", "title": "Planning Session Management", "type": "feature", "status": "approved" },
-    { "id": "relay-ai-chat", "title": "Connect AI Chat to Planning Agent", "type": "feature", "status": "in_progress", "audit_note": "Backend complete but TODO stubs in chat.ts:234-266 block suggestion application" },
-    { "id": "relay-ai-improvements", "title": "Connect Silent Improvements to Planning Agent", "type": "feature", "status": "in_progress", "audit_note": "Backend complete but improvements.ts handlers missing session_status in responses" },
-    { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "in_progress", "audit_note": "Backend complete - revision agent spawn logic at change-requests.ts:121-145" },
+    { "id": "relay-ai-chat", "title": "Connect AI Chat to Planning Agent", "type": "feature", "status": "approved" },
+    { "id": "relay-ai-improvements", "title": "Connect Silent Improvements to Planning Agent", "type": "feature", "status": "approved" },
+    { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "approved" },
     { "id": "relay-session-connect", "title": "On-Demand AI Session Connection", "type": "feature", "status": "approved", "audit_note": "All 8 implementation tasks completed - hook, badge, API, tests all implemented" },
 
-    { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "approved" }
+    { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "approved" },
+
+    { "id": "ui-design-system-migration", "title": "Design System Migration", "type": "epic", "status": "draft" },
+    { "id": "ui-dsm-audit-relay", "title": "Audit relay-dashboard Design System", "type": "feature", "status": "in_progress" },
+    { "id": "ui-dsm-audit-planner", "title": "Audit planner-ui Components", "type": "feature", "status": "in_progress" },
+    { "id": "ui-dsm-gap-analysis", "title": "Gap Analysis & Migration Plan", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-library-selection", "title": "Component Library Selection (Human Gate)", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-migrate-buttons", "title": "Migrate Button Components", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-migrate-forms", "title": "Migrate Form Components", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-migrate-modals", "title": "Migrate Modal/Dialog Components", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-migrate-cards", "title": "Migrate Card/Layout Components", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-migrate-utilities", "title": "Migrate Utility Components", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-testing", "title": "Visual Regression Testing", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-cleanup", "title": "Cleanup Deprecated Components", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-final-review", "title": "Final Review (Human Gate)", "type": "feature", "status": "pending" }
   ]
 }

@@ -2,7 +2,7 @@
   "feature_id": "ui-ai-chat",
   "title": "AI Chat",
   "type": "feature",
-  "status": "completed",
+  "status": "approved",
   "priority": "high",
   "dependencies": ["mcp-tools", "ui-editor-inline"],
 

@@ -2,7 +2,7 @@
   "feature_id": "ui-execution-status",
   "title": "Execution Status Overlay",
   "type": "feature",
-  "status": "completed",
+  "status": "approved",
   "priority": "medium",
   "dependencies": ["ui-publish"],
 
