@@ -2,6 +2,46 @@
   "project_id": "planner",
   "status": "approved",
 
+  "design_system": {
+    "feel": "professional, minimal, functional",
+    "library": {
+      "name": "custom CSS",
+      "notes": "No component library - custom React components with CSS variables"
+    },
+    "colors": {
+      "primary": "#2563eb (blue-600)",
+      "primary-hover": "#1d4ed8 (blue-700)",
+      "secondary": "#64748b (slate-500)",
+      "success": "#22c55e (green-500)",
+      "error": "#ef4444 (red-500)",
+      "warning": "#f59e0b (amber-500)",
+      "background": "#ffffff",
+      "surface": "#f8fafc (slate-50)",
+      "border": "#e2e8f0 (slate-200)",
+      "text": "#0f172a (slate-900)",
+      "text-muted": "#64748b (slate-500)"
+    },
+    "spacing": {
+      "xs": "0.25rem (4px)",
+      "sm": "0.5rem (8px)",
+      "md": "1rem (16px)",
+      "lg": "1.5rem (24px)",
+      "xl": "2rem (32px)"
+    },
+    "patterns": {
+      "cards": "1px border var(--color-border), radius-md, hover border-color change",
+      "buttons": "btn class + variant (btn-primary, btn-secondary, btn-danger, btn-success)",
+      "badges": "badge class + status variant, uppercase text, small font",
+      "collapsible": "expand icon (triangle), body hidden/shown, border highlight when expanded",
+      "loading": "spinner animation with border-top color, loading-message text",
+      "empty": "centered text with muted color, optional action button",
+      "forms": "form-group with label above, full-width inputs, focus border-color change",
+      "modals": "modal-overlay (backdrop) + modal (centered card max-w 500px), modal-actions for button row",
+      "workflow": "workflow-actions container with workflow-status, workflow-buttons row, workflow-error for inline errors",
+      "slide-in-panel": "fixed right-edge (400-420px width), full height, z-index 1000, semi-transparent overlay (rgba 0,0,0,0.3), click-overlay-to-close, Escape-to-close, slideInRight animation. Used by: ChatPanel, CommentThread. Rule: one panel open at a time."
+    }
+  },
+
   "components": [
     {
       "id": "planner-core",
@@ -38,18 +78,20 @@
 
     { "id": "ui-plan-creation", "title": "Plan Creation", "type": "epic", "status": "approved" },
     { "id": "ui-plan-create-goal", "title": "Create from Goal", "type": "feature", "status": "approved" },
-    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "approved" },
+    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "approved", "change_request": "Added backend implementation steps (uci007-uci010) for document parsing, format detection, and import API endpoint" },
 
     { "id": "ui-plan-editor", "title": "Plan Editor", "type": "epic", "status": "approved" },
     { "id": "ui-editor-inline", "title": "Inline Editing", "type": "feature", "status": "approved" },
     { "id": "ui-editor-steps", "title": "Step Editor", "type": "feature", "status": "approved" },
-    { "id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "type": "feature", "status": "approved" },
+    { "id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "type": "feature", "status": "partial", "audit_note": "Scope filtering exists but full multi-scope visualization not implemented - 17/26 criteria met" },
+    { "id": "ui-subplan-navigation", "title": "Sub-Plan Navigation", "type": "feature", "status": "approved" },
 
     { "id": "ui-approval-workflow", "title": "Approval Workflow", "type": "epic", "status": "approved" },
     { "id": "ui-submit-review", "title": "Submit for Review", "type": "feature", "status": "approved" },
-    { "id": "ui-review-comments", "title": "Review Comments", "type": "feature", "status": "approved" },
+    { "id": "ui-review-comments", "title": "Review Comments", "type": "feature", "status": "partial", "audit_note": "CommentThread.tsx (346 lines) never integrated into UI - backend complete but component orphaned" },
     { "id": "ui-approve", "title": "Approval Ceremony", "type": "feature", "status": "approved" },
     { "id": "ui-publish", "title": "Publish to Orchestrator", "type": "feature", "status": "approved" },
+    { "id": "ui-workflow-integration", "title": "Workflow Actions Integration", "type": "feature", "status": "draft", "audit_note": "WorkflowActions.tsx (170 lines) exists but never imported - connects submit/approve/publish buttons to API" },
 
     { "id": "ui-execution", "title": "Execution Visibility", "type": "epic", "status": "approved" },
     { "id": "ui-execution-status", "title": "Execution Status Overlay", "type": "feature", "status": "approved" },
@@ -58,6 +100,18 @@
 
     { "id": "ui-ai-integration", "title": "AI Integration", "type": "epic", "status": "approved" },
     { "id": "ui-ai-chat", "title": "AI Chat", "type": "feature", "status": "approved" },
-    { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" }
+    { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" },
+
+    { "id": "relay-integration", "title": "Agent Relay Integration", "type": "epic", "status": "in_progress", "notes": "All backend work complete. Frontend UI tasks pending." },
+    { "id": "relay-core", "title": "Relay Core Infrastructure", "type": "feature", "status": "approved" },
+    { "id": "relay-planning-agent", "title": "Planning Agent Spawning", "type": "feature", "status": "approved" },
+    { "id": "relay-mcp-bridge", "title": "MCP Bridge for Planning Agents", "type": "feature", "status": "approved" },
+    { "id": "relay-session-management", "title": "Planning Session Management", "type": "feature", "status": "approved" },
+    { "id": "relay-ai-chat", "title": "Connect AI Chat to Planning Agent", "type": "feature", "status": "in_progress", "audit_note": "Backend complete but TODO stubs in chat.ts:234-266 block suggestion application" },
+    { "id": "relay-ai-improvements", "title": "Connect Silent Improvements to Planning Agent", "type": "feature", "status": "in_progress", "audit_note": "Backend complete but improvements.ts handlers missing session_status in responses" },
+    { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "in_progress", "audit_note": "Backend complete - revision agent spawn logic at change-requests.ts:121-145" },
+    { "id": "relay-session-connect", "title": "On-Demand AI Session Connection", "type": "feature", "status": "approved", "audit_note": "All 8 implementation tasks completed - hook, badge, API, tests all implemented" },
+
+    { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "approved" }
   ]
 }
