@@ -1,5 +1,19 @@
 export type PlanStatus = 'draft' | 'approved' | 'published';
 
+/**
+ * Attention types that indicate what action a plan needs.
+ * These are computed from plan state and related data.
+ */
+export type AttentionType =
+  | 'awaiting_approval'
+  | 'change_request'
+  | 'gate_pending'
+  | 'execution_failed'
+  | 'unread_comments'
+  | 'stale_draft'
+  | 'active'
+  | 'none';
+
 export interface AcceptanceCriterion {
   id: string;
   description: string;
@@ -65,6 +79,8 @@ export interface PlanSummary {
   scopes?: string[];
   created_at: string;
   updated_at: string;
+  /** Attention types computed by backend when include_attention=true */
+  attention_types?: AttentionType[];
 }
 
 // Navigation state for sub-plan breadcrumbs

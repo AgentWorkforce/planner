@@ -25,7 +25,7 @@ export function TabNavigation({
 }: TabNavigationProps) {
   return (
     <div
-      className={`tab-navigation ${className}`.trim()}
+      className={`flex border-b border-border-subtle ${className}`.trim()}
       role="tablist"
       aria-label="Content tabs"
     >
@@ -39,7 +39,11 @@ export function TabNavigation({
             aria-selected={isActive}
             aria-controls={`tabpanel-${tab.id}`}
             tabIndex={isActive ? 0 : -1}
-            className={`tab-navigation-item${isActive ? ' tab-navigation-item--active' : ''}`}
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              isActive
+                ? 'text-accent-cyan border-accent-cyan'
+                : 'text-text-secondary border-transparent hover:text-text-primary hover:border-border'
+            }`}
             onClick={() => onTabChange(tab.id)}
           >
             {tab.label}
@@ -70,7 +74,7 @@ export function TabPanel({ tabId, isActive, children, className = '' }: TabPanel
       role="tabpanel"
       id={`tabpanel-${tabId}`}
       aria-labelledby={`tab-${tabId}`}
-      className={`tab-panel ${className}`.trim()}
+      className={`py-6 ${className}`.trim()}
       tabIndex={0}
     >
       {children}

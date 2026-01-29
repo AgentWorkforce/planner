@@ -16,7 +16,7 @@ import type {
   ImprovementType,
   ImprovementStatus,
 } from '../domain/improvement.js';
-import type { PlanStorage, Session, SessionStatus } from './interface.js';
+import type { PlanStorage, PlanWithAttentionData, Session, SessionStatus } from './interface.js';
 import { ALL_SCHEMA_STATEMENTS } from './schema.js';
 
 /**
@@ -100,6 +100,22 @@ interface ImprovementRow {
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+interface PlanWithAttentionRow {
+  plan_id: string;
+  plan_created_at: string;
+  plan_updated_at: string;
+  version: number;
+  status: string;
+  summary_json: string;
+  submitted_at: string | null;
+  approval_info_json: string | null;
+  change_request_id: string | null;
+  version_created_at: string;
+  version_updated_at: string;
+  pending_change_request_count: number;
+  unresolved_comment_count: number;
 }
 
 /**
@@ -194,6 +210,83 @@ export class SqliteStorage implements PlanStorage {
     `);
     const rows = stmt.all();
     return rows.map((row) => this.rowToPlan(row));
+  }
+
+  listPlansWithAttention(status?: PlanStatus): PlanWithAttentionData[] {
+    // Single query with LEFT JOINs to get plans with latest version and attention counts
+    const sql = `
+      SELECT
+        p.plan_id,
+        p.created_at as plan_created_at,
+        p.updated_at as plan_updated_at,
+        v.version,
+        v.status,
+        v.summary_json,
+        v.submitted_at,
+        v.approval_info_json,
+        v.change_request_id,
+        v.created_at as version_created_at,
+        v.updated_at as version_updated_at,
+        COALESCE(cr_count.pending_count, 0) as pending_change_request_count,
+        COALESCE(comment_count.unresolved_count, 0) as unresolved_comment_count
+      FROM plans p
+      INNER JOIN versions v ON p.plan_id = v.plan_id
+      INNER JOIN (
+        SELECT plan_id, MAX(version) as max_version
+        FROM versions
+        GROUP BY plan_id
+      ) latest ON v.plan_id = latest.plan_id AND v.version = latest.max_version
+      LEFT JOIN (
+        SELECT plan_id, COUNT(*) as pending_count
+        FROM change_requests
+        WHERE status = 'pending'
+        GROUP BY plan_id
+      ) cr_count ON p.plan_id = cr_count.plan_id
+      LEFT JOIN (
+        SELECT plan_id, version, COUNT(*) as unresolved_count
+        FROM comments
+        WHERE resolved = 0
+        GROUP BY plan_id, version
+      ) comment_count ON v.plan_id = comment_count.plan_id AND v.version = comment_count.version
+      ${status ? 'WHERE v.status = ?' : ''}
+      ORDER BY p.updated_at DESC
+    `;
+
+    let rows: PlanWithAttentionRow[];
+    if (status) {
+      const stmt = this.db.prepare<string, PlanWithAttentionRow>(sql);
+      rows = stmt.all(status);
+    } else {
+      const stmt = this.db.prepare<[], PlanWithAttentionRow>(sql);
+      rows = stmt.all();
+    }
+
+    return rows.map((row) => {
+      const steps = this.getStepsForVersion(row.plan_id, row.version);
+      return {
+        plan: {
+          plan_id: row.plan_id,
+          created_at: row.plan_created_at,
+          updated_at: row.plan_updated_at,
+        },
+        latestVersion: this.rowToVersion(
+          {
+            plan_id: row.plan_id,
+            version: row.version,
+            status: row.status,
+            summary_json: row.summary_json,
+            submitted_at: row.submitted_at,
+            approval_info_json: row.approval_info_json,
+            change_request_id: row.change_request_id,
+            created_at: row.version_created_at,
+            updated_at: row.version_updated_at,
+          },
+          steps
+        ),
+        pendingChangeRequestCount: row.pending_change_request_count,
+        unresolvedCommentCount: row.unresolved_comment_count,
+      };
+    });
   }
 
   // ============================================

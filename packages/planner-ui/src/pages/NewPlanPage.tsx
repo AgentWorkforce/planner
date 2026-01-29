@@ -50,14 +50,16 @@ export function NewPlanPage() {
   };
 
   return (
-    <div className="new-plan-page">
+    <div className="max-w-2xl mx-auto py-8 px-6">
       {loading && (
-        <div className="ai-overlay">
-          <LoadingSpinner message="AI is analyzing your goal and creating a plan..." />
+        <div className="fixed inset-0 bg-bg-deep/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-bg-card border border-border-subtle rounded-xl p-8 shadow-lg">
+            <LoadingSpinner message="AI is analyzing your goal and creating a plan..." />
+          </div>
         </div>
       )}
 
-      <h1>Create New Plan</h1>
+      <h1 className="font-display text-3xl text-text-primary mb-6">Create New Plan</h1>
 
       <TabNavigation
         tabs={TABS}
@@ -66,11 +68,17 @@ export function NewPlanPage() {
       />
 
       <TabPanel tabId="goal" isActive={activeTab === 'goal'}>
-        <form onSubmit={handleSubmit} className="new-plan-form">
-          {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="p-4 bg-error/10 border border-error/30 rounded-lg text-error text-sm">
+              {error}
+            </div>
+          )}
 
-          <div className="form-group">
-            <label htmlFor="goal">Goal *</label>
+          <div className="space-y-2">
+            <label htmlFor="goal" className="block text-sm font-medium text-text-primary">
+              Goal <span className="text-error">*</span>
+            </label>
             <textarea
               id="goal"
               value={goal}
@@ -80,15 +88,18 @@ export function NewPlanPage() {
               rows={3}
               disabled={loading}
               autoFocus
+              className="w-full px-4 py-3 bg-bg-secondary border border-border-subtle rounded-lg text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <p className="form-hint">
+            <p className="text-xs text-text-muted">
               Examples: "Add user authentication", "Improve homepage performance", "Build a REST API
               for orders"
             </p>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="context">Context (optional)</label>
+          <div className="space-y-2">
+            <label htmlFor="context" className="block text-sm font-medium text-text-primary">
+              Context <span className="text-text-muted">(optional)</span>
+            </label>
             <textarea
               id="context"
               value={context}
@@ -97,22 +108,33 @@ export function NewPlanPage() {
               placeholder="Any additional context, constraints, or requirements..."
               rows={4}
               disabled={loading}
+              className="w-full px-4 py-3 bg-bg-secondary border border-border-subtle rounded-lg text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <p className="form-hint">
+            <p className="text-xs text-text-muted">
               Include relevant technical constraints, deadlines, team information, or dependencies.
             </p>
           </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => navigate('/plans')}>
+          <div className="flex items-center justify-end gap-3 pt-4">
+            <button
+              type="button"
+              className="px-4 py-2 bg-bg-tertiary text-text-primary border border-border-subtle font-medium rounded-lg transition-all duration-150 hover:border-border-light"
+              onClick={() => navigate('/plans')}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={loading || !goal.trim()}>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-accent-cyan text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-cyan disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || !goal.trim()}
+            >
               {loading ? 'Creating...' : 'Create Plan'}
             </button>
           </div>
 
-          <p className="keyboard-hint">Press Cmd/Ctrl + Enter to submit</p>
+          <p className="text-center text-xs text-text-muted">
+            Press <kbd className="px-1.5 py-0.5 bg-bg-tertiary rounded text-text-secondary">Cmd/Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-bg-tertiary rounded text-text-secondary">Enter</kbd> to submit
+          </p>
         </form>
       </TabPanel>
 

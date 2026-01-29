@@ -1,12 +1,27 @@
 import { Link } from 'react-router-dom';
 
 interface ReadOnlyBannerProps {
-  /** Plan ID for creating new version link */
   planId: string;
-  /** Message to display (defaults to execution view message) */
   message?: string;
-  /** Whether to show the "create new version" link */
   showCreateVersionLink?: boolean;
+}
+
+// Eye icon for read-only indicator
+function EyeIcon() {
+  return (
+    <svg
+      className="w-5 h-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
 }
 
 /**
@@ -19,13 +34,17 @@ export function ReadOnlyBanner({
   showCreateVersionLink = true,
 }: ReadOnlyBannerProps) {
   return (
-    <div className="read-only-banner" role="alert">
-      <span className="read-only-icon" aria-hidden="true">
-        👁
-      </span>
-      <span className="read-only-message">{message}</span>
+    <div
+      className="flex items-center gap-3 px-4 py-3 bg-accent-cyan/10 border border-accent-cyan/30 rounded-lg text-accent-cyan"
+      role="alert"
+    >
+      <EyeIcon />
+      <span className="flex-1 text-sm">{message}</span>
       {showCreateVersionLink && (
-        <Link to={`/plans/${planId}/versions/new`} className="read-only-link">
+        <Link
+          to={`/plans/${planId}/versions/new`}
+          className="text-sm font-medium hover:underline"
+        >
           Create new version
         </Link>
       )}

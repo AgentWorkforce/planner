@@ -12,15 +12,18 @@
     "acceptance_criteria": [
       { "id": "ac1", "description": "Steps grouped into scope sections" },
       { "id": "ac2", "description": "Scope sections are collapsible" },
-      { "id": "ac3", "description": "Cross-scope dependencies shown as visual connectors" },
-      { "id": "ac4", "description": "Dependency arrows indicate direction (depends-on)" },
-      { "id": "ac5", "description": "Zoom levels: Overview (collapsed), Expanded (1-level), Full Detail" },
-      { "id": "ac6", "description": "Progress indicators per scope (N/M complete)" },
-      { "id": "ac7", "description": "Add step button within each scope section" },
-      { "id": "ac8", "description": "Swimlane view option showing scopes as horizontal lanes" },
-      { "id": "ac9", "description": "Scope summary statistics (step count, completion %, blocked count)" },
-      { "id": "ac10", "description": "Cross-scope dependency lines with curved paths avoiding overlaps" },
-      { "id": "ac11", "description": "Visual distinction for cross-scope vs intra-scope dependencies" }
+      { "id": "ac3", "description": "Dependencies indicated by edge badges (numbered dots) on step cards" },
+      { "id": "ac4", "description": "Left indicator shows incoming dependencies (what step depends on)" },
+      { "id": "ac5", "description": "Right indicator shows outgoing dependencies (what blocks on this step)" },
+      { "id": "ac6", "description": "Dependency lines appear only on hover (not always visible)" },
+      { "id": "ac7", "description": "Lines drawn in gutters (left/right margins), never crossing over card content" },
+      { "id": "ac8", "description": "Cross-scope dependencies shown with distinct color (orange/warning)" },
+      { "id": "ac9", "description": "Swimlane view option showing scopes as horizontal lanes" },
+      { "id": "ac10", "description": "Scope summary statistics (step count, completion %, blocked count)" },
+      { "id": "ac11", "description": "Progress indicators per scope (N/M complete)" },
+      { "id": "ac12", "description": "Click indicator scrolls to and highlights connected step" },
+      { "id": "ac13", "description": "Zoom levels: Overview (collapsed), Expanded (1-level), Full Detail" },
+      { "id": "ac14", "description": "Add step button within each scope section" }
     ]
   },
 
@@ -216,65 +219,112 @@
       },
       {
         "view_id": "v005",
-        "name": "Dependency Lines Visualization",
-        "layout": "SVG overlay covering the steps container",
-        "diagram": "```\nIntra-scope (solid):          Cross-scope (dashed):\n\n[Step A]                      [Scope: api]\n    |                              [Step A]----+\n    |  (solid, gray)                           |\n    v                                          | (dashed, blue)\n[Step B]                      [Scope: frontend]|\n                                   [Step B]<---+\n```",
+        "name": "Dependency Lines Visualization (Gutter-Based)",
+        "layout": "SVG gutters on left and right sides of steps container, lines never cross over cards",
+        "diagram": "```\n  Left Gutter          Step Cards                    Right Gutter\n  (depends on)                                       (blocks)\n\n  ┌──╮             ┌─────────────────────────┐\n  │  ╰────────────►│●2  Step A           1●  │──────────────╮\n  │                └─────────────────────────┘              │\n  │                                                         │\n  ├──╮             ┌─────────────────────────┐              │\n  │  ╰────────────►│●1  Step B           2●  │──────────────┤\n  ╰──╮             └─────────────────────────┘              │\n     ╰────────────►                                         │\n                   ┌─────────────────────────┐              │\n                   │●2  Step C           0●  │◄─────────────╯\n                   └─────────────────────────┘\n```",
+        "design_principles": {
+          "gutter_approach": "Lines stay in dedicated margin areas (40px each side), never cross over card content",
+          "left_gutter": "Shows incoming dependencies (what this step depends on)",
+          "right_gutter": "Shows outgoing dependencies (what blocks on this step)",
+          "edge_indicators": "Numbered dots on card edges show dependency counts, always visible",
+          "on_hover_lines": "Lines only rendered when step or indicator is hovered"
+        },
+        "edge_indicators": {
+          "incoming": {
+            "position": "Left edge of step card, vertically centered",
+            "styling": {
+              "width": "20px",
+              "height": "20px",
+              "border-radius": "50%",
+              "background": "var(--color-primary) (#2563eb)",
+              "color": "white",
+              "font-size": "0.75rem",
+              "font-weight": "600",
+              "border": "2px solid white",
+              "left": "-10px (half outside card)"
+            },
+            "content": "Count of dependencies (things this step depends on)",
+            "visibility": "Only show when count > 0"
+          },
+          "outgoing": {
+            "position": "Right edge of step card, vertically centered",
+            "styling": {
+              "width": "20px",
+              "height": "20px",
+              "border-radius": "50%",
+              "background": "var(--color-success) (#22c55e)",
+              "color": "white",
+              "font-size": "0.75rem",
+              "font-weight": "600",
+              "border": "2px solid white",
+              "right": "-10px (half outside card)"
+            },
+            "content": "Count of dependents (things that depend on this step)",
+            "visibility": "Only show when count > 0"
+          },
+          "cross_scope_indicator": {
+            "description": "When dependency crosses scope boundary",
+            "background": "var(--color-warning) (#f59e0b)",
+            "note": "Applied when any dependencies are from different scope"
+          }
+        },
         "line_types": {
-          "intra_scope": {
-            "description": "Both endpoints in same scope",
-            "stroke": "var(--color-border) (#e2e8f0)",
+          "incoming": {
+            "description": "Lines in left gutter showing what step depends on",
+            "stroke": "var(--color-primary) (#2563eb)",
             "stroke-width": "2px",
-            "stroke-dasharray": "none (solid line)",
-            "opacity": "0.6",
-            "path": "Straight line in list view, horizontal in swimlane"
+            "opacity": "0.8"
+          },
+          "outgoing": {
+            "description": "Lines in right gutter showing what depends on step",
+            "stroke": "var(--color-success) (#22c55e)",
+            "stroke-width": "2px",
+            "opacity": "0.8"
           },
           "cross_scope": {
-            "description": "Endpoints in different scopes",
-            "stroke": "var(--color-primary) (#2563eb)",
-            "stroke-width": "2px",
-            "stroke-dasharray": "6 4",
-            "opacity": "0.7",
-            "path": "Bezier curve that exits scope boundary gracefully"
+            "description": "When connection crosses scope boundary",
+            "stroke": "var(--color-warning) (#f59e0b)",
+            "stroke-dasharray": "6 4"
           },
           "highlighted": {
-            "description": "On hover, the entire dependency chain",
-            "stroke": "var(--color-primary) (#2563eb)",
+            "description": "Active hover state",
             "stroke-width": "3px",
             "opacity": "1.0",
-            "filter": "drop-shadow(0 0 3px var(--color-primary))"
-          },
-          "critical_path": {
-            "description": "Part of the longest dependency chain",
-            "stroke": "var(--color-error) (#ef4444)",
-            "stroke-width": "2px",
-            "stroke-dasharray": "none",
-            "opacity": "0.8"
+            "filter": "drop-shadow(0 0 3px currentColor)"
           }
         },
         "path_algorithms": {
-          "list_view": {
-            "intra_scope": "Vertical line: source.bottom-center -> target.top-center",
-            "cross_scope": "Bezier: source.right-center, control1 (+60px, 0), control2 (+60px, +dy), target.left-center"
+          "left_gutter": {
+            "description": "Vertical curve in 40px left margin, horizontal connector to card edge",
+            "path": "M gutter_x source_y Q gutter_x mid_y, gutter_x target_y L card_left target_y",
+            "note": "Quadratic bezier for smooth vertical curve, then straight horizontal to indicator"
           },
-          "swimlane": {
-            "intra_scope": "Horizontal line: source.right-center -> target.left-center",
-            "cross_scope": "Bezier: source.bottom-center, control1 (0, +40px), control2 (dx, +40px), target.top-center"
+          "right_gutter": {
+            "description": "Horizontal from card edge, vertical curve in 40px right margin",
+            "path": "M card_right source_y L gutter_x source_y Q gutter_x mid_y, gutter_x target_y",
+            "note": "Straight horizontal from card, then quadratic bezier vertical curve"
           }
         },
         "arrowhead": {
           "type": "SVG marker",
-          "size": "8x8",
-          "points_to": "dependent step (the one that depends on the source)"
+          "size": "6x6",
+          "points_to": "The step being connected to"
         },
         "interactions": {
-          "hover_step": "Highlight all lines in chain (both ancestors and descendants)",
-          "hover_line": "Tooltip: 'Step B depends on Step A'",
-          "click_line": "Scroll both steps into view if needed"
+          "hover_indicator": "Show all lines for that direction (incoming or outgoing)",
+          "hover_step": "Show both incoming (left) and outgoing (right) lines",
+          "click_indicator": "Scroll to and highlight the first connected step",
+          "tooltip": "Show on indicator hover: 'Depends on: Step A, Step B' or 'Blocks: Step C'"
+        },
+        "visibility": {
+          "indicators": "Always visible when count > 0",
+          "lines": "Only visible on hover (step card or indicator)"
         },
         "technical": {
+          "gutter_width": "40px each side",
           "update_triggers": ["scroll", "resize", "expand/collapse", "step add/remove"],
           "debounce": "16ms (one frame)",
-          "z_index": "10 (above cards, below modals/panels)"
+          "z_index": "Indicators: 15 (above cards), Lines: 5 (below cards)"
         }
       }
     ],
@@ -541,19 +591,50 @@
         "audit": {
           "evidence": "SwimlaneView.test.tsx (240 lines) covers lane rendering, step card rendering, interactions, step ordering, empty states, scope summary stats, and status colors. ScopeSummaryStats.test.tsx and DependencyLinesOverlay.test.tsx also exist."
         }
+      },
+      {
+        "step_id": "uem012",
+        "title": "Redesign dependency visualization with edge indicators and gutter lines",
+        "scope": "planner-ui",
+        "description": "Replace always-visible center/diagonal dependency lines with gutter-based approach per updated v005 spec. Create DependencyIndicator component (numbered dots on card edges). Modify DependencyLinesOverlay to render lines only on hover, in 40px left/right gutters. Left gutter shows incoming dependencies (blue), right gutter shows outgoing (green). Cross-scope uses orange. Lines use quadratic bezier curves within gutters, never crossing card content. Click indicator scrolls to connected step.",
+        "dependencies": ["uem003", "uem010"],
+        "owner_role": "frontend:Coder",
+        "status": "done",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "DependencyIndicator component renders 20px circular badges on card edges" },
+          { "id": "ac2", "description": "Left indicator (blue #2563eb) shows incoming dependency count, hidden when 0" },
+          { "id": "ac3", "description": "Right indicator (green #22c55e) shows outgoing dependency count, hidden when 0" },
+          { "id": "ac4", "description": "Cross-scope indicators use orange (#f59e0b) background" },
+          { "id": "ac5", "description": "Lines only render when step or indicator is hovered" },
+          { "id": "ac6", "description": "Left gutter (40px) contains incoming dependency curves" },
+          { "id": "ac7", "description": "Right gutter (40px) contains outgoing dependency curves" },
+          { "id": "ac8", "description": "Lines never cross over step card content area" },
+          { "id": "ac9", "description": "Click indicator scrolls to and highlights first connected step" },
+          { "id": "ac10", "description": "Tooltip on indicator hover shows connected step names" },
+          { "id": "ac11", "description": "Old center/diagonal lines removed" }
+        ],
+        "audit": {
+          "evidence": "DependencyIndicator.tsx (127 lines) renders 20px circular badges with direction-specific colors (blue incoming, green outgoing, orange cross-scope). DependencyLinesOverlay.tsx rewritten (300 lines) with gutter-based path algorithm using quadratic bezier curves in 40px left/right gutters. Lines only render on hover. Integrated into StepEditor and SwimlaneStepCard. PlanEditorPage updated with handleScrollToStep for click-to-scroll."
+        }
       }
     ]
   },
 
   "audit": {
     "last_run": "2026-01-29",
-    "result": "approved",
-    "summary": "Swimlane visualization integrated into PlanEditorPage. 8/11 acceptance criteria met. Missing: collapsible scope sections (ac2), zoom levels (ac5), per-scope add button (ac7).",
-    "done_steps": ["uem003", "uem008", "uem009", "uem010", "uem011"],
+    "result": "partial",
+    "summary": "uem012 completed: Dependency visualization redesigned with edge indicators and gutter-based lines. DependencyIndicator component shows numbered dots on card edges. Lines only visible on hover, drawn in 40px left/right gutters using quadratic bezier curves.",
+    "done_steps": ["uem003", "uem008", "uem009", "uem010", "uem011", "uem012"],
     "pending_steps": ["uem001", "uem002", "uem004", "uem005", "uem006", "uem007"],
-    "criteria_met": ["ac1", "ac3", "ac4", "ac6", "ac8", "ac9", "ac10", "ac11"],
-    "criteria_pending": ["ac2", "ac5", "ac7"],
-    "integration_complete": "2026-01-29 - SwimlaneView, ViewModeToggle, DependencyLinesOverlay integrated into PlanEditorPage.tsx with state management and conditional rendering"
+    "criteria_met": ["ac3", "ac4", "ac5", "ac6", "ac7", "ac8", "ac9", "ac10", "ac11", "ac12"],
+    "criteria_pending": ["ac1", "ac2", "ac13", "ac14"],
+    "change_request": {
+      "date": "2026-01-29",
+      "description": "Redesign dependency lines: edge indicators + gutter-based lines + hover-only visibility",
+      "affected_steps": ["uem003", "uem010"],
+      "new_step": "uem012",
+      "status": "completed"
+    }
   },
 
   "plan_tests": {

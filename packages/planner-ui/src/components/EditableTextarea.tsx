@@ -22,14 +22,12 @@ export function EditableTextarea({
   const [previousValue, setPreviousValue] = useState(value);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync with external value changes
   useEffect(() => {
     if (!isEditing) {
       setEditValue(value);
     }
   }, [value, isEditing]);
 
-  // Focus textarea when entering edit mode
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
@@ -50,7 +48,6 @@ export function EditableTextarea({
       try {
         await onSave(trimmedValue);
       } catch {
-        // Revert on error
         setEditValue(previousValue);
       }
     }
@@ -81,25 +78,31 @@ export function EditableTextarea({
 
   if (isEditing) {
     return (
-      <div className={`editable-textarea-wrapper ${className}`}>
+      <div className={className}>
         <textarea
           ref={textareaRef}
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          className="editable-textarea-input"
+          className="w-full px-3 py-2 bg-bg-secondary border border-accent-cyan rounded-md text-text-primary text-sm placeholder:text-text-muted focus:ring-1 focus:ring-accent-cyan/50 outline-none resize-y"
           placeholder={placeholder}
           rows={rows}
         />
-        <div className="editable-textarea-hint">Press Cmd/Ctrl+Enter to save, Esc to cancel</div>
+        <div className="mt-1 text-xs text-text-muted">
+          Press Cmd/Ctrl+Enter to save, Esc to cancel
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      className={`editable-textarea ${className} ${disabled ? 'disabled' : ''}`}
+      className={`rounded-md p-3 transition-colors ${
+        disabled
+          ? 'cursor-default bg-bg-tertiary'
+          : 'cursor-pointer bg-bg-tertiary hover:bg-bg-elevated border border-transparent hover:border-border'
+      } ${className}`}
       onClick={startEditing}
       role="button"
       tabIndex={disabled ? -1 : 0}
@@ -111,9 +114,9 @@ export function EditableTextarea({
       }}
     >
       {value ? (
-        <span className="editable-content">{value}</span>
+        <span className="text-sm text-text-secondary whitespace-pre-wrap">{value}</span>
       ) : (
-        <span className="editable-placeholder">{placeholder}</span>
+        <span className="text-sm text-text-muted italic">{placeholder}</span>
       )}
     </div>
   );

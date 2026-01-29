@@ -3,6 +3,9 @@ import type { PlanStorage, Session } from '../../storage/interface.js';
 import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createVersionFrom } from '../../domain/diff.js';
 import { PlanStatus } from '../../domain/status.js';
+import type { AttentionType } from '../../domain/attention.js';
+import { computeAttentionTypes, type AttentionInput } from '../../domain/compute-attention.js';
+import { getExecutionStatusBatch } from '../../orchestrator/client.js';
 import { notFound, badRequest } from '../middleware.js';
 import {
   CreatePlanRequestSchema,
@@ -13,6 +16,8 @@ import {
 import { isRelayAvailable } from '../../relay/service.js';
 import { createSpawner, type SpawnResult } from '../../relay/spawner.js';
 import { createMockSpawner } from '../../relay/mock-spawner.js';
+import { createPlanChannel } from '../../relay/channels.js';
+import { joinPlannerLeadToChannel } from '../../relay/planner-lead.js';
 import { randomUUID } from 'crypto';
 
 /** Default session expiration time (1 hour) */
@@ -79,6 +84,14 @@ export function createPlanHandlers(storage: PlanStorage) {
         const version = createPlanVersion(plan.plan_id, body.goal, body.context);
         storage.createVersion(version);
 
+        // Create plan channel for relay communication
+        const channelId = createPlanChannel(plan.plan_id, body.goal);
+        if (channelId) {
+          console.log(`[plans] Created channel ${channelId} for plan ${plan.plan_id}`);
+          // Join PlannerLead to the new channel
+          joinPlannerLeadToChannel(channelId);
+        }
+
         // Spawn planning agent if AI assistance requested
         let agent: SpawnResult | null = null;
         let session: Session | null = null;
@@ -120,19 +133,61 @@ export function createPlanHandlers(storage: PlanStorage) {
      * GET /plans
      * List all plans, optionally filtered by status.
      * Returns PlanSummary objects with goal, status, and latest_version.
+     * When include_attention=true, includes attention_types array for each plan.
      */
-    list: (req: Request, res: Response, next: NextFunction) => {
+    list: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const query = ListPlansQuerySchema.parse(req.query);
-        const plans = storage.listPlans(query.status);
 
-        // Enrich plans with version data to create PlanSummary objects
-        const planSummaries = plans.map((plan) => {
-          const latestVersion = storage.getLatestVersion(plan.plan_id);
+        // Standard flow without attention data
+        if (!query.include_attention) {
+          const plans = storage.listPlans(query.status);
+          const planSummaries = plans.map((plan) => {
+            const latestVersion = storage.getLatestVersion(plan.plan_id);
+            const scopes = latestVersion?.steps
+              ? [...new Set(latestVersion.steps.map((s) => s.scope).filter(Boolean))]
+              : [];
+            return {
+              plan_id: plan.plan_id,
+              goal: latestVersion?.summary?.goal || '',
+              status: latestVersion?.status || PlanStatus.Draft,
+              latest_version: latestVersion?.version || 1,
+              scopes,
+              created_at: plan.created_at,
+              updated_at: plan.updated_at,
+            };
+          });
+          res.json({ plans: planSummaries });
+          return;
+        }
+
+        // Enhanced flow with attention data
+        const plansWithData = storage.listPlansWithAttention(query.status);
+        const planIds = plansWithData.map((p) => p.plan.plan_id);
+
+        // Fetch execution status from orchestrator (graceful degradation)
+        const executionStatusMap = await getExecutionStatusBatch(planIds);
+
+        // Compute attention types for each plan
+        const planSummaries = plansWithData.map((data) => {
+          const { plan, latestVersion, pendingChangeRequestCount, unresolvedCommentCount } = data;
+
+          // Build attention input
+          const attentionInput: AttentionInput = {
+            plan,
+            latestVersion,
+            pendingChangeRequests: pendingChangeRequestCount,
+            executionStatus: executionStatusMap.get(plan.plan_id) ?? null,
+            unresolvedCommentCount,
+          };
+
+          const attentionTypes: AttentionType[] = computeAttentionTypes(attentionInput);
+
           // Extract unique scopes from steps
           const scopes = latestVersion?.steps
             ? [...new Set(latestVersion.steps.map((s) => s.scope).filter(Boolean))]
             : [];
+
           return {
             plan_id: plan.plan_id,
             goal: latestVersion?.summary?.goal || '',
@@ -141,6 +196,7 @@ export function createPlanHandlers(storage: PlanStorage) {
             scopes,
             created_at: plan.created_at,
             updated_at: plan.updated_at,
+            attention_types: attentionTypes,
           };
         });
 

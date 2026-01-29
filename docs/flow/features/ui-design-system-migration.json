@@ -2,41 +2,290 @@
   "feature_id": "ui-design-system-migration",
   "title": "Design System Migration",
   "type": "epic",
-  "status": "draft",
+  "status": "approved",
   "priority": "high",
   "dependencies": [],
   "summary": {
     "goal": "Migrate planner-ui to use the same design system and component patterns as relay-dashboard, enabling direct code reuse and visual consistency across the agentworkforce package ecosystem.",
     "in_scope": [
-      "Audit relay-dashboard design system (colors, typography, components, patterns)",
-      "Audit planner-ui current components and styles",
-      "Gap analysis between the two systems",
-      "Component library selection (adopt whatever relay-dashboard uses)",
-      "Incremental migration of all UI components",
-      "Visual regression testing",
-      "Cleanup of deprecated styles and components"
+      "Install Tailwind CSS 4 + PostCSS",
+      "Copy CSS variables, theme config, and globals from relay-dashboard",
+      "Add Google Fonts (Outfit, Inter, IBM Plex Mono)",
+      "Implement dark theme (Mission Control aesthetic)",
+      "Migrate all components to Tailwind classes",
+      "Replace emoji icons with inline SVG",
+      "Remove all deprecated CSS"
     ],
     "out_of_scope": [
       "Functionality changes (pure visual/structural migration)",
       "New features during migration",
-      "Backend changes"
+      "Backend changes",
+      "Shared package extraction (deferred)"
     ],
     "constraints": [
-      "Must match relay-dashboard visual appearance",
-      "Prefer direct code reuse where feasible",
-      "Incremental migration to avoid big-bang risk",
-      "Human approval gates at key decision points"
+      "Must match relay-dashboard visual appearance exactly",
+      "Greenfield approach - replace all existing styles",
+      "Dark theme by default (Mission Control aesthetic)",
+      "Inline SVG icons (no icon library)"
     ],
     "acceptance_criteria": [
-      { "id": "ac1", "description": "planner-ui uses the same component library as relay-dashboard" },
-      { "id": "ac2", "description": "Color palette matches relay-dashboard design tokens" },
-      { "id": "ac3", "description": "Typography system matches relay-dashboard" },
-      { "id": "ac4", "description": "All Button components use shared/consistent implementation" },
-      { "id": "ac5", "description": "All Form components (inputs, selects, checkboxes) use shared/consistent implementation" },
-      { "id": "ac6", "description": "All Modal/Dialog components use shared/consistent implementation" },
-      { "id": "ac7", "description": "All Card and layout components use shared/consistent implementation" },
-      { "id": "ac8", "description": "No deprecated custom CSS remains for migrated components" },
-      { "id": "ac9", "description": "Visual regression tests pass for all pages" }
+      { "id": "ac1", "description": "Tailwind CSS 4 installed with PostCSS, build succeeds" },
+      { "id": "ac2", "description": "CSS variables match relay-dashboard: --color-bg-deep (#0a0a0f), --color-accent-cyan (#00d9ff), etc." },
+      { "id": "ac3", "description": "Typography uses Outfit (display), Inter (body), IBM Plex Mono (code)" },
+      { "id": "ac4", "description": "All buttons use Tailwind classes matching relay-dashboard patterns" },
+      { "id": "ac5", "description": "All forms use Tailwind classes with focus:ring-cyan-500 pattern" },
+      { "id": "ac6", "description": "All modals use bg-bg-tertiary, border-border-subtle, shadow-modal" },
+      { "id": "ac7", "description": "All cards use bg-bg-card, rounded-xl, border-border-subtle" },
+      { "id": "ac8", "description": "All emoji icons replaced with inline SVG using currentColor" },
+      { "id": "ac9", "description": "Dark theme functional with .theme-dark class on html" },
+      { "id": "ac10", "description": "index.css reduced to <100 lines (only CSS variables and base resets)" }
+    ],
+    "decision": "Adopt Tailwind CSS 4, relay-dashboard CSS vars, dark theme, inline SVG icons. Greenfield - replace all existing planner-ui styles."
+  },
+  "investigation": {
+    "date": "2026-01-29",
+    "method": "Browser inspection + Playwright screenshots comparing relay-dashboard (localhost:3888) and planner-ui (localhost:3000)",
+    "root_cause": {
+      "summary": "Tailwind utilities not generating - globals.css missing @config directive",
+      "evidence": [
+        "CSS variables ARE defined correctly (--border-subtle: rgba(0, 0, 0, 0.06))",
+        "BUT computed borderColor is rgb(15, 23, 42) (not the variable value)",
+        "ZERO Tailwind utility rules exist in the stylesheet (.bg-*, .border-*, .text-* all return empty)",
+        "HTML has classes like border-border-subtle but no CSS rules are generated"
+      ]
+    },
+    "issues_found": [
+      {
+        "id": "inv-001",
+        "severity": "blocker",
+        "title": "Missing @config directive in globals.css",
+        "current": "globals.css has: @import 'tailwindcss';",
+        "required": "globals.css needs: @import 'tailwindcss';\n@config './tailwind.config.js';",
+        "reference": "relay-dashboard/packages/dashboard/src/app/globals.css line 12"
+      },
+      {
+        "id": "inv-002",
+        "severity": "major",
+        "title": "CSS variable naming convention mismatch",
+        "current": "planner-ui uses: --bg-deep, --text-primary, --accent-cyan",
+        "required": "relay-dashboard uses: --color-bg-deep, --color-text-primary, --color-accent-cyan",
+        "impact": "Tailwind config references var(--color-*) but CSS defines var(--*)"
+      },
+      {
+        "id": "inv-003",
+        "severity": "major",
+        "title": "Tailwind config structure mismatch",
+        "current": "planner-ui uses flat colors: { 'bg-deep': 'var(--bg-deep)', 'text-primary': 'var(--text-primary)' }",
+        "required": "relay-dashboard uses nested colors: { bg: { deep: 'var(--color-bg-deep)' }, text: { primary: 'var(--color-text-primary)' } }",
+        "impact": "Classes like bg-bg-deep won't work - need bg-deep with nested structure"
+      },
+      {
+        "id": "inv-004",
+        "severity": "minor",
+        "title": "Light theme is default",
+        "observation": "Both repos default to light theme via :root, dark via .theme-dark or prefers-color-scheme",
+        "status": "Correct behavior - no change needed"
+      }
+    ],
+    "required_fixes": [
+      {
+        "file": "packages/planner-ui/src/globals.css",
+        "action": "Add @config directive after @import 'tailwindcss'"
+      },
+      {
+        "file": "packages/planner-ui/src/globals.css",
+        "action": "Rename all CSS variables from --name to --color-name to match relay-dashboard"
+      },
+      {
+        "file": "packages/planner-ui/tailwind.config.js",
+        "action": "Restructure colors from flat { 'bg-deep': ... } to nested { bg: { deep: ... } }"
+      }
+    ]
+  },
+  "design_spec": {
+    "approach": "Hybrid - holographic/neon for status-critical items, clean functional for editing areas",
+    "views": [
+      {
+        "view_id": "v001",
+        "name": "PlansListPage",
+        "layout": "min-h-screen with header (bg-bg-card) + content area",
+        "header": {
+          "layout": "bg-bg-card border-b border-border-subtle, max-w-4xl mx-auto",
+          "content": "Title + subtitle + New Plan button + filter tabs"
+        },
+        "elements": [
+          { "component": "PageHeader", "style": "clean", "classes": "font-display text-3xl text-text-primary + subtitle text-sm text-text-muted" },
+          { "component": "NewPlanButton", "style": "neon", "classes": "bg-accent-cyan text-bg-deep hover:shadow-glow-cyan" },
+          { "component": "FilterTabs", "style": "clean", "classes": "flex gap-1, active: bg-bg-elevated text-text-primary, inactive: text-text-muted hover:bg-bg-hover" },
+          { "component": "PlanCard", "style": "clean", "classes": "bg-bg-card rounded-xl border-l-4 (status color accent), p-5 hover:border-border, title hover:text-accent-cyan, chevron on right" },
+          { "component": "StatusBadge", "style": "neon-subtle", "classes": "px-2.5 py-1 rounded-md, status-specific colors with /10 opacity backgrounds" },
+          { "component": "CardMetadata", "style": "clean", "classes": "text-sm text-text-muted, scopes + version + date inline with • separators" },
+          { "component": "EmptyState", "style": "clean", "classes": "text-center py-16, icon in bg-bg-tertiary circle, inviting copy" }
+        ]
+      },
+      {
+        "view_id": "v002",
+        "name": "NewPlanPage",
+        "layout": "bg-bg-primary min-h-screen, centered max-w-2xl",
+        "elements": [
+          { "component": "TabNavigation", "style": "clean", "classes": "border-b border-border-subtle mb-6" },
+          { "component": "GoalTextarea", "style": "clean", "classes": "bg-bg-secondary border-border-default rounded-lg focus:border-accent-cyan" },
+          { "component": "ContextTextarea", "style": "clean", "classes": "same as GoalTextarea" },
+          { "component": "SubmitButton", "style": "neon", "classes": "bg-accent-cyan text-bg-deep font-medium rounded-lg hover:shadow-glow-cyan" },
+          { "component": "LoadingOverlay", "style": "holographic", "classes": "bg-black/60 with pulsing cyan spinner and glow effect" }
+        ]
+      },
+      {
+        "view_id": "v003",
+        "name": "PlanEditorPage",
+        "layout": "bg-bg-primary min-h-screen, flex with main area + optional right panel",
+        "header": {
+          "layout": "2-column flex layout in bg-bg-card container",
+          "left_column": {
+            "content": "Plan title (editable), context as subtitle (line-clamp-2), version number, submitted status",
+            "classes": "flex-1 min-w-0"
+          },
+          "right_column": {
+            "content": "WorkflowActions status card with status badge + action buttons",
+            "classes": "flex-shrink-0 w-72"
+          },
+          "rationale": "Consolidates status display to single location (right card), title is primary focus on left"
+        },
+        "elements": [
+          { "component": "PlanHeader", "style": "clean", "classes": "bg-bg-card border-b border-border-subtle" },
+          { "component": "PlanBreadcrumb", "style": "clean", "classes": "text-sm text-text-muted, links hover:text-text-primary" },
+          { "component": "EditableGoal", "style": "clean", "classes": "text-2xl font-semibold text-text-primary, hover shows edit affordance (draft only)" },
+          { "component": "ContextSubtitle", "style": "clean", "classes": "text-sm text-text-secondary line-clamp-2, shown below title if context exists" },
+          { "component": "VersionInfo", "style": "clean", "classes": "text-sm text-text-muted, shows version + submitted status" },
+          { "component": "WorkflowActions", "style": "status-card", "classes": "bg-bg-secondary rounded-xl border-border-subtle p-4, contains status badge + action buttons" },
+          { "component": "ViewModeToggle", "style": "clean", "classes": "bg-bg-tertiary rounded-lg p-1, active button bg-bg-elevated" },
+          { "component": "StepCard", "style": "clean", "classes": "bg-bg-card rounded-lg border-border-subtle p-3, hover:border-border" },
+          { "component": "StepEditor", "style": "clean", "classes": "expandable, form inputs bg-bg-secondary" },
+          { "component": "DependencyChip", "style": "clean", "classes": "bg-bg-elevated text-text-secondary text-xs rounded px-2 py-0.5" }
+        ],
+        "states": {
+          "editing": "Step expands with border-accent-cyan/30",
+          "selected": "Step has ring-1 ring-accent-cyan (not doubled borders)"
+        }
+      },
+      {
+        "view_id": "v004",
+        "name": "SwimlaneView",
+        "layout": "horizontal scroll, scope lanes stacked vertically",
+        "elements": [
+          { "component": "ScopeLane", "style": "clean", "classes": "bg-bg-secondary/50 rounded-xl p-4 min-h-[120px]" },
+          { "component": "ScopeHeader", "style": "clean", "classes": "text-sm font-semibold text-text-secondary uppercase tracking-wide" },
+          { "component": "StepNode", "style": "clean", "classes": "bg-bg-card rounded-lg border-border-subtle p-3 min-w-[200px]" },
+          { "component": "DependencyLines", "style": "neon-subtle", "classes": "stroke-accent-cyan/40 strokeWidth-2" }
+        ]
+      },
+      {
+        "view_id": "v005",
+        "name": "WorkflowActions",
+        "layout": "Status card in header right column (w-72), not fixed/floating",
+        "container": "bg-bg-secondary rounded-xl border-border-subtle p-4 space-y-3",
+        "elements": [
+          { "component": "StatusBadge", "style": "neon-subtle", "classes": "inline-flex px-3 py-1.5 text-sm font-semibold uppercase tracking-wide rounded-lg border, status-specific colors (draft:warning, approved:success, published:accent-cyan)" },
+          { "component": "ApprovalInfo", "style": "clean", "classes": "text-xs text-text-muted, shows approver name + timestamp" },
+          { "component": "SubmitButton", "style": "neon", "classes": "w-full bg-accent-orange text-white hover:shadow-glow-orange" },
+          { "component": "ApproveButton", "style": "neon", "classes": "w-full bg-success text-bg-deep hover:shadow-glow-green" },
+          { "component": "PublishButton", "style": "neon", "classes": "w-full bg-accent-cyan text-bg-deep hover:shadow-glow-cyan" },
+          { "component": "ReadyMessage", "style": "clean", "classes": "text-xs text-accent-cyan font-medium text-center, shown when status=published" }
+        ],
+        "note": "Status badge is the single source of status display (not duplicated elsewhere in header). Buttons are full-width within card."
+      },
+      {
+        "view_id": "v006",
+        "name": "GateApprovalCard",
+        "layout": "card with prominent action buttons",
+        "style": "holographic",
+        "elements": [
+          { "component": "Card", "classes": "bg-gradient-to-br from-bg-card to-bg-elevated border-warning/30 rounded-xl p-4" },
+          { "component": "LockIcon", "classes": "text-warning w-6 h-6" },
+          { "component": "Title", "classes": "font-display text-lg text-text-primary" },
+          { "component": "ApproveButton", "classes": "bg-accent-green text-bg-deep hover:shadow-glow-green" },
+          { "component": "RejectButton", "classes": "bg-error text-white hover:shadow-[0_0_20px_rgba(255,71,87,0.3)]" }
+        ],
+        "note": "Gates require human attention - holographic treatment with warning border glow"
+      },
+      {
+        "view_id": "v007",
+        "name": "ExecutionStatusOverlay",
+        "layout": "overlay on step cards showing run status",
+        "style": "holographic",
+        "elements": [
+          { "component": "StepStatusIndicator", "classes": "w-3 h-3 rounded-full with status-specific glow" },
+          { "component": "RunningIndicator", "classes": "bg-accent-cyan animate-pulse shadow-glow-cyan" },
+          { "component": "CompletedIndicator", "classes": "bg-success shadow-glow-green" },
+          { "component": "FailedIndicator", "classes": "bg-error shadow-[0_0_10px_rgba(255,71,87,0.5)]" },
+          { "component": "BlockedIndicator", "classes": "bg-warning shadow-glow-orange" }
+        ],
+        "note": "Execution status is critical - use animated glows to show activity"
+      },
+      {
+        "view_id": "v008",
+        "name": "ChangeRequestNotification",
+        "layout": "alert banner at top of editor",
+        "style": "holographic",
+        "elements": [
+          { "component": "Banner", "classes": "bg-gradient-to-r from-warning/20 to-warning/5 border-l-4 border-warning p-4 rounded-r-lg" },
+          { "component": "AlertIcon", "classes": "text-warning w-5 h-5" },
+          { "component": "Message", "classes": "text-text-primary font-medium" },
+          { "component": "ActionButton", "classes": "text-accent-cyan hover:underline" }
+        ],
+        "note": "Change requests need immediate attention - use warning gradient"
+      },
+      {
+        "view_id": "v009",
+        "name": "ChatPanel",
+        "layout": "slide-in panel from right, 420px width",
+        "style": "clean",
+        "elements": [
+          { "component": "Panel", "classes": "bg-bg-secondary border-l border-border-subtle h-full" },
+          { "component": "Header", "classes": "h-14 border-b border-border-subtle px-4 flex items-center justify-between" },
+          { "component": "AIConnectionBadge", "style": "neon-subtle", "classes": "connected: text-success, disconnected: text-error" },
+          { "component": "MessageList", "classes": "flex-1 overflow-y-auto p-4 space-y-4" },
+          { "component": "UserMessage", "classes": "bg-accent-cyan/10 rounded-lg p-3 ml-8" },
+          { "component": "AIMessage", "classes": "bg-bg-tertiary rounded-lg p-3 mr-8" },
+          { "component": "InputArea", "classes": "border-t border-border-subtle p-4" }
+        ]
+      },
+      {
+        "view_id": "v010",
+        "name": "CommentThread",
+        "layout": "slide-in panel from right, 420px width",
+        "style": "clean",
+        "elements": [
+          { "component": "Panel", "classes": "same as ChatPanel" },
+          { "component": "Comment", "classes": "bg-bg-tertiary rounded-lg p-3" },
+          { "component": "ResolvedBadge", "classes": "bg-success/10 text-success text-xs" },
+          { "component": "UnresolvedBadge", "classes": "bg-warning/10 text-warning text-xs" }
+        ]
+      },
+      {
+        "view_id": "v011",
+        "name": "Modal",
+        "layout": "centered overlay",
+        "style": "clean",
+        "elements": [
+          { "component": "Overlay", "classes": "fixed inset-0 bg-black/50 z-50 animate-fade-in" },
+          { "component": "Dialog", "classes": "bg-bg-tertiary rounded-2xl shadow-modal max-w-md w-full p-6 animate-slide-up" },
+          { "component": "Title", "classes": "font-display text-xl text-text-primary mb-4" },
+          { "component": "Actions", "classes": "flex gap-3 justify-end mt-6" }
+        ]
+      }
+    ],
+    "custom_needed": [
+      "Icon components (CheckIcon, AlertIcon, LockIcon, MessageIcon, ChevronIcon, PlusIcon, TrashIcon, EditIcon, CloseIcon) - inline SVG with currentColor",
+      "StatusGlow component - reusable glow effect wrapper for execution status",
+      "HolographicCard component - gradient background card for status-critical items"
+    ],
+    "ux_improvements": [
+      "Add subtle hover animations to all interactive cards (scale 1.01, border lighten)",
+      "Add keyboard shortcuts hints in tooltips",
+      "Add loading skeletons matching card shapes during data fetches",
+      "Add smooth transitions between view modes (list ↔ swimlane)",
+      "Add focus-visible outlines with cyan glow for accessibility"
     ]
   },
   "sub_features": [
@@ -54,6 +303,416 @@
   ],
   "plan_implementation": {
     "scopes": ["planner-ui"],
-    "steps": []
+    "steps": [
+      {
+        "step_id": "dsm-001",
+        "title": "Install Tailwind CSS 4 and PostCSS",
+        "scope": "planner-ui",
+        "description": "Install tailwindcss, @tailwindcss/postcss, postcss as dev dependencies. Create postcss.config.js with @tailwindcss/postcss plugin.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "package.json includes: tailwindcss@^4.1, @tailwindcss/postcss, postcss" },
+          { "id": "ac2", "description": "postcss.config.js exists with { plugins: { '@tailwindcss/postcss': {} } }" },
+          { "id": "ac3", "description": "npm run build succeeds without errors" }
+        ],
+        "status": "completed"
+      },
+      {
+        "step_id": "dsm-002",
+        "title": "Create Tailwind config with relay-dashboard theme (NESTED STRUCTURE)",
+        "scope": "planner-ui",
+        "description": "Create tailwind.config.js copying EXACT structure from relay-dashboard. CRITICAL: Use NESTED color objects (bg: { deep, primary }, text: { primary, secondary }, border: { DEFAULT, subtle }, accent: { cyan, orange }) referencing CSS vars with --color-* prefix. Do NOT use flat structure like 'bg-deep': var(--bg-deep).",
+        "dependencies": ["dsm-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "tailwind.config.js exists with NESTED colors: { bg: { deep: 'var(--color-bg-deep)', primary: 'var(--color-bg-primary)', ... } }" },
+          { "id": "ac2", "description": "text colors NESTED: { text: { primary: 'var(--color-text-primary)', secondary: 'var(--color-text-secondary)', ... } }" },
+          { "id": "ac3", "description": "border colors NESTED: { border: { DEFAULT: 'var(--color-border-default)', subtle: 'var(--color-border-subtle)', ... } }" },
+          { "id": "ac4", "description": "accent colors NESTED: { accent: { cyan: 'var(--color-accent-cyan)', orange: 'var(--color-accent-orange)', ... } }" },
+          { "id": "ac5", "description": "theme.extend.fontFamily includes: display (Outfit), sans (Inter), mono (IBM Plex Mono)" },
+          { "id": "ac6", "description": "theme.extend.spacing includes: sidebar: '280px', header: '52px'" },
+          { "id": "ac7", "description": "theme.extend.boxShadow includes: glow-cyan, glow-orange, glow-purple, glow-green, modal" }
+        ],
+        "status": "needs_fix",
+        "blocker": "inv-003"
+      },
+      {
+        "step_id": "dsm-003",
+        "title": "Create globals.css with relay-dashboard CSS variables AND @config directive",
+        "scope": "planner-ui",
+        "description": "Create src/globals.css with complete CSS variable system from relay-dashboard. CRITICAL: Must include @config directive pointing to tailwind.config.js AFTER the @import 'tailwindcss' line. Use --color-* prefix for all variables (not --bg-*, --text-*).",
+        "dependencies": ["dsm-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "globals.css has @import 'tailwindcss' followed by @config './tailwind.config.js'" },
+          { "id": "ac2", "description": "globals.css defines --color-bg-deep, --color-bg-primary, --color-bg-secondary, --color-bg-tertiary, --color-bg-card, --color-bg-elevated, --color-bg-hover" },
+          { "id": "ac3", "description": "globals.css defines --color-text-primary (#f0f0f5), --color-text-secondary, --color-text-muted, --color-text-dim" },
+          { "id": "ac4", "description": "globals.css defines --color-accent-cyan (#00d9ff), --color-accent-orange (#ff6b35), --color-accent-purple (#a855f7), --color-accent-green (#00ffc8)" },
+          { "id": "ac5", "description": "globals.css defines --color-border-default, --color-border-subtle" },
+          { "id": "ac6", "description": "globals.css includes @import for Google Fonts: Outfit, Inter, IBM Plex Mono" },
+          { "id": "ac7", "description": ".theme-dark class sets dark theme as default, .theme-light provides light variant" }
+        ],
+        "status": "needs_fix",
+        "blocker": "inv-001, inv-002"
+      },
+      {
+        "step_id": "dsm-004",
+        "title": "Update index.html with fonts and theme class",
+        "scope": "planner-ui",
+        "description": "Add Google Fonts preconnect and stylesheet links to index.html. Add class='theme-dark' to html element for default dark theme.",
+        "dependencies": ["dsm-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "index.html has <link rel='preconnect' href='https://fonts.googleapis.com'>" },
+          { "id": "ac2", "description": "index.html has Google Fonts stylesheet link for Outfit, Inter, IBM Plex Mono" },
+          { "id": "ac3", "description": "index.html <html> element has class='theme-dark'" }
+        ],
+        "status": "completed"
+      },
+      {
+        "step_id": "dsm-005",
+        "title": "Update main entry to import globals.css",
+        "scope": "planner-ui",
+        "description": "Update src/main.tsx to import './globals.css' instead of './index.css'. Verify app loads with new styling foundation.",
+        "dependencies": ["dsm-003", "dsm-004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "main.tsx imports './globals.css'" },
+          { "id": "ac2", "description": "App renders with dark background (#0a0a0f) and light text (#f0f0f5)" },
+          { "id": "ac3", "description": "Fonts visually load (Outfit for headings, Inter for body)" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" },
+        "status": "completed"
+      },
+      {
+        "step_id": "dsm-005a",
+        "title": "Verify Tailwind utilities are generating",
+        "scope": "planner-ui",
+        "description": "BLOCKER CHECK: After fixing dsm-002 and dsm-003, verify that Tailwind utility classes are actually being generated. In browser devtools, check that classes like bg-bg-deep, text-text-primary, border-border-subtle have corresponding CSS rules.",
+        "dependencies": ["dsm-002", "dsm-003", "dsm-005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "In browser devtools, document.styleSheets shows rules for .bg-bg-deep, .bg-bg-primary, etc." },
+          { "id": "ac2", "description": "An element with class='bg-bg-deep' has computed backgroundColor matching --color-bg-deep value" },
+          { "id": "ac3", "description": "An element with class='border-border-subtle' has computed borderColor matching --color-border-subtle value" },
+          { "id": "ac4", "description": "An element with class='text-text-primary' has computed color matching --color-text-primary value" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" }
+      },
+      {
+        "step_id": "dsm-006",
+        "title": "Create SVG icon components",
+        "scope": "planner-ui",
+        "description": "Create src/components/icons/ directory with inline SVG icon components matching relay-dashboard patterns: stroke-based, strokeWidth=2, fill=none, currentColor. Icons needed: CheckIcon, AlertIcon, LockIcon, MessageIcon, ChevronIcon, PlusIcon, TrashIcon, EditIcon, CloseIcon.",
+        "dependencies": ["dsm-002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/components/icons/index.ts exports all icon components" },
+          { "id": "ac2", "description": "Each icon accepts size prop (sm:14px, md:16px, lg:20px, xl:24px) and className" },
+          { "id": "ac3", "description": "Each icon uses stroke='currentColor', strokeWidth='2', fill='none'" },
+          { "id": "ac4", "description": "Icons: CheckIcon, AlertIcon, LockIcon, MessageIcon, ChevronIcon, PlusIcon, TrashIcon, EditIcon, CloseIcon exist" }
+        ],
+        "status": "completed"
+      },
+      {
+        "step_id": "dsm-007",
+        "title": "Migrate Button components to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert all button styles from .btn classes to Tailwind utilities. Pattern: rounded-lg px-4 py-2 font-medium transition-all duration-150. Primary: bg-accent-cyan text-bg-deep hover:shadow-glow-cyan. Secondary: bg-bg-tertiary text-text-primary border border-border-default hover:border-border-light.",
+        "dependencies": ["dsm-005a"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All <button> elements use Tailwind classes, no .btn CSS classes" },
+          { "id": "ac2", "description": "Primary buttons: bg-accent-cyan text-bg-deep hover:shadow-glow-cyan" },
+          { "id": "ac3", "description": "Secondary buttons: bg-bg-tertiary border-border-default hover:border-border-light" },
+          { "id": "ac4", "description": "Danger buttons: bg-error text-white hover:shadow-[0_0_20px_rgba(255,71,87,0.3)]" },
+          { "id": "ac5", "description": "All buttons have transition-all duration-150" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-008",
+        "title": "Migrate Badge components to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert all badge styles to Tailwind. Pattern: inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide. Status badges use semantic colors from relay-dashboard.",
+        "dependencies": ["dsm-005a"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All badges use Tailwind classes, no .badge CSS classes" },
+          { "id": "ac2", "description": "Draft badge: bg-warning/10 text-warning" },
+          { "id": "ac3", "description": "Approved badge: bg-success/10 text-success" },
+          { "id": "ac4", "description": "Published badge: bg-accent-cyan/10 text-accent-cyan" },
+          { "id": "ac5", "description": "All badges: text-xs font-semibold uppercase tracking-wide" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-009",
+        "title": "Migrate Form components to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert form styles: inputs, textareas, selects, labels. Pattern: bg-bg-secondary border border-border-default rounded-md px-3 py-2 text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50.",
+        "dependencies": ["dsm-007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All inputs use Tailwind classes, no .form-group CSS" },
+          { "id": "ac2", "description": "Input pattern: bg-bg-secondary border-border-default rounded-md" },
+          { "id": "ac3", "description": "Focus state: focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50" },
+          { "id": "ac4", "description": "Labels: text-sm font-medium text-text-secondary mb-1.5" },
+          { "id": "ac5", "description": "EditableText and EditableTextarea components updated" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-010",
+        "title": "Migrate Modal components to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert modal/dialog styles. Overlay: fixed inset-0 bg-black/50 z-50. Modal: bg-bg-tertiary border border-border-subtle rounded-2xl shadow-modal max-w-md mx-auto. Header: border-b border-border-subtle. Actions: flex gap-3 justify-end.",
+        "dependencies": ["dsm-007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Modal overlay: fixed inset-0 bg-black/50 z-50" },
+          { "id": "ac2", "description": "Modal container: bg-bg-tertiary rounded-2xl shadow-modal" },
+          { "id": "ac3", "description": "Modal has fade-in animation (animate-fade-in)" },
+          { "id": "ac4", "description": "No .modal or .modal-overlay CSS classes used" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-011",
+        "title": "Migrate Panel components to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert ChatPanel and CommentThread panel styles. Pattern: fixed right-0 top-0 h-full w-[420px] bg-bg-secondary border-l border-border-subtle z-40 animate-slide-in-right.",
+        "dependencies": ["dsm-010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ChatPanel uses: fixed right-0 top-0 h-full w-[420px] bg-bg-secondary" },
+          { "id": "ac2", "description": "CommentThread uses same panel pattern" },
+          { "id": "ac3", "description": "Panel overlay: fixed inset-0 bg-black/30 z-30" },
+          { "id": "ac4", "description": "Slide-in animation: animate-slide-in-right" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-012",
+        "title": "Migrate Card components to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert card styles for plan items, step items. Pattern: bg-bg-card border border-border-subtle rounded-xl p-4 hover:border-border-light transition-colors duration-150.",
+        "dependencies": ["dsm-009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Plan cards: bg-bg-card rounded-xl border-border-subtle" },
+          { "id": "ac2", "description": "Step cards: bg-bg-tertiary rounded-lg border-border-subtle" },
+          { "id": "ac3", "description": "Hover state: hover:border-border-light transition-colors" },
+          { "id": "ac4", "description": "No .plan-item or .step-item CSS classes used" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-013",
+        "title": "Migrate Layout component to Tailwind",
+        "scope": "planner-ui",
+        "description": "Convert Layout, Header components. Header: h-header (52px) bg-bg-secondary border-b border-border-subtle. Main content area: bg-bg-primary min-h-screen.",
+        "dependencies": ["dsm-012"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header: h-header bg-bg-secondary border-b border-border-subtle" },
+          { "id": "ac2", "description": "Main: bg-bg-primary min-h-screen" },
+          { "id": "ac3", "description": "Navigation links: text-text-secondary hover:text-text-primary" },
+          { "id": "ac4", "description": "Active link: text-accent-cyan" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-014",
+        "title": "Replace emoji icons with SVG icons",
+        "scope": "planner-ui",
+        "description": "Replace all emoji usage with SVG icon components. Lock emoji → LockIcon, Warning emoji → AlertIcon, Comment emoji → MessageIcon, Checkmark → CheckIcon.",
+        "dependencies": ["dsm-006", "dsm-012"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GateApprovalCard uses LockIcon instead of lock emoji" },
+          { "id": "ac2", "description": "ChangeRequestNotification uses AlertIcon instead of warning emoji" },
+          { "id": "ac3", "description": "Comment indicators use MessageIcon" },
+          { "id": "ac4", "description": "No emoji characters remain in component JSX" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-015",
+        "title": "Migrate remaining utility components",
+        "scope": "planner-ui",
+        "description": "Convert remaining components: LoadingSpinner, StepStatusIndicator, ExecutionProgress, Tabs, etc. to Tailwind classes.",
+        "dependencies": ["dsm-014"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "LoadingSpinner: animate-spin border-accent-cyan" },
+          { "id": "ac2", "description": "StepStatusIndicator: colored circles with status colors" },
+          { "id": "ac3", "description": "Tabs: border-b border-border-subtle, active tab border-accent-cyan" },
+          { "id": "ac4", "description": "All components use Tailwind, no remaining CSS class references" }
+        ],
+        "status": "in_progress"
+      },
+      {
+        "step_id": "dsm-016",
+        "title": "Add animation keyframes to Tailwind config",
+        "scope": "planner-ui",
+        "description": "Add custom animations to tailwind.config.js: fade-in, slide-up, slide-down, slide-in-right, pulse-glow. Match relay-dashboard timing.",
+        "dependencies": ["dsm-002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "animation.fade-in: fadeIn 150ms ease" },
+          { "id": "ac2", "description": "animation.slide-up: slideUp 200ms ease" },
+          { "id": "ac3", "description": "animation.slide-in-right: slideInRight 200ms ease" },
+          { "id": "ac4", "description": "Keyframes defined for each animation" }
+        ],
+        "status": "completed"
+      },
+      {
+        "step_id": "dsm-017",
+        "title": "Visual verification of all pages",
+        "scope": "planner-ui",
+        "description": "Manually verify all pages render correctly with new design system: PlansListPage, NewPlanPage, PlanEditorPage. Check dark theme, fonts, colors, spacing.",
+        "dependencies": ["dsm-015"],
+        "owner_role": "frontend:QA",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlansListPage: dark background, cards visible, badges correct colors" },
+          { "id": "ac2", "description": "NewPlanPage: form inputs styled, tabs functional" },
+          { "id": "ac3", "description": "PlanEditorPage: steps, panels, workflow all styled correctly" },
+          { "id": "ac4", "description": "All text readable (text-text-primary on bg-bg-*)" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" }
+      },
+      {
+        "step_id": "dsm-018",
+        "title": "Delete old index.css",
+        "scope": "planner-ui",
+        "description": "Remove the old src/index.css file (~3900 lines) now that all styles are in Tailwind. Verify no imports reference it.",
+        "dependencies": ["dsm-017"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/index.css deleted" },
+          { "id": "ac2", "description": "No import statements reference index.css" },
+          { "id": "ac3", "description": "Build succeeds" },
+          { "id": "ac4", "description": "App renders correctly" }
+        ],
+        "status": "completed"
+      },
+      {
+        "step_id": "dsm-019",
+        "title": "Final cleanup and review",
+        "scope": "planner-ui",
+        "description": "Final review of all changes. Remove any unused CSS variables. Ensure globals.css is minimal. Run linter and fix any issues.",
+        "dependencies": ["dsm-018"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "globals.css < 200 lines (only CSS variables and base resets)" },
+          { "id": "ac2", "description": "No console errors in browser" },
+          { "id": "ac3", "description": "TypeScript build passes" },
+          { "id": "ac4", "description": "ESLint passes" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" }
+      }
+    ]
+  },
+  "plan_tests": {
+    "coverage": "integration + visual",
+    "priority": "high",
+    "strategy": "Verify migration didn't break rendering. Focus on page-level smoke tests and component render checks. Visual regression via manual review at gates.",
+    "cases": [
+      {
+        "id": "t001",
+        "type": "build",
+        "description": "Tailwind CSS builds without errors",
+        "how": "npm run build exits 0, no CSS compilation errors"
+      },
+      {
+        "id": "t002",
+        "type": "build",
+        "description": "TypeScript compiles with no type errors",
+        "how": "tsc --noEmit exits 0"
+      },
+      {
+        "id": "t003",
+        "type": "render",
+        "description": "PlansListPage renders without crash",
+        "how": "render(<PlansListPage />) with mock data, expect no thrown errors, expect plan cards visible"
+      },
+      {
+        "id": "t004",
+        "type": "render",
+        "description": "NewPlanPage renders without crash",
+        "how": "render(<NewPlanPage />), expect tabs visible, expect form inputs present"
+      },
+      {
+        "id": "t005",
+        "type": "render",
+        "description": "PlanEditorPage renders without crash",
+        "how": "render(<PlanEditorPage />) with mock plan, expect header visible, expect steps list present"
+      },
+      {
+        "id": "t006",
+        "type": "theme",
+        "description": "Dark theme CSS variables applied",
+        "how": "Check getComputedStyle(document.documentElement).getPropertyValue('--color-bg-deep') equals '#0a0a0f'"
+      },
+      {
+        "id": "t006a",
+        "type": "tailwind",
+        "description": "Tailwind utilities generating correctly",
+        "how": "Check document.styleSheets for rules matching .bg-bg-deep, .text-text-primary, .border-border-subtle"
+      },
+      {
+        "id": "t007",
+        "type": "component",
+        "description": "Button variants render correctly",
+        "how": "Render primary/secondary/danger buttons, check they have expected Tailwind classes"
+      },
+      {
+        "id": "t008",
+        "type": "component",
+        "description": "Badge variants render correctly",
+        "how": "Render draft/approved/published badges, check classes contain expected color tokens"
+      },
+      {
+        "id": "t009",
+        "type": "component",
+        "description": "Modal opens and closes",
+        "how": "Render modal trigger, click to open, expect modal visible, click overlay to close"
+      },
+      {
+        "id": "t010",
+        "type": "component",
+        "description": "Icons render as SVG",
+        "how": "Render each icon component, expect svg element with stroke='currentColor'"
+      },
+      {
+        "id": "t011",
+        "type": "a11y",
+        "description": "Focus states visible on interactive elements",
+        "how": "Tab through buttons/inputs, check focus-visible outline appears (cyan)"
+      },
+      {
+        "id": "t012",
+        "type": "a11y",
+        "description": "Text contrast meets minimum",
+        "how": "Verify text-primary on bg-primary passes WCAG AA (computed from CSS vars)"
+      }
+    ],
+    "data_requirements": [
+      "Mock plan with 3+ steps for PlanEditorPage",
+      "Mock plans list with draft/approved/published statuses",
+      "No API calls needed - pure render tests with mocked data"
+    ],
+    "tools": {
+      "test_runner": "vitest (already installed)",
+      "render": "@testing-library/react (already installed)",
+      "a11y": "Manual inspection at human gates, optional axe-core"
+    },
+    "skip": [
+      "E2E tests - overkill for style migration",
+      "Visual regression screenshots - rely on human gates instead",
+      "Animation timing tests - too brittle"
+    ]
   }
 }
