@@ -46,3 +46,16 @@ export {
   deleteComment,
 } from './comments';
 export type { CommentsResponse, CommentResponse } from './comments';
+export {
+  importDocument,
+  detectFormat as detectDocumentFormat,
+  createPlanFromImport,
+} from './import';
+export type {
+  ImportResponse,
+  ImportedScope,
+  ImportedStep,
+  DetectResponse,
+  CreateFromImportRequest,
+  CreateFromImportResponse,
+} from './import';

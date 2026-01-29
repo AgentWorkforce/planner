@@ -2,7 +2,7 @@
   "feature_id": "ui-subplan-navigation",
   "title": "Sub-Plan Navigation",
   "type": "feature",
-  "status": "implemented",
+  "status": "approved",
   "priority": "high",
   "dependencies": ["ui-editor-steps"],
 

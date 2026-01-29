@@ -2,7 +2,7 @@
   "feature_id": "ui-change-request-ui",
   "title": "Change Request Handling",
   "type": "feature",
-  "status": "completed",
+  "status": "approved",
   "priority": "medium",
   "dependencies": ["api-change-requests", "ui-execution-status"],
 

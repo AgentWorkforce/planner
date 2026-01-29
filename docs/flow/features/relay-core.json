@@ -2,7 +2,7 @@
   "feature_id": "relay-core",
   "title": "Relay Core Infrastructure",
   "type": "feature",
-  "status": "implemented",
+  "status": "approved",
   "priority": "critical",
   "dependencies": [],
 
