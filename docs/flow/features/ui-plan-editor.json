@@ -25,7 +25,8 @@
   "sub_features": [
     { "feature_id": "ui-editor-inline", "title": "Inline Editing", "ref": "ui-editor-inline.json" },
     { "feature_id": "ui-editor-steps", "title": "Step Editor", "ref": "ui-editor-steps.json" },
-    { "feature_id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "ref": "ui-editor-multiscope.json" }
+    { "feature_id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "ref": "ui-editor-multiscope.json" },
+    { "feature_id": "ui-subplan-navigation", "title": "Sub-Plan Navigation", "ref": "ui-subplan-navigation.json" }
   ],
 
   "plan_implementation": {

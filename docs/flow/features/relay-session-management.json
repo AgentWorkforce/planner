@@ -1,0 +1,167 @@
+{
+  "feature_id": "relay-session-management",
+  "title": "Planning Session Management",
+  "type": "feature",
+  "status": "complete",
+  "priority": "high",
+  "dependencies": ["relay-planning-agent", "relay-mcp-bridge"],
+
+  "summary": {
+    "goal": "Manage the lifecycle of planning sessions: start, monitor status, terminate on approval, handle timeouts",
+    "context": "A planning session represents an active planning agent working on a draft plan. Sessions should terminate automatically when the plan is approved (agent can no longer modify). Sessions need timeouts to prevent runaway agents. The UI needs visibility into session status.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Planning session created when agent spawned" },
+      { "id": "ac2", "description": "Session tracks: session_id, plan_id, agent_id, status, started_at, ended_at" },
+      { "id": "ac3", "description": "Session terminates automatically on plan approval" },
+      { "id": "ac4", "description": "Session times out after configurable duration (default 30 min)" },
+      { "id": "ac5", "description": "GET /plans/:id/session returns session status for UI" },
+      { "id": "ac6", "description": "DELETE /plans/:id/session manually terminates session" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "rsm001",
+        "title": "Define PlanningSession entity",
+        "description": "Create src/domain/planning-session.ts with interface and factory function.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanningSession interface: { session_id, plan_id, agent_id, status, started_at, ended_at, session_token }" },
+          { "id": "ac2", "description": "SessionStatus type: 'active' | 'completed' | 'timeout' | 'terminated' | 'error'" },
+          { "id": "ac3", "description": "createSession(plan_id, agent_id) factory function" }
+        ]
+      },
+      {
+        "step_id": "rsm002",
+        "title": "Add session storage",
+        "description": "Add planning_sessions table to SQLite schema. Implement CRUD operations in storage layer.",
+        "scope": "planner-core",
+        "dependencies": ["rsm001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "planning_sessions table created with all session fields" },
+          { "id": "ac2", "description": "createSession(session) inserts new session" },
+          { "id": "ac3", "description": "getSessionByPlanId(plan_id) returns active session or null" },
+          { "id": "ac4", "description": "updateSessionStatus(session_id, status) updates status and ended_at" },
+          { "id": "ac5", "description": "getActiveSessions() returns all sessions with status='active'" }
+        ]
+      },
+      {
+        "step_id": "rsm003",
+        "title": "Integrate session creation with agent spawn",
+        "description": "When planning agent spawned (relay-planning-agent), create PlanningSession record. Session token from spawner stored in session.",
+        "scope": "planner-core",
+        "dependencies": ["rsm001", "rsm002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Session created when spawnPlanningAgent succeeds" },
+          { "id": "ac2", "description": "Session stores session_token for MCP auth" },
+          { "id": "ac3", "description": "Plan record references active session_id" }
+        ]
+      },
+      {
+        "step_id": "rsm004",
+        "title": "Terminate session on plan approval",
+        "description": "Hook into approve workflow: when plan approved, terminate any active planning session. Call terminateAgent from relay-planning-agent.",
+        "scope": "planner-core",
+        "dependencies": ["rsm002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /plans/:id/versions/:v/approve triggers session termination" },
+          { "id": "ac2", "description": "Session status set to 'completed'" },
+          { "id": "ac3", "description": "Agent process terminated via terminateAgent()" },
+          { "id": "ac4", "description": "Works correctly even if no active session (idempotent)" }
+        ]
+      },
+      {
+        "step_id": "rsm005",
+        "title": "Implement session timeout",
+        "description": "Add background check for sessions exceeding timeout (configurable via SESSION_TIMEOUT_MINUTES, default 30). Terminate timed-out sessions.",
+        "scope": "planner-core",
+        "dependencies": ["rsm002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SESSION_TIMEOUT_MINUTES env var configures timeout (default 30)" },
+          { "id": "ac2", "description": "Background check runs every minute for active sessions" },
+          { "id": "ac3", "description": "Timed-out sessions: status='timeout', agent terminated" },
+          { "id": "ac4", "description": "Timeout check logged but not noisy" }
+        ]
+      },
+      {
+        "step_id": "rsm006",
+        "title": "Add session API endpoints",
+        "description": "Add GET /plans/:id/session (get active session status) and DELETE /plans/:id/session (terminate session).",
+        "scope": "planner-core",
+        "dependencies": ["rsm002", "rsm003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /plans/:id/session returns { session_id, status, started_at, agent_id } or { status: 'none' } if no active session" },
+          { "id": "ac2", "description": "DELETE /plans/:id/session terminates active session, returns { success: true, session_id }" },
+          { "id": "ac3", "description": "DELETE /plans/:id/session returns 404 if no active session" }
+        ]
+      },
+      {
+        "step_id": "rsm007",
+        "title": "Add unit tests for session management",
+        "description": "Test session lifecycle: creation, status queries, termination on approval, timeout handling.",
+        "scope": "planner-core",
+        "dependencies": ["rsm002", "rsm003", "rsm004", "rsm005", "rsm006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for session creation and storage" },
+          { "id": "ac2", "description": "Tests for session termination on approval" },
+          { "id": "ac3", "description": "Tests for timeout detection and handling" },
+          { "id": "ac4", "description": "Tests for API endpoints" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      { "type": "happy", "description": "PlanningSession interface includes all required fields (session_id, plan_id, agent_id, status, started_at, ended_at, session_token)" },
+      { "type": "happy", "description": "createSession(plan_id, agent_id) creates valid session with status='active'" },
+      { "type": "happy", "description": "planning_sessions table created with correct schema" },
+      { "type": "happy", "description": "createSession inserts session record into database" },
+      { "type": "happy", "description": "getSessionByPlanId returns active session for plan" },
+      { "type": "happy", "description": "updateSessionStatus updates status and sets ended_at timestamp" },
+      { "type": "happy", "description": "getActiveSessions returns all sessions with status='active'" },
+      { "type": "happy", "description": "Session created when spawnPlanningAgent succeeds" },
+      { "type": "happy", "description": "Session stores session_token from spawner" },
+      { "type": "happy", "description": "Plan record references active session_id after spawn" },
+      { "type": "happy", "description": "POST /plans/:id/versions/:v/approve terminates active session" },
+      { "type": "happy", "description": "Session status set to 'completed' on approval" },
+      { "type": "happy", "description": "terminateAgent called on approval" },
+      { "type": "happy", "description": "Background check detects session exceeding timeout" },
+      { "type": "happy", "description": "Timed-out session status set to 'timeout' and agent terminated" },
+      { "type": "happy", "description": "GET /plans/:id/session returns { session_id, status, started_at, agent_id } for active session" },
+      { "type": "happy", "description": "DELETE /plans/:id/session terminates session and returns { success: true, session_id }" },
+      { "type": "edge", "description": "SessionStatus type includes all states: active, completed, timeout, terminated, error" },
+      { "type": "edge", "description": "getSessionByPlanId returns null when no active session" },
+      { "type": "edge", "description": "SESSION_TIMEOUT_MINUTES env var overrides default 30 minute timeout" },
+      { "type": "edge", "description": "Background timeout check runs every minute" },
+      { "type": "edge", "description": "Timeout check logging uses backoff (not noisy)" },
+      { "type": "edge", "description": "Plan approval without active session works (idempotent)" },
+      { "type": "edge", "description": "GET /plans/:id/session returns { status: 'none' } when no active session" },
+      { "type": "edge", "description": "Multiple sessions for same plan (only one active at a time)" },
+      { "type": "error", "description": "createSession with invalid plan_id fails" },
+      { "type": "error", "description": "DELETE /plans/:id/session returns 404 when no active session" },
+      { "type": "error", "description": "Session timeout handles terminateAgent failure gracefully" },
+      { "type": "error", "description": "Database error during session creation handled gracefully" },
+      { "type": "error", "description": "GET /plans/:id/session with non-existent plan returns 404" }
+    ],
+    "data_requirements": [
+      "Test plans for session association",
+      "Mock agent spawner for session creation tests",
+      "Configurable clock/timer for timeout tests",
+      "Multiple session records for getActiveSessions tests",
+      "Expired sessions for timeout detection tests"
+    ]
+  }
+}

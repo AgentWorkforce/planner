@@ -1,0 +1,228 @@
+{
+  "feature_id": "relay-ai-chat",
+  "title": "Connect AI Chat to Planning Agent",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["relay-session-management", "ui-ai-chat"],
+
+  "summary": {
+    "goal": "Replace mock AI chat responses with real conversations to the planning agent via relay messaging",
+    "context": "The UI has a chat panel (useAIChat hook) that currently returns mock responses. With relay integration, chat messages should be sent to the active planning agent, and agent responses displayed in the UI. The agent can respond with suggestions that trigger MCP tool calls.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Chat messages routed to planning agent via relay" },
+      { "id": "ac2", "description": "Agent responses displayed in chat UI" },
+      { "id": "ac3", "description": "Agent can suggest plan changes in chat" },
+      { "id": "ac4", "description": "User can approve/reject agent suggestions" },
+      { "id": "ac5", "description": "Falls back to mock when no active session" },
+      { "id": "ac6", "description": "UI indicates 'AI Connected' vs 'Demo Mode'" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": [
+      {
+        "step_id": "rac001",
+        "title": "Add chat API endpoint",
+        "description": "Create POST /plans/:id/chat endpoint. Accepts message, routes to planning agent via relay, returns agent response.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /plans/:id/chat accepts { message: string, context?: object }" },
+          { "id": "ac2", "description": "Message forwarded to active planning agent via relay" },
+          { "id": "ac3", "description": "Returns { response: string, suggestions?: Suggestion[], session_status: 'active' | 'none' }" },
+          { "id": "ac4", "description": "Returns 400 if no active session for plan" }
+        ]
+      },
+      {
+        "step_id": "rac002",
+        "title": "Implement relay message routing",
+        "description": "Update src/relay/chat.ts sendToAgent() to use real relay messaging. Currently stubbed with mock responses. Use RelayClient.sendMessage() to send to agent, set up onMessage callback to receive response, correlate via thread ID.",
+        "scope": "planner-core",
+        "dependencies": ["rac001"],
+        "owner_role": "backend:Coder",
+        "status": "complete",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Use client.sendMessage(agentId, message, 'chat', data, threadId) to send message" },
+          { "id": "ac2", "description": "Set up client.onMessage callback to receive agent response" },
+          { "id": "ac3", "description": "Correlate request/response using thread ID (unique per chat message)" },
+          { "id": "ac4", "description": "Awaits response with configurable timeout (default 60s)" },
+          { "id": "ac5", "description": "Timeout returns { error: 'TIMEOUT', partial_response?: string }" },
+          { "id": "ac6", "description": "Remove mock response fallback in connected mode" }
+        ]
+      },
+      {
+        "step_id": "rac003",
+        "title": "Define suggestion protocol",
+        "description": "Define how agent structures suggestions in responses. Agent wraps suggestions in structured format that can be parsed by chat endpoint.",
+        "scope": "planner-core",
+        "dependencies": ["rac002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Suggestion type: { type: 'add_step' | 'edit_step' | 'remove_step' | ..., data: object, description: string }" },
+          { "id": "ac2", "description": "Agent response can contain 0+ suggestions alongside text" },
+          { "id": "ac3", "description": "Plain text responses work unchanged" },
+          { "id": "ac4", "description": "System prompt (rpa001) includes suggestion format instructions" }
+        ]
+      },
+      {
+        "step_id": "rac004",
+        "title": "Update UI chat API client",
+        "description": "Modify packages/planner-ui/src/api/chat.ts to call real endpoint instead of returning mock. Keep mock fallback when session_status is 'none'.",
+        "scope": "planner-ui",
+        "dependencies": ["rac001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "sendChatMessage(planId, message) calls POST /plans/:id/chat" },
+          { "id": "ac2", "description": "Response parsed into ChatResponse type matching existing UI types" },
+          { "id": "ac3", "description": "Falls back to mock response when endpoint returns session_status='none'" }
+        ]
+      },
+      {
+        "step_id": "rac005",
+        "title": "Create useAIConnectionStatus hook",
+        "description": "Create shared hook that checks session status via GET /plans/:id/session. Used by both chat and improvements to show 'AI Connected' vs 'Demo Mode'.",
+        "scope": "planner-ui",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useAIConnectionStatus(planId) returns { isConnected: boolean, status: 'connected' | 'demo' | 'loading' }" },
+          { "id": "ac2", "description": "Polls session status every 10s while plan is open" },
+          { "id": "ac3", "description": "Hook exported for reuse by relay-ai-improvements" }
+        ]
+      },
+      {
+        "step_id": "rac006",
+        "title": "Update useAIChat hook",
+        "description": "Modify hook to use useAIConnectionStatus. Show connection indicator in chat panel.",
+        "scope": "planner-ui",
+        "dependencies": ["rac004", "rac005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Chat panel shows 'AI Connected' badge when session active" },
+          { "id": "ac2", "description": "Chat panel shows 'Demo Mode' badge when no session" },
+          { "id": "ac3", "description": "Badge updates when session status changes" }
+        ]
+      },
+      {
+        "step_id": "rac007",
+        "title": "Add suggestion confirmation UI",
+        "description": "When agent suggests a change, show confirmation UI. User can approve (applies via MCP) or reject (discards).",
+        "scope": "planner-ui",
+        "dependencies": ["rac004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Suggestions rendered as actionable cards in chat" },
+          { "id": "ac2", "description": "Approve button calls appropriate API to apply change" },
+          { "id": "ac3", "description": "Reject button dismisses suggestion" },
+          { "id": "ac4", "description": "Applied suggestions show success indicator" }
+        ]
+      },
+      {
+        "step_id": "rac010",
+        "title": "Extract reusable plan modification functions from MCP handlers",
+        "description": "Refactor MCP tool handlers (handleAddStep, handleEditStep, handleRemoveStep, handleAddCriteria) to separate core logic into reusable functions. These functions should be callable by both MCP handlers and HTTP endpoints without duplication. Create src/domain/plan-operations.ts with functions: addStepToPlan, editStepInPlan, removeStepFromPlan, addCriteriaToStep, editCriteriaInStep.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "addStepToPlan(storage, planId, stepData, expectedVersion?) creates new version with added step" },
+          { "id": "ac2", "description": "editStepInPlan(storage, planId, stepId, updates, expectedVersion?) creates new version with modified step" },
+          { "id": "ac3", "description": "removeStepFromPlan(storage, planId, stepId, expectedVersion?) creates new version with step removed" },
+          { "id": "ac4", "description": "addCriteriaToStep(storage, planId, stepId, criteriaData, expectedVersion?) adds acceptance criterion" },
+          { "id": "ac5", "description": "editCriteriaInStep(storage, planId, stepId, criteriaId, updates, expectedVersion?) modifies existing criterion" },
+          { "id": "ac6", "description": "MCP handlers updated to call these shared functions" },
+          { "id": "ac7", "description": "Functions return { success: true, version } or { success: false, error, code }" }
+        ]
+      },
+      {
+        "step_id": "rac008",
+        "title": "Complete suggestion application endpoint implementation",
+        "description": "Replace TODO stubs in src/api/handlers/chat.ts applySuggestion handler (lines 234-266) with real implementations. Use the shared plan modification functions from rac010 to apply add_step, edit_step, remove_step, add_criteria, and edit_criteria suggestions. Ensure proper error handling and version conflict detection.",
+        "scope": "planner-core",
+        "dependencies": ["rac003", "rac010"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "add_step suggestion calls addStepToPlan and creates new version" },
+          { "id": "ac2", "description": "edit_step suggestion calls editStepInPlan and creates new version" },
+          { "id": "ac3", "description": "remove_step suggestion calls removeStepFromPlan and creates new version" },
+          { "id": "ac4", "description": "add_criteria suggestion calls addCriteriaToStep and creates new version" },
+          { "id": "ac5", "description": "edit_criteria suggestion calls editCriteriaInStep and creates new version" },
+          { "id": "ac6", "description": "Returns { success: true, version, step? } with updated plan version" },
+          { "id": "ac7", "description": "Returns 409 Conflict if version has changed (optimistic locking)" },
+          { "id": "ac8", "description": "Agent notified of change via relay message (optional, if session active)" }
+        ]
+      },
+      {
+        "step_id": "rac009",
+        "title": "Add tests for chat integration",
+        "description": "Test chat flow: message routing, suggestion parsing, UI updates, mock fallback. Also test shared plan modification functions.",
+        "scope": "planner-core",
+        "dependencies": ["rac001", "rac002", "rac003", "rac008", "rac010"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for chat endpoint with mocked relay" },
+          { "id": "ac2", "description": "Tests for suggestion parsing" },
+          { "id": "ac3", "description": "Tests for suggestion application via applySuggestion endpoint" },
+          { "id": "ac4", "description": "Tests for timeout handling" },
+          { "id": "ac5", "description": "Tests for shared plan modification functions (addStepToPlan, etc.)" },
+          { "id": "ac6", "description": "Tests for optimistic locking in suggestion application" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "notes": "Focused on critical paths: shared plan modification functions (rac010), suggestion application, and error handling. MCP tools already have extensive coverage in tools.test.ts.",
+    "cases": [
+      {
+        "group": "Plan Modification Functions (rac010)",
+        "rationale": "New shared functions used by both MCP handlers and HTTP endpoints - must be tested independently",
+        "tests": [
+          { "type": "happy", "description": "addStepToPlan creates new version with step added" },
+          { "type": "happy", "description": "editStepInPlan creates new version with step fields updated" },
+          { "type": "happy", "description": "removeStepFromPlan creates new version without step, cleans dependencies" },
+          { "type": "happy", "description": "addCriteriaToStep adds criterion to step" },
+          { "type": "error", "description": "Returns VERSION_CONFLICT when expectedVersion doesn't match" },
+          { "type": "error", "description": "Returns error when plan/step not found" },
+          { "type": "error", "description": "Returns error when version is not draft" }
+        ]
+      },
+      {
+        "group": "Suggestion Application Endpoint (rac008)",
+        "rationale": "Critical path for AI suggestions to modify plans - must work reliably",
+        "tests": [
+          { "type": "happy", "description": "POST /api/ai/suggestions/apply with add_step creates step" },
+          { "type": "happy", "description": "POST /api/ai/suggestions/apply with edit_step updates step" },
+          { "type": "happy", "description": "POST /api/ai/suggestions/apply with remove_step removes step" },
+          { "type": "happy", "description": "POST /api/ai/suggestions/apply with add_criteria adds criterion" },
+          { "type": "error", "description": "Returns 404 for non-existent plan" },
+          { "type": "error", "description": "Returns 400 for unknown suggestion_type" },
+          { "type": "error", "description": "Returns 409 on version conflict" }
+        ]
+      },
+      {
+        "group": "Chat Endpoint (existing coverage adequate)",
+        "rationale": "Basic tests exist in chat.test.ts - only add relay-specific tests when relay mode is enabled",
+        "tests": [
+          { "type": "edge", "description": "Falls back to mock response when no active session (already tested)" },
+          { "type": "error", "description": "Timeout handling returns TIMEOUT error" }
+        ]
+      }
+    ],
+    "data_requirements": [
+      "In-memory SQLite storage (:memory:)",
+      "Draft plan versions with steps for modification tests",
+      "Mock relay module for chat routing tests"
+    ],
+    "implementation_notes": [
+      "MCP tools (add_step, edit_step, etc.) already tested in tools.test.ts",
+      "After rac010 extraction, MCP handlers should still pass existing tests",
+      "Focus new tests on the shared functions and HTTP endpoint integration"
+    ]
+  }
+}

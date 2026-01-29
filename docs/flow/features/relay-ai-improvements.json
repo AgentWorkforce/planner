@@ -1,0 +1,252 @@
+{
+  "feature_id": "relay-ai-improvements",
+  "title": "Connect Silent Improvements to Planning Agent",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["relay-session-management", "ui-ai-improvements"],
+
+  "summary": {
+    "goal": "Replace mock silent improvements with real agent-driven analysis and suggestions",
+    "context": "The UI shows 'silent improvements' - background AI analysis that suggests enhancements (missing acceptance criteria, unclear descriptions, etc.). Currently mock. With relay, the planning agent periodically analyzes the plan and pushes improvement suggestions.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Planning agent periodically analyzes plan for improvements" },
+      { "id": "ac2", "description": "Improvements accessible via GET /plans/:id/improvements" },
+      { "id": "ac3", "description": "User can accept/dismiss improvements" },
+      { "id": "ac4", "description": "Accepted improvements applied via MCP tools" },
+      { "id": "ac5", "description": "Falls back to mock when no active session" },
+      { "id": "ac6", "description": "UI indicates 'AI Active' vs 'Demo Mode' (shared with relay-ai-chat)" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": [
+      {
+        "step_id": "rai001",
+        "title": "Define Improvement entity",
+        "description": "Create src/domain/improvement.ts with Improvement interface and factory.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Improvement interface: { improvement_id, plan_id, type, description, suggested_change, status, created_at }" },
+          { "id": "ac2", "description": "ImprovementType: 'missing_criteria' | 'unclear_description' | 'missing_dependency' | 'redundant_step' | 'scope_suggestion'" },
+          { "id": "ac3", "description": "ImprovementStatus: 'pending' | 'accepted' | 'dismissed'" },
+          { "id": "ac4", "description": "suggested_change: { tool: string, arguments: object } - MCP tool call to apply" }
+        ]
+      },
+      {
+        "step_id": "rai002",
+        "title": "Add improvements storage",
+        "description": "Add improvements table to SQLite schema. Implement CRUD operations.",
+        "scope": "planner-core",
+        "dependencies": ["rai001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "improvements table created" },
+          { "id": "ac2", "description": "createImprovement(improvement) inserts record" },
+          { "id": "ac3", "description": "getPendingImprovements(plan_id) returns pending improvements" },
+          { "id": "ac4", "description": "updateImprovementStatus(improvement_id, status) updates status" }
+        ]
+      },
+      {
+        "step_id": "rai003",
+        "title": "Add suggest_improvement MCP tool",
+        "description": "Add new MCP tool: suggest_improvement(plan_id, type, description, suggested_change). Agent uses this to push suggestions.",
+        "scope": "planner-core",
+        "dependencies": ["rai002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "suggest_improvement tool available to planning agents" },
+          { "id": "ac2", "description": "Tool accepts: { plan_id, type: ImprovementType, description, suggested_change }" },
+          { "id": "ac3", "description": "Creates improvement record with status='pending'" },
+          { "id": "ac4", "description": "Returns { improvement_id, success: true }" }
+        ]
+      },
+      {
+        "step_id": "rai004",
+        "title": "Add improvements endpoint",
+        "description": "Create GET /plans/:id/improvements endpoint. Returns list of pending improvement suggestions.",
+        "scope": "planner-core",
+        "dependencies": ["rai002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All improvement endpoints return session_status: 'active' | 'none' alongside their primary response data" },
+          { "id": "ac2", "description": "Only returns improvements with status='pending'" },
+          { "id": "ac3", "description": "Sorted by created_at descending (newest first)" },
+          { "id": "ac4", "description": "session_status reflects whether an active planning session exists for the plan" }
+        ]
+      },
+      {
+        "step_id": "rai004.1",
+        "title": "Add session_status to all improvement API responses",
+        "description": "Update improvements.ts handlers to include session_status in all responses by checking for active planning session.",
+        "scope": "planner-core",
+        "dependencies": ["rai004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "list endpoint returns { improvements, session_status }" },
+          { "id": "ac2", "description": "listPending endpoint returns { improvements, session_status }" },
+          { "id": "ac3", "description": "get endpoint returns { improvement, session_status }" },
+          { "id": "ac4", "description": "accept endpoint returns { improvement, session_status }" },
+          { "id": "ac5", "description": "dismiss endpoint returns { improvement, session_status }" },
+          { "id": "ac6", "description": "session_status='active' when planning session exists for plan, 'none' otherwise" }
+        ]
+      },
+      {
+        "step_id": "rai005",
+        "title": "Add apply improvement endpoint",
+        "description": "Create POST /plans/:id/improvements/:improvement_id/apply endpoint. Applies the suggested change via MCP tools.",
+        "scope": "planner-core",
+        "dependencies": ["rai002", "rai003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Endpoint calls MCP tool specified in suggested_change" },
+          { "id": "ac2", "description": "Updates improvement status to 'accepted'" },
+          { "id": "ac3", "description": "Returns { success: true, plan_version: number }" },
+          { "id": "ac4", "description": "Returns 400 if improvement already accepted/dismissed" }
+        ]
+      },
+      {
+        "step_id": "rai006",
+        "title": "Add dismiss improvement endpoint",
+        "description": "Create POST /plans/:id/improvements/:improvement_id/dismiss endpoint. Marks improvement as dismissed.",
+        "scope": "planner-core",
+        "dependencies": ["rai002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Updates improvement status to 'dismissed'" },
+          { "id": "ac2", "description": "Returns { success: true }" }
+        ]
+      },
+      {
+        "step_id": "rai007",
+        "title": "Update planning agent prompt for improvements",
+        "description": "Ensure planning agent system prompt (from relay-planning-agent.rpa001) includes instructions to periodically analyze plan and suggest improvements using suggest_improvement tool.",
+        "scope": "planner-core",
+        "dependencies": ["rai003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "System prompt instructs agent to analyze plan for improvements" },
+          { "id": "ac2", "description": "Agent uses suggest_improvement tool for findings" },
+          { "id": "ac3", "description": "Analysis triggered periodically or when plan structure changes" }
+        ],
+        "note": "Coordinates with relay-planning-agent.rpa001 - ensure prompt includes improvement instructions"
+      },
+      {
+        "step_id": "rai008",
+        "title": "Update UI improvements API client",
+        "description": "Modify packages/planner-ui/src/api/improvements.ts to call real endpoints. Poll for new improvements.",
+        "scope": "planner-ui",
+        "dependencies": ["rai004", "rai005", "rai006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getImprovements(planId) calls GET /plans/:id/improvements" },
+          { "id": "ac2", "description": "applyImprovement(planId, improvementId) calls POST .../apply" },
+          { "id": "ac3", "description": "dismissImprovement(planId, improvementId) calls POST .../dismiss" },
+          { "id": "ac4", "description": "Polling interval configurable (default 10s)" }
+        ]
+      },
+      {
+        "step_id": "rai009",
+        "title": "Update useAIImprovements hook",
+        "description": "Modify hook to use real API when session active. Use useAIConnectionStatus from relay-ai-chat for shared status indicator.",
+        "scope": "planner-ui",
+        "dependencies": ["rai008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Hook uses real API when useAIConnectionStatus.isConnected=true" },
+          { "id": "ac2", "description": "Falls back to mock improvements when no session" },
+          { "id": "ac3", "description": "Shares connection status with chat via useAIConnectionStatus hook" }
+        ],
+        "note": "Reuses useAIConnectionStatus hook created in relay-ai-chat.rac005"
+      },
+      {
+        "step_id": "rai010",
+        "title": "Add tests for improvements integration",
+        "description": "Test improvements flow: agent pushing improvements, API endpoints, UI integration.",
+        "scope": "planner-core",
+        "dependencies": ["rai003", "rai004", "rai005", "rai006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for suggest_improvement MCP tool" },
+          { "id": "ac2", "description": "Tests for improvements endpoints" },
+          { "id": "ac3", "description": "Tests for apply and dismiss flows" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "focus": "session_status in improvement API responses (rai004.1)",
+    "cases": [
+      {
+        "type": "happy",
+        "description": "GET /improvements returns session_status='none' when no active session",
+        "endpoint": "list",
+        "note": "Plan exists but no session"
+      },
+      {
+        "type": "happy",
+        "description": "GET /improvements returns session_status='active' when session exists",
+        "endpoint": "list",
+        "note": "Create session first via storage.createSession()"
+      },
+      {
+        "type": "happy",
+        "description": "GET /improvements/pending returns session_status='none' when no active session",
+        "endpoint": "listPending"
+      },
+      {
+        "type": "happy",
+        "description": "GET /improvements/pending returns session_status='active' when session exists",
+        "endpoint": "listPending"
+      },
+      {
+        "type": "happy",
+        "description": "GET /improvements/:id returns session_status='none' when no active session",
+        "endpoint": "get"
+      },
+      {
+        "type": "happy",
+        "description": "GET /improvements/:id returns session_status='active' when session exists",
+        "endpoint": "get"
+      },
+      {
+        "type": "happy",
+        "description": "POST /improvements/:id/accept returns session_status='none' when no active session",
+        "endpoint": "accept"
+      },
+      {
+        "type": "happy",
+        "description": "POST /improvements/:id/accept returns session_status='active' when session exists",
+        "endpoint": "accept"
+      },
+      {
+        "type": "happy",
+        "description": "POST /improvements/:id/dismiss returns session_status='none' when no active session",
+        "endpoint": "dismiss"
+      },
+      {
+        "type": "happy",
+        "description": "POST /improvements/:id/dismiss returns session_status='active' when session exists",
+        "endpoint": "dismiss"
+      }
+    ],
+    "data_requirements": [
+      "Test plan with at least one version",
+      "Test improvement in pending status",
+      "Helper to create active session: { session_id, plan_id, status: 'active', ... }",
+      "Second test improvement for dismiss test (since accept/dismiss consume the improvement)"
+    ],
+    "implementation_notes": [
+      "Add describe block 'session_status in responses' to improvements.test.ts",
+      "Session lookup uses storage.getSessionByPlanId(planId)",
+      "Session status: 'active' if session exists, 'none' otherwise",
+      "All 5 endpoints need the same session_status logic added to handlers"
+    ]
+  }
+}

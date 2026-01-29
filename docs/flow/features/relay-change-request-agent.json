@@ -1,0 +1,222 @@
+{
+  "feature_id": "relay-change-request-agent",
+  "title": "Change Request Agent Handling",
+  "type": "feature",
+  "status": "in_progress",
+  "priority": "medium",
+  "dependencies": ["relay-planning-agent", "relay-mcp-bridge", "api-change-requests"],
+  "completion_notes": {
+    "planner-core": {
+      "status": "complete",
+      "completed_steps": ["rcra001", "rcra002", "rcra003", "rcra004", "rcra005", "rcra006", "rcra009", "rcra010"],
+      "verified_at": "2026-01-29",
+      "test_count": 16,
+      "all_tests_pass": true
+    },
+    "planner-ui": {
+      "status": "pending",
+      "pending_steps": ["rcra007", "rcra008"]
+    }
+  },
+
+  "summary": {
+    "goal": "Spawn a revision agent when orchestrator sends a change request, to help revise the plan",
+    "context": "When the orchestrator discovers issues during execution (missing steps, wrong dependencies), it sends a ChangeRequest. Currently the UI just displays these. With relay, a revision agent can be spawned to analyze the change request and draft suggested revisions.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Change request receipt triggers revision agent spawn" },
+      { "id": "ac2", "description": "Revision agent receives change request context" },
+      { "id": "ac3", "description": "Agent drafts plan revisions addressing the request" },
+      { "id": "ac4", "description": "Human reviews and approves/rejects agent suggestions" },
+      { "id": "ac5", "description": "Approved changes create new version linked to change request" },
+      { "id": "ac6", "description": "Fallback to manual revision when relay unavailable" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": [
+      {
+        "step_id": "rcra001",
+        "title": "Define revision agent system prompt",
+        "description": "Create src/relay/prompts/revision-agent.ts with system prompt for handling change requests. Include: understand the change request, analyze current plan, suggest minimal changes to address the issue.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "System prompt defines revision agent role" },
+          { "id": "ac2", "description": "Prompt includes change request analysis instructions" },
+          { "id": "ac3", "description": "Prompt emphasizes minimal, targeted changes" }
+        ]
+      },
+      {
+        "step_id": "rcra002",
+        "title": "Create revision agent spawner",
+        "description": "Create spawnRevisionAgent(planId, changeRequest) in src/relay/spawner.ts. Similar to planning agent but with revision-specific prompt and change request context.",
+        "scope": "planner-core",
+        "dependencies": ["rcra001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "spawnRevisionAgent(planId, changeRequest) spawns revision agent" },
+          { "id": "ac2", "description": "Agent receives: change_request_id, reason, suggested_changes, current plan state" },
+          { "id": "ac3", "description": "Returns { agentId, sessionToken, sessionId }" }
+        ]
+      },
+      {
+        "step_id": "rcra003",
+        "title": "Trigger revision agent on change request",
+        "description": "Modify change request handler: when change request received (POST /runs/:run_id/change-requests) and relay available, spawn revision agent.",
+        "scope": "planner-core",
+        "dependencies": ["rcra002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Change request creation triggers revision agent spawn" },
+          { "id": "ac2", "description": "Change request record stores revision_session_id" },
+          { "id": "ac3", "description": "Falls back to no agent when relay unavailable (manual revision)" },
+          { "id": "ac4", "description": "Spawn errors logged but don't fail change request creation" }
+        ]
+      },
+      {
+        "step_id": "rcra004",
+        "title": "Agent creates draft revision",
+        "description": "Revision agent reads current plan, analyzes change request, uses MCP tools to create new draft version with suggested changes.",
+        "scope": "planner-core",
+        "dependencies": ["rcra002", "rcra003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Agent creates new draft version via create_version MCP tool" },
+          { "id": "ac2", "description": "Changes address the change request reason" },
+          { "id": "ac3", "description": "Agent marks its changes with revision_source: 'agent'" },
+          { "id": "ac4", "description": "Agent terminates after creating draft" }
+        ]
+      },
+      {
+        "step_id": "rcra005",
+        "title": "Link revision to change request",
+        "description": "New version created by revision agent is linked to the change request (result_version_id field). Change request status updated to 'revision_drafted'.",
+        "scope": "planner-core",
+        "dependencies": ["rcra004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Version linked to change request via result_version_id" },
+          { "id": "ac2", "description": "Change request status updated to 'revision_drafted'" },
+          { "id": "ac3", "description": "Version metadata includes { change_request_id, revision_source: 'agent' }" }
+        ]
+      },
+      {
+        "step_id": "rcra006",
+        "title": "Add revision status to change request API",
+        "description": "Enhance GET /plans/:id/change-requests to include revision agent status and linked draft version.",
+        "scope": "planner-core",
+        "dependencies": ["rcra005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Response includes: revision_session_id, revision_status, result_version_id" },
+          { "id": "ac2", "description": "revision_status: 'pending' | 'in_progress' | 'drafted' | 'none'" }
+        ]
+      },
+      {
+        "step_id": "rcra007",
+        "title": "Update UI to show revision status",
+        "description": "Enhance ChangeRequestCard to show revision agent status: 'AI analyzing...', 'Draft ready for review', or 'Manual revision needed'.",
+        "scope": "planner-ui",
+        "dependencies": ["rcra006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Card shows 'AI analyzing...' with spinner when revision_status='in_progress'" },
+          { "id": "ac2", "description": "Card shows 'Draft ready' with link when revision_status='drafted'" },
+          { "id": "ac3", "description": "Card shows 'Manual revision needed' when revision_status='none'" }
+        ]
+      },
+      {
+        "step_id": "rcra008",
+        "title": "Human review flow for agent revisions",
+        "description": "UI shows revision agent's suggested changes in diff view. Human can accept (keep version), reject (discard version and mark for manual revision), or edit further.",
+        "scope": "planner-ui",
+        "dependencies": ["rcra007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Diff view shows changes between current approved and agent draft" },
+          { "id": "ac2", "description": "Accept button approves the draft version" },
+          { "id": "ac3", "description": "Reject button discards draft, sets change request back to pending" },
+          { "id": "ac4", "description": "Edit button navigates to plan editor with draft version" }
+        ]
+      },
+      {
+        "step_id": "rcra009",
+        "title": "Add accept/reject revision endpoints",
+        "description": "Add POST /change-requests/:id/accept-revision and POST /change-requests/:id/reject-revision endpoints.",
+        "scope": "planner-core",
+        "dependencies": ["rcra005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "accept-revision: sets draft to approved, updates change request status" },
+          { "id": "ac2", "description": "reject-revision: discards draft version, resets change request to pending" },
+          { "id": "ac3", "description": "Both endpoints terminate any active revision session" }
+        ]
+      },
+      {
+        "step_id": "rcra010",
+        "title": "Add tests for change request agent flow",
+        "description": "Test revision agent lifecycle: spawn on change request, draft creation, human review, accept/reject.",
+        "scope": "planner-core",
+        "dependencies": ["rcra003", "rcra004", "rcra005", "rcra009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for revision agent spawning with mocked relay" },
+          { "id": "ac2", "description": "Tests for draft version linking" },
+          { "id": "ac3", "description": "Tests for accept/reject flows" },
+          { "id": "ac4", "description": "Tests for fallback when relay unavailable" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "medium",
+    "cases": [
+      { "type": "happy", "description": "Revision agent system prompt defines agent role" },
+      { "type": "happy", "description": "System prompt includes change request analysis instructions" },
+      { "type": "happy", "description": "System prompt emphasizes minimal, targeted changes" },
+      { "type": "happy", "description": "spawnRevisionAgent(planId, changeRequest) returns { agentId, sessionToken, sessionId }" },
+      { "type": "happy", "description": "Revision agent receives change_request_id, reason, suggested_changes, plan state" },
+      { "type": "happy", "description": "POST /runs/:run_id/change-requests triggers revision agent spawn when relay available" },
+      { "type": "happy", "description": "Change request record stores revision_session_id" },
+      { "type": "happy", "description": "Agent creates new draft version via create_version MCP tool" },
+      { "type": "happy", "description": "Agent draft addresses change request reason" },
+      { "type": "happy", "description": "Agent marks changes with revision_source: 'agent'" },
+      { "type": "happy", "description": "Agent terminates after creating draft" },
+      { "type": "happy", "description": "Version linked to change request via result_version_id" },
+      { "type": "happy", "description": "Change request status updated to 'revision_drafted'" },
+      { "type": "happy", "description": "Version metadata includes { change_request_id, revision_source: 'agent' }" },
+      { "type": "happy", "description": "GET /plans/:id/change-requests includes revision_session_id, revision_status, result_version_id" },
+      { "type": "happy", "description": "ChangeRequestCard shows 'AI analyzing...' when revision_status='in_progress'" },
+      { "type": "happy", "description": "ChangeRequestCard shows 'Draft ready' link when revision_status='drafted'" },
+      { "type": "happy", "description": "Diff view shows changes between approved version and agent draft" },
+      { "type": "happy", "description": "Accept button approves draft version" },
+      { "type": "happy", "description": "Reject button discards draft and resets change request to pending" },
+      { "type": "happy", "description": "Edit button navigates to plan editor with draft version loaded" },
+      { "type": "happy", "description": "POST /change-requests/:id/accept-revision sets draft to approved" },
+      { "type": "happy", "description": "POST /change-requests/:id/reject-revision discards draft and resets to pending" },
+      { "type": "happy", "description": "Accept and reject endpoints terminate active revision session" },
+      { "type": "edge", "description": "revision_status values: pending, in_progress, drafted, none" },
+      { "type": "edge", "description": "ChangeRequestCard shows 'Manual revision needed' when revision_status='none'" },
+      { "type": "edge", "description": "Change request creation falls back to no agent when relay unavailable" },
+      { "type": "edge", "description": "Accept revision when no active session (already terminated) works" },
+      { "type": "edge", "description": "Reject revision when no active session works" },
+      { "type": "error", "description": "Revision agent spawn error logged but change request creation succeeds" },
+      { "type": "error", "description": "Agent draft creation failure updates status to 'error'" },
+      { "type": "error", "description": "POST /change-requests/:id/accept-revision with no draft returns 400" },
+      { "type": "error", "description": "POST /change-requests/:id/reject-revision with no draft returns 400" },
+      { "type": "error", "description": "Invalid change request ID returns 404" },
+      { "type": "error", "description": "Diff view handles missing draft gracefully (shows error state)" }
+    ],
+    "data_requirements": [
+      "Test change requests with different statuses",
+      "Mock relay-pty for revision agent spawn tests",
+      "Plans with approved versions for diff testing",
+      "Agent-created draft versions with metadata",
+      "Timer mocks for agent timeout tests"
+    ]
+  }
+}

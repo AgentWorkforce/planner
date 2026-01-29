@@ -3,6 +3,74 @@ import { EditableText } from './EditableText';
 import { EditableTextarea } from './EditableTextarea';
 import type { Step } from '@/types';
 
+const COMMON_ROLES = [
+  'backend:Coder',
+  'frontend:Coder',
+  'fullstack:Coder',
+  'devops:Engineer',
+  'qa:Tester',
+];
+
+interface OwnerRoleSelectorProps {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+function OwnerRoleSelector({ value, onChange, disabled }: OwnerRoleSelectorProps) {
+  const [isCustom, setIsCustom] = useState(!COMMON_ROLES.includes(value) && value !== '');
+
+  if (isCustom) {
+    return (
+      <div className="owner-role-custom">
+        <input
+          type="text"
+          className="owner-role-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter custom role..."
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => {
+            setIsCustom(false);
+            onChange('');
+          }}
+          disabled={disabled}
+        >
+          Use preset
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      className="owner-role-select"
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === '__custom__') {
+          setIsCustom(true);
+          onChange('');
+        } else {
+          onChange(e.target.value);
+        }
+      }}
+      disabled={disabled}
+    >
+      <option value="">Select role...</option>
+      {COMMON_ROLES.map((role) => (
+        <option key={role} value={role}>
+          {role}
+        </option>
+      ))}
+      <option value="__custom__">Custom...</option>
+    </select>
+  );
+}
+
 interface StepEditorProps {
   step: Step;
   allSteps: Step[];
@@ -11,6 +79,8 @@ interface StepEditorProps {
   disabled?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  commentCount?: number;
+  onOpenComments?: (stepId: string) => void;
 }
 
 export function StepEditor({
@@ -21,6 +91,8 @@ export function StepEditor({
   disabled = false,
   isExpanded = false,
   onToggleExpand,
+  commentCount = 0,
+  onOpenComments,
 }: StepEditorProps) {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -86,6 +158,18 @@ export function StepEditor({
 
         {step.scope && <span className="step-scope-badge">{step.scope}</span>}
 
+        {onOpenComments && (
+          <button
+            type="button"
+            className="step-comment-btn"
+            onClick={() => onOpenComments(step.step_id)}
+            title={commentCount > 0 ? `${commentCount} comment${commentCount === 1 ? '' : 's'}` : 'Add comment'}
+          >
+            <span className="comment-icon">💬</span>
+            {commentCount > 0 && <span className="comment-badge">{commentCount}</span>}
+          </button>
+        )}
+
         {saving && <span className="saving-indicator">Saving...</span>}
 
         {!disabled && (
@@ -147,10 +231,9 @@ export function StepEditor({
 
             <div className="step-field">
               <label className="step-field-label">Owner Role</label>
-              <EditableText
+              <OwnerRoleSelector
                 value={step.owner_role || ''}
-                onSave={(value) => handleUpdate('owner_role', value)}
-                placeholder="e.g., backend:Coder"
+                onChange={(value) => handleUpdate('owner_role', value)}
                 disabled={!isEditable}
               />
             </div>
@@ -194,9 +277,8 @@ export function StepEditor({
                 className="dependency-select"
                 value=""
                 onChange={(e) => {
-                  if (e.target.value) {
+                  if (e.target.value && !step.dependencies.includes(e.target.value)) {
                     handleUpdate('dependencies', [...step.dependencies, e.target.value]);
-                    e.target.value = '';
                   }
                 }}
               >
@@ -210,33 +292,98 @@ export function StepEditor({
             </div>
           )}
 
-          {step.acceptance_criteria && step.acceptance_criteria.length > 0 && (
-            <div className="step-field">
-              <label className="step-field-label">Acceptance Criteria</label>
-              <ul className="acceptance-criteria-list">
-                {step.acceptance_criteria.map((criterion) => (
-                  <li key={criterion.id} className="criterion-item">
-                    <span className="criterion-description">{criterion.description}</span>
-                    {criterion.type && (
-                      <span className="criterion-type">{criterion.type}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="step-field">
+            <label className="step-field-label">Acceptance Criteria</label>
+            <ul className="acceptance-criteria-list">
+              {(step.acceptance_criteria || []).map((criterion) => (
+                <li key={criterion.id} className="criterion-item">
+                  <EditableText
+                    value={criterion.description}
+                    onSave={(value) => {
+                      const updated = (step.acceptance_criteria || []).map((c) =>
+                        c.id === criterion.id ? { ...c, description: value } : c
+                      );
+                      handleUpdate('acceptance_criteria', updated);
+                    }}
+                    placeholder="Enter criterion..."
+                    disabled={!isEditable}
+                    className="criterion-description"
+                  />
+                  {criterion.type && (
+                    <span className="criterion-type">{criterion.type}</span>
+                  )}
+                  {!disabled && (
+                    <button
+                      type="button"
+                      className="criterion-remove"
+                      onClick={() => {
+                        const updated = (step.acceptance_criteria || []).filter(
+                          (c) => c.id !== criterion.id
+                        );
+                        handleUpdate('acceptance_criteria', updated);
+                      }}
+                      title="Remove criterion"
+                    >
+                      ×
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!disabled && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  const newCriterion = {
+                    id: crypto.randomUUID(),
+                    description: '',
+                  };
+                  const updated = [...(step.acceptance_criteria || []), newCriterion];
+                  handleUpdate('acceptance_criteria', updated);
+                }}
+              >
+                + Add Criterion
+              </button>
+            )}
+          </div>
 
-          {step.gate && (
-            <div className="step-field">
-              <label className="step-field-label">Gate</label>
-              <div className="gate-info">
-                <span className="gate-type">{step.gate.type}</span>
-                {step.gate.approver_role && (
-                  <span className="gate-approver">Approver: {step.gate.approver_role}</span>
-                )}
-              </div>
+          <div className="step-field">
+            <label className="step-field-label">Gate</label>
+            <div className="gate-toggle">
+              <label className="gate-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={!!step.gate}
+                  disabled={disabled}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      handleUpdate('gate', { type: 'human_approval' });
+                    } else {
+                      handleUpdate('gate', undefined);
+                    }
+                  }}
+                />
+                Require human approval
+              </label>
+              {step.gate && (
+                <div className="gate-details">
+                  <label className="step-field-label">Approver Role</label>
+                  <EditableText
+                    value={step.gate.approver_role || ''}
+                    onSave={(value) => {
+                      handleUpdate('gate', {
+                        ...step.gate,
+                        approver_role: value || undefined,
+                      });
+                    }}
+                    placeholder="e.g., tech-lead (optional)"
+                    disabled={!isEditable}
+                  />
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

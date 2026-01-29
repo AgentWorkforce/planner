@@ -15,12 +15,13 @@ Creating tasks is a loop. You process features one by one, in dependency order.
 1. Read catalog, get all features with plan_implementation.steps
 2. Sort features: dependencies first, then by priority
 3. For each feature:
-   a. Create PRE task (blocked by previous feature's DOC if dependent)
+   a. Create PRE task (blocked by previous feature's CHECKPOINT if dependent)
    b. Create IMPL tasks (one per step, respecting step dependencies)
    c. Create POST task (blocked by all IMPLs)
    d. Create VERIFY task (blocked by POST)
    e. Create DOC task (blocked by VERIFY)
-   f. Record this feature's DOC task ID (needed for dependent features)
+   f. Create CHECKPOINT task (blocked by DOC)
+   g. Record this feature's CHECKPOINT task ID (needed for dependent features)
 4. Continue until all features processed
 ```
 
@@ -39,34 +40,113 @@ For each feature, create these tasks in order:
 
 | Task | Subject | Blocked By |
 |------|---------|------------|
-| PRE | [PRE] Analyze before [feature] | Previous feature's DOC (if dependent) |
+| PRE | [PRE] Analyze before [feature] | Previous feature's CHECKPOINT (if dependent) |
 | IMPL×N | [IMPL] [step title] | PRE, plus step dependencies from plan |
 | POST | [POST] Review [feature] changes | All IMPLs |
 | VERIFY | [VERIFY] Check [feature] criteria | POST |
 | DOC | [DOC] Document [feature] completion | VERIFY |
+| CHECKPOINT | [CHECKPOINT] Context check | DOC |
 
 ## Cross-Feature Dependencies
 
 If feature B depends on feature A:
-- B's PRE task is blocked by A's DOC task
+- B's PRE task is blocked by A's CHECKPOINT task
 
-This ensures you complete one feature before starting a dependent one.
+This ensures you complete one feature (and check context) before starting a dependent one.
 
 ## Task Format
 
 - **subject**: "[TYPE] Brief description"
 - **activeForm**: Present continuous form for the spinner
-- **description**: Feature ID, step ID (for IMPL), acceptance criteria, link to feature file
+- **description**: Must include actionable instructions (see templates below)
 
-## Checkpoint Purposes
+## Task Description Templates
 
-| Type | Purpose |
-|------|---------|
-| PRE | Read existing code, understand architecture before changing |
-| IMPL | Do the actual implementation work |
-| POST | Self-review: bugs, logic errors, code quality |
-| VERIFY | Acceptance criteria met? Tests pass? |
-| DOC | Compare to plan. Diverged? → `/flow change-request` |
+Each task description must tell the executing agent exactly what to do. Copy these templates:
+
+**PRE**:
+```
+Feature: [feature_id]
+File: docs/flow/features/[feature_id].json
+
+DO:
+1. Run /cost and report the ACTUAL percentage. If > 50%, run /compact first
+2. Read the feature file to understand goal and acceptance criteria
+3. Read all files that will be modified (check plan_implementation.steps)
+4. Note current architecture patterns to maintain consistency
+5. Identify risks or blockers before implementing
+
+You MUST state the actual context percentage. DO NOT proceed until you've reported it.
+```
+
+**IMPL** (one per step):
+```
+Feature: [feature_id]
+Step: [step_id] - [step_title]
+File: docs/flow/features/[feature_id].json
+
+DO: Implement this step per its acceptance_criteria in the feature file.
+```
+
+**POST**:
+```
+Feature: [feature_id]
+File: docs/flow/features/[feature_id].json
+
+DO: Review this code as if it were a PR from another developer.
+
+1. Re-read ALL code written or modified for this feature
+2. Look for:
+   - Bugs, logic errors, off-by-one mistakes
+   - Missing edge cases or error handling
+   - Inconsistent patterns vs existing codebase
+   - Security issues (injection, auth, data exposure)
+   - Performance concerns (N+1 queries, unnecessary loops)
+   - Code that could be clearer or simpler
+3. Make fixes and improvements—don't just note them
+
+Be critical. If you wouldn't approve this PR, fix it before marking complete.
+```
+
+**VERIFY**:
+```
+Feature: [feature_id]
+File: docs/flow/features/[feature_id].json
+
+DO:
+1. Read the feature's acceptance_criteria from the file
+2. For EACH criterion: confirm it is met (not assumed)
+3. Run relevant tests (typecheck, unit tests, integration tests)
+4. If any criterion is NOT met, fix it before marking complete
+
+List each criterion and its status in your response.
+```
+
+**DOC**:
+```
+Feature: [feature_id]
+File: docs/flow/features/[feature_id].json
+
+DO:
+1. Compare what you built to the plan_implementation.steps
+2. If implementation diverged from plan, run `/flow change-request`
+3. Update feature status if complete
+
+Mark complete only if implementation matches plan (or change request filed).
+```
+
+**CHECKPOINT**:
+```
+Feature: [feature_id] complete.
+
+DO:
+1. Run /cost and report the ACTUAL percentage shown
+2. If > 50%, run /compact before marking complete
+3. If this completes an epic, suggest running `/flow audit` on the epic
+4. Mark complete only after reporting the actual number
+
+You MUST state the actual context percentage. "Context is fine" without a number = task NOT complete.
+```
 
 ## Prerequisite
 

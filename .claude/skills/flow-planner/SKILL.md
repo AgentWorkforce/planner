@@ -17,6 +17,7 @@ Transform a feature into a structured implementation plan:
 ## Input
 
 - Feature file with `summary` section (from flow-brainstorm or flow-discover)
+- Feature file with `design_spec` section (if UI feature, from flow-ui-ux-designer)
 - Or direct intent from user
 
 ## Output
@@ -31,12 +32,15 @@ If feature exists but no summary → "Run /flow brainstorm or /flow discover fir
 
 ## Rules
 
-- 1–2 questions per message. Prefer option-based questions.
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
 - Multi-scope is the default—real work crosses boundaries.
 - Use component IDs from `catalog.components` as scope values.
 - AI infers dependencies from step content.
 - Steps specify `owner_role` (e.g., "backend:Coder"), not specific agents.
 - Human approval gates are explicit where accountability matters.
+- **Acceptance criteria must be specific** — not "returns data" but "returns { id, name, status }".
+- **Cross-scope boundaries need contracts** — if backend serves frontend, define the shape.
+- **Include integration steps** — every new component/endpoint/service needs a step for where it gets rendered/called/used.
 - After completion: single-sentence summary unless user requests more.
 
 ## Workflow
@@ -94,7 +98,26 @@ For each scope, draft implementation steps:
 }
 ```
 
-### 5. Add Gates
+### 5. Define Cross-Scope Contracts
+
+When steps cross boundaries (API ↔ UI, service ↔ service), define explicit contracts:
+
+1. **Check `design_spec`** — what does the consumer (UI) need?
+2. **Specify data shapes** in acceptance criteria:
+
+```json
+// Bad: vague
+{ "id": "ac1", "description": "Returns list of plans" }
+
+// Good: explicit shape
+{ "id": "ac1", "description": "Returns [{ id, goal, status, latest_version, created_at }]" }
+```
+
+3. **Mark integration points** — add `"integration": true` to steps that cross scopes
+
+This prevents the classic "backend returns X, frontend expects Y" mismatch.
+
+### 6. Add Gates
 
 Add `human_approval` gates for:
 - Security-sensitive steps (auth, permissions, data access)
@@ -105,7 +128,7 @@ Add `human_approval` gates for:
 "gate": { "type": "human_approval", "approver_role": "tech-lead" }
 ```
 
-### 6. Approval
+### 7. Approval
 
 When implementation plan is complete:
 - Verify dependencies form valid DAG
@@ -135,5 +158,6 @@ When implementation plan is complete:
 - `plan_implementation` section is filled
 - Scopes match catalog component IDs
 - Each step has: title, scope, description, acceptance criteria
+- **Cross-scope steps have explicit data shapes** in acceptance criteria
 - Dependencies are inferred and shown
 - Gates are placed where accountability matters

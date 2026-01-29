@@ -21,7 +21,7 @@ Transform a vague idea into a processable, approved feature set by:
 
 ## Rules
 
-- 1–2 questions per message. Prefer option-based questions.
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
 - Propose 2–3 approaches with trade-offs before committing.
 - MVP by default; expand scope only when required by success criteria.
 - Persist decisions into files—no chat-only conclusions.
@@ -124,6 +124,7 @@ When feature list is stable:
 
 ## Suggested Next Steps
 
+- For UI features: `/flow design` (define UI/UX before implementation)
 - To plan implementation: `/flow planner`
 - To document behavior for testing: `/flow feature`
 

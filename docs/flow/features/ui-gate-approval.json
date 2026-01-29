@@ -2,7 +2,7 @@
   "feature_id": "ui-gate-approval",
   "title": "Gate Approval UI",
   "type": "feature",
-  "status": "approved",
+  "status": "completed",
   "priority": "medium",
   "dependencies": ["ui-execution-status"],
 

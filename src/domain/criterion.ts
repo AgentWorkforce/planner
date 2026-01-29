@@ -8,7 +8,7 @@ import { z } from 'zod';
  */
 export const AcceptanceCriterionSchema = z.object({
   id: z.string().min(1, 'Criterion id is required'),
-  description: z.string().min(1, 'Criterion description is required'),
+  description: z.string(), // Allow empty during editing; validate non-empty at approval
   type: z.string().optional(),
 });
 

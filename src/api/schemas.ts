@@ -8,9 +8,41 @@ import { PlanStatusSchema } from '../domain/status.js';
 export const CreatePlanRequestSchema = z.object({
   goal: z.string().min(1, 'Goal is required'),
   context: z.string().optional(),
+  /** Request AI assistance for plan creation */
+  ai_assist: z.boolean().optional().default(false),
 });
 
 export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;
+
+/**
+ * Request schema for creating a new comment.
+ */
+export const CreateCommentRequestSchema = z.object({
+  step_id: z.string().uuid(),
+  author: z.string().min(1),
+  content: z.string().min(1),
+  parent_id: z.string().uuid().optional(),
+});
+
+export type CreateCommentRequest = z.infer<typeof CreateCommentRequestSchema>;
+
+/**
+ * Request schema for updating a comment.
+ */
+export const UpdateCommentRequestSchema = z.object({
+  content: z.string().min(1),
+});
+
+export type UpdateCommentRequest = z.infer<typeof UpdateCommentRequestSchema>;
+
+/**
+ * Request schema for resolving a comment.
+ */
+export const ResolveCommentRequestSchema = z.object({
+  resolved_by: z.string().min(1),
+});
+
+export type ResolveCommentRequest = z.infer<typeof ResolveCommentRequestSchema>;
 
 /**
  * Request schema for updating a plan's draft version.

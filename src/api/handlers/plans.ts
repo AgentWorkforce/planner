@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { PlanStorage } from '../../storage/interface.js';
+import type { PlanStorage, Session } from '../../storage/interface.js';
 import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createVersionFrom } from '../../domain/diff.js';
 import { PlanStatus } from '../../domain/status.js';
@@ -10,6 +10,33 @@ import {
   ListPlansQuerySchema,
   CreateVersionRequestSchema,
 } from '../schemas.js';
+import { isRelayAvailable } from '../../relay/service.js';
+import { createSpawner, type SpawnResult } from '../../relay/spawner.js';
+import { createMockSpawner } from '../../relay/mock-spawner.js';
+import { randomUUID } from 'crypto';
+
+/** Default session expiration time (1 hour) */
+const SESSION_EXPIRATION_MS = 60 * 60 * 1000;
+
+/**
+ * Create a session record for an agent.
+ */
+function createAgentSession(planId: string, agentId: string, token: string): Session {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_EXPIRATION_MS);
+
+  return {
+    session_id: randomUUID(),
+    token,
+    plan_id: planId,
+    agent_id: agentId,
+    status: 'active',
+    started_at: now.toISOString(),
+    ended_at: null,
+    expires_at: expiresAt.toISOString(),
+    created_at: now.toISOString(),
+  };
+}
 
 interface IdParams {
   id: string;
@@ -19,16 +46,28 @@ interface VersionParams extends IdParams {
   version: string;
 }
 
+// Get MCP server URL for agent connection
+function getMcpServerUrl(): string {
+  const port = process.env.PORT || 3001;
+  const host = process.env.MCP_SERVER_HOST || `http://localhost:${port}`;
+  return `${host}/api/mcp`;
+}
+
 /**
  * Creates plan route handlers with injected storage dependency.
  */
 export function createPlanHandlers(storage: PlanStorage) {
+  // Create spawner instances
+  const realSpawner = createSpawner();
+  const mockSpawner = createMockSpawner();
+
   return {
     /**
      * POST /plans
      * Create a new plan with initial draft version.
+     * If ai_assist=true, spawns a planning agent.
      */
-    create: (req: Request, res: Response, next: NextFunction) => {
+    create: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = CreatePlanRequestSchema.parse(req.body);
 
@@ -40,9 +79,37 @@ export function createPlanHandlers(storage: PlanStorage) {
         const version = createPlanVersion(plan.plan_id, body.goal, body.context);
         storage.createVersion(version);
 
+        // Spawn planning agent if AI assistance requested
+        let agent: SpawnResult | null = null;
+        let session: Session | null = null;
+        if (body.ai_assist) {
+          const spawner = isRelayAvailable() ? realSpawner : mockSpawner;
+          try {
+            agent = await spawner.spawn({
+              planId: plan.plan_id,
+              goal: body.goal,
+              context: body.context,
+              mcpServerUrl: getMcpServerUrl(),
+            });
+            console.log(`[plans] Spawned agent ${agent.agentId} for plan ${plan.plan_id}`);
+
+            // Create session record for agent authentication
+            session = createAgentSession(plan.plan_id, agent.agentId, agent.sessionToken);
+            storage.createSession(session);
+            console.log(`[plans] Created session ${session.session_id} for agent ${agent.agentId}`);
+          } catch (err) {
+            // Log spawn error but don't fail plan creation
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[plans] Failed to spawn agent for plan ${plan.plan_id}: ${message}`);
+          }
+        }
+
         res.status(201).json({
           plan,
           version,
+          agent: agent && session
+            ? { agent_id: agent.agentId, session_id: session.session_id, token: session.token, is_mock: agent.isMock }
+            : undefined,
         });
       } catch (err) {
         next(err);
@@ -52,12 +119,32 @@ export function createPlanHandlers(storage: PlanStorage) {
     /**
      * GET /plans
      * List all plans, optionally filtered by status.
+     * Returns PlanSummary objects with goal, status, and latest_version.
      */
     list: (req: Request, res: Response, next: NextFunction) => {
       try {
         const query = ListPlansQuerySchema.parse(req.query);
         const plans = storage.listPlans(query.status);
-        res.json({ plans });
+
+        // Enrich plans with version data to create PlanSummary objects
+        const planSummaries = plans.map((plan) => {
+          const latestVersion = storage.getLatestVersion(plan.plan_id);
+          // Extract unique scopes from steps
+          const scopes = latestVersion?.steps
+            ? [...new Set(latestVersion.steps.map((s) => s.scope).filter(Boolean))]
+            : [];
+          return {
+            plan_id: plan.plan_id,
+            goal: latestVersion?.summary?.goal || '',
+            status: latestVersion?.status || PlanStatus.Draft,
+            latest_version: latestVersion?.version || 1,
+            scopes,
+            created_at: plan.created_at,
+            updated_at: plan.updated_at,
+          };
+        });
+
+        res.json({ plans: planSummaries });
       } catch (err) {
         next(err);
       }
