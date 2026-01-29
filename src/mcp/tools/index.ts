@@ -3,6 +3,7 @@ import type { PlanStorage } from '../../storage/interface.js';
 import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createStep, validateStepDag, type Step } from '../../domain/step.js';
 import { PlanStatus } from '../../domain/status.js';
+import { createImprovement, type ImprovementType } from '../../domain/improvement.js';
 import { success, error, toCallToolResult, type ToolResponse } from './types.js';
 
 /**
@@ -27,7 +28,7 @@ export const tools: Tool[] = [
   {
     name: 'read_plan',
     description:
-      'Read a plan with its current (latest) version. Returns the full plan with all steps, summary, and status.',
+      'Read a plan with its current (latest) version. Returns the full plan with all steps, summary, status, and version number for optimistic locking.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -61,7 +62,7 @@ export const tools: Tool[] = [
   {
     name: 'add_step',
     description:
-      'Add a step to the latest draft version of a plan. Returns the updated version with the new step.',
+      'Add a step to the latest draft version of a plan. Returns the updated version with the new step. Supports optimistic locking via expected_version.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -90,6 +91,10 @@ export const tools: Tool[] = [
           items: { type: 'string' },
           description: 'Array of step_ids this step depends on',
         },
+        expected_version: {
+          type: 'number',
+          description: 'Expected version number for optimistic locking. If provided and version has changed, returns VERSION_CONFLICT error.',
+        },
       },
       required: ['plan_id', 'title'],
     },
@@ -97,7 +102,7 @@ export const tools: Tool[] = [
   {
     name: 'edit_step',
     description:
-      'Modify an existing step in the draft version. Only specified fields are updated; others are preserved.',
+      'Modify an existing step in the draft version. Only specified fields are updated; others are preserved. Supports optimistic locking via expected_version.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -125,6 +130,10 @@ export const tools: Tool[] = [
           type: 'string',
           description: 'New owner role for the step',
         },
+        expected_version: {
+          type: 'number',
+          description: 'Expected version number for optimistic locking. If provided and version has changed, returns VERSION_CONFLICT error.',
+        },
       },
       required: ['plan_id', 'step_id'],
     },
@@ -132,7 +141,7 @@ export const tools: Tool[] = [
   {
     name: 'remove_step',
     description:
-      'Remove a step from the draft version. Also removes this step_id from other steps\' dependencies.',
+      'Remove a step from the draft version. Also removes this step_id from other steps\' dependencies. Supports optimistic locking via expected_version.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -144,6 +153,10 @@ export const tools: Tool[] = [
           type: 'string',
           description: 'The UUID of the step to remove',
         },
+        expected_version: {
+          type: 'number',
+          description: 'Expected version number for optimistic locking. If provided and version has changed, returns VERSION_CONFLICT error.',
+        },
       },
       required: ['plan_id', 'step_id'],
     },
@@ -151,7 +164,7 @@ export const tools: Tool[] = [
   {
     name: 'set_dependencies',
     description:
-      'Set the dependencies for a step. Validates that all dependency step_ids exist and no cycles are created.',
+      'Set the dependencies for a step. Validates that all dependency step_ids exist and no cycles are created. Supports optimistic locking via expected_version.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -168,6 +181,10 @@ export const tools: Tool[] = [
           items: { type: 'string' },
           description: 'Array of step_ids this step depends on',
         },
+        expected_version: {
+          type: 'number',
+          description: 'Expected version number for optimistic locking. If provided and version has changed, returns VERSION_CONFLICT error.',
+        },
       },
       required: ['plan_id', 'step_id', 'dependencies'],
     },
@@ -175,7 +192,7 @@ export const tools: Tool[] = [
   {
     name: 'add_criteria',
     description:
-      'Add an acceptance criterion to a step. Returns the updated step.',
+      'Add an acceptance criterion to a step. Returns the updated step. Supports optimistic locking via expected_version.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -195,6 +212,10 @@ export const tools: Tool[] = [
           type: 'string',
           description: 'Type of criterion (e.g., "test", "review", "metric")',
         },
+        expected_version: {
+          type: 'number',
+          description: 'Expected version number for optimistic locking. If provided and version has changed, returns VERSION_CONFLICT error.',
+        },
       },
       required: ['plan_id', 'step_id', 'description'],
     },
@@ -202,7 +223,7 @@ export const tools: Tool[] = [
   {
     name: 'add_gate',
     description:
-      'Add a human approval gate to a step. Gates require explicit sign-off before proceeding.',
+      'Add a human approval gate to a step. Gates require explicit sign-off before proceeding. Supports optimistic locking via expected_version.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -217,6 +238,10 @@ export const tools: Tool[] = [
         approver_role: {
           type: 'string',
           description: 'The role required to approve (e.g., "tech_lead")',
+        },
+        expected_version: {
+          type: 'number',
+          description: 'Expected version number for optimistic locking. If provided and version has changed, returns VERSION_CONFLICT error.',
         },
       },
       required: ['plan_id', 'step_id'],
@@ -235,6 +260,76 @@ export const tools: Tool[] = [
         },
       },
       required: ['plan_id'],
+    },
+  },
+  {
+    name: 'suggest_improvement',
+    description:
+      'Suggest an improvement to the plan. Creates a pending improvement that can be accepted or dismissed by the user. Use this when you notice issues or opportunities to enhance the plan quality.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The UUID of the plan',
+        },
+        version: {
+          type: 'number',
+          description: 'The version number this improvement applies to',
+        },
+        type: {
+          type: 'string',
+          enum: [
+            'missing_criteria',
+            'unclear_description',
+            'missing_dependency',
+            'redundant_step',
+            'scope_suggestion',
+          ],
+          description: 'Type of improvement being suggested',
+        },
+        description: {
+          type: 'string',
+          description: 'Human-readable explanation of the improvement',
+        },
+        step_id: {
+          type: 'string',
+          description: 'The step this improvement targets (if applicable)',
+        },
+        suggested_change: {
+          type: 'object',
+          description: 'Structured data describing the suggested change',
+        },
+      },
+      required: ['plan_id', 'version', 'type', 'description'],
+    },
+  },
+  {
+    name: 'create_draft_version',
+    description:
+      'Create a new draft version from an existing approved or published version. Used by revision agents to create drafts for change request revisions. The new draft inherits the steps and summary from the source version.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The UUID of the plan',
+        },
+        source_version: {
+          type: 'number',
+          description: 'The version number to create the draft from (must be approved or published)',
+        },
+        change_request_id: {
+          type: 'string',
+          description: 'The change request this draft is addressing (optional)',
+        },
+        revision_source: {
+          type: 'string',
+          enum: ['agent', 'human'],
+          description: 'Who is creating this revision (default: "agent")',
+        },
+      },
+      required: ['plan_id', 'source_version'],
     },
   },
 ];
@@ -277,12 +372,47 @@ function executeToolCall(
       return handleAddGate(storage, args);
     case 'submit_plan':
       return handleSubmitPlan(storage, args);
+    case 'suggest_improvement':
+      return handleSuggestImprovement(storage, args);
+    case 'create_draft_version':
+      return handleCreateDraftVersion(storage, args);
     default:
       return error(`Unknown tool: ${name}`);
   }
 }
 
 // Tool handlers
+
+/**
+ * Error response for version conflict (structured for optimistic locking).
+ */
+interface VersionConflictResponse {
+  success: false;
+  error: 'VERSION_CONFLICT';
+  message: string;
+  expected_version: number;
+  current_version: number;
+}
+
+/**
+ * Check for version conflict and return error response if detected.
+ * Returns null if no conflict (or no expected_version provided).
+ */
+function checkVersionConflict(
+  expectedVersion: number | undefined,
+  currentVersion: number
+): VersionConflictResponse | null {
+  if (expectedVersion !== undefined && expectedVersion !== currentVersion) {
+    return {
+      success: false,
+      error: 'VERSION_CONFLICT',
+      message: 'Version has changed since last read. Re-read the plan before editing.',
+      expected_version: expectedVersion,
+      current_version: currentVersion,
+    };
+  }
+  return null;
+}
 
 function handleListPlans(
   storage: PlanStorage,
@@ -349,6 +479,7 @@ function handleAddStep(
 ): ToolResponse {
   const planId = args.plan_id as string;
   const title = args.title as string;
+  const expectedVersion = args.expected_version as number | undefined;
 
   if (!planId) {
     return error('plan_id is required');
@@ -368,6 +499,12 @@ function handleAddStep(
   }
   if (latestVersion.status !== PlanStatus.Draft) {
     return error('Can only add steps to draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
   }
 
   // Create new step
@@ -398,6 +535,7 @@ function handleEditStep(
 ): ToolResponse {
   const planId = args.plan_id as string;
   const stepId = args.step_id as string;
+  const expectedVersion = args.expected_version as number | undefined;
 
   if (!planId) {
     return error('plan_id is required');
@@ -417,6 +555,12 @@ function handleEditStep(
   }
   if (latestVersion.status !== PlanStatus.Draft) {
     return error('Can only edit steps in draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
   }
 
   const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
@@ -457,6 +601,7 @@ function handleRemoveStep(
 ): ToolResponse {
   const planId = args.plan_id as string;
   const stepId = args.step_id as string;
+  const expectedVersion = args.expected_version as number | undefined;
 
   if (!planId) {
     return error('plan_id is required');
@@ -476,6 +621,12 @@ function handleRemoveStep(
   }
   if (latestVersion.status !== PlanStatus.Draft) {
     return error('Can only remove steps from draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
   }
 
   const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
@@ -511,6 +662,7 @@ function handleSetDependencies(
   const planId = args.plan_id as string;
   const stepId = args.step_id as string;
   const dependencies = args.dependencies as string[];
+  const expectedVersion = args.expected_version as number | undefined;
 
   if (!planId) {
     return error('plan_id is required');
@@ -533,6 +685,12 @@ function handleSetDependencies(
   }
   if (latestVersion.status !== PlanStatus.Draft) {
     return error('Can only set dependencies in draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
   }
 
   const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
@@ -585,6 +743,7 @@ function handleAddCriteria(
   const stepId = args.step_id as string;
   const description = args.description as string;
   const type = args.type as string | undefined;
+  const expectedVersion = args.expected_version as number | undefined;
 
   if (!planId) {
     return error('plan_id is required');
@@ -607,6 +766,12 @@ function handleAddCriteria(
   }
   if (latestVersion.status !== PlanStatus.Draft) {
     return error('Can only add criteria to draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
   }
 
   const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
@@ -649,6 +814,7 @@ function handleAddGate(
   const planId = args.plan_id as string;
   const stepId = args.step_id as string;
   const approverRole = args.approver_role as string | undefined;
+  const expectedVersion = args.expected_version as number | undefined;
 
   if (!planId) {
     return error('plan_id is required');
@@ -668,6 +834,12 @@ function handleAddGate(
   }
   if (latestVersion.status !== PlanStatus.Draft) {
     return error('Can only add gates to draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
   }
 
   const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
@@ -728,4 +900,146 @@ function handleSubmitPlan(
 
   const updatedVersion = storage.submitVersion(planId, latestVersion.version);
   return success({ version: updatedVersion });
+}
+
+const VALID_IMPROVEMENT_TYPES = [
+  'missing_criteria',
+  'unclear_description',
+  'missing_dependency',
+  'redundant_step',
+  'scope_suggestion',
+] as const;
+
+function handleSuggestImprovement(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const version = args.version as number;
+  const type = args.type as string;
+  const description = args.description as string;
+  const stepId = args.step_id as string | undefined;
+  const suggestedChange = args.suggested_change as Record<string, unknown> | undefined;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (version === undefined || version === null) {
+    return error('version is required');
+  }
+  if (!type) {
+    return error('type is required');
+  }
+  if (!description) {
+    return error('description is required');
+  }
+
+  // Validate type
+  if (!VALID_IMPROVEMENT_TYPES.includes(type as typeof VALID_IMPROVEMENT_TYPES[number])) {
+    return error(`Invalid improvement type: ${type}. Must be one of: ${VALID_IMPROVEMENT_TYPES.join(', ')}`);
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const planVersion = storage.getVersion(planId, version);
+  if (!planVersion) {
+    return error(`Version ${version} not found for plan ${planId}`);
+  }
+
+  // If step_id is provided, validate it exists
+  if (stepId) {
+    const stepExists = planVersion.steps.some((s) => s.step_id === stepId);
+    if (!stepExists) {
+      return error(`Step not found: ${stepId}`);
+    }
+  }
+
+  // Create the improvement
+  const improvement = createImprovement({
+    plan_id: planId,
+    version,
+    step_id: stepId,
+    type: type as ImprovementType,
+    description,
+    suggested_change: suggestedChange,
+  });
+
+  storage.createImprovement(improvement);
+  return success({ improvement });
+}
+
+function handleCreateDraftVersion(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const sourceVersion = args.source_version as number;
+  const changeRequestId = args.change_request_id as string | undefined;
+  const revisionSource = (args.revision_source as string) || 'agent';
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (sourceVersion === undefined || sourceVersion === null) {
+    return error('source_version is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const source = storage.getVersion(planId, sourceVersion);
+  if (!source) {
+    return error(`Version ${sourceVersion} not found for plan ${planId}`);
+  }
+
+  // Only allow creating draft from approved or published versions
+  if (source.status !== PlanStatus.Approved && source.status !== PlanStatus.Published) {
+    return error(`Can only create draft from approved or published versions. Current status: ${source.status}`);
+  }
+
+  // Get the latest version to determine the new version number
+  const latestVersion = storage.getLatestVersion(planId);
+  const newVersionNumber = latestVersion ? latestVersion.version + 1 : 1;
+
+  // Validate change request if provided
+  if (changeRequestId) {
+    const changeRequest = storage.getChangeRequest(changeRequestId);
+    if (!changeRequest) {
+      return error(`Change request not found: ${changeRequestId}`);
+    }
+    if (changeRequest.plan_id !== planId) {
+      return error(`Change request ${changeRequestId} does not belong to plan ${planId}`);
+    }
+  }
+
+  const now = new Date().toISOString();
+  const newVersion = {
+    plan_id: planId,
+    version: newVersionNumber,
+    status: PlanStatus.Draft,
+    summary: { ...source.summary },
+    steps: source.steps.map((step) => ({ ...step })),
+    change_request_id: changeRequestId,
+    metadata: {
+      revision_source: revisionSource,
+      source_version: sourceVersion,
+    },
+    created_at: now,
+    updated_at: now,
+  };
+
+  storage.createVersion(newVersion);
+
+  // Update change request to link the revision and set status
+  if (changeRequestId) {
+    // Update revision status to 'drafted'
+    storage.updateChangeRequestRevisionStatus(changeRequestId, null, 'drafted');
+  }
+
+  return success({ version: newVersion });
 }

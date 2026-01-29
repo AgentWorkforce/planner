@@ -7,15 +7,21 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
-    "test:run": "vitest run",
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "test": "vitest run --config vitest.config.ts && npm test --prefix packages/planner-ui -- --run",
+    "test:watch": "vitest --config vitest.config.ts",
+    "test:backend": "vitest run --config vitest.config.ts",
+    "test:ui": "npm test --prefix packages/planner-ui -- --run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@agent-relay/sdk": "^2.0.37",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "yaml": "^2.8.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -25,6 +31,7 @@
     "@types/node": "^20.11.0",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vitest": "^2.1.0"
   },

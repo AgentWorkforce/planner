@@ -9,6 +9,7 @@ import {
   generatePlanRef,
 } from '../../domain/workflow.js';
 import { notFound, badRequest } from '../middleware.js';
+import { terminateAgent } from '../../relay/spawner.js';
 
 interface VersionParams {
   id: string;
@@ -69,7 +70,7 @@ export function createWorkflowHandlers(storage: PlanStorage) {
      * POST /plans/:id/versions/:version/approve
      * Approve and lock a version.
      */
-    approve: (req: Request<VersionParams>, res: Response, next: NextFunction) => {
+    approve: async (req: Request<VersionParams>, res: Response, next: NextFunction) => {
       try {
         const { id, version: versionStr } = req.params;
         const versionNum = parseInt(versionStr, 10);
@@ -102,6 +103,24 @@ export function createWorkflowHandlers(storage: PlanStorage) {
         const updated = storage.approveVersion(id, versionNum, approvalInfo);
         if (!updated) {
           throw badRequest('Failed to approve version');
+        }
+
+        // Terminate any active planning session for this plan
+        const session = storage.getSessionByPlanId(id);
+        if (session) {
+          // Mark session as completed
+          storage.updateSessionStatus(session.session_id, 'completed');
+          console.log(`[workflow] Session ${session.session_id} completed on plan approval`);
+
+          // Terminate the agent process
+          try {
+            await terminateAgent(session.agent_id);
+            console.log(`[workflow] Terminated agent ${session.agent_id} on plan approval`);
+          } catch (err) {
+            // Log but don't fail approval if agent termination fails
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[workflow] Failed to terminate agent ${session.agent_id}: ${message}`);
+          }
         }
 
         res.json({ version: updated });

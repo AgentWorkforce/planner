@@ -38,6 +38,13 @@ export function badRequest(message: string, details?: unknown): HttpError {
 }
 
 /**
+ * Unprocessable entity error helper (422).
+ */
+export function unprocessableEntity(message: string, details?: unknown): HttpError {
+  return new HttpError(422, message, details);
+}
+
+/**
  * Error handling middleware.
  * Converts errors to consistent JSON responses.
  */

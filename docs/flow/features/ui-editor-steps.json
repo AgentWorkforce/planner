@@ -6,6 +6,23 @@
   "priority": "high",
   "dependencies": ["ui-editor-inline"],
 
+  "audit": {
+    "last_run": "2026-01-29",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "partial", "note": "Title ✓ (StepEditor.tsx:149-157), Scope ✓ (line 159), Dependencies count NOT shown in collapsed view - original implementation gap" },
+      { "id": "ac2", "status": "satisfied", "evidence": "PlanEditorPage.tsx:180,223-225 - expand button toggles expandedStepId state" },
+      { "id": "ac3", "status": "satisfied", "evidence": "StepEditor.tsx:298-349 - list with add/edit/remove" },
+      { "id": "ac4", "status": "satisfied", "evidence": "StepEditor.tsx:352-387 - checkbox toggle + approver_role field" },
+      { "id": "ac5", "status": "satisfied", "evidence": "StepEditor.tsx:6-72 - OwnerRoleSelector with dropdown + custom" },
+      { "id": "ac6", "status": "satisfied", "evidence": "StepEditor.tsx:242-294 - dependency chips with add/remove" },
+      { "id": "ac7", "status": "satisfied", "evidence": "StepEditor.tsx:112-128,175-205 - delete with confirmation" },
+      { "id": "ac8", "status": "deferred", "note": "Drag-drop requires library, deferred to separate feature" }
+    ],
+    "drift": [],
+    "remediation_applied": "2026-01-29"
+  },
+
   "summary": {
     "goal": "Provide comprehensive editing for step details including acceptance criteria and gates",
     "context": "Steps are the core content of plans. Users need to edit title, description, criteria, owner roles, and gates. Complex edits expand in place rather than opening modals.",
@@ -18,6 +35,103 @@
       { "id": "ac6", "description": "Dependency display shows what this step depends on" },
       { "id": "ac7", "description": "Delete step with confirmation" },
       { "id": "ac8", "description": "Drag-drop to reorder steps within scope" }
+    ]
+  },
+
+  "plan_remediation": {
+    "reason": "Audit found StepEditor component exists but not integrated; missing features",
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "fix001",
+        "title": "Add steps support to frontend API",
+        "scope": "planner-ui",
+        "description": "Update updatePlan() in api/plans.ts to accept steps parameter. Backend already supports PUT /plans/:id with steps array.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "updatePlan(planId, { steps: Step[] }) sends steps to backend" },
+          { "id": "ac2", "description": "Type signature: updatePlan(planId: string, data: { goal?: string; context?: string; steps?: Step[] })" }
+        ]
+      },
+      {
+        "step_id": "fix002",
+        "title": "Integrate StepEditor into PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Replace read-only <li> step rendering with StepEditor component. Wire up onUpdate and onDelete handlers to call updatePlan API.",
+        "dependencies": ["fix001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanEditorPage imports and renders StepEditor for each step" },
+          { "id": "ac2", "description": "StepEditor receives onUpdate callback that calls updatePlan with modified steps array" },
+          { "id": "ac3", "description": "StepEditor receives onDelete callback that calls updatePlan with step removed" },
+          { "id": "ac4", "description": "Expand/collapse works - clicking expand button shows all fields" },
+          { "id": "ac5", "description": "Editing title/description/scope/owner_role persists to backend" }
+        ]
+      },
+      {
+        "step_id": "fix003",
+        "title": "Add acceptance criteria editor",
+        "scope": "planner-ui",
+        "description": "Enhance StepEditor to support add/edit/remove acceptance criteria. Currently only displays read-only list.",
+        "dependencies": ["fix002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Add button appends new criterion with generated UUID" },
+          { "id": "ac2", "description": "Click criterion description to edit inline" },
+          { "id": "ac3", "description": "X button removes criterion from list" },
+          { "id": "ac4", "description": "Changes persist via onUpdate callback" }
+        ]
+      },
+      {
+        "step_id": "fix004",
+        "title": "Add gate toggle",
+        "scope": "planner-ui",
+        "description": "Add toggle to enable/disable human_approval gate. When enabled, show approver_role field.",
+        "dependencies": ["fix002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Checkbox/toggle to enable gate" },
+          { "id": "ac2", "description": "When enabled, gate: { type: 'human_approval' }" },
+          { "id": "ac3", "description": "Optional approver_role text field shown when gate enabled" },
+          { "id": "ac4", "description": "Disabling gate sets step.gate = undefined" }
+        ]
+      },
+      {
+        "step_id": "fix005",
+        "title": "Add owner role dropdown",
+        "scope": "planner-ui",
+        "description": "Replace EditableText for owner_role with dropdown showing common roles plus custom input option.",
+        "dependencies": ["fix002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Dropdown with options: backend:Coder, frontend:Coder, fullstack:Coder, devops:Engineer, qa:Tester" },
+          { "id": "ac2", "description": "Custom option allows typing arbitrary role" },
+          { "id": "ac3", "description": "Selected role persists to step" }
+        ]
+      },
+      {
+        "step_id": "fix006",
+        "title": "Verify integration works end-to-end",
+        "scope": "planner-ui",
+        "description": "Manual verification that editing steps in UI persists to backend and survives page reload.",
+        "dependencies": ["fix003", "fix004", "fix005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Edit step title → reload → change persisted" },
+          { "id": "ac2", "description": "Add acceptance criterion → reload → criterion persisted" },
+          { "id": "ac3", "description": "Toggle gate on → reload → gate persisted" },
+          { "id": "ac4", "description": "Delete step → reload → step gone" }
+        ]
+      }
+    ],
+    "deferred": [
+      {
+        "step_id": "defer001",
+        "title": "Drag-drop reordering",
+        "reason": "Lower priority - requires drag-drop library and more complex state management. Can be added later.",
+        "original_step": "ues008"
+      }
     ]
   },
 
