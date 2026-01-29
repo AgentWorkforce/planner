@@ -38,7 +38,7 @@ For documenting behavior of existing code without a feature file, use `/flow dis
 
 ## Rules
 
-- 1–2 questions per message. Prefer option-based questions.
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
 - Each step must be atomic: one action or one assertion
 - Assertions must be observable (UI state, URL, API response, persisted record)
 - No vague language ("works", "handles correctly")

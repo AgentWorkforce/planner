@@ -62,6 +62,204 @@ export interface PlanSummary {
   goal: string;
   status: PlanStatus;
   latest_version: number;
+  scopes?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Navigation state for sub-plan breadcrumbs
+export interface ParentPlanInfo {
+  plan_id: string;
+  goal: string;
+}
+
+export interface SubPlanNavigationState {
+  parents: ParentPlanInfo[];
+}
+
+// Execution status (from orchestrator)
+export type StepExecutionStatus = 'pending' | 'running' | 'done' | 'blocked' | 'failed';
+
+export interface StepExecutionInfo {
+  step_id: string;
+  status: StepExecutionStatus;
+  started_at?: string;
+  completed_at?: string;
+  error?: string;
+}
+
+export interface ExecutionStatus {
+  plan_id: string;
+  version: number;
+  run_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  steps: StepExecutionInfo[];
+  progress: {
+    total: number;
+    done: number;
+    running: number;
+    pending: number;
+    blocked: number;
+    failed: number;
+  };
+  started_at?: string;
+  completed_at?: string;
+}
+
+// Type guards for execution status
+export function isStepDone(status: StepExecutionStatus): boolean {
+  return status === 'done';
+}
+
+export function isStepRunning(status: StepExecutionStatus): boolean {
+  return status === 'running';
+}
+
+export function isStepBlocked(status: StepExecutionStatus): boolean {
+  return status === 'blocked';
+}
+
+export function isStepFailed(status: StepExecutionStatus): boolean {
+  return status === 'failed';
+}
+
+export function isStepPending(status: StepExecutionStatus): boolean {
+  return status === 'pending';
+}
+
+// Review comments
+export interface Comment {
+  comment_id: string;
+  plan_id: string;
+  version: number;
+  step_id: string;
+  parent_id: string | null;
+  author: string;
+  content: string;
+  resolved: boolean;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// AI Chat types
+export type ChatMessageRole = 'user' | 'assistant';
+
+export interface ChatMessage {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  timestamp: string;
+  suggestion?: ChatSuggestion;
+}
+
+export interface ChatSuggestion {
+  id: string;
+  type: 'add_step' | 'edit_step' | 'add_criteria' | 'edit_goal' | 'edit_context';
+  description: string;
+  preview: string;
+  data: Record<string, unknown>;
+  status: 'pending' | 'applied' | 'dismissed';
+}
+
+// AI Improvement types
+export type ImprovementType = 'criteria' | 'dependencies' | 'description' | 'scope';
+
+export type ImprovementStatus = 'applied' | 'undone';
+
+export interface Improvement {
+  id: string;
+  type: ImprovementType;
+  step_id: string;
+  description: string;
+  before: unknown;
+  after: unknown;
+  status: ImprovementStatus;
+  timestamp: string;
+}
+
+// Flagged concern (issues needing human decision)
+export type ConcernSeverity = 'info' | 'warning' | 'error';
+
+export interface FlaggedConcern {
+  id: string;
+  step_id: string;
+  severity: ConcernSeverity;
+  title: string;
+  description: string;
+  suggestions?: string[];
+  dismissed: boolean;
+  timestamp: string;
+}
+
+// Activity log entry
+export type ActivityType = 'user_edit' | 'ai_improvement' | 'ai_concern' | 'undo';
+
+export interface ActivityEntry {
+  id: string;
+  type: ActivityType;
+  description: string;
+  step_id?: string;
+  improvement_id?: string;
+  timestamp: string;
+}
+
+// Gate approval types
+export type GateApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface GateApprovalInfo {
+  step_id: string;
+  step_title: string;
+  gate_type: 'human_approval';
+  approver_role?: string;
+  status: GateApprovalStatus;
+  approved_by?: string;
+  approved_at?: string;
+  rejection_reason?: string;
+}
+
+export interface PendingGate {
+  step_id: string;
+  step_title: string;
+  step_description?: string;
+  gate: Gate;
+  blocked_since: string;
+}
+
+// Change Request types (from orchestrator)
+export type ChangeRequestStatus = 'pending' | 'applied' | 'rejected';
+
+export interface StepModification {
+  step_id: string;
+  title?: string;
+  description?: string;
+  scope?: string;
+  owner_role?: string;
+  dependencies?: string[];
+}
+
+export interface SuggestedChanges {
+  add_steps?: Step[];
+  modify_steps?: StepModification[];
+  remove_steps?: string[];
+}
+
+/** Revision agent status for change requests */
+export type RevisionStatus = 'none' | 'pending' | 'in_progress' | 'drafted' | 'error';
+
+export interface ChangeRequest {
+  change_request_id: string;
+  run_id: string;
+  plan_id: string;
+  reason: string;
+  suggested_changes: SuggestedChanges;
+  status: ChangeRequestStatus;
+  result_version?: number;
+  /** Revision agent session ID (if agent was spawned) */
+  revision_session_id?: string;
+  /** Status of AI-assisted revision */
+  revision_status?: RevisionStatus;
   created_at: string;
   updated_at: string;
 }

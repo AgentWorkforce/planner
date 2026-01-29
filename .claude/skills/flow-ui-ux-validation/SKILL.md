@@ -112,12 +112,14 @@ If a step's UI is missing:
 | Check | What it means |
 |-------|---------------|
 | **present** | Element exists, visible, reachable |
-| **designed** | Clear labels, good hierarchy, proper feedback, accessible |
-| **holistic** | Consistent with design system across the app |
+| **designed** | Matches `design_spec` (elements, layout, states) |
+| **holistic** | Consistent with `catalog.design_system` patterns |
+
+If no `design_spec` exists, "designed" checks use best judgment—note this in issues.
 
 ## Rules
 
-- 1–2 questions per message. Prefer option-based questions.
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
 - No opinions without evidence tied to a specific step
 - If you cannot verify, use `unknown` and state what's missing
 - After completion: single-sentence summary unless user requests more

@@ -50,3 +50,11 @@ export async function del<T>(path: string): Promise<T> {
   });
   return handleResponse<T>(response);
 }
+
+// Bundled client for object-style imports
+export const apiClient = {
+  get,
+  post,
+  put,
+  delete: del,
+};

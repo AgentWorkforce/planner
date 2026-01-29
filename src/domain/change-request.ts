@@ -8,6 +8,12 @@ export const ChangeRequestStatusSchema = z.enum(['pending', 'applied', 'rejected
 export type ChangeRequestStatus = z.infer<typeof ChangeRequestStatusSchema>;
 
 /**
+ * Status of the revision agent for a change request.
+ */
+export const RevisionStatusSchema = z.enum(['none', 'pending', 'in_progress', 'drafted', 'error']);
+export type RevisionStatus = z.infer<typeof RevisionStatusSchema>;
+
+/**
  * Step modification within a change request.
  * Contains the step_id and partial step data to update.
  */
@@ -46,6 +52,8 @@ export const ChangeRequestSchema = z.object({
   suggested_changes: SuggestedChangesSchema,
   status: ChangeRequestStatusSchema,
   result_version: z.number().int().positive().optional(),
+  revision_session_id: z.string().uuid().optional(),
+  revision_status: RevisionStatusSchema.optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });

@@ -1,0 +1,134 @@
+{
+  "feature_id": "relay-mcp-bridge",
+  "title": "MCP Bridge for Planning Agents",
+  "type": "feature",
+  "status": "completed",
+  "priority": "critical",
+  "dependencies": ["relay-planning-agent", "mcp-tools"],
+
+  "summary": {
+    "goal": "Enable planning agents to connect to Planner's MCP server and use planning tools to modify plans",
+    "context": "The MCP server already exists (src/mcp/server.ts) with stdio transport. For relay agents, we need a transport that allows remote connection. Agents spawned via relay-pty need to connect back and call tools like read_plan, add_step, edit_step, etc.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "MCP server supports HTTP transport (POST /mcp/tools/list, POST /mcp/tools/call)" },
+      { "id": "ac2", "description": "Planning agent can list available tools" },
+      { "id": "ac3", "description": "Planning agent can call any MCP tool" },
+      { "id": "ac4", "description": "Tool calls result in SQLite database changes" },
+      { "id": "ac5", "description": "Authentication via session token for MCP connections" },
+      { "id": "ac6", "description": "Optimistic locking prevents edit conflicts" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "rmb001",
+        "title": "Add HTTP transport to MCP server",
+        "description": "Extend src/mcp/server.ts to support HTTP transport in addition to stdio. Add POST /mcp/tools/list and POST /mcp/tools/call endpoints.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /mcp/tools/list returns { tools: [{ name, description, inputSchema }] }" },
+          { "id": "ac2", "description": "POST /mcp/tools/call accepts { name: string, arguments: object } and returns { result: any, error?: string }" },
+          { "id": "ac3", "description": "Same tool handlers used for both stdio and HTTP transports" }
+        ]
+      },
+      {
+        "step_id": "rmb002",
+        "title": "Add session context to tool calls",
+        "description": "Modify tool call handler to accept session context (plan_id, agent_id) from authenticated session. Ensure agent can only modify the plan it's assigned to.",
+        "scope": "planner-core",
+        "dependencies": ["rmb001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool calls include session context from auth token: { plan_id, agent_id, session_id }" },
+          { "id": "ac2", "description": "Agent scoped to its assigned plan - cannot modify other plans" },
+          { "id": "ac3", "description": "read_plan without plan_id uses session's plan_id" }
+        ]
+      },
+      {
+        "step_id": "rmb003",
+        "title": "Add authentication for MCP connections",
+        "description": "Generate session token when agent spawned (from relay-planning-agent). Agent must include token in MCP requests via Authorization header. Validate token on each request.",
+        "scope": "planner-core",
+        "dependencies": ["rmb001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Session token generated on spawn, stored in sessions table" },
+          { "id": "ac2", "description": "Requests without valid Authorization: Bearer <token> rejected with 401" },
+          { "id": "ac3", "description": "Token passed to agent via MCP_SESSION_TOKEN environment variable" },
+          { "id": "ac4", "description": "Token lookup returns { plan_id, agent_id, session_id, expires_at }" }
+        ]
+      },
+      {
+        "step_id": "rmb004",
+        "title": "Add optimistic locking for concurrent edits",
+        "description": "Add version check to edit operations. If human edited since agent last read, agent must re-read before editing. Prevents overwrite conflicts.",
+        "scope": "planner-core",
+        "dependencies": ["rmb002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Edit tools (edit_step, add_step, remove_step) accept optional expected_version parameter" },
+          { "id": "ac2", "description": "Conflict returns { error: 'VERSION_CONFLICT', current_version: number, expected_version: number }" },
+          { "id": "ac3", "description": "Agent re-reads plan state on conflict before retrying" },
+          { "id": "ac4", "description": "read_plan returns version number in response" }
+        ]
+      },
+      {
+        "step_id": "rmb005",
+        "title": "Add tests for MCP bridge",
+        "description": "Write integration tests: spawn mock agent, call MCP tools via HTTP, verify database changes, verify auth and locking.",
+        "scope": "planner-core",
+        "dependencies": ["rmb001", "rmb002", "rmb003", "rmb004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests verify tool calls work via HTTP transport" },
+          { "id": "ac2", "description": "Tests verify auth enforcement (401 without token)" },
+          { "id": "ac3", "description": "Tests verify session scoping (cannot modify other plans)" },
+          { "id": "ac4", "description": "Tests verify optimistic locking (conflict detection)" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "critical",
+    "cases": [
+      { "type": "happy", "description": "POST /mcp/tools/list returns array of tools with name, description, inputSchema" },
+      { "type": "happy", "description": "POST /mcp/tools/call with valid tool name and arguments returns { result }" },
+      { "type": "happy", "description": "add_step via HTTP transport creates step in database" },
+      { "type": "happy", "description": "edit_step via HTTP transport updates step in database" },
+      { "type": "happy", "description": "remove_step via HTTP transport deletes step from database" },
+      { "type": "happy", "description": "read_plan via HTTP transport returns plan state" },
+      { "type": "happy", "description": "Session token generated on agent spawn and stored in sessions table" },
+      { "type": "happy", "description": "Valid Authorization: Bearer <token> header allows request" },
+      { "type": "happy", "description": "Token lookup returns { plan_id, agent_id, session_id, expires_at }" },
+      { "type": "happy", "description": "Tool calls receive session context from authenticated token" },
+      { "type": "happy", "description": "read_plan without plan_id arg uses session's plan_id" },
+      { "type": "happy", "description": "edit_step with correct expected_version succeeds" },
+      { "type": "happy", "description": "read_plan returns version number in response" },
+      { "type": "edge", "description": "Same tool handlers work for both stdio and HTTP transports" },
+      { "type": "edge", "description": "Tool call for session's assigned plan succeeds" },
+      { "type": "edge", "description": "edit_step without expected_version still works (backward compatible)" },
+      { "type": "edge", "description": "Expired token rejected with 401" },
+      { "type": "error", "description": "POST /mcp/tools/call without Authorization header returns 401" },
+      { "type": "error", "description": "POST /mcp/tools/call with invalid token returns 401" },
+      { "type": "error", "description": "POST /mcp/tools/call with unknown tool name returns { error: 'TOOL_NOT_FOUND' }" },
+      { "type": "error", "description": "POST /mcp/tools/call with invalid arguments returns { error: 'INVALID_ARGUMENTS' }" },
+      { "type": "error", "description": "Agent cannot modify plan other than session's plan_id (returns 403)" },
+      { "type": "error", "description": "edit_step with stale expected_version returns VERSION_CONFLICT error" },
+      { "type": "error", "description": "VERSION_CONFLICT response includes current_version and expected_version" },
+      { "type": "error", "description": "add_step on non-existent plan returns 404" }
+    ],
+    "data_requirements": [
+      "Test plans in database for tool operations",
+      "Valid session tokens for authenticated requests",
+      "Multiple test agents for scoping tests",
+      "Pre-created steps for edit/delete operations",
+      "Plans at different versions for optimistic locking tests"
+    ]
+  }
+}

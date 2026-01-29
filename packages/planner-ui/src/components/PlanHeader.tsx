@@ -8,6 +8,8 @@ interface PlanHeaderProps {
   onUpdateGoal: (goal: string) => Promise<void>;
   onUpdateContext: (context: string) => Promise<void>;
   disabled?: boolean;
+  unresolvedCommentCount?: number;
+  onFilterByComments?: () => void;
 }
 
 export function PlanHeader({
@@ -15,6 +17,8 @@ export function PlanHeader({
   onUpdateGoal,
   onUpdateContext,
   disabled = false,
+  unresolvedCommentCount = 0,
+  onFilterByComments,
 }: PlanHeaderProps) {
   const [saving, setSaving] = useState(false);
 
@@ -73,6 +77,16 @@ export function PlanHeader({
           <span className="plan-version-badge">v{version.version}</span>
           {version.submitted_at && <span className="badge badge-submitted">Submitted</span>}
           {saving && <span className="badge badge-saving">Saving...</span>}
+          {unresolvedCommentCount > 0 && (
+            <button
+              type="button"
+              className="badge badge-comments"
+              onClick={onFilterByComments}
+              title="Click to filter steps with comments"
+            >
+              💬 {unresolvedCommentCount} unresolved
+            </button>
+          )}
         </div>
       </div>
 

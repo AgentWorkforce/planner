@@ -11,3 +11,38 @@ export {
   approveVersion,
   publishVersion,
 } from './plans';
+export { getExecutionStatus, createMockExecutionStatus } from './execution';
+export {
+  sendChatMessage,
+  streamChatMessage,
+  applySuggestion,
+  createMockChatResponse,
+} from './chat';
+export {
+  getPendingGates,
+  approveGate,
+  rejectGate,
+  getGateHistory,
+  createMockPendingGates,
+} from './gates';
+export {
+  getChangeRequests,
+  acceptChangeRequest,
+  rejectChangeRequest,
+  createMockChangeRequests,
+} from './changeRequests';
+export {
+  getImprovements,
+  applyImprovement,
+  dismissImprovement,
+} from './improvements';
+export type { ApiImprovement, ImprovementsResponse } from './improvements';
+export {
+  getComments,
+  getStepComments,
+  createComment,
+  resolveComment,
+  unresolveComment,
+  deleteComment,
+} from './comments';
+export type { CommentsResponse, CommentResponse } from './comments';

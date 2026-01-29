@@ -306,4 +306,119 @@ describe('Change Request API Integration Tests', () => {
       expect(versionResponse.body.version.change_request_id).toBe(changeRequestId);
     });
   });
+
+  describe('POST /change-requests/:id/accept-revision', () => {
+    it('should accept a drafted revision', async () => {
+      const { planId } = await createAndPublishPlan('Goal');
+
+      // Create a change request that will be in 'applied' status with revision_status 'none'
+      const createResponse = await request(app)
+        .post('/api/runs/run-accept/change-requests')
+        .send({
+          plan_id: planId,
+          reason: 'Test accept',
+          suggested_changes: { add_steps: [createStep('New step')] },
+        })
+        .expect(201);
+
+      const changeRequestId = createResponse.body.change_request.change_request_id;
+
+      // Manually set revision_status to 'drafted' to simulate agent completion
+      storage.updateChangeRequestRevisionStatus(changeRequestId, null, 'drafted');
+
+      const response = await request(app)
+        .post(`/api/change-requests/${changeRequestId}/accept-revision`)
+        .expect(200);
+
+      expect(response.body.change_request.status).toBe('applied');
+      expect(response.body.change_request.revision_status).toBe('none');
+      expect(response.body.message).toContain('Revision accepted');
+    });
+
+    it('should return 400 if revision_status is not drafted', async () => {
+      const { planId } = await createAndPublishPlan('Goal');
+
+      const createResponse = await request(app)
+        .post('/api/runs/run-invalid/change-requests')
+        .send({
+          plan_id: planId,
+          reason: 'Test',
+          suggested_changes: {},
+        })
+        .expect(201);
+
+      const changeRequestId = createResponse.body.change_request.change_request_id;
+      // Change request is in 'applied' status with revision_status 'none'
+
+      const response = await request(app)
+        .post(`/api/change-requests/${changeRequestId}/accept-revision`)
+        .expect(400);
+
+      expect(response.body.error).toContain("expected 'drafted'");
+    });
+
+    it('should return 404 for non-existent change request', async () => {
+      const response = await request(app)
+        .post('/api/change-requests/00000000-0000-0000-0000-000000000000/accept-revision')
+        .expect(404);
+
+      expect(response.body.error).toBe('Change request not found');
+    });
+  });
+
+  describe('POST /change-requests/:id/reject-revision', () => {
+    it('should reject a drafted revision', async () => {
+      const { planId } = await createAndPublishPlan('Goal');
+
+      const createResponse = await request(app)
+        .post('/api/runs/run-reject/change-requests')
+        .send({
+          plan_id: planId,
+          reason: 'Test reject',
+          suggested_changes: { add_steps: [createStep('New step')] },
+        })
+        .expect(201);
+
+      const changeRequestId = createResponse.body.change_request.change_request_id;
+
+      // Manually set revision_status to 'drafted' to simulate agent completion
+      storage.updateChangeRequestRevisionStatus(changeRequestId, null, 'drafted');
+
+      const response = await request(app)
+        .post(`/api/change-requests/${changeRequestId}/reject-revision`)
+        .expect(200);
+
+      expect(response.body.change_request.revision_status).toBe('none');
+      expect(response.body.message).toContain('Revision rejected');
+    });
+
+    it('should return 400 if revision_status is not drafted', async () => {
+      const { planId } = await createAndPublishPlan('Goal');
+
+      const createResponse = await request(app)
+        .post('/api/runs/run-invalid2/change-requests')
+        .send({
+          plan_id: planId,
+          reason: 'Test',
+          suggested_changes: {},
+        })
+        .expect(201);
+
+      const changeRequestId = createResponse.body.change_request.change_request_id;
+
+      const response = await request(app)
+        .post(`/api/change-requests/${changeRequestId}/reject-revision`)
+        .expect(400);
+
+      expect(response.body.error).toContain("expected 'drafted'");
+    });
+
+    it('should return 404 for non-existent change request', async () => {
+      const response = await request(app)
+        .post('/api/change-requests/00000000-0000-0000-0000-000000000000/reject-revision')
+        .expect(404);
+
+      expect(response.body.error).toBe('Change request not found');
+    });
+  });
 });

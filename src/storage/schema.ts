@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS change_requests (
   suggested_changes_json TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'applied', 'rejected')),
   result_version INTEGER,
+  revision_session_id TEXT,
+  revision_status TEXT CHECK (revision_status IN ('none', 'pending', 'in_progress', 'drafted', 'error')),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE CASCADE
@@ -113,6 +115,124 @@ CREATE INDEX IF NOT EXISTS idx_change_requests_run_id ON change_requests(run_id)
 `;
 
 /**
+ * SQL to create the comments table.
+ * Stores review comments on plan steps with threading support.
+ */
+export const CREATE_COMMENTS_TABLE = `
+CREATE TABLE IF NOT EXISTS comments (
+  comment_id TEXT PRIMARY KEY NOT NULL,
+  plan_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  step_id TEXT NOT NULL,
+  parent_id TEXT,
+  author TEXT NOT NULL,
+  content TEXT NOT NULL,
+  resolved INTEGER NOT NULL DEFAULT 0,
+  resolved_by TEXT,
+  resolved_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (plan_id, version) REFERENCES versions(plan_id, version) ON DELETE CASCADE,
+  FOREIGN KEY (parent_id) REFERENCES comments(comment_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by plan_id and version on comments table.
+ */
+export const CREATE_COMMENTS_VERSION_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_comments_version ON comments(plan_id, version)
+`;
+
+/**
+ * Index for faster lookups by step_id on comments table.
+ */
+export const CREATE_COMMENTS_STEP_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_comments_step ON comments(plan_id, version, step_id)
+`;
+
+/**
+ * Index for faster lookups of unresolved comments.
+ */
+export const CREATE_COMMENTS_RESOLVED_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_comments_resolved ON comments(plan_id, version, resolved)
+`;
+
+/**
+ * SQL to create the sessions table.
+ * Tracks agent sessions for MCP authentication and lifecycle management.
+ */
+export const CREATE_SESSIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id TEXT PRIMARY KEY NOT NULL,
+  token TEXT UNIQUE NOT NULL,
+  plan_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'timeout', 'terminated', 'error')),
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by token on sessions table.
+ */
+export const CREATE_SESSIONS_TOKEN_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)
+`;
+
+/**
+ * Index for faster lookups by plan_id on sessions table.
+ */
+export const CREATE_SESSIONS_PLAN_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_sessions_plan_id ON sessions(plan_id)
+`;
+
+/**
+ * SQL to create the improvements table.
+ * Stores AI-suggested improvements for plans.
+ */
+export const CREATE_IMPROVEMENTS_TABLE = `
+CREATE TABLE IF NOT EXISTS improvements (
+  improvement_id TEXT PRIMARY KEY NOT NULL,
+  plan_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  step_id TEXT,
+  type TEXT NOT NULL CHECK (type IN ('missing_criteria', 'unclear_description', 'missing_dependency', 'redundant_step', 'scope_suggestion')),
+  description TEXT NOT NULL,
+  suggested_change_json TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'dismissed')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (plan_id, version) REFERENCES versions(plan_id, version) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by plan_id and version on improvements table.
+ */
+export const CREATE_IMPROVEMENTS_VERSION_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_improvements_version ON improvements(plan_id, version)
+`;
+
+/**
+ * Index for faster lookups by step_id on improvements table.
+ */
+export const CREATE_IMPROVEMENTS_STEP_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_improvements_step ON improvements(plan_id, version, step_id)
+`;
+
+/**
+ * Index for faster lookups of pending improvements.
+ */
+export const CREATE_IMPROVEMENTS_STATUS_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_improvements_status ON improvements(plan_id, version, status)
+`;
+
+/**
  * All schema creation statements in order.
  */
 export const ALL_SCHEMA_STATEMENTS = [
@@ -125,4 +245,15 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_CHANGE_REQUESTS_TABLE,
   CREATE_CHANGE_REQUESTS_PLAN_INDEX,
   CREATE_CHANGE_REQUESTS_RUN_INDEX,
+  CREATE_COMMENTS_TABLE,
+  CREATE_COMMENTS_VERSION_INDEX,
+  CREATE_COMMENTS_STEP_INDEX,
+  CREATE_COMMENTS_RESOLVED_INDEX,
+  CREATE_SESSIONS_TABLE,
+  CREATE_SESSIONS_TOKEN_INDEX,
+  CREATE_SESSIONS_PLAN_INDEX,
+  CREATE_IMPROVEMENTS_TABLE,
+  CREATE_IMPROVEMENTS_VERSION_INDEX,
+  CREATE_IMPROVEMENTS_STEP_INDEX,
+  CREATE_IMPROVEMENTS_STATUS_INDEX,
 ];

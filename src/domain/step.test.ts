@@ -35,10 +35,10 @@ describe('AcceptanceCriterion', () => {
     ).toThrow();
   });
 
-  it('should reject empty description', () => {
-    expect(() =>
-      AcceptanceCriterionSchema.parse({ id: 'ac1', description: '' })
-    ).toThrow();
+  it('should allow empty description (permitted during editing)', () => {
+    const result = AcceptanceCriterionSchema.parse({ id: 'ac1', description: '' });
+    expect(result.id).toBe('ac1');
+    expect(result.description).toBe('');
   });
 });
 

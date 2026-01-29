@@ -5,6 +5,7 @@ import type {
   PlanWithVersion,
   PlanSummary,
   PlanStatus,
+  Step,
 } from '@/types';
 
 // Plan operations
@@ -24,7 +25,7 @@ export async function createPlan(goal: string, context?: string): Promise<PlanWi
 
 export async function updatePlan(
   planId: string,
-  data: { goal?: string; context?: string }
+  data: { goal?: string; context?: string; steps?: Step[] }
 ): Promise<PlanWithVersion> {
   return put<PlanWithVersion>(`/plans/${planId}`, data);
 }
