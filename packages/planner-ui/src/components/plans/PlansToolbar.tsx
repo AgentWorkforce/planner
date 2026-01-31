@@ -1,12 +1,20 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { PlusIcon } from '@/components/icons/PlusIcon';
 import { RowsIcon } from '@/components/icons/RowsIcon';
 import { DocumentIcon } from '@/components/icons/DocumentIcon';
 import { TableIcon } from '@/components/icons/TableIcon';
 import { SearchIcon } from '@/components/icons/SearchIcon';
 import { CloseIcon } from '@/components/icons/CloseIcon';
+import { useInitiatives } from '@/hooks/useInitiatives';
 import type { PlansFilter } from '@/hooks/usePlansFilter';
 import type { PlanStatus } from '@/types/plan';
 import type { PlansViewMode } from '@/hooks';
@@ -70,7 +78,7 @@ export function PlansToolbar({
   return (
     <div className="border-b border-border-subtle">
       {/* Row 1: Breadcrumb + Action */}
-      <div className="flex items-center justify-between h-12 px-4">
+      <div className="flex items-center justify-between h-12 px-4 border-b border-border-subtle">
         <h1 className="font-display text-lg font-semibold text-text-primary">
           {title}
         </h1>
@@ -84,11 +92,17 @@ export function PlansToolbar({
 
       {/* Row 2: Filters + Search + View Mode */}
       <div className="grid grid-cols-[auto_1fr_auto] items-center h-12 px-4 gap-4">
-        {/* Left: Status Filter */}
-        <StatusToggle
-          value={filter.status}
-          onChange={(status) => onFilterChange({ status })}
-        />
+        {/* Left: Initiative Filter + Status Filter */}
+        <div className="flex items-center gap-2">
+          <InitiativeSelect
+            value={filter.initiative_id}
+            onChange={(initiative_id) => onFilterChange({ initiative_id })}
+          />
+          <StatusToggle
+            value={filter.status}
+            onChange={(status) => onFilterChange({ status })}
+          />
+        </div>
 
         {/* Center: Search Input */}
         <div className="flex justify-center">
@@ -141,16 +155,16 @@ function StatusToggle({ value, onChange }: StatusToggleProps) {
       size="sm"
       aria-label="Filter by status"
     >
-      <ToggleGroupItem value="all" aria-label="All plans">
+      <ToggleGroupItem value="all" aria-label="All plans" className="h-7">
         All
       </ToggleGroupItem>
-      <ToggleGroupItem value="draft" aria-label="Draft plans">
+      <ToggleGroupItem value="draft" aria-label="Draft plans" className="h-7">
         Draft
       </ToggleGroupItem>
-      <ToggleGroupItem value="approved" aria-label="Approved plans">
+      <ToggleGroupItem value="approved" aria-label="Approved plans" className="h-7">
         Approved
       </ToggleGroupItem>
-      <ToggleGroupItem value="published" aria-label="Published plans">
+      <ToggleGroupItem value="published" aria-label="Published plans" className="h-7">
         Published
       </ToggleGroupItem>
     </ToggleGroup>
@@ -187,5 +201,39 @@ function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
         <DocumentIcon size="sm" />
       </ToggleGroupItem>
     </ToggleGroup>
+  );
+}
+
+interface InitiativeSelectProps {
+  value: string | null;
+  onChange: (value: string | null) => void;
+}
+
+/**
+ * InitiativeSelect - Dropdown to filter plans by initiative.
+ */
+function InitiativeSelect({ value, onChange }: InitiativeSelectProps) {
+  const { initiatives, isLoading } = useInitiatives();
+
+  return (
+    <Select
+      value={value || 'all'}
+      onValueChange={(val) => onChange(val === 'all' ? null : val)}
+    >
+      <SelectTrigger className="w-[160px]" aria-label="Filter by initiative">
+        <SelectValue placeholder="All initiatives" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All initiatives</SelectItem>
+        {!isLoading && initiatives.map((initiative) => (
+          <SelectItem key={initiative.initiative_id} value={initiative.initiative_id}>
+            <span className="flex items-center gap-1.5">
+              {initiative.icon && <span>{initiative.icon}</span>}
+              <span>{initiative.name}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
