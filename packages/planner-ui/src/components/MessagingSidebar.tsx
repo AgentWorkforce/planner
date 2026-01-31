@@ -114,34 +114,72 @@ export function MessagingSidebar({
     }
   }, [activeChannelId, channels.channels, planContext?.planId]);
 
-  // Collapsed view
-  if (isCollapsed) {
-    return (
-      <CollapsedSidebar
-        onExpand={handleExpand}
-        connectionState={connection.state}
-        isMock={connection.isMock}
-      />
-    );
-  }
-
   // Determine if we should show the channel list panel
   // Hide it when viewing a specific plan (use envelope dropdown instead)
   const showChannelList = !planContext;
 
-  return (
-    <div className={`${showChannelList ? 'w-96' : 'w-[340px]'} h-full bg-bg-secondary border-l border-border-subtle flex flex-col flex-shrink-0 relative z-0`}>
-      {/* Channel header */}
-      <ChannelHeader
-        channel={activeChannel}
-        presence={presence.members}
-        isMock={connection.isMock}
-        onClose={handleClose}
-        otherChannels={otherChannels}
-        onSwitchChannel={handleSelectChannel}
-        onDirectMessage={handleDirectMessage}
-      />
+  // Calculate sidebar width based on state
+  const sidebarWidth = isCollapsed ? 'w-12' : showChannelList ? 'w-96' : 'w-[340px]';
 
+  // Collapsed view - still uses fixed positioning
+  if (isCollapsed) {
+    return (
+      <>
+        {/* Spacer to push main content left */}
+        <div className="w-12 flex-shrink-0" />
+        {/* Fixed collapsed sidebar */}
+        <div className="fixed top-0 bottom-12 right-0 w-12 bg-bg-secondary border-l border-border-subtle flex flex-col items-center py-4 z-20">
+          <button
+            onClick={handleExpand}
+            className="p-2 text-text-muted hover:text-text-primary transition-colors rounded-lg hover:bg-bg-hover"
+            aria-label="Expand messaging sidebar"
+          >
+            <ChevronIcon direction="left" size="lg" />
+          </button>
+
+          <div className="mt-4">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                connection.isMock
+                  ? 'bg-warning'
+                  : connection.state === 'connected'
+                  ? 'bg-success'
+                  : 'bg-text-muted'
+              }`}
+              title={
+                connection.isMock
+                  ? 'Demo mode'
+                  : connection.state === 'connected'
+                  ? 'Connected'
+                  : 'Disconnected'
+              }
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/* Spacer to push main content left - matches sidebar width */}
+      <div className={`${sidebarWidth} flex-shrink-0`} />
+      {/* Fixed sidebar - positioned like left sidebar with top-0 bottom-12 */}
+      <div className={`fixed top-0 bottom-12 right-0 ${sidebarWidth} bg-bg-secondary border-l border-border-subtle flex flex-col z-20`}>
+      {/* Channel header - fixed at top */}
+      <div className="flex-shrink-0">
+        <ChannelHeader
+          channel={activeChannel}
+          presence={presence.members}
+          isMock={connection.isMock}
+          onClose={handleClose}
+          otherChannels={otherChannels}
+          onSwitchChannel={handleSelectChannel}
+          onDirectMessage={handleDirectMessage}
+        />
+      </div>
+
+      {/* Middle content area - takes remaining space */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Channel list (only shown when not in plan context) */}
         {showChannelList && (
@@ -156,27 +194,33 @@ export function MessagingSidebar({
           </div>
         )}
 
-        {/* Message area */}
+        {/* Message area - flex column with scrollable messages and fixed input */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {activeChannelId ? (
             <>
-              <MessageStream
-                messages={channelMessages.messages}
-                currentUserId={connection.userId}
-                isLoading={channelMessages.isLoading}
-              />
-              <MessageInput
-                onSend={channelMessages.send}
-                disabled={!connection.isConnected}
-                planContext={planContext}
-                placeholder={
-                  connection.isConnected
-                    ? 'Type a message...'
-                    : connection.state === 'connecting'
-                    ? 'Connecting...'
-                    : 'Disconnected'
-                }
-              />
+              {/* Messages - scrollable area */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MessageStream
+                  messages={channelMessages.messages}
+                  currentUserId={connection.userId}
+                  isLoading={channelMessages.isLoading}
+                />
+              </div>
+              {/* Input - fixed at bottom */}
+              <div className="flex-shrink-0">
+                <MessageInput
+                  onSend={channelMessages.send}
+                  disabled={!connection.isConnected}
+                  planContext={planContext}
+                  placeholder={
+                    connection.isConnected
+                      ? 'Type a message...'
+                      : connection.state === 'connecting'
+                      ? 'Connecting...'
+                      : 'Disconnected'
+                  }
+                />
+              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center p-4">
@@ -195,55 +239,17 @@ export function MessagingSidebar({
         </div>
       </div>
 
-      {/* Connection status bar */}
-      <ConnectionStatusBar
-        state={connection.state}
-        isMock={connection.isMock}
-        error={connection.error}
-        onReconnect={connection.reconnect}
-      />
-    </div>
-  );
-}
-
-interface CollapsedSidebarProps {
-  onExpand: () => void;
-  connectionState: string;
-  isMock: boolean;
-}
-
-function CollapsedSidebar({ onExpand, connectionState, isMock }: CollapsedSidebarProps) {
-  const isConnected = connectionState === 'connected';
-
-  return (
-    <div className="w-12 h-full bg-bg-secondary border-l border-border-subtle flex flex-col items-center py-4 flex-shrink-0 relative z-0">
-      <button
-        onClick={onExpand}
-        className="p-2 text-text-muted hover:text-text-primary transition-colors rounded-lg hover:bg-bg-hover"
-        aria-label="Expand messaging sidebar"
-      >
-        <ChevronIcon direction="left" size="lg" />
-      </button>
-
-      <div className="mt-4">
-        <div
-          className={`w-3 h-3 rounded-full ${
-            isMock
-              ? 'bg-warning'
-              : isConnected
-              ? 'bg-success'
-              : 'bg-text-muted'
-          }`}
-          title={
-            isMock
-              ? 'Demo mode'
-              : isConnected
-              ? 'Connected'
-              : 'Disconnected'
-          }
+      {/* Connection status bar - fixed at bottom */}
+      <div className="flex-shrink-0">
+        <ConnectionStatusBar
+          state={connection.state}
+          isMock={connection.isMock}
+          error={connection.error}
+          onReconnect={connection.reconnect}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
