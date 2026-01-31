@@ -23,6 +23,15 @@ npm run dev:frontend  # UI on :3000
 
 Then open http://localhost:3000 to explore.
 
+### Configuration
+
+```bash
+# Optional: Enable AI features (planning agent, chat)
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Without the API key, the app runs in mock mode - all features work, but AI responses are simulated.
+
 **On first run**, the database is automatically seeded with the "Planner v1" initiative - the actual plans used to build the Planner itself (~70 plans covering domain model, REST API, UI components, and relay integration). This gives you real content to explore immediately.
 
 To re-seed or update after changes to `docs/flow/`:
