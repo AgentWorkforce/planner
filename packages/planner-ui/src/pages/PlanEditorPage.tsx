@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getPlan, updatePlan, ApiError, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion } from '@/api';
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
 import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
@@ -13,9 +13,17 @@ import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { DependencyLinesOverlay } from '@/components/DependencyLinesOverlay';
 import { MessagingSidebar } from '@/components/MessagingSidebar';
 import { Badge } from '@/components/ui/Badge';
-import { MessageIcon, DocumentIcon, DecisionsIcon } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { MessageIcon, DocumentIcon, DecisionsIcon, PlusIcon, ChevronLeftIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
+import { useUserTrajectory } from '@/hooks/useUserTrajectory';
+import { DecisionLogHeader } from '@/components/trajectory/DecisionLogHeader';
+import { DecisionList } from '@/components/trajectory/DecisionList';
+import { DecisionEmptyState } from '@/components/trajectory/DecisionEmptyState';
+import { DecisionDetailSheet } from '@/components/trajectory/DecisionDetailSheet';
+import { PreferencesSummary } from '@/components/trajectory/PreferencesSummary';
 
 /** Panel type for coexistence - only one panel can be open at a time */
 type ActivePanel = 'chat' | 'comments' | null;
@@ -26,6 +34,7 @@ const SIDEBAR_COLLAPSED_KEY = 'planner-sidebar-collapsed';
 export function PlanEditorPage() {
   const { planId } = useParams<{ planId: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [version, setVersion] = useState<PlanVersion | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +74,53 @@ export function PlanEditorPage() {
   const [hoveredStepId, setHoveredStepId] = useState<string | null>(null);
   const [hoveredDirection, setHoveredDirection] = useState<'incoming' | 'outgoing' | null>(null);
   const stepsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Active tab detection based on URL
+  const activeTab = location.pathname.endsWith('/decisions') ? 'decisions' : 'plan';
+
+  // Decision-related state (for decisions tab)
+  const [agentFilter, setAgentFilter] = useState<string>('all');
+  const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [decisionSheetOpen, setDecisionSheetOpen] = useState(false);
+
+  // Fetch trajectory data for decisions tab
+  const { decisions, preferences, isLoading: decisionsLoading, error: decisionsError } = useUserTrajectory(planId || null);
+
+  // Extract unique agent roles from decisions
+  const uniqueAgents = useMemo(() => {
+    const agents = new Set<string>();
+    decisions.forEach((decision) => {
+      if (decision.asking_agent) {
+        agents.add(decision.asking_agent);
+      }
+    });
+    return Array.from(agents).sort();
+  }, [decisions]);
+
+  // Filter decisions by agent
+  const filteredDecisions = useMemo(() => {
+    if (agentFilter === 'all') {
+      return decisions;
+    }
+    return decisions.filter((decision) => decision.asking_agent === agentFilter);
+  }, [decisions, agentFilter]);
+
+  // Get selected decision object
+  const selectedDecision = useMemo(() => {
+    if (!selectedDecisionId) return null;
+    return decisions.find((d) => d.event_id === selectedDecisionId) || null;
+  }, [decisions, selectedDecisionId]);
+
+  // Handle decision row click
+  const handleDecisionSelect = (eventId: string) => {
+    setSelectedDecisionId(eventId);
+    setDecisionSheetOpen(true);
+  };
+
+  // Handle decision sheet close
+  const handleDecisionSheetClose = () => {
+    setDecisionSheetOpen(false);
+  };
 
   // Scroll to and highlight a step (used by dependency indicator click)
   const handleScrollToStep = useCallback((stepId: string) => {
@@ -417,40 +473,56 @@ export function PlanEditorPage() {
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex overflow-hidden">
       {/* Main content area - higher z-index so popovers appear above sidebar */}
-      <div className="flex-1 min-w-0 overflow-auto relative z-10">
+      <div className="flex-1 min-w-0 overflow-y-auto relative z-10">
         {/* Header */}
-        <div className="border-b border-border-subtle bg-bg-card">
-          <div className="px-6 py-4">
+        <div className="border-b border-border-subtle">
+          {/* Row 1: Back + Action */}
+          <div className="flex items-center justify-between h-12 px-4 border-b border-border-subtle">
+            <Link
+              to="/plans"
+              className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ChevronLeftIcon size="sm" />
+              Back to plans
+            </Link>
+            <Button asChild variant="primary" size="sm">
+              <Link to="/plans/new">
+                <PlusIcon size="sm" />
+                New Plan
+              </Link>
+            </Button>
+          </div>
+
+          {/* Row 2: Tab toggle */}
+          <div className="flex items-center h-12 px-4 border-b border-border-subtle">
+            <ToggleGroup
+              type="single"
+              value={activeTab}
+              onValueChange={(value) => {
+                if (value === 'plan') {
+                  navigate(`/plans/${planId}`);
+                } else if (value === 'decisions') {
+                  navigate(`/plans/${planId}/decisions`);
+                }
+              }}
+              className="h-8 p-0.5 bg-bg-tertiary rounded-lg"
+            >
+              <ToggleGroupItem value="plan" aria-label="Plan view" className="h-7">
+                <DocumentIcon size="sm" />
+                Plan
+              </ToggleGroupItem>
+              <ToggleGroupItem value="decisions" aria-label="Decisions view" className="h-7">
+                <DecisionsIcon size="sm" />
+                Decisions
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          <div className="px-6 py-4 bg-bg-card">
           {/* Breadcrumb row */}
           <PlanBreadcrumb parents={parents} currentGoal={version.summary.goal} />
-
-          {/* Tab navigation */}
-          <div className="flex items-center gap-2 mt-3 mb-1 border-b border-border-subtle pb-3">
-            <Link
-              to={`/plans/${planId}`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === `/plans/${planId}`
-                  ? 'bg-bg-tertiary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-              }`}
-            >
-              <DocumentIcon size="sm" />
-              <span>Plan</span>
-            </Link>
-            <Link
-              to={`/plans/${planId}/decisions`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === `/plans/${planId}/decisions`
-                  ? 'bg-bg-tertiary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-              }`}
-            >
-              <DecisionsIcon size="sm" />
-              <span>Decisions</span>
-            </Link>
-          </div>
 
           {/* Main header: 2-column layout */}
           <div className="mt-4 flex gap-8">
@@ -493,11 +565,11 @@ export function PlanEditorPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="px-6 py-6 space-y-6">
-        {/* Steps section */}
-        <div className="bg-bg-tertiary rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
+      {/* Content - conditionally render Plan or Decisions based on active tab */}
+      {activeTab === 'plan' ? (
+        <div className="px-6 py-6 space-y-6 overflow-hidden">
+          {/* Steps header */}
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-text-primary">
               Steps ({version.steps.length})
             </h2>
@@ -617,14 +689,63 @@ export function PlanEditorPage() {
               )}
             </div>
           )}
-        </div>
 
-        {/* Timestamps */}
-        <div className="flex items-center gap-6 text-sm text-text-muted">
-          <span>Created: {new Date(version.created_at).toLocaleString()}</span>
-          <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
+          {/* Timestamps */}
+          <div className="flex items-center gap-6 text-sm text-text-muted">
+            <span>Created: {new Date(version.created_at).toLocaleString()}</span>
+            <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Decisions tab content */
+        <div className="px-6 py-6 space-y-6 overflow-hidden">
+          {/* Header with title and agent filter */}
+          <DecisionLogHeader
+            count={filteredDecisions.length}
+            agents={uniqueAgents}
+            selectedAgent={agentFilter}
+            onAgentChange={setAgentFilter}
+          />
+
+          {/* Main content area */}
+          <div>
+            {/* Preferences summary (if preferences exist) */}
+            {preferences.length > 0 && (
+              <div className="mb-4">
+                <PreferencesSummary preferences={preferences} />
+              </div>
+            )}
+
+            {/* Decision list or empty state */}
+            {decisionsLoading && decisions.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-text-muted text-sm">Loading decisions...</p>
+              </div>
+            ) : decisionsError ? (
+              <div className="py-12 text-center">
+                <p className="text-error text-sm">{decisionsError}</p>
+              </div>
+            ) : filteredDecisions.length > 0 ? (
+              <DecisionList
+                decisions={filteredDecisions}
+                selectedId={selectedDecisionId}
+                onSelect={handleDecisionSelect}
+              />
+            ) : (
+              <DecisionEmptyState />
+            )}
+          </div>
+
+          {/* Decision detail sheet - only render when open */}
+          {decisionSheetOpen && (
+            <DecisionDetailSheet
+              decision={selectedDecision}
+              open={decisionSheetOpen}
+              onClose={handleDecisionSheetClose}
+            />
+          )}
+        </div>
+      )}
 
       {/* AI Chat Panel */}
       <ChatPanel
