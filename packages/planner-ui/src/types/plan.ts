@@ -81,6 +81,7 @@ export interface InitiativeBadgeData {
 export interface PlanSummary {
   plan_id: string;
   goal: string;
+  context?: string;
   status: PlanStatus;
   latest_version: number;
   scopes?: string[];
@@ -95,6 +96,15 @@ export interface PlanSummary {
   org_id?: string;
   /** Owner user ID for "My Plans" filtering */
   owner_user_id?: string;
+  // Navigation fields for PlanCard enhancements
+  /** Total number of steps in the plan */
+  step_count?: number;
+  /** Number of steps marked as completed */
+  completed_step_count?: number;
+  /** Number of pending questions awaiting user answer */
+  pending_questions?: number;
+  /** Whether an agent is currently working on this plan */
+  agent_active?: boolean;
 }
 
 // Navigation state for sub-plan breadcrumbs

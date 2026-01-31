@@ -1,4 +1,71 @@
 /**
+ * Format a date as a compact relative time string (e.g., "2h", "14d", "3w").
+ * Ideal for table columns and tight spaces.
+ *
+ * @param date - Date string or Date object to format
+ * @returns Compact relative time string, or empty string if invalid
+ */
+export function formatCompactTime(date: string | Date): string {
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+    if (isNaN(dateObj.getTime())) {
+      return '';
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - dateObj.getTime();
+    const diffSeconds = Math.floor(diffMs / 1000);
+
+    // Handle future dates
+    if (diffSeconds < 0) {
+      return 'soon';
+    }
+
+    // Just now (< 1 minute)
+    if (diffSeconds < 60) {
+      return 'now';
+    }
+
+    // Minutes (< 1 hour)
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) {
+      return `${diffMinutes}m`;
+    }
+
+    // Hours (< 1 day)
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) {
+      return `${diffHours}h`;
+    }
+
+    // Days (< 1 week)
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) {
+      return `${diffDays}d`;
+    }
+
+    // Weeks (< 4 weeks)
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) {
+      return `${diffWeeks}w`;
+    }
+
+    // Months (< 12 months)
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) {
+      return `${diffMonths}mo`;
+    }
+
+    // Years
+    const diffYears = Math.floor(diffDays / 365);
+    return `${diffYears}y`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Format a date as a relative time string (e.g., "2h ago", "14 days ago").
  * Uses Intl.RelativeTimeFormat for localization support.
  *

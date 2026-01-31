@@ -20,6 +20,7 @@ export { EnvelopeIcon } from './EnvelopeIcon';
 export { SearchIcon } from './SearchIcon';
 export { BrainIcon } from './BrainIcon';
 export { DecisionsIcon } from './DecisionsIcon';
+export { ChatQuestionIcon } from './ChatQuestionIcon';
 
 // Navigation icons (lucide-react)
 export { DashboardIcon } from './DashboardIcon';
@@ -33,6 +34,7 @@ export { ChevronRightIcon } from './ChevronRightIcon';
 // Pipeline view icons (lucide-react)
 export { RowsIcon } from './RowsIcon';
 export { ColumnsIcon } from './ColumnsIcon';
+export { TableIcon } from './TableIcon';
 export { WaveIcon } from './WaveIcon';
 
 // Theme icons

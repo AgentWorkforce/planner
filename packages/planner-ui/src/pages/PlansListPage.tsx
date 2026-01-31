@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { listPlans, ApiError } from '@/api';
-import { CollapsibleSection } from '@/components/CollapsibleSection';
 import { PlansListSkeleton } from '@/components/AttentionSkeleton';
-import { ScopeGroup } from '@/components/ScopeGroup';
 import { PlanCard } from '@/components/PlanCard';
+import { PlanTable } from '@/components/PlanTable';
+import { SectionedPlanTable } from '@/components/SectionedPlanTable';
 import { PlansToolbar } from '@/components/plans/PlansToolbar';
 import { groupPlansByScope } from '@/utils/scopeGrouping';
 import { useAttentionPlans, usePlansViewMode, useScopeGroupExpansion, useFuzzySearch, usePlansFilter, useCurrentUser } from '@/hooks';
@@ -29,8 +29,8 @@ export function PlansListPage() {
   // View mode persistence (list vs grouped)
   const { viewMode, setViewMode } = usePlansViewMode();
 
-  // Scope group expansion state
-  const { isExpanded, toggleExpansion, expandAll, collapseAll } = useScopeGroupExpansion();
+  // Scope group expansion state (for sectioned view)
+  const { isExpanded, toggleExpansion } = useScopeGroupExpansion();
 
   // Fetch all plans once (no filter - we need all plans for attention sections)
   useEffect(() => {
@@ -117,8 +117,8 @@ export function PlansListPage() {
       />
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
+        <div className={`w-full px-6 py-6 ${viewMode === 'table' || viewMode === 'sectioned' ? '' : 'max-w-4xl mx-auto'}`}>
         {loading && <PlansListSkeleton />}
 
         {error && (
@@ -137,80 +137,45 @@ export function PlansListPage() {
           </div>
         )}
 
-        {/* Attention sections - only shown when plans exist */}
+        {/* Plans content - only shown when plans exist */}
         {!loading && !error && plans.length > 0 && (
-          <div className="space-y-4">
-            {/* All Plans section */}
-            <CollapsibleSection
-              sectionId="all-plans"
-              title="All Plans"
-              count={allOther.length}
-            >
-              {/* Plans display */}
-              {displayPlans.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-12 h-12 mb-3 rounded-full bg-bg-tertiary flex items-center justify-center">
-                    <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                    </svg>
-                  </div>
-                  <p className="text-text-secondary font-medium">
-                    {filter.search.trim() ? 'No matching plans' : 'No plans found'}
-                  </p>
-                  <p className="text-sm text-text-muted mt-1">
-                    {filter.search.trim()
-                      ? 'Try adjusting your search terms'
-                      : `No ${filter.status === 'all' ? '' : filter.status + ' '}plans in this category`}
-                  </p>
-                </div>
-              ) : viewMode === 'list' ? (
-                /* List view */
-                <ul className="space-y-2.5">
-                  {displayPlans.map((plan) => (
-                    <li key={plan.plan_id}>
-                      <PlanCard plan={plan} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                /* Grouped view */
-                <div>
-                  {/* Expand/Collapse all controls */}
-                  <div className="flex items-center gap-1 mb-4 pl-1">
-                    <button
-                      type="button"
-                      onClick={expandAll}
-                      className="px-2 py-1 text-xs text-text-muted hover:text-accent-cyan hover:bg-accent-cyan/5 rounded transition-colors"
-                    >
-                      Expand all
-                    </button>
-                    <span className="text-text-dim/50">|</span>
-                    <button
-                      type="button"
-                      onClick={() => collapseAll(sortedScopeNames)}
-                      className="px-2 py-1 text-xs text-text-muted hover:text-accent-cyan hover:bg-accent-cyan/5 rounded transition-colors"
-                    >
-                      Collapse all
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    {sortedScopeNames.map((scopeName) => {
-                      const scopePlans = scopeGroups.get(scopeName) || [];
-                      return (
-                        <ScopeGroup
-                          key={scopeName}
-                          scopeName={scopeName}
-                          plans={scopePlans}
-                          isExpanded={isExpanded(scopeName)}
-                          onToggle={() => toggleExpansion(scopeName)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </CollapsibleSection>
-          </div>
+          displayPlans.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-12 h-12 mb-3 rounded-full bg-bg-tertiary flex items-center justify-center">
+                <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              </div>
+              <p className="text-text-secondary font-medium">
+                {filter.search.trim() ? 'No matching plans' : 'No plans found'}
+              </p>
+              <p className="text-sm text-text-muted mt-1">
+                {filter.search.trim()
+                  ? 'Try adjusting your search terms'
+                  : `No ${filter.status === 'all' ? '' : filter.status + ' '}plans in this category`}
+              </p>
+            </div>
+          ) : viewMode === 'table' ? (
+            /* Table view */
+            <PlanTable plans={displayPlans} />
+          ) : viewMode === 'sectioned' ? (
+            /* Sectioned table view */
+            <SectionedPlanTable
+              scopeGroups={scopeGroups}
+              sortedScopeNames={sortedScopeNames}
+              isExpanded={isExpanded}
+              onToggle={toggleExpansion}
+            />
+          ) : (
+            /* Card view */
+            <ul className="space-y-2.5">
+              {displayPlans.map((plan) => (
+                <li key={plan.plan_id}>
+                  <PlanCard plan={plan} />
+                </li>
+              ))}
+            </ul>
+          )
         )}
         </div>
       </div>

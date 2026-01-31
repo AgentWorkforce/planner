@@ -678,7 +678,6 @@ export function PlanEditorPage() {
         planContext={planContext}
         isCollapsed={sidebarCollapsed}
         onCollapseChange={handleSidebarCollapseChange}
-        displayName="User"
       />
     </div>
   );

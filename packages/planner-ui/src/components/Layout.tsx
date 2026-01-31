@@ -224,14 +224,14 @@ export function Layout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         {/* Mobile header with hamburger menu */}
         <header className="flex h-12 items-center gap-2 border-b px-4 md:hidden">
           <SidebarTrigger />
           <span className="font-display font-medium">Planner</span>
         </header>
 
-        <main className="flex h-full w-full flex-1 flex-col overflow-auto pb-12">
+        <main className="flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden pb-12">
           <Outlet />
         </main>
       </SidebarInset>

@@ -3,11 +3,13 @@ import { Button } from '@/components/ui/Button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PlusIcon } from '@/components/icons/PlusIcon';
 import { RowsIcon } from '@/components/icons/RowsIcon';
-import { ColumnsIcon } from '@/components/icons/ColumnsIcon';
+import { DocumentIcon } from '@/components/icons/DocumentIcon';
+import { TableIcon } from '@/components/icons/TableIcon';
 import { SearchIcon } from '@/components/icons/SearchIcon';
 import { CloseIcon } from '@/components/icons/CloseIcon';
 import type { PlansFilter } from '@/hooks/usePlansFilter';
 import type { PlanStatus } from '@/types/plan';
+import type { PlansViewMode } from '@/hooks';
 
 export interface PlansToolbarProps {
   /** Page title: "Plans" or "My Plans" */
@@ -16,10 +18,10 @@ export interface PlansToolbarProps {
   filter: PlansFilter;
   /** Update filter state */
   onFilterChange: (updates: Partial<PlansFilter>) => void;
-  /** View mode: list or grouped */
-  viewMode: 'list' | 'grouped';
+  /** View mode: list, table, or grouped */
+  viewMode: PlansViewMode;
   /** Change view mode */
-  onViewModeChange: (mode: 'list' | 'grouped') => void;
+  onViewModeChange: (mode: PlansViewMode) => void;
 }
 
 /**
@@ -81,33 +83,35 @@ export function PlansToolbar({
       </div>
 
       {/* Row 2: Filters + Search + View Mode */}
-      <div className="flex items-center h-12 px-4 gap-4">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center h-12 px-4 gap-4">
         {/* Left: Status Filter */}
         <StatusToggle
           value={filter.status}
           onChange={(status) => onFilterChange({ status })}
         />
 
-        {/* Middle: Search Input */}
-        <div className="relative flex-1 max-w-sm">
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" size="sm" />
-          <input
-            type="text"
-            placeholder="Search plans..."
-            value={filter.search}
-            onChange={(e) => onFilterChange({ search: e.target.value })}
-            className="w-full pl-8 pr-9 py-1.5 text-sm bg-bg-secondary border border-border-subtle rounded-md focus:outline-none focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan placeholder:text-text-muted transition-all"
-          />
-          {filter.search && (
-            <button
-              type="button"
-              onClick={() => onFilterChange({ search: '' })}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
-              aria-label="Clear search"
-            >
-              <CloseIcon size="sm" />
-            </button>
-          )}
+        {/* Center: Search Input */}
+        <div className="flex justify-center">
+          <div className="relative w-full max-w-md">
+            <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" size="sm" />
+            <input
+              type="text"
+              placeholder="Search plans..."
+              value={filter.search}
+              onChange={(e) => onFilterChange({ search: e.target.value })}
+              className="w-full pl-8 pr-9 py-1.5 text-sm bg-bg-secondary border border-border-subtle rounded-md focus:outline-none focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan placeholder:text-text-muted transition-all"
+            />
+            {filter.search && (
+              <button
+                type="button"
+                onClick={() => onFilterChange({ search: '' })}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
+                aria-label="Clear search"
+              >
+                <CloseIcon size="sm" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Right: View Mode Toggle */}
@@ -154,12 +158,12 @@ function StatusToggle({ value, onChange }: StatusToggleProps) {
 }
 
 interface ViewModeToggleProps {
-  value: 'list' | 'grouped';
-  onChange: (mode: 'list' | 'grouped') => void;
+  value: PlansViewMode;
+  onChange: (mode: PlansViewMode) => void;
 }
 
 /**
- * ViewModeToggle - Toggle between list and grouped view.
+ * ViewModeToggle - Toggle between list, table, and grouped view.
  */
 function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
   return (
@@ -167,17 +171,20 @@ function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
       type="single"
       value={value}
       onValueChange={(val) => {
-        if (val) onChange(val as 'list' | 'grouped');
+        if (val) onChange(val as PlansViewMode);
       }}
       variant="outline"
       size="sm"
       aria-label="View mode"
     >
-      <ToggleGroupItem value="list" aria-label="List view">
+      <ToggleGroupItem value="table" aria-label="Table view">
         <RowsIcon size="sm" />
       </ToggleGroupItem>
-      <ToggleGroupItem value="grouped" aria-label="Grouped view">
-        <ColumnsIcon size="sm" />
+      <ToggleGroupItem value="sectioned" aria-label="Sectioned table view">
+        <TableIcon size="sm" />
+      </ToggleGroupItem>
+      <ToggleGroupItem value="cards" aria-label="Card view">
+        <DocumentIcon size="sm" />
       </ToggleGroupItem>
     </ToggleGroup>
   );

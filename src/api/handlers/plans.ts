@@ -195,9 +195,16 @@ export function createPlanHandlers(storage: PlanStorage) {
               }
             }
 
+            // Navigation fields
+            const stepCount = latestVersion?.steps?.length ?? 0;
+            const pendingQuestions = storage.listQuestionsByPlan(plan.plan_id, 'pending');
+            const session = storage.getSessionByPlanId(plan.plan_id);
+            const agentActive = session !== null && session.status === 'active';
+
             return {
               plan_id: plan.plan_id,
               goal: latestVersion?.summary?.goal || '',
+              context: latestVersion?.summary?.context,
               status: latestVersion?.status || PlanStatus.Draft,
               latest_version: latestVersion?.version || 1,
               scopes,
@@ -205,6 +212,11 @@ export function createPlanHandlers(storage: PlanStorage) {
               initiative,
               created_at: plan.created_at,
               updated_at: plan.updated_at,
+              // Navigation fields
+              step_count: stepCount,
+              completed_step_count: 0, // No execution data in non-attention flow
+              pending_questions: pendingQuestions.length,
+              agent_active: agentActive,
             };
           });
           res.json({ plans: planSummaries });
@@ -252,9 +264,19 @@ export function createPlanHandlers(storage: PlanStorage) {
             }
           }
 
+          // Navigation fields
+          const stepCount = latestVersion?.steps?.length ?? 0;
+          // Note: completed_step_count requires full orchestrator integration
+          // For now, default to 0 until orchestrator provides step progress data
+          const completedStepCount = 0;
+          const pendingQuestions = storage.listQuestionsByPlan(plan.plan_id, 'pending');
+          const session = storage.getSessionByPlanId(plan.plan_id);
+          const agentActive = session !== null && session.status === 'active';
+
           return {
             plan_id: plan.plan_id,
             goal: latestVersion?.summary?.goal || '',
+            context: latestVersion?.summary?.context,
             status: latestVersion?.status || PlanStatus.Draft,
             latest_version: latestVersion?.version || 1,
             scopes,
@@ -263,6 +285,11 @@ export function createPlanHandlers(storage: PlanStorage) {
             created_at: plan.created_at,
             updated_at: plan.updated_at,
             attention_types: attentionTypes,
+            // Navigation fields
+            step_count: stepCount,
+            completed_step_count: completedStepCount,
+            pending_questions: pendingQuestions.length,
+            agent_active: agentActive,
           };
         });
 

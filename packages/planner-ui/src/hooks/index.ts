@@ -10,7 +10,7 @@ export { usePlanEvents } from './usePlanEvents';
 export type { PlanChangeEvent, UsePlanEventsReturn } from './usePlanEvents';
 export { useAttentionPlans } from './useAttentionPlans';
 export { usePlansViewMode } from './usePlansViewMode';
-export type { PlansViewMode } from '@/components/PlansViewModeToggle';
+export type { PlansViewMode } from './usePlansViewMode';
 export { useScopeGroupExpansion } from './useScopeGroupExpansion';
 export {
   useCommandPalette,
