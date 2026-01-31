@@ -98,7 +98,28 @@ Write to feature's `design_spec`:
 }
 ```
 
-### 3. Flag Custom Components
+### 3. Extract Shared Patterns
+
+When a UI pattern appears in 2+ features, extract to `catalog.design_system.patterns`:
+
+```json
+"patterns": {
+  "two_row_toolbar": {
+    "row1": "breadcrumb + primary action",
+    "row2": "filter tabs/pills + status filter + view toggle",
+    "usage": ["ui-pipeline-view", "ui-plans-view-rework"]
+  }
+}
+```
+
+Then reference in feature `design_spec`:
+```json
+"toolbar": { "pattern": "two_row_toolbar", "customizations": { "row1_action": "+ New Plan" } }
+```
+
+**Check before designing**: Does this pattern exist in `catalog.patterns`? Reference it, don't duplicate.
+
+### 4. Flag Custom Components
 
 If library lacks something, note in `custom_needed`. These become tasks in flow-planner.
 
@@ -130,3 +151,4 @@ If library lacks something, note in `custom_needed`. These become tasks in flow-
 - Feature `design_spec.views` covers all screens
 - Components reference library by name
 - Custom components flagged in `custom_needed`
+- Shared patterns extracted to `catalog.design_system.patterns`

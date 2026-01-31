@@ -1,8 +1,4 @@
----
-name: flow-ui-ux-validation
-description: When feature has user_flow and user wants to verify it works in a real browser - "validate the UI", "check if it looks right", "test the flow". Uses browser automation to check present/designed/holistic for each step.
-user-invocable: false
----
+
 # UI/UX Validation: Validate in Real UI
 
 **Owns**: Feature `validation_uiux` section
@@ -45,6 +41,15 @@ Before starting, detect or ask which automation pathway is available:
    - Browser/screenshot capabilities (e.g., `browser-automation`, `puppeteer-mcp`, `playwright-mcp`)
    - DOM inspection tools
    - Navigation/interaction tools
+
+   **Playwright MCP tools (preferred when available):**
+   - `browser_navigate` - open pages
+   - `browser_snapshot` - get accessibility tree (better than screenshots for validation)
+   - `browser_take_screenshot` - capture visual evidence
+   - `browser_click`, `browser_type` - interact with elements
+   - `browser_hover` - test hover states
+   - `browser_resize` - test responsive viewports
+
 2. Check `package.json` for `puppeteer`, `playwright`, `cypress`, or similar
 3. If none found, ask: "No browser automation detected. Install Puppeteer or Playwright?"
 
@@ -64,6 +69,16 @@ Execute each `user_flow` step in browser:
 - Verify element is present and reachable
 - Assess design quality (labels, hierarchy, feedback)
 - Check consistency with rest of app
+
+### 2b. Suggest Improvements
+
+Beyond pass/fail, actively recommend improvements:
+- **Better patterns**: If a flow works but is clunky, suggest smoother alternatives
+- **Accessibility gains**: Missing ARIA labels, keyboard navigation, contrast issues
+- **Design system alignment**: Reference existing components that could replace custom implementations
+- **UX best practices**: Loading states, error handling, empty states, confirmation feedback
+
+Issues should include actionable `fix` recommendations, not just problem descriptions.
 
 ### 3. Fill Validation
 
@@ -112,14 +127,12 @@ If a step's UI is missing:
 | Check | What it means |
 |-------|---------------|
 | **present** | Element exists, visible, reachable |
-| **designed** | Matches `design_spec` (elements, layout, states) |
-| **holistic** | Consistent with `catalog.design_system` patterns |
-
-If no `design_spec` exists, "designed" checks use best judgment—note this in issues.
+| **designed** | Clear labels, good hierarchy, proper feedback, accessible |
+| **holistic** | Consistent with design system across the app |
 
 ## Rules
 
-- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
+- 1–2 questions per message. Prefer option-based questions.
 - No opinions without evidence tied to a specific step
 - If you cannot verify, use `unknown` and state what's missing
 - After completion: single-sentence summary unless user requests more
@@ -131,7 +144,7 @@ If no `design_spec` exists, "designed" checks use best judgment—note this in i
 | flow-discover | `summary` (from code) |
 | flow-brainstorm | `summary` (from ideas) |
 | flow-planner | `plan_implementation` |
-| flow-tasks | Creates executable tasks from plan |
+| flow-todos | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
 | **flow-ui-ux-validation** | `validation_uiux` |
 | flow-test-designer | `plan_tests` |
