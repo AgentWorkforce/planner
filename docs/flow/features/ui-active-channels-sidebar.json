@@ -83,7 +83,7 @@
   "plan_implementation": {
     "scopes": ["planner-core", "planner-ui"],
     "reference_code": {
-      "source": "/Users/flysikring/conductor/repos/relay-dashboard/packages/dashboard/src/components/channels/",
+      "source": "https://github.com/AgentWorkforce/relay-dashboard/tree/main/packages/dashboard/src/components/channels/",
       "files_to_copy": [
         "ChannelViewV1.tsx",
         "ChannelHeader.tsx",
@@ -296,7 +296,7 @@
           { "id": "ac7", "description": "Preserve auto-scroll behavior on new messages" }
         ],
         "reference_code": {
-          "source": "/Users/flysikring/conductor/repos/relay-dashboard/packages/dashboard/src/components/channels/ChannelMessageList.tsx",
+          "source": "https://github.com/AgentWorkforce/relay-dashboard/blob/main/packages/dashboard/src/components/channels/ChannelMessageList.tsx",
           "copy_components": ["Avatar", "DateDivider", "MessageItem", "shouldShowAvatar", "formatDateKey", "formatDateDisplay"]
         }
       }

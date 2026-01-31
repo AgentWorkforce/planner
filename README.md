@@ -226,4 +226,4 @@ Apache-2.0 - Copyright 2025 Agent Workforce Incorporated
 
 ---
 
-**Links:** [Documentation](./docs) | [Issues](https://github.com/jahala/plannr/issues)
+**Links:** [Documentation](./docs) | [Issues](https://github.com/AgentWorkforce/planner/issues)
