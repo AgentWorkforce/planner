@@ -186,8 +186,8 @@ export function DocumentImportForm() {
   // Show loading overlay for analyzing/creating states
   if (state === 'analyzing') {
     return (
-      <div className="document-import-form">
-        <div className="ai-overlay" style={{ position: 'relative', minHeight: '300px' }}>
+      <div className="space-y-6">
+        <div className="relative min-h-[300px] flex items-center justify-center">
           <LoadingSpinner message="Analyzing document structure..." />
         </div>
       </div>
@@ -197,9 +197,9 @@ export function DocumentImportForm() {
   // Show extraction preview (for both preview and creating states)
   if ((state === 'preview' || state === 'creating') && extractionResult) {
     return (
-      <div className="document-import-form">
+      <div className="relative">
         {state === 'creating' && (
-          <div className="ai-overlay">
+          <div className="absolute inset-0 bg-bg-deep/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
             <LoadingSpinner message="Creating plan..." />
           </div>
         )}
@@ -217,8 +217,12 @@ export function DocumentImportForm() {
 
   // Input state - show upload and textarea
   return (
-    <div className="document-import-form">
-      {error && <div className="error-message">{error}</div>}
+    <div className="space-y-6">
+      {error && (
+        <div className="px-4 py-3 bg-error/10 border border-error/30 rounded-lg text-error text-sm">
+          {error}
+        </div>
+      )}
 
       <UploadDropZone
         onFileContent={handleFileContent}
@@ -226,7 +230,11 @@ export function DocumentImportForm() {
         onClear={handleClearFile}
       />
 
-      <div className="import-divider">or paste content below</div>
+      <div className="flex items-center gap-4 text-text-muted">
+        <div className="flex-1 h-px bg-text-dim/30" />
+        <span className="text-sm">or paste content below</span>
+        <div className="flex-1 h-px bg-text-dim/30" />
+      </div>
 
       <DocumentTextarea
         value={content}
@@ -235,7 +243,7 @@ export function DocumentImportForm() {
         rows={12}
       />
 
-      <div className="import-form-footer">
+      <div className="flex items-center justify-between">
         <div>
           {detectedFormat && content.trim() && (
             <FormatDetectionBadge
@@ -244,17 +252,17 @@ export function DocumentImportForm() {
             />
           )}
         </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+        <div className="flex gap-3">
           <button
             type="button"
-            className="btn btn-secondary"
+            className="px-4 py-2 bg-bg-tertiary text-text-primary font-medium rounded-lg hover:bg-bg-hover transition-colors"
             onClick={handleCancel}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="btn btn-primary"
+            className="px-4 py-2 bg-accent-cyan text-bg-deep font-medium rounded-lg hover:bg-accent-cyan/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleExtract}
             disabled={!content.trim()}
           >

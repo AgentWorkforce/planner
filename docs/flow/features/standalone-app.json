@@ -1,0 +1,37 @@
+{
+  "feature_id": "standalone-app",
+  "title": "Standalone App Foundation",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Transform Planner from a plan-centric tool into a standalone app with organization context, initiative grouping, and Linear-style navigation",
+    "context": "Currently plans exist in isolation with no tenant context, no grouping mechanism, and top-nav only navigation. For Planner to work as a standalone product, it needs: (1) schema for org/initiative/user context, (2) left sidebar navigation pattern, (3) three main views - Initiatives, Plans, Roadmap",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Organization and Initiative tables exist in schema with proper FKs" },
+      { "id": "ac2", "description": "Plans have org_id (required) and initiative_id (optional) foreign keys" },
+      { "id": "ac3", "description": "Left sidebar is always visible on desktop with collapse toggle" },
+      { "id": "ac4", "description": "Left sidebar is slide-out drawer on mobile (<768px)" },
+      { "id": "ac5", "description": "Sidebar shows: quick actions, global views, initiatives list with nested plans" },
+      { "id": "ac6", "description": "Initiatives view shows all initiatives with status, plan counts" },
+      { "id": "ac7", "description": "Plans view shows filtered/searchable plan list (reworked from current)" },
+      { "id": "ac8", "description": "Roadmap view shows timeline with initiatives and plans, cross-dependencies" }
+    ],
+    "out_of_scope": [
+      "Multi-org switching UI (schema ready, UI deferred)",
+      "User authentication (external, just user_id reference)",
+      "Initiative permissions/roles",
+      "Gantt chart editing (view-only timeline)"
+    ]
+  },
+
+  "sub_features": [
+    "schema-org-initiative",
+    "ui-sidebar-layout",
+    "ui-initiatives-view",
+    "ui-plans-view-rework",
+    "ui-roadmap-view"
+  ]
+}

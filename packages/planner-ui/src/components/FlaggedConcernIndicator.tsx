@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { FlaggedConcern } from '@/types';
+import { AlertIcon, CloseIcon } from './icons';
 
 interface FlaggedConcernIndicatorProps {
-  /** Concern data */
   concern: FlaggedConcern;
-  /** Callback to dismiss the concern */
   onDismiss: (concernId: string) => void;
 }
 
@@ -15,57 +14,67 @@ interface FlaggedConcernIndicatorProps {
 export function FlaggedConcernIndicator({ concern, onDismiss }: FlaggedConcernIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const getSeverityIcon = () => {
-    switch (concern.severity) {
-      case 'error':
-        return '⚠';
-      case 'warning':
-        return '⚡';
-      case 'info':
-      default:
-        return 'ℹ';
-    }
+  const severityClasses: Record<string, string> = {
+    error: 'text-error',
+    warning: 'text-warning',
+    info: 'text-accent-cyan',
+  };
+
+  const severityBgClasses: Record<string, string> = {
+    error: 'bg-error/10 border-error/30',
+    warning: 'bg-warning/10 border-warning/30',
+    info: 'bg-accent-cyan/10 border-accent-cyan/30',
   };
 
   return (
-    <div className={`flagged-concern flagged-concern--${concern.severity}`}>
+    <div className="relative inline-flex">
       <button
-        className="flagged-concern-trigger"
+        className={`p-1 rounded-full transition-colors hover:bg-bg-hover ${severityClasses[concern.severity] || 'text-text-muted'}`}
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
         aria-label={`${concern.severity}: ${concern.title}`}
         title={concern.title}
       >
-        <span className="flagged-concern-icon" aria-hidden="true">
-          {getSeverityIcon()}
-        </span>
+        <AlertIcon size="sm" />
       </button>
 
       {isExpanded && (
-        <div className="flagged-concern-popover" role="dialog" aria-label={concern.title}>
-          <div className="flagged-concern-header">
-            <span className={`flagged-concern-severity flagged-concern-severity--${concern.severity}`}>
-              {concern.severity}
-            </span>
-            <span className="flagged-concern-title">{concern.title}</span>
+        <div
+          className={`absolute z-50 right-0 top-full mt-1 w-72 p-3 rounded-lg border shadow-lg ${severityBgClasses[concern.severity] || 'bg-bg-card border-border-subtle'}`}
+          role="dialog"
+          aria-label={concern.title}
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold uppercase ${severityClasses[concern.severity]}`}>
+                {concern.severity}
+              </span>
+              <span className="text-sm font-medium text-text-primary">{concern.title}</span>
+            </div>
+            <button
+              className="p-0.5 text-text-muted hover:text-text-primary"
+              onClick={() => setIsExpanded(false)}
+            >
+              <CloseIcon size="sm" />
+            </button>
           </div>
-          <p className="flagged-concern-description">{concern.description}</p>
+          <p className="text-sm text-text-secondary mb-3">{concern.description}</p>
           {concern.suggestions && concern.suggestions.length > 0 && (
-            <div className="flagged-concern-suggestions">
-              <strong>Suggestions:</strong>
-              <ul>
+            <div className="mb-3">
+              <strong className="text-xs text-text-muted uppercase tracking-wide">Suggestions:</strong>
+              <ul className="mt-1 list-disc list-inside text-sm text-text-secondary space-y-0.5">
                 {concern.suggestions.map((suggestion, idx) => (
                   <li key={idx}>{suggestion}</li>
                 ))}
               </ul>
             </div>
           )}
-          <div className="flagged-concern-actions">
-            <button className="btn btn-sm btn-secondary" onClick={() => onDismiss(concern.id)}>
+          <div className="flex justify-end gap-2">
+            <button
+              className="px-2 py-1 text-xs bg-bg-tertiary text-text-primary rounded hover:bg-bg-hover transition-colors"
+              onClick={() => onDismiss(concern.id)}
+            >
               Dismiss
-            </button>
-            <button className="btn btn-sm btn-link" onClick={() => setIsExpanded(false)}>
-              Close
             </button>
           </div>
         </div>
@@ -75,9 +84,7 @@ export function FlaggedConcernIndicator({ concern, onDismiss }: FlaggedConcernIn
 }
 
 interface StepConcernsProps {
-  /** Concerns for this step */
   concerns: FlaggedConcern[];
-  /** Callback to dismiss */
   onDismiss: (concernId: string) => void;
 }
 
@@ -90,7 +97,7 @@ export function StepConcerns({ concerns, onDismiss }: StepConcernsProps) {
   }
 
   return (
-    <div className="step-concerns">
+    <div className="flex items-center gap-1">
       {concerns.map((concern) => (
         <FlaggedConcernIndicator key={concern.id} concern={concern} onDismiss={onDismiss} />
       ))}

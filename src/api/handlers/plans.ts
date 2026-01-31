@@ -3,6 +3,9 @@ import type { PlanStorage, Session } from '../../storage/interface.js';
 import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createVersionFrom } from '../../domain/diff.js';
 import { PlanStatus } from '../../domain/status.js';
+import type { AttentionType } from '../../domain/attention.js';
+import { computeAttentionTypes, type AttentionInput } from '../../domain/compute-attention.js';
+import { getExecutionStatusBatch } from '../../orchestrator/client.js';
 import { notFound, badRequest } from '../middleware.js';
 import {
   CreatePlanRequestSchema,
@@ -13,10 +16,28 @@ import {
 import { isRelayAvailable } from '../../relay/service.js';
 import { createSpawner, type SpawnResult } from '../../relay/spawner.js';
 import { createMockSpawner } from '../../relay/mock-spawner.js';
+import { createPlanChannel, joinChannel, getPlanChannelId } from '../../relay/channels.js';
+import { notifyNewPlan } from '../../relay/planner-lead.js';
 import { randomUUID } from 'crypto';
 
 /** Default session expiration time (1 hour) */
 const SESSION_EXPIRATION_MS = 60 * 60 * 1000;
+
+/** Default organization slug for MVP (single-org mode) */
+const DEFAULT_ORG_SLUG = 'default';
+
+/**
+ * Get the default org_id from storage.
+ * In MVP single-org mode, we use the 'default' organization.
+ */
+function getDefaultOrgId(storage: PlanStorage): string {
+  const orgs = storage.listOrganizations();
+  const defaultOrg = orgs.find((o) => o.slug === DEFAULT_ORG_SLUG);
+  if (!defaultOrg) {
+    throw new Error('Default organization not found');
+  }
+  return defaultOrg.org_id;
+}
 
 /**
  * Create a session record for an agent.
@@ -71,13 +92,29 @@ export function createPlanHandlers(storage: PlanStorage) {
       try {
         const body = CreatePlanRequestSchema.parse(req.body);
 
-        // Create plan
-        const plan = createPlan();
+        // Get default org for MVP single-org mode
+        const orgId = getDefaultOrgId(storage);
+
+        // Create plan with org and optional initiative association
+        const plan = createPlan(orgId);
+        if (body.initiative_id) {
+          plan.initiative_id = body.initiative_id;
+        }
         storage.createPlan(plan);
 
         // Create initial draft version
         const version = createPlanVersion(plan.plan_id, body.goal, body.context);
         storage.createVersion(version);
+
+        // Create plan channel for relay communication
+        const channelId = createPlanChannel(plan.plan_id, body.goal);
+        if (channelId) {
+          console.log(`[plans] Created channel ${channelId} for plan ${plan.plan_id}`);
+          // Notify PlannerLead of the new plan (fire-and-forget, don't block API response)
+          notifyNewPlan(channelId, plan.plan_id, body.goal, body.context).catch((err) => {
+            console.error('[plans] Failed to notify PlannerLead:', err);
+          });
+        }
 
         // Spawn planning agent if AI assistance requested
         let agent: SpawnResult | null = null;
@@ -120,27 +157,112 @@ export function createPlanHandlers(storage: PlanStorage) {
      * GET /plans
      * List all plans, optionally filtered by status.
      * Returns PlanSummary objects with goal, status, and latest_version.
+     * When include_attention=true, includes attention_types array for each plan.
      */
-    list: (req: Request, res: Response, next: NextFunction) => {
+    list: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const query = ListPlansQuerySchema.parse(req.query);
-        const plans = storage.listPlans(query.status);
 
-        // Enrich plans with version data to create PlanSummary objects
-        const planSummaries = plans.map((plan) => {
-          const latestVersion = storage.getLatestVersion(plan.plan_id);
+        // Build filter from query params
+        const filter: { status?: PlanStatus; initiative_id?: string } = {};
+        if (query.status) {
+          filter.status = query.status;
+        }
+        if (query.initiative_id) {
+          filter.initiative_id = query.initiative_id;
+        }
+
+        // Standard flow without attention data
+        if (!query.include_attention) {
+          const plans = storage.listPlans(filter);
+          const planSummaries = plans.map((plan) => {
+            const latestVersion = storage.getLatestVersion(plan.plan_id);
+            const scopes = latestVersion?.steps
+              ? [...new Set(latestVersion.steps.map((s) => s.scope).filter(Boolean))]
+              : [];
+
+            // Include initiative data if plan has initiative_id
+            let initiative = undefined;
+            if (plan.initiative_id) {
+              const init = storage.getInitiative(plan.initiative_id);
+              if (init) {
+                initiative = {
+                  initiative_id: init.initiative_id,
+                  name: init.name,
+                  icon: init.icon,
+                  color: init.color,
+                };
+              }
+            }
+
+            return {
+              plan_id: plan.plan_id,
+              goal: latestVersion?.summary?.goal || '',
+              status: latestVersion?.status || PlanStatus.Draft,
+              latest_version: latestVersion?.version || 1,
+              scopes,
+              initiative_id: plan.initiative_id,
+              initiative,
+              created_at: plan.created_at,
+              updated_at: plan.updated_at,
+            };
+          });
+          res.json({ plans: planSummaries });
+          return;
+        }
+
+        // Enhanced flow with attention data
+        const plansWithData = storage.listPlansWithAttention(filter);
+        const planIds = plansWithData.map((p) => p.plan.plan_id);
+
+        // Fetch execution status from orchestrator (graceful degradation)
+        const executionStatusMap = await getExecutionStatusBatch(planIds);
+
+        // Compute attention types for each plan
+        const planSummaries = plansWithData.map((data) => {
+          const { plan, latestVersion, pendingChangeRequestCount, unresolvedCommentCount } = data;
+
+          // Build attention input
+          const attentionInput: AttentionInput = {
+            plan,
+            latestVersion,
+            pendingChangeRequests: pendingChangeRequestCount,
+            executionStatus: executionStatusMap.get(plan.plan_id) ?? null,
+            unresolvedCommentCount,
+          };
+
+          const attentionTypes: AttentionType[] = computeAttentionTypes(attentionInput);
+
           // Extract unique scopes from steps
           const scopes = latestVersion?.steps
             ? [...new Set(latestVersion.steps.map((s) => s.scope).filter(Boolean))]
             : [];
+
+          // Include initiative data if plan has initiative_id
+          let initiative = undefined;
+          if (plan.initiative_id) {
+            const init = storage.getInitiative(plan.initiative_id);
+            if (init) {
+              initiative = {
+                initiative_id: init.initiative_id,
+                name: init.name,
+                icon: init.icon,
+                color: init.color,
+              };
+            }
+          }
+
           return {
             plan_id: plan.plan_id,
             goal: latestVersion?.summary?.goal || '',
             status: latestVersion?.status || PlanStatus.Draft,
             latest_version: latestVersion?.version || 1,
             scopes,
+            initiative_id: plan.initiative_id,
+            initiative,
             created_at: plan.created_at,
             updated_at: plan.updated_at,
+            attention_types: attentionTypes,
           };
         });
 
@@ -164,6 +286,10 @@ export function createPlanHandlers(storage: PlanStorage) {
 
         const latestVersion = storage.getLatestVersion(id);
 
+        // Auto-join user to plan channel
+        const channelId = getPlanChannelId(id);
+        joinChannel(channelId, 'user');
+
         res.json({
           plan,
           version: latestVersion,
@@ -175,7 +301,9 @@ export function createPlanHandlers(storage: PlanStorage) {
 
     /**
      * PUT /plans/:id
-     * Update the draft version of a plan.
+     * Update plan metadata (initiative_id) and/or draft version content.
+     * - initiative_id can be updated regardless of version status
+     * - goal, context, steps require draft status
      */
     update: (req: Request<IdParams>, res: Response, next: NextFunction) => {
       try {
@@ -192,28 +320,50 @@ export function createPlanHandlers(storage: PlanStorage) {
           throw notFound('Version');
         }
 
-        if (latestVersion.status !== PlanStatus.Draft) {
-          throw badRequest('Cannot update approved or published version');
+        // Update initiative_id if provided (plan-level, allowed regardless of version status)
+        let updatedPlan = plan;
+        if (body.initiative_id !== undefined) {
+          const result = storage.updatePlan(id, { initiative_id: body.initiative_id });
+          if (!result) {
+            throw notFound('Plan');
+          }
+          updatedPlan = result;
         }
 
-        // Create updated version (new version number)
-        const newVersion = createVersionFrom(latestVersion);
-        if (body.goal !== undefined) {
-          newVersion.summary.goal = body.goal;
-        }
-        if (body.context !== undefined) {
-          newVersion.summary.context = body.context;
-        }
-        if (body.steps !== undefined) {
-          newVersion.steps = body.steps;
-        }
+        // Check if there are version-level updates
+        const hasVersionUpdates = body.goal !== undefined || body.context !== undefined || body.steps !== undefined;
 
-        storage.createVersion(newVersion);
+        if (hasVersionUpdates) {
+          // Version updates require draft status
+          if (latestVersion.status !== PlanStatus.Draft) {
+            throw badRequest('Cannot update approved or published version');
+          }
 
-        res.json({
-          plan,
-          version: newVersion,
-        });
+          // Create updated version (new version number)
+          const newVersion = createVersionFrom(latestVersion);
+          if (body.goal !== undefined) {
+            newVersion.summary.goal = body.goal;
+          }
+          if (body.context !== undefined) {
+            newVersion.summary.context = body.context;
+          }
+          if (body.steps !== undefined) {
+            newVersion.steps = body.steps;
+          }
+
+          storage.createVersion(newVersion);
+
+          res.json({
+            plan: updatedPlan,
+            version: newVersion,
+          });
+        } else {
+          // Only plan-level updates, return existing version
+          res.json({
+            plan: updatedPlan,
+            version: latestVersion,
+          });
+        }
       } catch (err) {
         next(err);
       }

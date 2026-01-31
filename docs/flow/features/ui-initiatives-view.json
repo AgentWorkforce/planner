@@ -1,0 +1,453 @@
+{
+  "feature_id": "ui-initiatives-view",
+  "title": "Initiatives View",
+  "type": "feature",
+  "status": "completed",
+  "priority": "medium",
+  "dependencies": ["schema-org-initiative", "ui-sidebar-layout"],
+  "audit_note": "All 14 implementation steps completed. API client with full CRUD (createInitiative, updateInitiative, deleteInitiative, reorderInitiatives). TypeScript types (InitiativeStatus, PlanCounts, InitiativeWithPlanCounts, InitiativeWithPlans). Custom components: ColorPicker (6 preset colors), IconPicker (emoji grid). InitiativeCard showing icon, name, description preview, status badge, plan counts. InitiativeModal for create/edit with form validation. InitiativesListPage with drag-drop reorder via @dnd-kit, status filtering, empty state. InitiativeDetailPage with full details, actions menu, plans list. Routes /initiatives and /initiatives/:id added to App.tsx. Skeleton component for loading states. Tests for components and pages all passing.",
+
+  "summary": {
+    "goal": "Create dedicated view to list, create, and manage initiatives",
+    "context": "Initiatives group related plans. This view provides CRUD for initiatives and shows aggregate stats (plan counts by status, progress). Accessible via sidebar 'Initiatives' link or clicking section header.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Route /initiatives shows all initiatives in card grid" },
+      { "id": "ac2", "description": "Each initiative card shows: icon, name, description preview, status badge" },
+      { "id": "ac3", "description": "Each initiative card shows plan counts: total, draft, approved, published" },
+      { "id": "ac4", "description": "Initiative cards are clickable, navigate to /initiatives/:id (initiative detail)" },
+      { "id": "ac5", "description": "Initiative detail view shows full description, all plans in list, edit/archive actions" },
+      { "id": "ac6", "description": "New Initiative modal: name (required), description (optional), icon picker, color picker" },
+      { "id": "ac7", "description": "Edit Initiative modal: same fields as create, plus archive action" },
+      { "id": "ac8", "description": "Filter by status: active, completed, archived" },
+      { "id": "ac9", "description": "Empty state when no initiatives: prompt to create first" },
+      { "id": "ac10", "description": "Drag-drop reorder initiatives (persists order)" }
+    ]
+  },
+
+  "design_spec": {
+    "shadcn_components": [
+      "Card",
+      "Dialog",
+      "DropdownMenu",
+      "Input",
+      "Button",
+      "Badge",
+      "Select",
+      "Tooltip"
+    ],
+    "views": [
+      {
+        "view_id": "initiatives-list",
+        "name": "Initiatives List",
+        "route": "/initiatives",
+        "layout": "responsive card grid, 3 cols desktop, 2 cols tablet, 1 col mobile",
+        "elements": [
+          { "component": "PageToolbar", "use": "filters + actions", "props": "status filter Select, New Initiative Button" },
+          { "component": "InitiativeCard", "use": "each initiative", "custom": true }
+        ]
+      },
+      {
+        "view_id": "initiative-card",
+        "name": "Initiative Card",
+        "layout": "bg-bg-card rounded-xl p-4, hover:border-border-default",
+        "elements": [
+          { "component": "header", "use": "icon + name", "props": "emoji/icon with color bg, font-display font-semibold" },
+          { "component": "description", "use": "preview", "props": "text-text-secondary, line-clamp-2" },
+          { "component": "stats-bar", "use": "plan counts", "props": "flex row, total|draft|approved|published counts" },
+          { "component": "Badge", "use": "status", "props": "active=green, completed=cyan, archived=muted" }
+        ],
+        "states": {
+          "hover": "border-border-default, cursor-pointer",
+          "click": "navigate to /initiatives/:id"
+        }
+      },
+      {
+        "view_id": "initiative-detail",
+        "name": "Initiative Detail",
+        "route": "/initiatives/:id",
+        "layout": "single column, max-w-4xl",
+        "elements": [
+          { "component": "header", "use": "icon + name + actions", "props": "edit button, archive DropdownMenu" },
+          { "component": "description", "use": "full text", "props": "prose formatting" },
+          { "component": "plans-list", "use": "all plans in initiative", "props": "reuse PlanCard component" }
+        ]
+      },
+      {
+        "view_id": "initiative-modal",
+        "name": "New/Edit Initiative Modal",
+        "layout": "Dialog, max-w-md",
+        "elements": [
+          { "component": "Input", "use": "name", "props": "required, autofocus" },
+          { "component": "Textarea", "use": "description", "props": "optional, 3 rows" },
+          { "component": "IconPicker", "use": "icon selection", "custom": true, "props": "emoji grid" },
+          { "component": "ColorPicker", "use": "color selection", "custom": true, "props": "preset swatches" },
+          { "component": "Button", "use": "submit", "props": "primary, 'Create Initiative' or 'Save Changes'" }
+        ]
+      },
+      {
+        "view_id": "empty-state",
+        "name": "No Initiatives",
+        "layout": "centered, max-w-sm",
+        "elements": [
+          { "component": "illustration", "use": "empty graphic", "props": "muted icon or illustration" },
+          { "component": "text", "use": "message", "props": "'No initiatives yet'" },
+          { "component": "Button", "use": "cta", "props": "primary, 'Create your first initiative'" }
+        ]
+      }
+    ],
+    "custom_needed": [
+      "InitiativeCard - Card variant with icon, stats bar, status badge",
+      "IconPicker - Grid of emoji/icons, click to select",
+      "ColorPicker - Preset color swatches (cyan, purple, green, orange, pink, yellow)"
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "i001",
+        "title": "Extend initiatives API client with CRUD operations",
+        "scope": "planner-ui",
+        "description": "Add API client functions to src/api/initiatives.ts for full CRUD: createInitiative, updateInitiative, deleteInitiative, reorderInitiatives. Export from src/api/index.ts. These consume backend endpoints from schema-org-initiative.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createInitiative({ name, description?, icon?, color? }) returns Promise<{ initiative: Initiative }>" },
+          { "id": "ac2", "description": "updateInitiative(id, { name?, description?, icon?, color?, status? }) returns Promise<{ initiative: Initiative }>" },
+          { "id": "ac3", "description": "deleteInitiative(id) returns Promise<void> (archives via status='archived')" },
+          { "id": "ac4", "description": "reorderInitiatives(ids: string[]) returns Promise<void> (sets display_order)" },
+          { "id": "ac5", "description": "All functions exported from src/api/index.ts" }
+        ],
+        "integration": true,
+        "notes": "listInitiatives and getInitiative already added by ui-sidebar-layout feature"
+      },
+      {
+        "step_id": "i002",
+        "title": "Add Initiative TypeScript types",
+        "scope": "planner-ui",
+        "description": "Add/extend Initiative types in src/types.ts to match backend schema. Include InitiativeStatus enum, PlanCounts type for stats.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativeStatus = 'active' | 'completed' | 'archived'" },
+          { "id": "ac2", "description": "PlanCounts = { total: number, draft: number, approved: number, published: number }" },
+          { "id": "ac3", "description": "Initiative type includes: initiative_id, org_id, name, description?, status, icon?, color?, display_order, plan_count or plan_counts, created_at, updated_at" },
+          { "id": "ac4", "description": "InitiativeWithPlans extends Initiative with plans: PlanSummary[]" }
+        ]
+      },
+      {
+        "step_id": "i003",
+        "title": "Create useInitiative hook for single initiative",
+        "scope": "planner-ui",
+        "description": "Create src/hooks/useInitiative.ts that fetches a single initiative with its plans. Handles loading, error, refetch.",
+        "dependencies": ["i001", "i002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useInitiative(id) returns { initiative: InitiativeWithPlans | null, isLoading, error, refetch }" },
+          { "id": "ac2", "description": "Calls getInitiative(id) which returns initiative with nested plans array" },
+          { "id": "ac3", "description": "Hook exported from src/hooks/index.ts" }
+        ]
+      },
+      {
+        "step_id": "i004",
+        "title": "Create ColorPicker component",
+        "scope": "planner-ui",
+        "description": "Create src/components/ColorPicker.tsx with preset color swatches matching design system. Grid of clickable swatches, selected state shown with ring.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ColorPicker accepts { value, onChange, className? } props" },
+          { "id": "ac2", "description": "Renders 6 preset colors: cyan (#00d9ff), purple (#a855f7), green (#00ffc8), orange (#ff6b35), pink (#f472b6), yellow (#facc15)" },
+          { "id": "ac3", "description": "Each swatch is 24x24px circle, arranged in row with gap-2" },
+          { "id": "ac4", "description": "Selected swatch has ring-2 ring-offset-2 ring-offset-bg-card" },
+          { "id": "ac5", "description": "Clicking swatch calls onChange(colorHex)" }
+        ]
+      },
+      {
+        "step_id": "i005",
+        "title": "Create IconPicker component",
+        "scope": "planner-ui",
+        "description": "Create src/components/IconPicker.tsx with grid of emoji/icons to select. Includes common initiative emojis and option to type custom emoji.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "IconPicker accepts { value, onChange, className? } props" },
+          { "id": "ac2", "description": "Renders grid of 12-16 preset emojis: rocket, target, flag, star, lightning, folder, briefcase, chart, etc." },
+          { "id": "ac3", "description": "Each emoji button is 32x32px with hover:bg-bg-tertiary" },
+          { "id": "ac4", "description": "Selected emoji has bg-accent-cyan/10 border-accent-cyan ring" },
+          { "id": "ac5", "description": "Small input below grid allows typing custom emoji" },
+          { "id": "ac6", "description": "Clicking emoji or typing in input calls onChange(emoji)" }
+        ]
+      },
+      {
+        "step_id": "i006",
+        "title": "Create InitiativeCard component",
+        "scope": "planner-ui",
+        "description": "Create src/components/InitiativeCard.tsx per design_spec. Shows icon with color bg, name, description preview, status badge, plan counts stats bar. Clickable, navigates to detail view.",
+        "dependencies": ["i002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativeCard accepts { initiative: Initiative, className? } props" },
+          { "id": "ac2", "description": "Header row: icon (32x32 rounded bg with emoji), name (font-display font-semibold truncate)" },
+          { "id": "ac3", "description": "Description: text-text-secondary text-sm line-clamp-2, min-h to prevent layout shift" },
+          { "id": "ac4", "description": "Stats bar: row of counts - total plans, draft, approved, published with colored dots" },
+          { "id": "ac5", "description": "Status badge: active=accent-green, completed=accent-cyan, archived=text-muted" },
+          { "id": "ac6", "description": "Card: bg-bg-card border border-border-subtle rounded-xl p-4 hover:border-border-default transition-all cursor-pointer" },
+          { "id": "ac7", "description": "Wraps in Link to /initiatives/{initiative_id}" }
+        ]
+      },
+      {
+        "step_id": "i007",
+        "title": "Create InitiativeModal component",
+        "scope": "planner-ui",
+        "description": "Create src/components/InitiativeModal.tsx for create/edit. Uses Dialog from design system. Form with name input, description textarea, IconPicker, ColorPicker. Submit button, loading state.",
+        "dependencies": ["i001", "i004", "i005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativeModal accepts { open, onOpenChange, initiative?, onSuccess } props" },
+          { "id": "ac2", "description": "If initiative prop provided, populates form for edit mode, title='Edit Initiative'" },
+          { "id": "ac3", "description": "If no initiative, create mode, title='New Initiative'" },
+          { "id": "ac4", "description": "Form fields: name (required, autofocus), description (optional, Textarea 3 rows), icon (IconPicker), color (ColorPicker)" },
+          { "id": "ac5", "description": "Submit calls createInitiative or updateInitiative, shows loading spinner, calls onSuccess on completion" },
+          { "id": "ac6", "description": "Cancel button closes modal without action" },
+          { "id": "ac7", "description": "Form validation: name required, min 1 char" }
+        ]
+      },
+      {
+        "step_id": "i008",
+        "title": "Create InitiativesListPage component",
+        "scope": "planner-ui",
+        "description": "Create src/pages/InitiativesListPage.tsx showing all initiatives in responsive grid. Header with title, New Initiative button, status filter. Empty state when no initiatives.",
+        "dependencies": ["i006", "i007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Page header: 'Initiatives' title, description, New Initiative button (opens modal)" },
+          { "id": "ac2", "description": "Filter row: status filter (All, Active, Completed, Archived) as button group" },
+          { "id": "ac3", "description": "Grid: grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
+          { "id": "ac4", "description": "Each initiative rendered with InitiativeCard" },
+          { "id": "ac5", "description": "Loading state: skeleton grid of 6 cards" },
+          { "id": "ac6", "description": "Empty state: centered message with TargetIcon, 'No initiatives yet', 'Create your first initiative' button" },
+          { "id": "ac7", "description": "Uses useInitiatives hook from ui-sidebar-layout" }
+        ]
+      },
+      {
+        "step_id": "i009",
+        "title": "Create InitiativeDetailPage component",
+        "scope": "planner-ui",
+        "description": "Create src/pages/InitiativeDetailPage.tsx showing single initiative detail. Header with icon, name, edit/archive actions. Full description. Plans list using PlanCard.",
+        "dependencies": ["i003", "i007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header: large icon (48x48 with color bg), name (text-2xl font-display), status badge" },
+          { "id": "ac2", "description": "Actions: Edit button (opens InitiativeModal in edit mode), dropdown with Archive option" },
+          { "id": "ac3", "description": "Description section: full text with prose formatting if description exists" },
+          { "id": "ac4", "description": "Plans section: 'Plans in this Initiative' heading with count, list of PlanCard components" },
+          { "id": "ac5", "description": "Empty plans state: 'No plans in this initiative yet', link to create plan with initiative pre-selected" },
+          { "id": "ac6", "description": "Loading state: skeleton for header + plan cards" },
+          { "id": "ac7", "description": "Archive action: confirms, calls deleteInitiative (sets status=archived), navigates to /initiatives" },
+          { "id": "ac8", "description": "Uses useInitiative(id) hook" }
+        ]
+      },
+      {
+        "step_id": "i010",
+        "title": "Add routes for initiatives pages",
+        "scope": "planner-ui",
+        "description": "Add routes to React Router config: /initiatives -> InitiativesListPage, /initiatives/:id -> InitiativeDetailPage.",
+        "dependencies": ["i008", "i009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Route /initiatives renders InitiativesListPage within Layout" },
+          { "id": "ac2", "description": "Route /initiatives/:id renders InitiativeDetailPage within Layout" },
+          { "id": "ac3", "description": "Routes lazy-loaded for code splitting" },
+          { "id": "ac4", "description": "Sidebar navigation link to /initiatives works" }
+        ]
+      },
+      {
+        "step_id": "i011",
+        "title": "Add drag-drop reorder for initiatives",
+        "scope": "planner-ui",
+        "description": "Add drag-drop reordering to InitiativesListPage using @dnd-kit. Reorder persists via reorderInitiatives API call.",
+        "dependencies": ["i008", "i001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "@dnd-kit/core and @dnd-kit/sortable installed in package.json" },
+          { "id": "ac2", "description": "InitiativesListPage wraps grid in DndContext with SortableContext" },
+          { "id": "ac3", "description": "Each InitiativeCard wrapped in useSortable for drag handle" },
+          { "id": "ac4", "description": "Drag indicator: grab cursor, slight lift on drag, drop preview" },
+          { "id": "ac5", "description": "onDragEnd calls reorderInitiatives(newOrder) with initiative IDs in new order" },
+          { "id": "ac6", "description": "Optimistic update: reorder locally before API confirms" },
+          { "id": "ac7", "description": "Error handling: revert to original order if API fails, show toast" }
+        ]
+      },
+      {
+        "step_id": "i012",
+        "title": "Create InitiativeCardSkeleton component",
+        "scope": "planner-ui",
+        "description": "Create skeleton loading state component matching InitiativeCard dimensions for smooth loading experience.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativeCardSkeleton matches InitiativeCard dimensions (same padding, border-radius)" },
+          { "id": "ac2", "description": "Animated shimmer effect using bg-bg-tertiary with pulse animation" },
+          { "id": "ac3", "description": "Skeleton shapes: icon circle, name bar, description lines, stats row" },
+          { "id": "ac4", "description": "Exported alongside InitiativeCard for use in loading states" }
+        ]
+      },
+      {
+        "step_id": "i013",
+        "title": "Write tests for initiative components",
+        "scope": "planner-ui",
+        "description": "Add tests for InitiativeCard, InitiativeModal, ColorPicker, IconPicker. Cover rendering, interactions, form validation.",
+        "dependencies": ["i004", "i005", "i006", "i007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativeCard.test.tsx: renders name, description, status, stats; click navigates" },
+          { "id": "ac2", "description": "InitiativeModal.test.tsx: create mode renders empty form; edit mode populates; submit calls API" },
+          { "id": "ac3", "description": "ColorPicker.test.tsx: renders swatches, click fires onChange, selected state shown" },
+          { "id": "ac4", "description": "IconPicker.test.tsx: renders grid, click fires onChange, selected state shown" },
+          { "id": "ac5", "description": "All tests pass: npm run test" }
+        ]
+      },
+      {
+        "step_id": "i014",
+        "title": "Write tests for initiative pages",
+        "scope": "planner-ui",
+        "description": "Add tests for InitiativesListPage and InitiativeDetailPage. Cover loading, error, empty states, filtering, navigation.",
+        "dependencies": ["i008", "i009", "i010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativesListPage.test.tsx: loading skeleton, renders cards, filter works, empty state" },
+          { "id": "ac2", "description": "InitiativeDetailPage.test.tsx: loading, renders initiative details, plans list, edit/archive actions" },
+          { "id": "ac3", "description": "Tests mock API calls appropriately" },
+          { "id": "ac4", "description": "All tests pass: npm run test" }
+        ]
+      }
+    ]
+  },
+
+  "validation_uiux": {
+    "env": "local",
+    "viewport": "desktop",
+    "validated_at": "2026-01-30",
+    "focus": "creating new initiative flow/sheet",
+    "steps": [
+      {
+        "step_id": "v001",
+        "action": "Click 'New Initiative' button on /initiatives page",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Button in header with + icon, uses primary cyan styling, clearly visible"
+      },
+      {
+        "step_id": "v002",
+        "action": "Verify New Initiative sheet/dialog opens",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Clean slide-in sheet from right. Title 'New Initiative' with helpful description. Close button in top right."
+      },
+      {
+        "step_id": "v003",
+        "action": "Verify Name field is required and autofocused",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Name field has asterisk (*) indicating required. Autofocused on open. Good placeholder text 'e.g., Q1 Product Launch'. Cyan ring on focus."
+      },
+      {
+        "step_id": "v004",
+        "action": "Verify Description field is optional",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Textarea without asterisk. Good placeholder 'Optional description of this initiative...'"
+      },
+      {
+        "step_id": "v005",
+        "action": "Verify Icon picker with preset emojis and custom input",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "16 preset emoji icons in 2-row grid. Selected state shows cyan ring. Custom emoji input below grid labeled 'Or type a custom emoji'. Rocket (🚀) selected by default."
+      },
+      {
+        "step_id": "v006",
+        "action": "Verify Color picker with 6 preset colors",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "6 color swatches in row: cyan, purple, green, orange, pink, yellow. Selected state shows ring. Cyan selected by default. Colors match design system."
+      },
+      {
+        "step_id": "v007",
+        "action": "Verify Create Initiative button state",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Button disabled (grayed out) when name empty. Enables with primary cyan styling when name has content. Good visual feedback for form validity."
+      },
+      {
+        "step_id": "v008",
+        "action": "Submit form and verify initiative created",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Form submits successfully. Dialog closes automatically. New initiative appears in sidebar under INITIATIVES section and in main card grid."
+      },
+      {
+        "step_id": "v009",
+        "action": "Verify newly created initiative card displays correctly",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Card shows: icon (🚀), name, status badge (ACTIVE), 'No description' text, '0 plans'. Sidebar shows initiative with cyan color dot."
+      },
+      {
+        "step_id": "v010",
+        "action": "Verify initiative card navigates to detail page",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Clicking card navigates to /initiatives/:id. Detail page shows header with icon, name, status, Edit/Archive buttons."
+      },
+      {
+        "step_id": "v011",
+        "action": "Verify Edit modal pre-populates form",
+        "present": "pass",
+        "designed": "pass",
+        "holistic": "pass",
+        "notes": "Edit button opens same sheet with title 'Edit Initiative'. Form pre-populated with current name, icon (🚀 checked), color (cyan checked). Button says 'Save Changes'."
+      }
+    ],
+    "summary": {
+      "present": "pass",
+      "designed": "pass",
+      "holistic": "pass",
+      "blockers": 0,
+      "majors": 0,
+      "minors": 1
+    },
+    "issues": [
+      {
+        "severity": "minor",
+        "issue": "Initiative cards show only total plan count ('0 plans'), not breakdown by status (draft/approved/published)",
+        "acceptance_criteria": "ac3",
+        "fix": "Update InitiativeCard to show plan_counts breakdown if available from API, or simplify ac3 to just show total"
+      }
+    ],
+    "recommendations": [
+      {
+        "type": "enhancement",
+        "description": "Consider adding loading spinner on Create/Save button during submission",
+        "rationale": "Provides feedback during API call, prevents double-submit"
+      },
+      {
+        "type": "enhancement",
+        "description": "Consider adding success toast after initiative creation",
+        "rationale": "Confirms action completed, especially useful if user clicks away quickly"
+      }
+    ]
+  }
+}

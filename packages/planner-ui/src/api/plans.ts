@@ -10,8 +10,29 @@ import type {
 
 // Plan operations
 
-export async function listPlans(status?: PlanStatus): Promise<{ plans: PlanSummary[] }> {
-  const query = status ? `?status=${status}` : '';
+export interface ListPlansParams {
+  status?: PlanStatus;
+  initiative_id?: string;
+  owner_user_id?: string;
+  include_attention?: boolean;
+}
+
+export async function listPlans(
+  params?: ListPlansParams
+): Promise<{ plans: PlanSummary[] }> {
+  const searchParams = new URLSearchParams();
+
+  if (params) {
+    if (params.status) searchParams.set('status', params.status);
+    if (params.initiative_id) searchParams.set('initiative_id', params.initiative_id);
+    if (params.owner_user_id) searchParams.set('owner_user_id', params.owner_user_id);
+    if (params.include_attention !== false) searchParams.set('include_attention', 'true');
+  } else {
+    // Default: include attention types
+    searchParams.set('include_attention', 'true');
+  }
+
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
   return get<{ plans: PlanSummary[] }>(`/plans${query}`);
 }
 
@@ -25,7 +46,7 @@ export async function createPlan(goal: string, context?: string): Promise<PlanWi
 
 export async function updatePlan(
   planId: string,
-  data: { goal?: string; context?: string; steps?: Step[] }
+  data: { goal?: string; context?: string; steps?: Step[]; initiative_id?: string | null }
 ): Promise<PlanWithVersion> {
   return put<PlanWithVersion>(`/plans/${planId}`, data);
 }

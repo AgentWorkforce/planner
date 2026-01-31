@@ -5,17 +5,29 @@
  * PlanVersion format, and inserts into SQLite database.
  *
  * Key behavior:
+ * - Idempotent: safe to re-run to pick up new features or changes
+ * - Uses deterministic UUIDs: same feature_id always produces same plan_id
  * - Regular features: steps from plan_implementation.steps
  * - Epics (with sub_features): creates steps pointing to child plans via sub_plan_id
+ *
+ * Re-running will:
+ * - Update existing plans with any changes
+ * - Add new plans for new features
+ * - Remove steps that no longer exist in the flow files
  */
 
 import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+
+// Namespace UUID for generating deterministic UUIDs from feature_id
+// This ensures the same feature_id always produces the same plan_id
+const NAMESPACE_UUID = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace (standard)
 
 interface FlowAcceptanceCriterion {
   id: string;
@@ -76,8 +88,32 @@ interface FlowCatalog {
   }>;
 }
 
-function generateUUID(): string {
-  return crypto.randomUUID();
+/**
+ * Generate a deterministic UUID v5 from a feature_id.
+ * Uses SHA-1 hash of namespace + name, formatted as UUID.
+ * This ensures the same feature_id always produces the same plan_id.
+ */
+function deterministicUUID(featureId: string): string {
+  // Create SHA-1 hash of namespace + feature_id
+  const hash = createHash('sha1');
+
+  // Parse namespace UUID to bytes
+  const namespaceBytes = NAMESPACE_UUID.replace(/-/g, '');
+  const namespaceBuffer = Buffer.from(namespaceBytes, 'hex');
+
+  hash.update(namespaceBuffer);
+  hash.update(featureId);
+
+  const hashBytes = hash.digest();
+
+  // Format as UUID v5:
+  // Set version (5) in byte 6, variant (10xx) in byte 8
+  hashBytes[6] = (hashBytes[6] & 0x0f) | 0x50; // version 5
+  hashBytes[8] = (hashBytes[8] & 0x3f) | 0x80; // variant 10xx
+
+  // Format as UUID string
+  const hex = hashBytes.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 function mapStatus(flowStatus: string): 'draft' | 'approved' | 'published' {
@@ -166,12 +202,18 @@ async function migrate() {
     VALUES (?, ?, ?, ?, ?)
   `);
 
+  // Delete existing steps for a plan/version (to handle removed steps on re-migration)
+  const deleteSteps = db.prepare(`
+    DELETE FROM steps WHERE plan_id = ? AND version = ?
+  `);
+
   // Track feature_id -> plan_id mapping for consistent references
+  // Uses deterministic UUIDs so re-running migration updates existing records
   const featureIdToPlanId = new Map<string, string>();
 
-  // First pass: assign UUIDs to all features
+  // First pass: generate deterministic UUIDs for all features
   for (const [featureId] of allFeatures) {
-    featureIdToPlanId.set(featureId, generateUUID());
+    featureIdToPlanId.set(featureId, deterministicUUID(featureId));
   }
 
   const now = new Date().toISOString();
@@ -263,7 +305,9 @@ async function migrate() {
         }
       }
 
-      // Insert steps
+      // Delete existing steps and insert fresh (handles removed steps)
+      deleteSteps.run(planId, 1);
+
       let stepOrder = 0;
       for (const step of stepsToInsert) {
         insertStep.run(planId, 1, step.step_id, stepOrder++, JSON.stringify(step));
@@ -285,10 +329,11 @@ async function migrate() {
   transaction();
 
   console.log(`\nMigration complete!`);
-  console.log(`  Plans imported: ${importedCount}`);
+  console.log(`  Plans imported/updated: ${importedCount}`);
   console.log(`  Steps imported: ${stepsCount}`);
   console.log(`  Epics with sub-plans: ${epicsWithSubPlans}`);
   console.log(`  Database: ${dbPath}`);
+  console.log(`\n  Note: Uses deterministic UUIDs - safe to re-run for updates.`);
 
   db.close();
 }

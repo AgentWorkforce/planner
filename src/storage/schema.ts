@@ -2,6 +2,9 @@
  * SQLite database schema definitions for planner-core.
  *
  * Tables:
+ * - organizations: stores Organization entities
+ * - initiatives: stores Initiative entities within organizations
+ * - org_members: stores organization membership with roles
  * - plans: stores Plan entities
  * - versions: stores PlanVersion entities (with summary as JSON)
  * - steps: stores Step entities for each version (with full step data as JSON)
@@ -10,13 +13,33 @@
 /**
  * SQL to create the plans table.
  * Primary key is plan_id (UUID).
+ * Plans belong to an organization and optionally an initiative.
  */
 export const CREATE_PLANS_TABLE = `
 CREATE TABLE IF NOT EXISTS plans (
   plan_id TEXT PRIMARY KEY NOT NULL,
+  org_id TEXT NOT NULL,
+  initiative_id TEXT,
+  owner_user_id TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (org_id) REFERENCES organizations(org_id) ON DELETE CASCADE,
+  FOREIGN KEY (initiative_id) REFERENCES initiatives(initiative_id) ON DELETE SET NULL
 )
+`;
+
+/**
+ * Index for faster lookups by org_id on plans table.
+ */
+export const CREATE_PLANS_ORG_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_plans_org_id ON plans(org_id)
+`;
+
+/**
+ * Index for faster lookups by initiative_id on plans table.
+ */
+export const CREATE_PLANS_INITIATIVE_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_plans_initiative_id ON plans(initiative_id)
 `;
 
 /**
@@ -33,6 +56,7 @@ CREATE TABLE IF NOT EXISTS versions (
   submitted_at TEXT,
   approval_info_json TEXT,
   change_request_id TEXT,
+  metadata_json TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (plan_id, version),
@@ -233,10 +257,169 @@ CREATE INDEX IF NOT EXISTS idx_improvements_status ON improvements(plan_id, vers
 `;
 
 /**
+ * SQL to create the questions table.
+ * Stores agent questions awaiting human answers with priority-based queue management.
+ */
+export const CREATE_QUESTIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS questions (
+  question_id TEXT PRIMARY KEY NOT NULL,
+  plan_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  agent_role TEXT NOT NULL,
+  text TEXT NOT NULL,
+  context TEXT,
+  options_json TEXT,
+  blocking_level TEXT NOT NULL CHECK (blocking_level IN ('hard_block', 'soft_block', 'preference', 'fyi')),
+  steps_blocked INTEGER NOT NULL DEFAULT 0,
+  can_use_default INTEGER NOT NULL DEFAULT 0,
+  default_value TEXT,
+  subscribers_json TEXT NOT NULL DEFAULT '[]',
+  merged_from_json TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'answered', 'dismissed')),
+  answer TEXT,
+  answered_at TEXT,
+  priority_score INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by plan_id on questions table.
+ */
+export const CREATE_QUESTIONS_PLAN_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_questions_plan_id ON questions(plan_id)
+`;
+
+/**
+ * Index for priority-based sorting of pending questions.
+ */
+export const CREATE_QUESTIONS_PRIORITY_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_questions_priority ON questions(plan_id, status, priority_score DESC)
+`;
+
+/**
+ * Index for deduplication checks (agent_id + text prefix).
+ */
+export const CREATE_QUESTIONS_DEDUP_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_questions_dedup ON questions(plan_id, agent_id, status)
+`;
+
+/**
+ * SQL to create the trajectory_events table.
+ * Stores decision events from user trajectory during plan sessions.
+ */
+export const CREATE_TRAJECTORY_EVENTS_TABLE = `
+CREATE TABLE IF NOT EXISTS trajectory_events (
+  event_id TEXT PRIMARY KEY NOT NULL,
+  type TEXT NOT NULL DEFAULT 'decision',
+  question_id TEXT NOT NULL,
+  asking_agent TEXT NOT NULL,
+  question_text TEXT NOT NULL,
+  context_provided TEXT,
+  options_presented_json TEXT NOT NULL,
+  selected_option TEXT,
+  free_text_response TEXT,
+  reasoning TEXT,
+  plan_id TEXT NOT NULL,
+  step_id TEXT,
+  agent_trajectory_ref TEXT,
+  timestamp TEXT NOT NULL,
+  FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by plan_id on trajectory_events table.
+ */
+export const CREATE_TRAJECTORY_EVENTS_PLAN_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_trajectory_events_plan_id ON trajectory_events(plan_id)
+`;
+
+/**
+ * Index for faster lookups by asking_agent on trajectory_events table.
+ */
+export const CREATE_TRAJECTORY_EVENTS_AGENT_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_trajectory_events_agent ON trajectory_events(plan_id, asking_agent)
+`;
+
+/**
+ * Index for faster lookups by timestamp on trajectory_events table.
+ */
+export const CREATE_TRAJECTORY_EVENTS_TIMESTAMP_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_trajectory_events_timestamp ON trajectory_events(plan_id, timestamp DESC)
+`;
+
+/**
+ * SQL to create the organizations table.
+ * Organizations are containers for initiatives and members.
+ */
+export const CREATE_ORGANIZATIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS organizations (
+  org_id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)
+`;
+
+/**
+ * SQL to create the initiatives table.
+ * Initiatives represent strategic goals within an organization.
+ */
+export const CREATE_INITIATIVES_TABLE = `
+CREATE TABLE IF NOT EXISTS initiatives (
+  initiative_id TEXT PRIMARY KEY NOT NULL,
+  org_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'archived')),
+  icon TEXT,
+  color TEXT,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (org_id) REFERENCES organizations(org_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by org_id on initiatives table.
+ */
+export const CREATE_INITIATIVES_ORG_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_initiatives_org_id ON initiatives(org_id)
+`;
+
+/**
+ * SQL to create the org_members table.
+ * Tracks user membership and roles within organizations.
+ */
+export const CREATE_ORG_MEMBERS_TABLE = `
+CREATE TABLE IF NOT EXISTS org_members (
+  org_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (org_id, user_id),
+  FOREIGN KEY (org_id) REFERENCES organizations(org_id) ON DELETE CASCADE
+)
+`;
+
+/**
  * All schema creation statements in order.
  */
 export const ALL_SCHEMA_STATEMENTS = [
+  // Organizations must be created before plans (for FK reference)
+  CREATE_ORGANIZATIONS_TABLE,
+  CREATE_INITIATIVES_TABLE,
+  CREATE_INITIATIVES_ORG_INDEX,
+  CREATE_ORG_MEMBERS_TABLE,
+  // Core plan tables
   CREATE_PLANS_TABLE,
+  CREATE_PLANS_ORG_INDEX,
+  CREATE_PLANS_INITIATIVE_INDEX,
   CREATE_VERSIONS_TABLE,
   CREATE_STEPS_TABLE,
   CREATE_VERSIONS_PLAN_INDEX,
@@ -256,4 +439,14 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_IMPROVEMENTS_VERSION_INDEX,
   CREATE_IMPROVEMENTS_STEP_INDEX,
   CREATE_IMPROVEMENTS_STATUS_INDEX,
+  // Question queue tables
+  CREATE_QUESTIONS_TABLE,
+  CREATE_QUESTIONS_PLAN_INDEX,
+  CREATE_QUESTIONS_PRIORITY_INDEX,
+  CREATE_QUESTIONS_DEDUP_INDEX,
+  // Trajectory tables
+  CREATE_TRAJECTORY_EVENTS_TABLE,
+  CREATE_TRAJECTORY_EVENTS_PLAN_INDEX,
+  CREATE_TRAJECTORY_EVENTS_AGENT_INDEX,
+  CREATE_TRAJECTORY_EVENTS_TIMESTAMP_INDEX,
 ];

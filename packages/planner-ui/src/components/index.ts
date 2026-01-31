@@ -31,3 +31,12 @@ export type { DocumentFormat, FormatConfidence } from './FormatDetectionBadge';
 export { ExtractionPreview } from './ExtractionPreview';
 export type { ExtractedStep, ExtractedScope } from './ExtractionPreview';
 export { DocumentImportForm } from './DocumentImportForm';
+export { DependencyIndicator } from './DependencyIndicator';
+export type { DependencyDirection, ConnectedStep } from './DependencyIndicator';
+
+// Relay messaging components
+export { ChannelList } from './ChannelList';
+export { ChannelHeader } from './ChannelHeader';
+export { MessageStream } from './MessageStream';
+export { MessageInput } from './MessageInput';
+export { MessagingSidebar } from './MessagingSidebar';

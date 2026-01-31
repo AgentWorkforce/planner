@@ -13,12 +13,45 @@ interface FormatDetectionBadgeProps {
   className?: string;
 }
 
-const FORMAT_CONFIG: Record<DocumentFormat, { icon: string; label: string }> = {
-  markdown: { icon: '📝', label: 'Markdown' },
-  yaml: { icon: '📋', label: 'YAML' },
-  json: { icon: '{ }', label: 'JSON' },
-  text: { icon: '📄', label: 'Plain Text' },
+const FORMAT_CONFIG: Record<DocumentFormat, { label: string; colorClass: string }> = {
+  markdown: { label: 'Markdown', colorClass: 'bg-accent-cyan/10 text-accent-cyan' },
+  yaml: { label: 'YAML', colorClass: 'bg-accent-purple/10 text-accent-purple' },
+  json: { label: 'JSON', colorClass: 'bg-warning/10 text-warning' },
+  text: { label: 'Plain Text', colorClass: 'bg-bg-tertiary text-text-secondary' },
 };
+
+// Simple format icons
+function FormatIcon({ format }: { format: DocumentFormat }) {
+  const iconClasses = "w-4 h-4";
+
+  if (format === 'json') {
+    return (
+      <span className="text-xs font-mono font-bold">{'{}'}</span>
+    );
+  }
+
+  return (
+    <svg
+      className={iconClasses}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14,2 14,8 20,8" />
+      {format === 'markdown' && <line x1="8" y1="13" x2="16" y2="13" />}
+      {format === 'yaml' && (
+        <>
+          <line x1="8" y1="12" x2="12" y2="12" />
+          <line x1="8" y1="16" x2="14" y2="16" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 export function FormatDetectionBadge({
   format,
@@ -29,15 +62,13 @@ export function FormatDetectionBadge({
 
   return (
     <span
-      className={`format-badge format-badge--${format} ${className}`.trim()}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.colorClass} ${className}`}
       aria-live="polite"
     >
-      <span className="format-badge-icon" aria-hidden="true">
-        {config.icon}
-      </span>
+      <FormatIcon format={format} />
       <span>Detected: {config.label}</span>
       {confidence && confidence !== 'high' && (
-        <span className="format-confidence">({confidence})</span>
+        <span className="opacity-70">({confidence})</span>
       )}
     </span>
   );
@@ -63,7 +94,6 @@ export function detectFormatFromContent(content: string): {
       JSON.parse(trimmed);
       return { format: 'json', confidence: 'high' };
     } catch {
-      // Might still be JSON with errors, or something else
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
         return { format: 'json', confidence: 'medium' };
       }

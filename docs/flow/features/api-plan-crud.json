@@ -17,9 +17,27 @@
       { "id": "ac5", "description": "GET /plans/:id/versions/:version returns specific version" },
       { "id": "ac6", "description": "PUT /plans/:id updates draft version (rejects if approved)" },
       { "id": "ac7", "description": "POST /plans/:id/versions creates new version from existing" },
-      { "id": "ac8", "description": "All endpoints return proper status codes and JSON responses" }
+      { "id": "ac8", "description": "All endpoints return proper status codes and JSON responses" },
+      { "id": "ac9", "description": "MCP tool remove_criteria removes acceptance criterion from step" },
+      { "id": "ac10", "description": "MCP tool edit_criteria updates existing criterion text/type" },
+      { "id": "ac11", "description": "MCP tool remove_gate removes approval gate from step" },
+      { "id": "ac12", "description": "MCP tool approve_plan transitions plan from draft to approved status" },
+      { "id": "ac13", "description": "MCP tool publish_plan transitions plan from approved to published status" }
     ]
   },
+
+  "extended_by": [
+    {
+      "feature_id": "schema-org-initiative",
+      "impact": "Plan endpoints need initiative filter, new initiative CRUD endpoints added",
+      "changes": [
+        "GET /plans supports ?initiative_id= query parameter",
+        "POST /plans accepts optional initiative_id in body",
+        "New endpoints: GET/POST /initiatives, GET/PUT/DELETE /initiatives/:id",
+        "Plan responses include initiative_id field"
+      ]
+    }
+  ],
 
   "plan_implementation": {
     "scopes": ["planner-core"],
@@ -141,6 +159,65 @@
           { "id": "ac2", "description": "Tests verify correct status codes" },
           { "id": "ac3", "description": "Tests verify error responses" },
           { "id": "ac4", "description": "All tests pass" }
+        ]
+      },
+      {
+        "step_id": "ac010",
+        "title": "Implement remove_criteria and edit_criteria MCP tools",
+        "scope": "planner-core",
+        "description": "Add MCP tools for managing acceptance criteria on steps. File: src/mcp/tools/index.ts",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "remove_criteria tool: inputs {plan_id, step_id, criterion_id}, removes criterion from step.acceptance_criteria array" },
+          { "id": "ac2", "description": "edit_criteria tool: inputs {plan_id, step_id, criterion_id, description?, type?}, updates matching criterion" },
+          { "id": "ac3", "description": "Both tools return error if plan/step/criterion not found" },
+          { "id": "ac4", "description": "Both tools reject if version is not draft status" },
+          { "id": "ac5", "description": "Both tools support expected_version for optimistic locking" }
+        ]
+      },
+      {
+        "step_id": "ac011",
+        "title": "Implement remove_gate MCP tool",
+        "scope": "planner-core",
+        "description": "Add MCP tool to remove approval gate from a step. File: src/mcp/tools/index.ts",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "remove_gate tool: inputs {plan_id, step_id}, sets step.gate to undefined" },
+          { "id": "ac2", "description": "Returns error if plan/step not found" },
+          { "id": "ac3", "description": "Rejects if version is not draft status" },
+          { "id": "ac4", "description": "Returns success with updated version even if step had no gate" }
+        ]
+      },
+      {
+        "step_id": "ac012",
+        "title": "Implement approve_plan and publish_plan MCP tools",
+        "scope": "planner-core",
+        "description": "Add MCP tools for plan lifecycle transitions. File: src/mcp/tools/index.ts",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "approve_plan tool: inputs {plan_id}, transitions latest version from draft→approved" },
+          { "id": "ac2", "description": "approve_plan returns error if latest version is not draft" },
+          { "id": "ac3", "description": "publish_plan tool: inputs {plan_id}, transitions latest version from approved→published" },
+          { "id": "ac4", "description": "publish_plan returns error if latest version is not approved" },
+          { "id": "ac5", "description": "Both tools update version.updated_at timestamp" },
+          { "id": "ac6", "description": "Both tools return { plan_id, version, status } on success" }
+        ]
+      },
+      {
+        "step_id": "ac013",
+        "title": "Add tool schemas and register in switch statement",
+        "scope": "planner-core",
+        "description": "Add Tool schema definitions to tools array and case handlers to handleToolCall switch. File: src/mcp/tools/index.ts",
+        "dependencies": ["ac010", "ac011", "ac012"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "5 new tools added to tools[] array with inputSchema" },
+          { "id": "ac2", "description": "5 new case statements in handleToolCall switch" },
+          { "id": "ac3", "description": "npm run build succeeds with no TypeScript errors" },
+          { "id": "ac4", "description": "Tools appear in MCP tool list when server starts" }
         ]
       }
     ]

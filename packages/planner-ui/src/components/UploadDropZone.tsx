@@ -6,6 +6,7 @@
  */
 
 import { useRef, useState, useCallback } from 'react';
+import { CloseIcon } from './icons';
 
 interface UploadedFile {
   name: string;
@@ -40,6 +41,66 @@ function formatFileSize(bytes: number): string {
 function isAcceptedFile(file: File): boolean {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase();
   return ACCEPTED_EXTENSIONS.includes(ext) || ACCEPTED_MIME_TYPES.includes(file.type);
+}
+
+// Simple file icons using SVG
+function FileIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14,2 14,8 20,8" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17,8 12,3 7,8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7,10 12,15 17,10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
 }
 
 export function UploadDropZone({
@@ -110,7 +171,6 @@ export function UploadDropZone({
       if (selectedFile) {
         handleFile(selectedFile);
       }
-      // Reset input so same file can be selected again
       e.target.value = '';
     },
     [handleFile]
@@ -129,15 +189,15 @@ export function UploadDropZone({
     }
   };
 
-  const getStateClass = () => {
-    if (file) return 'upload-drop-zone--has-file';
-    if (isDragOver) return 'upload-drop-zone--dragover';
-    return '';
-  };
-
   return (
     <div
-      className={`upload-drop-zone ${getStateClass()}`.trim()}
+      className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
+        file
+          ? 'border-success bg-success/5'
+          : isDragOver
+          ? 'border-accent-cyan bg-accent-cyan/5'
+          : 'border-border-subtle bg-bg-secondary hover:border-accent-cyan/50'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -153,44 +213,44 @@ export function UploadDropZone({
         type="file"
         accept={ACCEPTED_EXTENSIONS.join(',')}
         onChange={handleInputChange}
-        style={{ display: 'none' }}
+        className="hidden"
         disabled={disabled}
       />
 
       {file ? (
-        <div className="upload-file-info">
-          <span className="upload-file-icon">📄</span>
-          <span className="upload-file-name">{file.name}</span>
-          <span className="upload-file-size">{formatFileSize(file.size)}</span>
+        <div className="flex items-center justify-center gap-3">
+          <FileIcon className="text-success" />
+          <span className="font-medium text-text-primary">{file.name}</span>
+          <span className="text-sm text-text-muted">{formatFileSize(file.size)}</span>
           <button
             type="button"
-            className="upload-file-remove"
+            className="p-1 text-text-muted hover:text-error transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onClear();
             }}
             aria-label={`Remove file: ${file.name}`}
           >
-            ×
+            <CloseIcon size="md" />
           </button>
         </div>
       ) : isDragOver ? (
-        <>
-          <div className="upload-zone-icon">📥</div>
-          <div className="upload-zone-text">Drop file to upload</div>
-        </>
+        <div className="flex flex-col items-center gap-2">
+          <DownloadIcon className="text-accent-cyan" />
+          <div className="text-text-primary font-medium">Drop file to upload</div>
+        </div>
       ) : (
-        <>
-          <div className="upload-zone-icon">📤</div>
-          <div className="upload-zone-text">Drop your document here or click to browse</div>
-          <div className="upload-zone-hint" id="upload-hint">
+        <div className="flex flex-col items-center gap-2">
+          <UploadIcon className="text-text-muted" />
+          <div className="text-text-primary font-medium">Drop your document here or click to browse</div>
+          <div className="text-sm text-text-muted" id="upload-hint">
             .md, .txt, .yaml, .json
           </div>
-        </>
+        </div>
       )}
 
       {error && (
-        <div className="error-message" style={{ marginTop: 'var(--spacing-sm)' }}>
+        <div className="mt-3 p-2 bg-error/10 border border-error/30 rounded text-error text-sm">
           {error}
         </div>
       )}

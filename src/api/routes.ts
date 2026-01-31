@@ -11,6 +11,11 @@ import { createSessionHandlers } from './handlers/sessions.js';
 import { createChatHandlers } from './handlers/chat.js';
 import { createImportHandlers } from './handlers/import.js';
 import { createEventsHandler } from './handlers/events.js';
+import { createChannelHandlers } from './handlers/channels.js';
+import { createInitiativeHandlers } from './handlers/initiatives.js';
+import { createQuestionHandlers } from './handlers/questions.js';
+import { createTrajectoryHandlers } from './handlers/trajectories.js';
+import { createAgentHandlers } from './handlers/agents.js';
 import { createOptionalMcpAuthMiddleware } from './middleware/mcp-auth.js';
 
 /**
@@ -29,6 +34,11 @@ export function createRouter(storage: PlanStorage): Router {
   const chatHandlers = createChatHandlers(storage);
   const importHandlers = createImportHandlers(storage);
   const eventsHandler = createEventsHandler(storage);
+  const channelHandlers = createChannelHandlers(storage);
+  const initiativeHandlers = createInitiativeHandlers(storage);
+  const questionHandlers = createQuestionHandlers(storage);
+  const trajectoryHandlers = createTrajectoryHandlers(storage);
+  const agentHandlers = createAgentHandlers();
   const mcpAuth = createOptionalMcpAuthMiddleware(storage);
 
   // Plan routes
@@ -93,6 +103,36 @@ export function createRouter(storage: PlanStorage): Router {
   // List is public (no auth), call uses optional auth for session context
   router.post('/mcp/tools/list', mcpHandlers.listTools);
   router.post('/mcp/tools/call', mcpAuth, mcpHandlers.callTool);
+
+  // Channel routes (relay messaging)
+  router.get('/channels', channelHandlers.list);
+  router.get('/channels/:id/messages', channelHandlers.messages);
+  router.get('/channels/:id/presence', channelHandlers.presence);
+
+  // Initiative routes
+  router.get('/initiatives', initiativeHandlers.list);
+  router.get('/initiatives/:id', initiativeHandlers.get);
+  router.post('/initiatives', initiativeHandlers.create);
+  router.put('/initiatives/:id', initiativeHandlers.update);
+  router.delete('/initiatives/:id', initiativeHandlers.delete);
+
+  // Question routes (agent questions queue)
+  router.post('/plans/:id/questions', questionHandlers.create);
+  router.get('/plans/:id/questions', questionHandlers.list);
+  router.get('/plans/:id/questions/:questionId', questionHandlers.get);
+  router.post('/plans/:id/questions/:questionId/answer', questionHandlers.answer);
+  router.post('/plans/:id/questions/:questionId/dismiss', questionHandlers.dismiss);
+  router.post('/plans/:id/questions/:questionId/subscribe', questionHandlers.subscribe);
+  router.post('/plans/:id/questions/check-duplicates', questionHandlers.checkDuplicates);
+
+  // Trajectory routes (user decision tracking)
+  router.get('/plans/:id/trajectory/events', trajectoryHandlers.listEvents);
+  router.post('/plans/:id/trajectory/decision', trajectoryHandlers.recordDecision);
+  router.get('/plans/:id/trajectory/preferences', trajectoryHandlers.getPreferences);
+  router.get('/plans/:id/trajectory/similar', trajectoryHandlers.findSimilar);
+
+  // Agent routes (merged presence + state)
+  router.get('/agents', agentHandlers.list);
 
   return router;
 }

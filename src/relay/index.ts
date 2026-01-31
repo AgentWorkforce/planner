@@ -13,7 +13,14 @@ export {
   getConnectionState,
   getClient,
   onStateChange,
+  spawnAgent,
+  releaseAgent,
+  getSpawnedAgents,
+  isAgentSpawned,
+  sendMessage,
+  sendChannelMessage,
   type ClientState,
+  type SpawnAgentOptions,
 } from './client.js';
 
 // Config exports
@@ -55,3 +62,36 @@ export {
   checkSessionTimeouts,
   createSessionTimeoutService,
 } from './session-timeout.js';
+
+// WebSocket proxy exports
+export {
+  initWebSocketProxy,
+  getActiveConnections,
+  broadcastToUsers,
+} from './ws-proxy.js';
+
+// Channel management exports
+export {
+  PLANNER_CHANNEL,
+  getPlanChannelId,
+  createPlannerChannel,
+  createPlanChannel,
+  removePlanChannel,
+  getChannelsForUser,
+  channelExists,
+  getAllChannels,
+  initChannelManagement,
+  syncPlanChannels,
+  type ChannelInfo,
+} from './channels.js';
+
+// PlannerLead exports
+export {
+  spawnPlannerLead,
+  terminatePlannerLead,
+  isPlannerLeadActive,
+  getPlannerLeadAgentId,
+  joinPlannerLeadToChannel,
+  initPlannerLead,
+  notifyNewPlan,
+} from './planner-lead.js';

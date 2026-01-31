@@ -1,0 +1,156 @@
+{
+  "feature_id": "ui-mentions",
+  "title": "@Mentions in Messaging",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["ui-relay-messaging"],
+  "parent_epic": "ui-relay-messaging",
+  "summary": {
+    "goal": "Allow users to @mention agents/users in messages with autocomplete dropdown and visual highlighting",
+    "approach": "Simple plain-text mentions - @ triggers dropdown populated from presence, inserts '@Name' text, regex-based highlighting on render",
+    "in_scope": [
+      "Typing @ shows dropdown of available users/agents from presence",
+      "Arrow keys + Enter to select from dropdown",
+      "Escape or clicking away dismisses dropdown",
+      "Selected mention inserted as plain text '@Name'",
+      "Mentions highlighted visually in rendered messages",
+      "Dropdown positioned near cursor in input"
+    ],
+    "out_of_scope": [
+      "Notifications when mentioned",
+      "Structured mention data (rich text)",
+      "Click-to-view-profile on mentions",
+      "Multiple mention types (channels, steps, etc.)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Typing '@' in MessageInput shows dropdown with users/agents from presence" },
+      { "id": "ac2", "description": "Dropdown filters as user types after '@'" },
+      { "id": "ac3", "description": "Arrow up/down navigates dropdown, Enter selects" },
+      { "id": "ac4", "description": "Escape or blur dismisses dropdown without inserting" },
+      { "id": "ac5", "description": "Selecting inserts '@Name ' (with trailing space) at cursor position" },
+      { "id": "ac6", "description": "Messages containing @mentions display mentions with distinct visual style" },
+      { "id": "ac7", "description": "Dropdown appears near text cursor, not fixed position" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "um001",
+        "title": "Create useMentions hook for mention state management",
+        "scope": "planner-ui",
+        "description": "Create a hook that manages mention autocomplete state: detecting '@' trigger, tracking query text, filtering candidates from PresenceEntry[], handling selection. This hook encapsulates all mention logic separate from UI.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "um001-ac1", "description": "Hook accepts { value: string, cursorPosition: number, candidates: PresenceEntry[] }" },
+          { "id": "um001-ac2", "description": "Returns { isOpen: boolean, query: string, filteredCandidates: PresenceEntry[], selectedIndex: number }" },
+          { "id": "um001-ac3", "description": "Returns { moveUp: () => void, moveDown: () => void, select: () => { text: string, insertAt: number } | null, dismiss: () => void }" },
+          { "id": "um001-ac4", "description": "isOpen becomes true when '@' detected at cursor position (not inside word)" },
+          { "id": "um001-ac5", "description": "query is the text after '@' until cursor (e.g., 'Hey @Jo|hn' -> query='Jo')" },
+          { "id": "um001-ac6", "description": "filteredCandidates filters by name.toLowerCase().startsWith(query.toLowerCase())" },
+          { "id": "um001-ac7", "description": "selectedIndex wraps around on moveUp/moveDown" },
+          { "id": "um001-ac8", "description": "select() returns '@Name ' text to insert, replacing '@query'" }
+        ]
+      },
+      {
+        "step_id": "um002",
+        "title": "Create MentionDropdown component",
+        "scope": "planner-ui",
+        "description": "Create dropdown UI component that displays filtered mention candidates. Shows name and entity type (user/agent) with visual distinction. Handles click selection. Positioned absolutely relative to container.",
+        "dependencies": ["um001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "um002-ac1", "description": "Accepts { candidates: PresenceEntry[], selectedIndex: number, onSelect: (index: number) => void, position: { top: number, left: number } }" },
+          { "id": "um002-ac2", "description": "Renders list of candidates with name and entity type indicator (AI badge for agents)" },
+          { "id": "um002-ac3", "description": "Selected item has highlight style (bg-bg-elevated or similar)" },
+          { "id": "um002-ac4", "description": "Click on item calls onSelect with that index" },
+          { "id": "um002-ac5", "description": "Max height ~200px with overflow-y-auto" },
+          { "id": "um002-ac6", "description": "Styled per design system: bg-bg-tertiary, border-border-subtle, rounded-lg, shadow" },
+          { "id": "um002-ac7", "description": "Empty state hidden (parent should not render if no candidates)" }
+        ]
+      },
+      {
+        "step_id": "um003",
+        "title": "Add cursor position tracking to MessageInput",
+        "scope": "planner-ui",
+        "description": "Enhance MessageInput to track textarea cursor position on every change/selection. Calculate visual position of cursor for dropdown positioning. This is foundational for mention integration.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "um003-ac1", "description": "Track selectionStart on onChange and onSelect events" },
+          { "id": "um003-ac2", "description": "Calculate approximate visual position using hidden mirror element or character measurement" },
+          { "id": "um003-ac3", "description": "Export cursor position to parent via callback or return value" },
+          { "id": "um003-ac4", "description": "Position updates on: typing, arrow keys, mouse click in textarea" }
+        ]
+      },
+      {
+        "step_id": "um004",
+        "title": "Integrate useMentions and MentionDropdown into MessageInput",
+        "scope": "planner-ui",
+        "description": "Wire up the mention hook and dropdown into MessageInput. Handle keyboard events (ArrowUp, ArrowDown, Enter, Escape) when dropdown is open. Insert selected mention text. Pass presence members from props.",
+        "dependencies": ["um001", "um002", "um003"],
+        "owner_role": "frontend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "um004-ac1", "description": "MessageInput accepts new prop: mentionCandidates: PresenceEntry[]" },
+          { "id": "um004-ac2", "description": "Typing '@' shows MentionDropdown with filtered candidates" },
+          { "id": "um004-ac3", "description": "ArrowUp/ArrowDown navigates dropdown (prevents default cursor movement)" },
+          { "id": "um004-ac4", "description": "Enter selects mention (does not send message when dropdown open)" },
+          { "id": "um004-ac5", "description": "Escape dismisses dropdown without action" },
+          { "id": "um004-ac6", "description": "Clicking outside textarea dismisses dropdown" },
+          { "id": "um004-ac7", "description": "Selection inserts '@Name ' and closes dropdown" },
+          { "id": "um004-ac8", "description": "Dropdown positioned near text cursor, not fixed" }
+        ]
+      },
+      {
+        "step_id": "um005",
+        "title": "Add mention highlighting to MessageContent",
+        "scope": "planner-ui",
+        "description": "Enhance the processInlineFormatting function in MessageStream.tsx to detect @mentions and render them with distinct styling. Use regex to find '@Name' patterns.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "um005-ac1", "description": "Regex pattern /@\\w+/g matches mentions in message body" },
+          { "id": "um005-ac2", "description": "Mentions rendered with distinct style: text-accent-cyan, font-medium" },
+          { "id": "um005-ac3", "description": "Mentions inside code blocks are NOT highlighted (code takes precedence)" },
+          { "id": "um005-ac4", "description": "Multiple mentions in same message all highlighted" },
+          { "id": "um005-ac5", "description": "Works with existing markdown processing (code, bold, italic, links)" }
+        ]
+      },
+      {
+        "step_id": "um006",
+        "title": "Pass presence to MessageInput in MessagingSidebar",
+        "scope": "planner-ui",
+        "description": "Update MessagingSidebar to pass presence members to MessageInput for mention autocomplete. The presence data is already available via usePresence hook.",
+        "dependencies": ["um004"],
+        "owner_role": "frontend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "um006-ac1", "description": "MessagingSidebar passes presence.members to MessageInput.mentionCandidates" },
+          { "id": "um006-ac2", "description": "When presence updates, MessageInput receives updated candidates" },
+          { "id": "um006-ac3", "description": "Works in both connected and mock mode" }
+        ]
+      },
+      {
+        "step_id": "um007",
+        "title": "Add useMentions and MentionDropdown tests",
+        "scope": "planner-ui",
+        "description": "Write unit tests for useMentions hook and MentionDropdown component. Test mention detection, filtering, keyboard navigation, and selection logic.",
+        "dependencies": ["um001", "um002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "um007-ac1", "description": "Test: '@' at start of input triggers isOpen" },
+          { "id": "um007-ac2", "description": "Test: '@' after space triggers isOpen" },
+          { "id": "um007-ac3", "description": "Test: '@' inside word does NOT trigger (e.g., 'email@test')" },
+          { "id": "um007-ac4", "description": "Test: query filters candidates case-insensitively" },
+          { "id": "um007-ac5", "description": "Test: moveUp/moveDown cycles through candidates" },
+          { "id": "um007-ac6", "description": "Test: select returns correct replacement text and position" },
+          { "id": "um007-ac7", "description": "Test: MentionDropdown renders candidates with correct styling" },
+          { "id": "um007-ac8", "description": "Test: MentionDropdown click calls onSelect" }
+        ]
+      }
+    ]
+  }
+}
