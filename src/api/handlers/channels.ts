@@ -144,35 +144,36 @@ export function createChannelHandlers(storage: PlanStorage) {
         }
 
         try {
-          // Use channel filter to get channel messages
-          const relayMessages = await client.queryMessages({
+          // Use getInbox with channel filter to get channel messages
+          // getInbox returns messages received by planner-core in the channel
+          const inboxMessages = await client.getInbox({
             limit,
-            // Note: The relay queryMessages doesn't have a native channel filter,
-            // so we filter client-side for now
+            channel: channelId,
           });
 
           // Debug: log what we got from relay
-          console.log(`[channels] queryMessages returned ${relayMessages.length} messages for ${channelId}`);
-          if (relayMessages.length > 0) {
-            console.log(`[channels] Sample message:`, JSON.stringify(relayMessages[0], null, 2));
+          console.log(`[channels] getInbox returned ${inboxMessages.length} messages for ${channelId}`);
+          if (inboxMessages.length > 0) {
+            console.log(`[channels] Sample message:`, JSON.stringify(inboxMessages[0], null, 2));
           }
 
-          // Filter to channel messages and transform
-          // Channel messages may have channel in 'to' field OR 'channel' field
-          const channelMessages = relayMessages
-            .filter((msg) => msg.to === channelId || msg.channel === channelId)
-            .map((msg) => ({
-              id: msg.id,
-              from: msg.from,
-              fromName: msg.from, // Use from as display name
-              entityType: 'agent' as const, // Default to agent for relay messages
-              channel: channelId,
-              body: msg.body || '',
-              timestamp: typeof msg.timestamp === 'number'
-                ? new Date(msg.timestamp).toISOString()
-                : msg.timestamp,
-              data: msg.data,
-            }));
+          // Transform inbox messages to response format
+          const channelMessages = inboxMessages.map((msg) => ({
+            id: msg.id,
+            from: msg.from,
+            fromName: msg.from, // Use from as display name
+            entityType: (msg.from.startsWith('user-') ? 'user' : 'agent') as 'user' | 'agent',
+            channel: channelId,
+            body: msg.body || '',
+            timestamp: typeof msg.timestamp === 'number'
+              ? new Date(msg.timestamp).toISOString()
+              : String(msg.timestamp),
+          }));
+
+          // Sort by timestamp ascending (oldest first) for chronological chat display
+          channelMessages.sort((a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
 
           res.json({
             messages: channelMessages,
