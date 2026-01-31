@@ -8,6 +8,8 @@ build/
 # Database files
 *.db
 *.sqlite
+*.db-shm
+*.db-wal
 
 # Trajectory storage
 .trajectories/
@@ -37,3 +39,19 @@ coverage/
 # Temp files
 *.tmp
 *.temp
+
+# Runtime files
+*.pid
+*.sock
+
+# Agent Relay runtime (messages, sessions, identities)
+.agent-relay/
+
+# Playwright MCP screenshots (testing artifacts)
+.playwright-mcp/
+
+# Lock files
+prpm.lock
+
+# Claude prompts (local snippets)
+.prompts/
