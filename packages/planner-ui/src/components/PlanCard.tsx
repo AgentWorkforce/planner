@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { PlanSummary, PlanStatus } from '@/types';
 import { ChevronIcon } from '@/components/icons';
+import { InitiativeBadge } from '@/components/plans/InitiativeBadge';
 
 interface PlanCardProps {
   plan: PlanSummary;
@@ -8,27 +9,20 @@ interface PlanCardProps {
 }
 
 /**
- * Get the design system color for a plan status.
+ * Get the CSS classes for a status badge.
+ * Returns inline styles for colors since Tailwind doesn't support dynamic classes.
  */
-function getStatusColor(status: PlanStatus): string {
+function getStatusBadgeStyles(status: PlanStatus): { bg: string; text: string } {
   switch (status) {
     case 'draft':
-      return 'warning';
+      return { bg: 'rgba(255, 107, 53, 0.1)', text: '#ff6b35' }; // warning
     case 'approved':
-      return 'success';
+      return { bg: 'rgba(0, 255, 200, 0.1)', text: '#00ffc8' }; // success
     case 'published':
-      return 'accent-cyan';
+      return { bg: 'rgba(0, 217, 255, 0.1)', text: '#00d9ff' }; // accent-cyan
     default:
-      return 'text-secondary';
+      return { bg: 'rgba(148, 163, 184, 0.1)', text: '#94a3b8' }; // text-secondary
   }
-}
-
-/**
- * Get the CSS classes for a status badge.
- */
-function getStatusBadgeClasses(status: PlanStatus): string {
-  const color = getStatusColor(status);
-  return `inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide bg-${color}/10 text-${color}`;
 }
 
 /**
@@ -86,6 +80,12 @@ export function PlanCard({ plan, className = '' }: PlanCardProps) {
             {plan.goal || 'Untitled Plan'}
           </h2>
 
+          {plan.initiative && (
+            <div className="mt-2 mb-1.5">
+              <InitiativeBadge initiative={plan.initiative} size="sm" />
+            </div>
+          )}
+
           <div className="flex items-center gap-2 text-sm text-text-muted">
             {plan.scopes && plan.scopes.length > 0 && (
               <>
@@ -105,7 +105,15 @@ export function PlanCard({ plan, className = '' }: PlanCardProps) {
         </div>
 
         <div className="flex items-center gap-3 flex-shrink-0">
-          <span className={getStatusBadgeClasses(plan.status)}>{plan.status}</span>
+          <span
+            className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide"
+            style={{
+              backgroundColor: getStatusBadgeStyles(plan.status).bg,
+              color: getStatusBadgeStyles(plan.status).text,
+            }}
+          >
+            {plan.status}
+          </span>
           <ChevronIcon
             size="sm"
             direction="right"

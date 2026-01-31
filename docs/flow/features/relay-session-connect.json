@@ -5,6 +5,7 @@
   "status": "approved",
   "priority": "high",
   "dependencies": ["relay-session-management", "relay-ai-chat"],
+  "audit_note": "All 8 implementation tasks completed - spawner updated (rsc001), POST /plans/:id/session endpoint (rsc002), API client (rsc003), useAIConnectionStatus hook (rsc004), AIConnectionBadge (rsc005), tests (rsc007-008). Note: rsc006 (ChatPanel integration) superseded by MessagingSidebar architecture - badge integrated into PlanEditorPage header instead.",
 
   "summary": {
     "goal": "Allow users to spawn/connect an AI planning agent for any existing plan, not just at plan creation time",

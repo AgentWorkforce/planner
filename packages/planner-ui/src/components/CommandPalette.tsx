@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFuzzySearch } from '@/hooks/useFuzzySearch';
 import { PlanResultItem } from './PlanResultItem';
+import { SearchIcon } from '@/components/icons/SearchIcon';
 import type { PlanSummary } from '@/types';
 
 interface CommandPaletteProps {
@@ -132,34 +133,51 @@ export function CommandPalette({ isOpen, onClose, plans, recentPlanIds }: Comman
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] bg-bg-deep/80 backdrop-blur-md animate-in fade-in duration-150"
       onClick={handleBackdropClick}
     >
       <div
-        className="w-full max-w-lg bg-bg-primary border border-border rounded-xl shadow-2xl overflow-hidden"
+        className="w-full max-w-xl mx-4 bg-bg-card border border-border-subtle rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-top-4 duration-200"
         onKeyDown={handleKeyDown}
       >
         {/* Search input */}
-        <div className="px-4 py-3 border-b border-border-subtle">
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-border-subtle">
+          <SearchIcon className="text-text-muted flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search plans..."
-            className="w-full bg-transparent text-text-primary placeholder:text-text-muted outline-none text-base"
+            className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted outline-none text-base"
           />
+          <kbd className="hidden sm:inline-flex px-2 py-1 text-xs font-medium text-text-muted bg-bg-tertiary border border-border-subtle rounded-md">
+            esc
+          </kbd>
         </div>
 
         {/* Results list */}
-        <div ref={listRef} className="max-h-80 overflow-y-auto py-2 px-2">
+        <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2 px-2">
           {showEmptyState ? (
-            <div className="px-3 py-6 text-center text-text-muted text-sm">{emptyStateMessage}</div>
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 mb-3 rounded-full bg-bg-tertiary flex items-center justify-center">
+                <SearchIcon className="text-text-muted" />
+              </div>
+              <p className="text-text-muted text-sm">{emptyStateMessage}</p>
+              {!query.trim() && (
+                <p className="text-text-dim text-xs mt-1">Start typing to search all plans</p>
+              )}
+            </div>
           ) : (
             <>
               {!query.trim() && displayItems.length > 0 && (
-                <div className="px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wide">
-                  Recent
+                <div className="px-3 py-2 text-xs font-medium text-text-muted uppercase tracking-wider">
+                  Recent Plans
+                </div>
+              )}
+              {query.trim() && (
+                <div className="px-3 py-2 text-xs font-medium text-text-muted uppercase tracking-wider">
+                  {displayItems.length} {displayItems.length === 1 ? 'result' : 'results'}
                 </div>
               )}
               {displayItems.map((plan, index) => (
@@ -176,16 +194,23 @@ export function CommandPalette({ isOpen, onClose, plans, recentPlanIds }: Comman
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-2.5 border-t border-border-subtle bg-bg-secondary">
-          <div className="flex items-center gap-4 text-xs text-text-muted">
-            <span>
-              <kbd className="px-1.5 py-0.5 bg-bg-tertiary rounded text-text-secondary">↑↓</kbd> navigate
-            </span>
-            <span>
-              <kbd className="px-1.5 py-0.5 bg-bg-tertiary rounded text-text-secondary">↵</kbd> open
-            </span>
-            <span>
-              <kbd className="px-1.5 py-0.5 bg-bg-tertiary rounded text-text-secondary">esc</kbd> close
+        <div className="px-4 py-3 border-t border-border-subtle bg-bg-secondary/50">
+          <div className="flex items-center justify-between text-xs text-text-muted">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 bg-bg-tertiary border border-border-subtle rounded font-medium text-text-secondary">↑</kbd>
+                <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 bg-bg-tertiary border border-border-subtle rounded font-medium text-text-secondary">↓</kbd>
+                <span className="ml-1">navigate</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 bg-bg-tertiary border border-border-subtle rounded font-medium text-text-secondary">↵</kbd>
+                <span className="ml-1">open</span>
+              </span>
+            </div>
+            <span className="text-text-dim">
+              <kbd className="px-1.5 py-0.5 bg-bg-tertiary border border-border-subtle rounded font-medium text-text-secondary">⌘</kbd>
+              <kbd className="px-1.5 py-0.5 bg-bg-tertiary border border-border-subtle rounded font-medium text-text-secondary ml-0.5">K</kbd>
+              <span className="ml-1.5">to toggle</span>
             </span>
           </div>
         </div>

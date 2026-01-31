@@ -2,13 +2,25 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../storage/sqlite.js';
 import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createStep } from '../../domain/step.js';
+import { createOrganization } from '../../domain/organization.js';
 import { handleToolCall, tools } from './index.js';
 
 describe('MCP Tools', () => {
   let storage: SqliteStorage;
+  let testOrgId: string;
 
   beforeEach(() => {
     storage = new SqliteStorage(':memory:');
+
+    // Get default org created by migrations, or create a test org
+    const orgs = storage.listOrganizations();
+    if (orgs.length > 0) {
+      testOrgId = orgs[0]!.org_id;
+    } else {
+      const org = createOrganization('Test Org', 'test-org');
+      storage.createOrganization(org);
+      testOrgId = org.org_id;
+    }
   });
 
   afterEach(() => {
@@ -52,12 +64,12 @@ describe('MCP Tools', () => {
 
     it('should return all plans', () => {
       // Create two plans
-      const plan1 = createPlan();
+      const plan1 = createPlan(testOrgId);
       storage.createPlan(plan1);
       const version1 = createPlanVersion(plan1.plan_id, 'Goal 1');
       storage.createVersion(version1);
 
-      const plan2 = createPlan();
+      const plan2 = createPlan(testOrgId);
       storage.createPlan(plan2);
       const version2 = createPlanVersion(plan2.plan_id, 'Goal 2');
       storage.createVersion(version2);
@@ -68,7 +80,7 @@ describe('MCP Tools', () => {
     });
 
     it('should filter by status', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -83,7 +95,7 @@ describe('MCP Tools', () => {
 
   describe('read_plan', () => {
     it('should return plan with latest version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal', 'Test context');
       storage.createVersion(version);
@@ -140,7 +152,7 @@ describe('MCP Tools', () => {
 
   describe('add_step', () => {
     it('should add step to draft version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -160,7 +172,7 @@ describe('MCP Tools', () => {
     });
 
     it('should error on non-draft version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -179,7 +191,7 @@ describe('MCP Tools', () => {
 
   describe('edit_step', () => {
     it('should update step fields', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Original title');
@@ -200,7 +212,7 @@ describe('MCP Tools', () => {
     });
 
     it('should error on missing step', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -217,7 +229,7 @@ describe('MCP Tools', () => {
 
   describe('remove_step', () => {
     it('should remove step from version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step1 = createStep('Step 1');
@@ -237,7 +249,7 @@ describe('MCP Tools', () => {
     });
 
     it('should clean up dependencies', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step1 = createStep('Step 1');
@@ -258,7 +270,7 @@ describe('MCP Tools', () => {
 
   describe('set_dependencies', () => {
     it('should set dependencies for a step', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step1 = createStep('Step 1');
@@ -278,7 +290,7 @@ describe('MCP Tools', () => {
     });
 
     it('should error on missing dependency', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step');
@@ -296,7 +308,7 @@ describe('MCP Tools', () => {
     });
 
     it('should error on self-dependency', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step');
@@ -316,7 +328,7 @@ describe('MCP Tools', () => {
 
   describe('add_criteria', () => {
     it('should add criterion to step', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step');
@@ -341,7 +353,7 @@ describe('MCP Tools', () => {
 
   describe('add_gate', () => {
     it('should add gate to step', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step');
@@ -361,7 +373,7 @@ describe('MCP Tools', () => {
     });
 
     it('should add gate without approver_role', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step');
@@ -382,7 +394,7 @@ describe('MCP Tools', () => {
 
   describe('submit_plan', () => {
     it('should submit draft version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -395,7 +407,7 @@ describe('MCP Tools', () => {
     });
 
     it('should error if already submitted', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -408,7 +420,7 @@ describe('MCP Tools', () => {
     });
 
     it('should error on non-draft version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -432,7 +444,7 @@ describe('MCP Tools', () => {
 
   describe('optimistic locking', () => {
     it('should succeed when expected_version matches current version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -448,7 +460,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return VERSION_CONFLICT when expected_version does not match', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -467,7 +479,7 @@ describe('MCP Tools', () => {
     });
 
     it('should work without expected_version (backward compatible)', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       storage.createVersion(version);
@@ -482,7 +494,7 @@ describe('MCP Tools', () => {
     });
 
     it('should detect conflict on edit_step', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step 1');
@@ -501,7 +513,7 @@ describe('MCP Tools', () => {
     });
 
     it('should detect conflict on remove_step', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step 1');
@@ -519,7 +531,7 @@ describe('MCP Tools', () => {
     });
 
     it('should detect conflict on set_dependencies', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step1 = createStep('Step 1');
@@ -539,7 +551,7 @@ describe('MCP Tools', () => {
     });
 
     it('should detect conflict on add_criteria', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step 1');
@@ -558,7 +570,7 @@ describe('MCP Tools', () => {
     });
 
     it('should detect conflict on add_gate', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Goal');
       const step = createStep('Step 1');
@@ -583,7 +595,7 @@ describe('MCP Tools', () => {
     });
 
     it('should create an improvement', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -602,7 +614,7 @@ describe('MCP Tools', () => {
     });
 
     it('should create improvement with step_id', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const step = createStep('Test step');
       const version = createPlanVersion(plan.plan_id, 'Test goal');
@@ -623,7 +635,7 @@ describe('MCP Tools', () => {
     });
 
     it('should create improvement with suggested_change', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -658,7 +670,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return error for missing version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -675,7 +687,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return error for invalid step_id', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -693,7 +705,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return error for invalid improvement type', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -744,7 +756,7 @@ describe('MCP Tools', () => {
     });
 
     it('should support all valid improvement types', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -776,7 +788,7 @@ describe('MCP Tools', () => {
     });
 
     it('should create draft from approved version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       const step = createStep('Test step');
@@ -799,7 +811,7 @@ describe('MCP Tools', () => {
     });
 
     it('should create draft from published version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -821,7 +833,7 @@ describe('MCP Tools', () => {
     });
 
     it('should include change_request_id when provided', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -852,7 +864,7 @@ describe('MCP Tools', () => {
     });
 
     it('should include revision_source in metadata', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -871,7 +883,7 @@ describe('MCP Tools', () => {
     });
 
     it('should default revision_source to agent', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -898,7 +910,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return error for missing version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -914,7 +926,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return error when source version is draft', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -943,7 +955,7 @@ describe('MCP Tools', () => {
     });
 
     it('should copy steps from source version', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       const step1 = createStep('Step 1');
@@ -965,7 +977,7 @@ describe('MCP Tools', () => {
     });
 
     it('should update change request revision status to drafted', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -1000,7 +1012,7 @@ describe('MCP Tools', () => {
     });
 
     it('should return error for non-existent change request', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -1017,13 +1029,13 @@ describe('MCP Tools', () => {
     });
 
     it('should return error when change request belongs to different plan', () => {
-      const plan1 = createPlan();
+      const plan1 = createPlan(testOrgId);
       storage.createPlan(plan1);
       const version1 = createPlanVersion(plan1.plan_id, 'Test goal 1');
       storage.createVersion(version1);
       storage.approveVersion(plan1.plan_id, 1, { approver: 'Approver', approved_at: new Date().toISOString() });
 
-      const plan2 = createPlan();
+      const plan2 = createPlan(testOrgId);
       storage.createPlan(plan2);
 
       // Create change request for plan2

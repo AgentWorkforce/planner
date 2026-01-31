@@ -104,6 +104,10 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
   const isAgent = message.entityType === 'agent';
+  // Fallback for missing fromName (e.g., from REST API history)
+  const displayName = message.fromName || message.from || 'Unknown';
+  // Handle both 'body' (WebSocket) and 'content' (REST API) fields
+  const messageBody = message.body || (message as unknown as { content?: string }).content || '';
 
   return (
     <div className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
@@ -113,16 +117,16 @@ function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
             isAgent ? 'bg-accent-purple/20 text-accent-purple' : 'bg-accent-cyan/20 text-accent-cyan'
           }`}
         >
-          {isAgent ? 'AI' : message.fromName.slice(0, 2).toUpperCase()}
+          {isAgent ? 'AI' : displayName.slice(0, 2).toUpperCase()}
         </div>
       )}
       {!showAvatar && !isOwn && <div className="w-8" />}
 
-      <div className={`flex-1 max-w-[80%] ${isOwn ? 'ml-8' : 'mr-8'}`}>
+      <div className={`flex-1 max-w-[85%] ${isOwn ? 'ml-5' : 'mr-5'}`}>
         {showAvatar && !isOwn && (
           <div className="flex items-baseline gap-2 mb-1">
             <span className={`text-sm font-medium ${isAgent ? 'text-accent-purple' : 'text-text-primary'}`}>
-              {message.fromName}
+              {displayName}
             </span>
             <span className="text-xs text-text-muted">
               {formatTime(message.timestamp)}
@@ -137,7 +141,7 @@ function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
               : 'bg-bg-tertiary text-text-primary'
           }`}
         >
-          <MessageContent content={message.body} />
+          <MessageContent content={messageBody} />
         </div>
 
         {isOwn && (
@@ -208,7 +212,12 @@ function groupMessagesByDate(messages: RelayMessage[]): Record<string, RelayMess
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  for (const message of messages) {
+  // Sort messages by timestamp first (oldest to newest)
+  const sortedMessages = [...messages].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  for (const message of sortedMessages) {
     const date = new Date(message.timestamp);
     let label: string;
 

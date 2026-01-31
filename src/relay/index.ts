@@ -13,7 +13,14 @@ export {
   getConnectionState,
   getClient,
   onStateChange,
+  spawnAgent,
+  releaseAgent,
+  getSpawnedAgents,
+  isAgentSpawned,
+  sendMessage,
+  sendChannelMessage,
   type ClientState,
+  type SpawnAgentOptions,
 } from './client.js';
 
 // Config exports
@@ -86,4 +93,5 @@ export {
   getPlannerLeadAgentId,
   joinPlannerLeadToChannel,
   initPlannerLead,
+  notifyNewPlan,
 } from './planner-lead.js';

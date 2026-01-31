@@ -4,6 +4,9 @@ import type { ApprovalInfo } from '../domain/workflow.js';
 import type { ChangeRequest, ChangeRequestStatus, RevisionStatus } from '../domain/change-request.js';
 import type { Comment } from '../domain/comment.js';
 import type { Improvement, ImprovementStatus } from '../domain/improvement.js';
+import type { Organization, Initiative } from '../domain/organization.js';
+import type { Question, QuestionStatus, QuestionFilter } from '../domain/question.js';
+import type { DecisionEvent, TrajectoryEventFilter } from '../domain/trajectory.js';
 
 /**
  * Plan data with pre-joined attention signal inputs.
@@ -38,16 +41,38 @@ export interface Session {
 }
 
 /**
+ * Filter options for plan list queries
+ */
+export interface PlanFilter {
+  org_id?: string;
+  initiative_id?: string;
+  owner_user_id?: string;
+  status?: PlanStatus;
+}
+
+/**
  * PlanStorage interface defines all storage operations for plans and versions.
  */
 export interface PlanStorage {
+  // Organization operations
+  createOrganization(org: Organization): Organization;
+  getOrganization(orgId: string): Organization | null;
+  listOrganizations(): Organization[];
+
+  // Initiative operations
+  createInitiative(initiative: Initiative): Initiative;
+  getInitiative(initiativeId: string): Initiative | null;
+  updateInitiative(initiativeId: string, updates: Partial<Initiative>): Initiative | null;
+  deleteInitiative(initiativeId: string): boolean;
+  listInitiatives(orgId: string): Initiative[];
+
   // Plan operations
   createPlan(plan: Plan): Plan;
   getPlan(planId: string): Plan | null;
-  updatePlan(planId: string): Plan | null;
+  updatePlan(planId: string, updates?: { initiative_id?: string | null }): Plan | null;
   deletePlan(planId: string): boolean;
-  listPlans(status?: PlanStatus): Plan[];
-  listPlansWithAttention(status?: PlanStatus): PlanWithAttentionData[];
+  listPlans(filter?: PlanFilter): Plan[];
+  listPlansWithAttention(filter?: PlanFilter): PlanWithAttentionData[];
 
   // Version operations
   createVersion(version: PlanVersion): PlanVersion;
@@ -125,6 +150,26 @@ export interface PlanStorage {
   ): Improvement[];
   listPendingImprovements(planId: string, version: number): Improvement[];
   deleteImprovement(improvementId: string): boolean;
+
+  // Question operations
+  createQuestion(question: Question): Question;
+  getQuestion(questionId: string): Question | null;
+  updateQuestion(questionId: string, updates: Partial<Question>): Question | null;
+  answerQuestion(questionId: string, answer: string): Question | null;
+  dismissQuestion(questionId: string): Question | null;
+  subscribeToQuestion(questionId: string, agentId: string): Question | null;
+  mergeQuestions(targetId: string, duplicateId: string): Question | null;
+  listQuestionsByPlan(planId: string, status?: QuestionStatus): Question[];
+  listPendingQuestionsByPriority(planId: string): Question[];
+  findDuplicateQuestions(planId: string, agentId: string, textPrefix: string): Question[];
+  deleteQuestion(questionId: string): boolean;
+
+  // Trajectory operations
+  createTrajectoryEvent(event: DecisionEvent): DecisionEvent;
+  getTrajectoryEvent(eventId: string): DecisionEvent | null;
+  listTrajectoryEvents(planId: string, filter?: TrajectoryEventFilter): DecisionEvent[];
+  findSimilarQuestions(planId: string, text: string, threshold?: number): DecisionEvent[];
+  deleteTrajectoryEvent(eventId: string): boolean;
 
   // Transaction support
   transaction<T>(fn: () => T): T;

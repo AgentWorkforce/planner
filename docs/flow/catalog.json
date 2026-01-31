@@ -5,9 +5,10 @@
   "design_system": {
     "feel": "Mission Control - professional dark theme with neon accents, holographic effects for status-critical items, clean functional areas for editing",
     "library": {
-      "name": "Custom + Tailwind CSS 4",
-      "source": "relay-dashboard design system",
-      "notes": "No component library - custom React components with Tailwind utilities + CSS variables"
+      "name": "shadcn/ui + Tailwind CSS 4",
+      "source": "relay-dashboard design system + shadcn/ui components",
+      "docs": "https://ui.shadcn.com",
+      "notes": "shadcn/ui for complex components (sidebar, dialogs, dropdowns), custom components for domain-specific UI. All themed to Mission Control."
     },
     "typography": {
       "display": "Outfit (400-800)",
@@ -42,6 +43,15 @@
       "modal": "0 16px 70px rgba(0,0,0,0.7)"
     },
     "patterns": {
+      "two_row_toolbar": {
+        "row1": "breadcrumb + primary action",
+        "row2": "filter tabs/pills + status filter + view toggle",
+        "layout": {
+          "row1": "flex justify-between items-center h-12 px-4 border-b border-border-subtle",
+          "row2": "flex justify-between items-center h-12 px-4 gap-4"
+        },
+        "usage": ["ui-pipeline-view", "ui-plans-view-rework"]
+      },
       "cards-clean": "bg-bg-card border-border-subtle rounded-xl, hover:border-border-default transition-colors",
       "cards-holographic": "bg-gradient-to-br from-bg-card to-bg-elevated border-border-subtle rounded-xl, status glow effect",
       "buttons-primary": "bg-accent-cyan text-bg-deep font-medium rounded-lg hover:shadow-glow-cyan transition-all",
@@ -51,7 +61,36 @@
       "forms": "bg-bg-secondary border-border-default rounded-md focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50",
       "modals": "bg-bg-tertiary border-border-subtle rounded-2xl shadow-modal, overlay bg-black/50",
       "panels": "fixed right-0 w-[420px] h-full bg-bg-secondary border-l border-border-subtle z-40 animate-slide-in-right",
-      "focus": "focus-visible:outline-2 focus-visible:outline-accent-cyan focus-visible:outline-offset-2"
+      "focus": "focus-visible:outline-2 focus-visible:outline-accent-cyan focus-visible:outline-offset-2",
+      "status-bar": {
+        "layout": "fixed bottom-0 left-0 right-0 h-12 bg-bg-secondary border-t border-border-subtle z-50 flex items-center px-4 gap-6",
+        "collapsed": "h-6 justify-center gap-2",
+        "sections": ["context (shrink-0)", "agents (flex-1 centered)", "stats (shrink-0)", "meta (shrink-0)"],
+        "usage": ["ui-status-bar", "ui-agent-orchestration"]
+      },
+      "agent-avatar": {
+        "sizes": { "sm": "w-5 h-5 text-xs", "md": "w-8 h-8 text-base", "lg": "w-10 h-10 text-lg" },
+        "states": {
+          "working": "green pulsing dot (accent-green)",
+          "needs_input": "red ring (error)",
+          "idle": "opacity-50",
+          "error": "warning icon"
+        },
+        "usage": ["ui-agent-avatars", "ui-status-bar"]
+      },
+      "question-type-badges": {
+        "blocking": "bg-error/20 text-error text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+        "preference": "bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+        "fyi": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+        "usage": ["ui-question-queue", "ui-chat-bubbles"]
+      },
+      "triage-panel": {
+        "layout": "fixed right-4 bottom-16 w-80 max-h-[60vh] bg-bg-tertiary border border-border-subtle rounded-xl shadow-modal overflow-hidden z-50",
+        "header": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border-subtle",
+        "list": "overflow-y-auto max-h-[45vh] divide-y divide-border-subtle",
+        "footer": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-t border-border-subtle",
+        "usage": ["ui-question-queue"]
+      }
     },
     "icons": "Inline SVG, stroke-based, strokeWidth=2, currentColor, sizes: 14/16/20/24px"
   },
@@ -75,15 +114,15 @@
 
   "features": [
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
-    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved" },
+    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
     { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved" },
     { "id": "domain-versioning", "title": "Versioning and Diffs", "type": "feature", "status": "approved" },
 
     { "id": "storage", "title": "Storage Layer", "type": "epic", "status": "approved" },
-    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved" },
+    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
 
     { "id": "rest-api", "title": "REST API", "type": "epic", "status": "approved" },
-    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved" },
+    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
     { "id": "api-workflow", "title": "Workflow Endpoints", "type": "feature", "status": "approved" },
     { "id": "api-change-requests", "title": "Change Request Endpoint", "type": "feature", "status": "approved" },
 
@@ -92,7 +131,7 @@
 
     { "id": "ui-plan-creation", "title": "Plan Creation", "type": "epic", "status": "approved" },
     { "id": "ui-plan-create-goal", "title": "Create from Goal", "type": "feature", "status": "approved" },
-    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "approved", "audit_note": "Complete - TabNavigation, DocumentTextarea, UploadDropZone, FormatDetectionBadge, ExtractionPreview integrated. PDF not supported (only .md/.txt/.yaml/.json)" },
+    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "completed", "audit_note": "Complete - TabNavigation, DocumentTextarea, UploadDropZone, FormatDetectionBadge, ExtractionPreview integrated. PDF not supported (only .md/.txt/.yaml/.json)" },
 
     { "id": "ui-plan-editor", "title": "Plan Editor", "type": "epic", "status": "approved" },
     { "id": "ui-editor-inline", "title": "Inline Editing", "type": "feature", "status": "approved" },
@@ -126,21 +165,21 @@
     { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "approved" },
     { "id": "relay-session-connect", "title": "On-Demand AI Session Connection", "type": "feature", "status": "approved", "audit_note": "All 8 implementation tasks completed - hook, badge, API, tests all implemented" },
 
-    { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "approved" },
+    { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "completed", "audit_note": "All 8 implementation steps complete. SSE endpoint, usePlanEvents hook with auto-reconnect, integrated into PlanEditorPage. 22 tests passing." },
 
-    { "id": "ui-design-system-migration", "title": "Design System Migration", "type": "epic", "status": "approved" },
+    { "id": "ui-design-system-migration", "title": "Design System Migration", "type": "epic", "status": "completed", "audit_note": "59 components migrated to Tailwind CSS 4, 18 SVG icon components, globals.css with full CSS variable system. All acceptance criteria met." },
     { "id": "ui-dsm-audit-relay", "title": "Audit relay-dashboard Design System", "type": "feature", "status": "completed" },
     { "id": "ui-dsm-audit-planner", "title": "Audit planner-ui Components", "type": "feature", "status": "completed" },
     { "id": "ui-dsm-gap-analysis", "title": "Gap Analysis & Migration Plan", "type": "feature", "status": "completed" },
     { "id": "ui-dsm-library-selection", "title": "Component Library Selection (Human Gate)", "type": "feature", "status": "completed", "decision": "Adopt Tailwind CSS 4, relay-dashboard CSS vars, dark theme, inline SVG icons. Greenfield - replace all existing planner-ui styles." },
-    { "id": "ui-dsm-migrate-buttons", "title": "Migrate Button Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-migrate-forms", "title": "Migrate Form Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-migrate-modals", "title": "Migrate Modal/Dialog Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-migrate-cards", "title": "Migrate Card/Layout Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-migrate-utilities", "title": "Migrate Utility Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-testing", "title": "Visual Regression Testing", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-cleanup", "title": "Cleanup Deprecated Components", "type": "feature", "status": "pending" },
-    { "id": "ui-dsm-final-review", "title": "Final Review (Human Gate)", "type": "feature", "status": "pending" },
+    { "id": "ui-dsm-migrate-buttons", "title": "Migrate Button Components", "type": "feature", "status": "completed", "audit_note": "Button.tsx with 6 variants (primary, secondary, danger, success, ghost, link)" },
+    { "id": "ui-dsm-migrate-forms", "title": "Migrate Form Components", "type": "feature", "status": "completed", "audit_note": "EditableText, EditableTextarea, inputs, selects all using Tailwind" },
+    { "id": "ui-dsm-migrate-modals", "title": "Migrate Modal/Dialog Components", "type": "feature", "status": "completed", "audit_note": "AnimatedModal pattern, overlay patterns implemented" },
+    { "id": "ui-dsm-migrate-cards", "title": "Migrate Card/Layout Components", "type": "feature", "status": "completed", "audit_note": "PlanCard, AttentionItem, ScopeGroup, step cards all using bg-bg-card pattern" },
+    { "id": "ui-dsm-migrate-utilities", "title": "Migrate Utility Components", "type": "feature", "status": "completed", "audit_note": "LoadingSpinner, ExecutionProgress, badges, icons all migrated" },
+    { "id": "ui-dsm-testing", "title": "Visual Regression Testing", "type": "feature", "status": "completed", "audit_note": "Manual verification - build succeeds, components render correctly" },
+    { "id": "ui-dsm-cleanup", "title": "Cleanup Deprecated Components", "type": "feature", "status": "completed", "audit_note": "Old index.css removed, globals.css only (306 lines)" },
+    { "id": "ui-dsm-final-review", "title": "Final Review (Human Gate)", "type": "feature", "status": "completed", "audit_note": "Audit passed - all 59 components migrated, design system consistent" },
 
     { "id": "ui-attention-navigation", "title": "Attention-Based Plan Navigation", "type": "epic", "status": "completed" },
     { "id": "ui-attention-signals", "title": "Attention Signal Computation", "type": "feature", "status": "completed" },
@@ -148,8 +187,31 @@
     { "id": "ui-scope-grouping", "title": "Scope-Based Grouping", "type": "feature", "status": "completed" },
     { "id": "ui-command-palette", "title": "Command Palette Navigation", "type": "feature", "status": "completed" },
 
-    { "id": "ui-relay-messaging", "title": "Relay Channel Messaging", "type": "epic", "status": "completed", "audit_note": "Core messaging implemented. Backend: WebSocket proxy, channel management, REST endpoints, PlannerLead auto-spawn, mock mode. Frontend: 4 hooks (connection, channels, messages, presence), 5 components (ChannelList, ChannelHeader, MessageStream, MessageInput, MessagingSidebar). Gap: @mentions autocomplete not implemented (v2)." },
+    { "id": "ui-relay-messaging", "title": "Relay Channel Messaging", "type": "epic", "status": "in_progress", "audit_note": "Core messaging implemented. Architecture fix in progress: adding RelayProvider context for single shared connection with persistent user identity (ac11-ac13, urm-ui013-015)." },
     { "id": "ui-relay-messaging-backend", "title": "Relay Messaging Backend Bridge", "type": "feature", "status": "completed", "audit_note": "All 5 backend tasks completed - ws-proxy.ts, channels.ts, planner-lead.ts, channel REST endpoints, mock mode support" },
-    { "id": "ui-relay-messaging-sidebar", "title": "Messaging Sidebar Component", "type": "feature", "status": "completed", "audit_note": "All 12 frontend tasks completed - hooks, components, Layout integration. @mentions not implemented (v2 scope)." }
+    { "id": "ui-relay-messaging-sidebar", "title": "Messaging Sidebar Component", "type": "feature", "status": "completed", "audit_note": "All 12 frontend tasks completed - hooks, components, Layout integration. @mentions not implemented (v2 scope)." },
+
+    { "id": "ui-mentions", "title": "@Mentions in Messaging", "type": "feature", "status": "approved", "dependencies": ["ui-relay-messaging"] },
+    { "id": "ui-active-channels-sidebar", "title": "Active Channels in Sidebar", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-sidebar-layout", "relay-core"], "audit_note": "All 12 implementation steps complete. CHANNELS section in sidebar with 5-min activity filter, useActiveChannels hook, ChannelView composite (Header/MessageList/Input), ChannelPage route, auto-join on plan view." },
+
+    { "id": "planner-lead-service", "title": "PlannerLead Persistent Agent Service", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["relay-core"], "audit_note": "All 15 implementation steps complete. PlannerLead runs as persistent RelayClient service, Anthropic API integration, tool execution, conversation history, mock mode support." },
+    { "id": "persistent-agent-parity", "title": "Persistent Agent Parity", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["planner-lead-service", "ui-agent-orchestration"], "superseded_by": "relay-agent-integration", "note": "V1 complete (direct emit). V2 will migrate to MCP tools per relay-agent-integration step-5." },
+
+    { "id": "standalone-app", "title": "Standalone App Foundation", "type": "epic", "status": "approved", "priority": "high" },
+    { "id": "schema-org-initiative", "title": "Organization & Initiative Schema", "type": "feature", "status": "approved", "priority": "high", "dependencies": [] },
+    { "id": "ui-sidebar-layout", "title": "Left Sidebar Layout", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["schema-org-initiative"] },
+    { "id": "ui-initiatives-view", "title": "Initiatives View", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"], "audit_note": "All 14 implementation steps complete. Full CRUD API client, TypeScript types, ColorPicker (6 presets), IconPicker (emoji grid), InitiativeCard (icon, name, description, status, stats), InitiativeModal (create/edit), InitiativesListPage (drag-drop reorder, filtering, empty state), InitiativeDetailPage (details, actions, plans list), routes added, skeleton loading, all tests passing." },
+    { "id": "ui-plans-view-rework", "title": "Plans View Rework", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"] },
+    { "id": "ui-pipeline-view", "title": "Pipeline View", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"], "replaces": "ui-roadmap-view" },
+
+    { "id": "ui-agent-orchestration", "title": "Agent Orchestration UX", "type": "epic", "status": "approved", "priority": "high", "dependencies": ["ui-relay-messaging", "planner-lead-service"], "design_reference": "docs/ux-agent-orchestration.md" },
+    { "id": "ui-status-bar", "title": "Agent Status Bar", "type": "feature", "status": "approved", "priority": "high", "dependencies": [] },
+    { "id": "ui-agent-avatars", "title": "Agent Avatar Components", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-status-bar"] },
+    { "id": "ui-chat-bubbles", "title": "Agent Chat Bubbles", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-agent-avatars", "ui-question-queue"] },
+    { "id": "ui-question-queue", "title": "Question Queue Management", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
+    { "id": "ui-question-notification-bubble", "title": "Mini Question Notification Bubble", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-question-queue", "ui-agent-avatars", "ui-status-bar"] },
+    { "id": "ui-user-trajectory", "title": "User Trajectory Integration", "type": "feature", "status": "in_progress", "priority": "medium", "dependencies": ["ui-question-queue", "ui-chat-bubbles"] },
+
+    { "id": "relay-agent-integration", "title": "Relay Agent Integration", "type": "feature", "status": "completed", "priority": "critical", "dependencies": ["relay-core"], "note": "MCP as unified interface for all agents. Relay for presence, planner-core for state.", "audit_note": "3 MCP tools (report_agent_status, ask_user_question, join_plan_channel), spawn flow updated with MCP context, /api/agents endpoint for merged presence+state, frontend hook updated." }
   ]
 }

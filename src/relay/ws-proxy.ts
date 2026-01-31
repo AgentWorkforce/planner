@@ -30,6 +30,8 @@ interface RelayMessage {
   type: 'message' | 'channel_message' | 'presence' | 'status' | 'error' | 'joined' | 'left';
   channel?: string;
   from?: string;
+  fromName?: string;
+  entityType?: 'user' | 'agent';
   body?: string;
   messageId?: string;
   timestamp?: number;
@@ -98,6 +100,8 @@ function handleMockMessage(ws: WebSocket, userId: string, displayName: string, c
             type: 'channel_message',
             channel: message.channel,
             from: 'Demo AI',
+            fromName: 'Demo AI',
+            entityType: 'agent',
             body: `Welcome to ${message.channel}! You're in demo mode because the relay daemon is not running.`,
             messageId: `mock-${randomUUID().slice(0, 8)}`,
             timestamp: Date.now(),
@@ -119,7 +123,9 @@ function handleMockMessage(ws: WebSocket, userId: string, displayName: string, c
         sendToBrowser(ws, {
           type: 'channel_message',
           channel: message.channel,
-          from: displayName,
+          from: userId,
+          fromName: displayName,
+          entityType: 'user',
           body: message.body,
           messageId: `mock-${randomUUID().slice(0, 8)}`,
           timestamp: Date.now(),
@@ -131,6 +137,8 @@ function handleMockMessage(ws: WebSocket, userId: string, displayName: string, c
             type: 'channel_message',
             channel: message.channel,
             from: 'Demo AI',
+            fromName: 'Demo AI',
+            entityType: 'agent',
             body: generateMockResponse(message.body!),
             messageId: `mock-${randomUUID().slice(0, 8)}`,
             timestamp: Date.now(),
@@ -146,6 +154,8 @@ function handleMockMessage(ws: WebSocket, userId: string, displayName: string, c
           sendToBrowser(ws, {
             type: 'message',
             from: 'Demo AI',
+            fromName: 'Demo AI',
+            entityType: 'agent',
             body: generateMockResponse(message.body!),
             messageId: `mock-${randomUUID().slice(0, 8)}`,
             timestamp: Date.now(),
@@ -196,10 +206,30 @@ function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): vo
 
     case 'send':
       if (message.channel && message.body) {
+        // Auto-join channel if not already a member (relay requires membership to send)
+        if (!conn.channels.has(message.channel)) {
+          console.log(`[ws-proxy] User ${conn.userId} auto-joining ${message.channel} before sending`);
+          const joined = client.joinChannel(message.channel, conn.displayName);
+          if (joined) {
+            conn.channels.add(message.channel);
+            sendToBrowser(ws, { type: 'joined', channel: message.channel });
+          } else {
+            console.log(`[ws-proxy] Failed to auto-join ${message.channel}`);
+            sendToBrowser(ws, { type: 'error', error: `Failed to join channel ${message.channel}` });
+            break;
+          }
+        }
+
+        console.log(`[ws-proxy] User ${conn.userId} sending to ${message.channel}: "${message.body.slice(0, 50)}"`);
+        console.log(`[ws-proxy] User channels: ${Array.from(conn.channels).join(', ')}`);
+        console.log(`[ws-proxy] Client state: ${client.state}`);
         const sent = client.sendChannelMessage(message.channel, message.body, {
           data: message.data,
         });
-        if (!sent) {
+        if (sent) {
+          console.log(`[ws-proxy] Message sent successfully to ${message.channel}`);
+        } else {
+          console.log(`[ws-proxy] Failed to send message - client not connected`);
           sendToBrowser(ws, { type: 'error', error: 'Failed to send message: not connected' });
         }
       }
@@ -252,9 +282,13 @@ async function createUserClient(ws: WebSocket, userId: string, displayName: stri
   };
 
   client.onMessage = (from: string, payload: SendPayload, messageId: string, meta?: SendMeta) => {
+    // Determine entity type based on sender name pattern
+    const isUserMessage = from.startsWith('user-');
     sendToBrowser(ws, {
       type: 'message',
       from,
+      fromName: from,
+      entityType: isUserMessage ? 'user' : 'agent',
       body: payload.body || '',
       messageId,
       timestamp: Date.now(),
@@ -263,10 +297,15 @@ async function createUserClient(ws: WebSocket, userId: string, displayName: stri
   };
 
   client.onChannelMessage = (from: string, channel: string, body: string, envelope: Envelope<ChannelMessagePayload>) => {
+    console.log(`[ws-proxy] Received channel message from ${from} in ${channel}: "${body.slice(0, 50)}"`);
+    // Determine entity type based on sender name pattern
+    const isUserMessage = from.startsWith('user-');
     sendToBrowser(ws, {
       type: 'channel_message',
       channel,
       from,
+      fromName: from,
+      entityType: isUserMessage ? 'user' : 'agent',
       body,
       messageId: envelope.id,
       timestamp: envelope.ts || Date.now(),

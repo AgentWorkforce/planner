@@ -64,16 +64,8 @@ export function MessageInput({
   };
 
   return (
-    <div className="border-t border-border-subtle p-3">
-      {planContext && (
-        <div className="mb-2 px-1">
-          <span className="text-xs text-text-muted">Context: </span>
-          <span className="text-xs text-text-secondary">
-            {planContext.stepTitle || planContext.planTitle}
-          </span>
-        </div>
-      )}
-
+    <div className="border-t border-border-subtle p-3 flex-shrink-0">
+      {/* Context is passed to agents via message data, no need to display */}
       <div className="flex gap-2 items-end">
         <div className="flex-1 relative">
           <textarea

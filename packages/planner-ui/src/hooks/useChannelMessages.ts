@@ -72,13 +72,28 @@ export function useChannelMessages(
     });
   }, []);
 
-  // Send a message to the channel
+  // Send a message to the channel with optimistic update
   const send = useCallback(
     (body: string, data?: Record<string, unknown>) => {
       if (!channelIdRef.current || !connection.isConnected) return;
+
+      // Optimistic update: add message immediately to UI
+      const optimisticMessage: RelayMessage = {
+        id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        from: connection.userId || 'user',
+        fromName: 'You',
+        entityType: 'user',
+        channel: channelIdRef.current,
+        body,
+        timestamp: new Date().toISOString(),
+        data,
+      };
+      addMessage(optimisticMessage);
+
+      // Send to relay
       connection.sendChannelMessage(channelIdRef.current, body, data);
     },
-    [connection]
+    [connection, addMessage]
   );
 
   // Clear all messages
@@ -98,20 +113,16 @@ export function useChannelMessages(
     return unsubscribe;
   }, [connection, addMessage]);
 
-  // Load history when channel changes
+  // Load history when channel changes (or clear if no channel)
   useEffect(() => {
-    if (loadHistory && channelId) {
-      loadMessageHistory();
-    } else {
-      setMessages([]);
-    }
-  }, [channelId, loadHistory, loadMessageHistory]);
-
-  // Clear messages when channel changes
-  useEffect(() => {
+    // Clear previous messages and error when channel changes
     setMessages([]);
     setError(null);
-  }, [channelId]);
+
+    if (loadHistory && channelId) {
+      loadMessageHistory();
+    }
+  }, [channelId, loadHistory, loadMessageHistory]);
 
   return {
     messages,

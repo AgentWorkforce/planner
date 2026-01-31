@@ -2,9 +2,16 @@
   "feature_id": "ui-relay-messaging",
   "title": "Relay Channel Messaging",
   "type": "epic",
-  "status": "completed",
-  "completed_at": "2026-01-29",
-  "audit_note": "Core messaging implemented. @mentions autocomplete deferred to v2.",
+  "status": "in_progress",
+  "completed_at": null,
+  "audit_note": "Core messaging implemented. RelayProvider context architecture completed (urm-ui013, urm-ui014, urm-ui015) - single shared WebSocket per session with persistent user identity via useCurrentUser/sessionStorage.",
+  "change_log": [
+    {
+      "date": "2026-01-30",
+      "type": "architecture_fix",
+      "description": "Adding RelayProvider context pattern - single shared WebSocket per session, persistent userId integrated with useCurrentUser"
+    }
+  ],
   "priority": "high",
   "dependencies": ["relay-core", "relay-session-connect"],
 
@@ -40,7 +47,10 @@
       { "id": "ac7", "description": "Messages from PlannerLead agent display with agent avatar/name" },
       { "id": "ac8", "description": "Plan context (current step selection) shared with channel" },
       { "id": "ac9", "description": "Sidebar can be collapsed/expanded" },
-      { "id": "ac10", "description": "Works in demo mode when relay unavailable (mock channel)" }
+      { "id": "ac10", "description": "Works in demo mode when relay unavailable (mock channel)" },
+      { "id": "ac11", "description": "Single shared WebSocket connection per browser session (RelayProvider context)" },
+      { "id": "ac12", "description": "User identity persisted via sessionStorage, integrated with useCurrentUser" },
+      { "id": "ac13", "description": "userId passed to ws-proxy via query param for stable identity" }
     ]
   },
 
@@ -208,10 +218,12 @@
         },
 
         "state_management": {
-          "useRelayConnection": "Manages WebSocket lifecycle. Returns { status, send, subscribe }. Status: connecting|connected|disconnected|error.",
-          "useChannels": "Fetches channel list, tracks activeChannel, unreadCounts. Subscribes to relay for new channels.",
-          "useChannelMessages": "Loads history via REST, appends from WebSocket. Returns { messages, sendMessage, loadMore, hasMore }.",
-          "usePresence": "Fetches presence via REST, updates from WebSocket join/leave events."
+          "RelayProvider": "App-level context providing single shared WebSocket connection. Wraps entire app in main.tsx. Manages connection lifecycle, reconnection, and user identity.",
+          "useRelay": "Hook to access shared connection from RelayProvider. Returns { connection, isConnected, userId, displayName }. Components use this instead of useRelayConnection directly.",
+          "useRelayConnection": "(internal) Low-level hook used only by RelayProvider. Not called directly by components.",
+          "useChannels": "Fetches channel list, tracks activeChannel, unreadCounts. Receives connection from useRelay().",
+          "useChannelMessages": "Loads history via REST, appends from WebSocket. Receives connection from useRelay().",
+          "usePresence": "Fetches presence via REST, updates from WebSocket join/leave events. Receives connection from useRelay()."
         }
       },
 
@@ -387,6 +399,52 @@
               { "id": "ac2", "description": "#demo channel with simulated messages" },
               { "id": "ac3", "description": "Clear 'Demo Mode' indicator in sidebar" },
               { "id": "ac4", "description": "Messages to demo channel get mock AI responses" }
+            ]
+          },
+          {
+            "step_id": "urm-ui013",
+            "title": "Create RelayProvider context",
+            "scope": "planner-ui",
+            "description": "Create a React context that provides a single shared WebSocket connection for the entire app. Wrap App in main.tsx. The provider manages connection lifecycle and exposes connection state to all descendants via useRelay() hook.",
+            "dependencies": ["urm-ui001"],
+            "owner_role": "frontend:Coder",
+            "status": "completed",
+            "acceptance_criteria": [
+              { "id": "ac1", "description": "RelayProvider context created in src/contexts/RelayContext.tsx" },
+              { "id": "ac2", "description": "useRelay() returns { connection: UseRelayConnectionResult, isConnected, userId, displayName, isMock }" },
+              { "id": "ac3", "description": "App wrapped with RelayProvider in main.tsx" },
+              { "id": "ac4", "description": "Only ONE WebSocket connection created per browser session" }
+            ]
+          },
+          {
+            "step_id": "urm-ui014",
+            "title": "Integrate user identity with RelayProvider",
+            "scope": "planner-ui",
+            "description": "Use useCurrentUser() to get user identity. Generate stable userId (from useCurrentUser or sessionStorage fallback). Update useRelayConnection to accept optional userId param. Pass userId to ws-proxy via query param: /ws/relay?name=DisplayName&userId=user-id",
+            "dependencies": ["urm-ui013"],
+            "owner_role": "frontend:Coder",
+            "status": "completed",
+            "acceptance_criteria": [
+              { "id": "ac1", "description": "useRelayConnection accepts optional userId param" },
+              { "id": "ac2", "description": "RelayProvider passes useCurrentUser().user_id or sessionStorage fallback" },
+              { "id": "ac3", "description": "WebSocket URL includes userId: /ws/relay?name=X&userId=Y" },
+              { "id": "ac4", "description": "Relay logs show stable user ID (e.g., dev-user-001) not random user-*" }
+            ]
+          },
+          {
+            "step_id": "urm-ui015",
+            "title": "Refactor consumers to use RelayProvider context",
+            "scope": "planner-ui",
+            "description": "Update MessagingSidebar and useAgentOrchestration to use useRelay() instead of calling useRelayConnection directly. Remove direct useRelayConnection imports from components.",
+            "dependencies": ["urm-ui014"],
+            "owner_role": "frontend:Coder",
+            "status": "completed",
+            "acceptance_criteria": [
+              { "id": "ac1", "description": "MessagingSidebar uses useRelay() instead of useRelayConnection" },
+              { "id": "ac2", "description": "useAgentOrchestration uses useRelay() instead of useRelayConnection" },
+              { "id": "ac3", "description": "No component directly calls useRelayConnection (only RelayProvider does)" },
+              { "id": "ac4", "description": "Browser shows single WebSocket connection in DevTools Network tab" },
+              { "id": "ac5", "description": "Relay logs show stable user identity across page navigation" }
             ]
           }
         ]

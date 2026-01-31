@@ -13,7 +13,7 @@ import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { DependencyLinesOverlay } from '@/components/DependencyLinesOverlay';
 import { MessagingSidebar } from '@/components/MessagingSidebar';
 import { Badge } from '@/components/ui/Badge';
-import { MessageIcon } from '@/components/icons';
+import { MessageIcon, DocumentIcon, DecisionsIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
 
@@ -134,10 +134,10 @@ export function PlanEditorPage() {
     };
   }, []);
 
-  // Real-time sync: Subscribe to plan changes when AI agent is connected
+  // Real-time sync: Subscribe to plan changes (always enabled since PlannerLead is persistent)
   const { isConnected: isEventStreamConnected, error: eventStreamError } = usePlanEvents(
     planId ?? null,
-    connectionStatus === 'connected',
+    true, // Always subscribe - PlannerLead may update plans at any time
     handlePlanEvent
   );
 
@@ -417,14 +417,40 @@ export function PlanEditorPage() {
   };
 
   return (
-    <div className="h-screen flex">
+    <div className="h-full flex">
       {/* Main content area - higher z-index so popovers appear above sidebar */}
       <div className="flex-1 min-w-0 overflow-auto relative z-10">
         {/* Header */}
         <div className="border-b border-border-subtle bg-bg-card">
-          <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="px-6 py-4">
           {/* Breadcrumb row */}
           <PlanBreadcrumb parents={parents} currentGoal={version.summary.goal} />
+
+          {/* Tab navigation */}
+          <div className="flex items-center gap-2 mt-3 mb-1 border-b border-border-subtle pb-3">
+            <Link
+              to={`/plans/${planId}`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                location.pathname === `/plans/${planId}`
+                  ? 'bg-bg-tertiary text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+              }`}
+            >
+              <DocumentIcon size="sm" />
+              <span>Plan</span>
+            </Link>
+            <Link
+              to={`/plans/${planId}/decisions`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                location.pathname === `/plans/${planId}/decisions`
+                  ? 'bg-bg-tertiary text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+              }`}
+            >
+              <DecisionsIcon size="sm" />
+              <span>Decisions</span>
+            </Link>
+          </div>
 
           {/* Main header: 2-column layout */}
           <div className="mt-4 flex gap-8">
@@ -468,7 +494,7 @@ export function PlanEditorPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <div className="px-6 py-6 space-y-6">
         {/* Steps section */}
         <div className="bg-bg-tertiary rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
@@ -579,13 +605,16 @@ export function PlanEditorPage() {
                   onScrollToStep={handleScrollToStep}
                 />
               )}
-              <DependencyLinesOverlay
-                steps={version.steps}
-                containerRef={stepsContainerRef}
-                hoveredStepId={hoveredStepId}
-                hoveredDirection={hoveredDirection}
-                viewMode={viewMode}
-              />
+              {/* Dependency lines only for list view - swimlane has its own cross-scope lines */}
+              {viewMode === 'list' && (
+                <DependencyLinesOverlay
+                  steps={version.steps}
+                  containerRef={stepsContainerRef}
+                  hoveredStepId={hoveredStepId}
+                  hoveredDirection={hoveredDirection}
+                  viewMode={viewMode}
+                />
+              )}
             </div>
           )}
         </div>

@@ -34,10 +34,12 @@ type PresenceHandler = (channelId: string, members: PresenceEntry[]) => void;
  *
  * @param displayName - Display name for the user in relay
  * @param autoConnect - Whether to connect automatically (default: true)
+ * @param requestedUserId - Optional stable user ID (if not provided, server generates random one)
  */
 export function useRelayConnection(
   displayName: string = 'User',
-  autoConnect: boolean = true
+  autoConnect: boolean = true,
+  requestedUserId?: string
 ): UseRelayConnectionResult {
   const [state, setState] = useState<RelayConnectionState>('disconnected');
   const [isMock, setIsMock] = useState(false);
@@ -87,7 +89,11 @@ export function useRelayConnection(
     setError(null);
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/relay?name=${encodeURIComponent(displayName)}`;
+    const params = new URLSearchParams({ name: displayName });
+    if (requestedUserId) {
+      params.set('userId', requestedUserId);
+    }
+    const wsUrl = `${protocol}//${window.location.host}/ws/relay?${params.toString()}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -191,7 +197,7 @@ export function useRelayConnection(
         setError('Failed to connect after multiple attempts');
       }
     };
-  }, [displayName, cleanup]);
+  }, [displayName, requestedUserId, cleanup]);
 
   // Reconnect manually
   const reconnect = useCallback(() => {

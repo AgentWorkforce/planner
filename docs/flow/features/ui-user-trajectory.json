@@ -1,0 +1,173 @@
+{
+  "feature_id": "ui-user-trajectory",
+  "title": "User Trajectory Integration",
+  "type": "feature",
+  "status": "in_progress",
+  "priority": "medium",
+  "dependencies": ["ui-question-queue", "ui-chat-bubbles"],
+
+  "summary": {
+    "goal": "Capture user decisions as trajectory events using @agent-relay/trajectory library, enable agents to query past answers before asking, and build a preference model over time.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "User answers recorded via @agent-relay/trajectory recordDecision()" },
+      { "id": "ac2", "description": "Event includes question context, selected option, free text, reasoning" },
+      { "id": "ac3", "description": "Event links to agent trajectory via trajectoryId" },
+      { "id": "ac4", "description": "Agents query trajectory via listTrajectorySteps() for similar decisions" },
+      { "id": "ac5", "description": "If similar question found, agent uses existing answer (no re-ask)" },
+      { "id": "ac6", "description": "Decision Log view renders trajectory data with filtering" },
+      { "id": "ac7", "description": "Preference model derived from trajectory queries" },
+      { "id": "ac8", "description": "Agents can query preference model to order options intelligently" }
+    ],
+    "out_of_scope_v1": [
+      "Cross-plan global trajectory (plan-scoped only)",
+      "Automatic preference learning ML (rule-based only)",
+      "Preference editing UI",
+      "Custom trajectory storage tables (using @agent-relay/trajectory instead)"
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui", "planner-core"],
+    "steps": [
+      {
+        "step_id": "step-1-refactor",
+        "scope": "planner-core",
+        "title": "Remove custom trajectory_events table",
+        "description": "Remove trajectory_events table from src/storage/schema.ts. Remove related methods from sqlite.ts (createTrajectoryEvent, listTrajectoryEvents, findSimilarQuestions). Clean up trajectory storage interface.",
+        "acceptance_criteria": [
+          { "id": "ac1-1", "description": "trajectory_events table definition removed from schema.ts" },
+          { "id": "ac1-2", "description": "Storage methods removed from sqlite.ts" },
+          { "id": "ac1-3", "description": "Storage interface cleaned up" }
+        ],
+        "dependencies": []
+      },
+      {
+        "step_id": "step-2-refactor",
+        "scope": "planner-core",
+        "title": "Refactor TrajectoryService to use @agent-relay/trajectory",
+        "description": "Update src/trajectory/service.ts to import from @agent-relay/trajectory. Use recordDecision(), listTrajectorySteps(), getTrajectoryHistory(). Remove custom SQL storage. Maintain same public API for handlers.",
+        "acceptance_criteria": [
+          { "id": "ac2-1", "description": "Imports @agent-relay/trajectory functions" },
+          { "id": "ac2-2", "description": "recordDecision() uses relay trajectory recordDecision()" },
+          { "id": "ac2-3", "description": "queryEvents() uses listTrajectorySteps() and filters" },
+          { "id": "ac2-4", "description": "Same public interface maintained for handlers" }
+        ],
+        "dependencies": ["step-1-refactor"]
+      },
+      {
+        "step_id": "step-3-refactor",
+        "scope": "planner-core",
+        "title": "Update API handlers to use refactored service",
+        "description": "Update src/api/handlers/trajectories.ts to work with refactored TrajectoryService. Same HTTP endpoints, now backed by relay trajectory. Update response format if needed to match relay types.",
+        "acceptance_criteria": [
+          { "id": "ac3-1", "description": "Handlers use refactored TrajectoryService" },
+          { "id": "ac3-2", "description": "HTTP interface unchanged (frontend compatible)" },
+          { "id": "ac3-3", "description": "Response types align with relay trajectory format" }
+        ],
+        "dependencies": ["step-2-refactor"]
+      },
+      {
+        "step_id": "step-4-refactor",
+        "scope": "planner-core",
+        "title": "Update domain types to match relay trajectory",
+        "description": "Update src/domain/trajectory.ts to align DecisionEvent with @agent-relay/trajectory DecisionOptions. Remove redundant types. Keep DerivedPreference for preference calculation.",
+        "acceptance_criteria": [
+          { "id": "ac4-1", "description": "DecisionEvent aligns with relay DecisionOptions" },
+          { "id": "ac4-2", "description": "Redundant types removed" },
+          { "id": "ac4-3", "description": "DerivedPreference retained for UI" }
+        ],
+        "dependencies": ["step-2-refactor"]
+      },
+      {
+        "step_id": "step-5-refactor",
+        "scope": "planner-ui",
+        "title": "Update frontend types to match new backend",
+        "description": "Update packages/planner-ui/src/types/trajectory.ts to match refactored backend types. Ensure DecisionEvent matches relay trajectory format.",
+        "acceptance_criteria": [
+          { "id": "ac5-1", "description": "Frontend DecisionEvent matches backend" },
+          { "id": "ac5-2", "description": "API responses properly typed" }
+        ],
+        "dependencies": ["step-4-refactor"]
+      },
+      {
+        "step_id": "step-6-verify",
+        "scope": "planner-core",
+        "title": "Test refactored trajectory integration",
+        "description": "Test that decisions are recorded via relay trajectory. Verify listTrajectorySteps returns decisions. Test preference derivation still works. Verify API endpoints return correct data.",
+        "acceptance_criteria": [
+          { "id": "ac6-1", "description": "Decisions recorded to relay trajectory storage" },
+          { "id": "ac6-2", "description": "API endpoints return decision data" },
+          { "id": "ac6-3", "description": "Preferences derived correctly" },
+          { "id": "ac6-4", "description": "Decision Log UI still works" }
+        ],
+        "dependencies": ["step-5-refactor"]
+      }
+    ],
+    "previous_steps_completed": [
+      "step-5 through step-14: UI components (DecisionRow, DecisionList, DecisionLogHeader, DecisionEmptyState, DecisionDetailSheet, PreferencesSummary, DecisionLogPage, ChatBubble integration, navigation) - these remain unchanged"
+    ]
+  },
+
+  "design_spec": {
+    "views": [
+      {
+        "view_id": "decision-log",
+        "name": "Decision Log View",
+        "description": "Paginated list of user decisions rendered from trajectory data. Shows question, answer, reasoning. Click row for full context.",
+        "access": "Tab in plan editor toolbar or status bar dropdown",
+        "layout": {
+          "container": "flex flex-col h-full bg-bg-primary",
+          "maxWidth": "max-w-4xl mx-auto"
+        },
+        "components": ["DecisionLogHeader", "DecisionList", "DecisionEmptyState"]
+      },
+      {
+        "view_id": "decision-detail",
+        "name": "Decision Detail Sheet",
+        "description": "Slide-out panel showing full decision context from trajectory.",
+        "trigger": "Click on DecisionRow",
+        "layout": {
+          "wrapper": "Sheet (from ui/sheet.tsx)",
+          "side": "right",
+          "width": "w-[420px]"
+        }
+      },
+      {
+        "view_id": "preferences-summary",
+        "name": "Preferences Summary Card",
+        "description": "Read-only card showing preferences derived from trajectory queries.",
+        "condition": "Only show if preferences exist"
+      }
+    ],
+    "trajectory_integration": {
+      "library": "@agent-relay/trajectory",
+      "source": "Already installed via @agent-relay/sdk",
+      "storage": "Uses relay's built-in trajectory storage (.trajectories/)",
+      "event_recording": "Use recordDecision() from @agent-relay/trajectory",
+      "querying": "Use listTrajectorySteps() to get decision events"
+    },
+    "decision_event_schema": {
+      "note": "Maps to @agent-relay/trajectory DecisionOptions",
+      "choice": "string (selected option or free text)",
+      "question": "string (question text)",
+      "alternatives": "string[] (other options)",
+      "reasoning": "string?",
+      "confidence": "number?"
+    },
+    "api_interface": {
+      "GET /api/plans/:planId/trajectory/events": "Get trajectory steps filtered to decisions",
+      "POST /api/plans/:planId/trajectory/decision": "Record decision via relay trajectory",
+      "GET /api/plans/:planId/trajectory/preferences": "Get derived preferences (computed from decisions)",
+      "GET /api/plans/:planId/trajectory/similar?text=": "Find similar past questions from trajectory"
+    },
+    "custom_needed": []
+  },
+
+  "change_history": [
+    {
+      "date": "2026-01-30",
+      "change": "Refactor from custom SQLite storage to @agent-relay/trajectory library",
+      "reason": "Avoid duplicate infrastructure - relay already provides trajectory storage"
+    }
+  ]
+}

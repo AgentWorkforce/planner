@@ -12,6 +12,9 @@ export function useDependencyPositions(
 ): Map<string, DOMRect> {
   const [positions, setPositions] = useState<Map<string, DOMRect>>(new Map());
   const rafRef = useRef<number | null>(null);
+  // Use ref to store stepIds to avoid recreating callback on every render
+  const stepIdsRef = useRef(stepIds);
+  stepIdsRef.current = stepIds;
 
   const updatePositions = useCallback(() => {
     if (!containerRef.current) return;
@@ -19,7 +22,7 @@ export function useDependencyPositions(
     const containerRect = containerRef.current.getBoundingClientRect();
     const newPositions = new Map<string, DOMRect>();
 
-    for (const stepId of stepIds) {
+    for (const stepId of stepIdsRef.current) {
       const element = containerRef.current.querySelector(`[data-step-id="${stepId}"]`);
       if (element) {
         const rect = element.getBoundingClientRect();
@@ -34,7 +37,7 @@ export function useDependencyPositions(
     }
 
     setPositions(newPositions);
-  }, [containerRef, stepIds]);
+  }, [containerRef]);
 
   useEffect(() => {
     // Only run when enabled (hovering)

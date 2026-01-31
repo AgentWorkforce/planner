@@ -11,6 +11,7 @@ export {
   approveVersion,
   publishVersion,
 } from './plans';
+export type { ListPlansParams } from './plans';
 export { getExecutionStatus, createMockExecutionStatus } from './execution';
 export {
   sendChatMessage,
@@ -59,3 +60,47 @@ export type {
   CreateFromImportRequest,
   CreateFromImportResponse,
 } from './import';
+export {
+  listInitiatives,
+  getInitiative,
+  createInitiative,
+  updateInitiative,
+  deleteInitiative,
+  reorderInitiatives,
+} from './initiatives';
+export type {
+  Initiative,
+  InitiativeStatus,
+  CreateInitiativeInput,
+  UpdateInitiativeInput,
+  PlanCounts,
+  InitiativeWithPlanCounts,
+  InitiativeWithPlans,
+} from '../types/initiative';
+export {
+  getQuestions,
+  getQuestion,
+  createQuestion as createQuestionApi,
+  answerQuestion,
+  dismissQuestion as dismissQuestionApi,
+  subscribeToQuestion,
+  checkDuplicates,
+} from './questions';
+export type {
+  QuestionsResponse,
+  QuestionResponse,
+  AnswerQuestionInput,
+  CreateQuestionInput,
+} from './questions';
+export {
+  getEvents,
+  recordDecision,
+  getPreferences,
+  findSimilarQuestions,
+} from './trajectories';
+export type {
+  EventsResponse,
+  EventResponse,
+  PreferencesResponse,
+  SimilarQuestionsResponse,
+} from './trajectories';

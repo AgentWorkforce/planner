@@ -1,18 +1,31 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '@/components';
-import { PlansListPage, NewPlanPage, PlanEditorPage } from '@/pages';
+import { PlansListPage, NewPlanPage, PlanEditorPage, DecisionLogPage, ChannelPage } from '@/pages';
+import { InitiativesListPage } from './pages/InitiativesListPage';
+import { InitiativeDetailPage } from './pages/InitiativeDetailPage';
+import { PipelinePage } from './pages/PipelinePage';
+import { RelayProvider } from '@/contexts';
 
 export function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <RelayProvider>
+        <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/plans" replace />} />
           <Route path="plans" element={<PlansListPage />} />
+          {/* /plans/my will be handled by PlansListPage reading ?owner=me from URL and replacing with actual user_id */}
+          <Route path="plans/my" element={<PlansListPage />} />
           <Route path="plans/new" element={<NewPlanPage />} />
           <Route path="plans/:planId" element={<PlanEditorPage />} />
+          <Route path="plans/:planId/decisions" element={<DecisionLogPage />} />
+          <Route path="initiatives" element={<InitiativesListPage />} />
+          <Route path="initiatives/:id" element={<InitiativeDetailPage />} />
+          <Route path="pipeline" element={<PipelinePage />} />
+          <Route path="channels/:channelId" element={<ChannelPage />} />
         </Route>
-      </Routes>
+        </Routes>
+      </RelayProvider>
     </BrowserRouter>
   );
 }

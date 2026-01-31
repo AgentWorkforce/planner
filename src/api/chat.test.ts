@@ -17,18 +17,24 @@ vi.mock('../relay/service.js', () => ({
 }));
 
 describe('Chat API', () => {
-  let storage: PlanStorage;
+  let storage: PlanStorage & { listOrganizations: () => { org_id: string }[] };
   let app: ReturnType<typeof createApp>;
   let planId: string;
   let version: PlanVersion;
+  let testOrgId: string;
 
   beforeEach(() => {
     storage = new SqliteStorage(':memory:');
     app = createApp(storage);
 
+    // Get default org created by migrations
+    const orgs = storage.listOrganizations();
+    testOrgId = orgs[0]!.org_id;
+
     // Create a test plan
     const plan = storage.createPlan({
       plan_id: crypto.randomUUID(),
+      org_id: testOrgId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });

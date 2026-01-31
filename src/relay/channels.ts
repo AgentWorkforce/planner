@@ -222,3 +222,24 @@ export function syncPlanChannels(planIds: string[]): void {
 
   console.log(`[channels] Synced ${planIds.length} plan channels`);
 }
+
+/**
+ * Join a user to a channel.
+ * Returns true if successful, false if relay not connected.
+ */
+export function joinChannel(channelId: string, userId: string): boolean {
+  const client = getClient();
+  if (!client || !isConnected()) {
+    console.log(`[channels] Skipping join to ${channelId}: relay not connected`);
+    return false;
+  }
+
+  const joined = client.joinChannel(channelId, userId);
+  if (joined) {
+    console.log(`[channels] User ${userId} joined ${channelId}`);
+    return true;
+  }
+
+  console.warn(`[channels] Failed to join user ${userId} to ${channelId}`);
+  return false;
+}

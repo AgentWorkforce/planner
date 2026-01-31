@@ -71,6 +71,13 @@ export interface PlanWithVersion {
   version: PlanVersion;
 }
 
+export interface InitiativeBadgeData {
+  initiative_id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+}
+
 export interface PlanSummary {
   plan_id: string;
   goal: string;
@@ -81,6 +88,13 @@ export interface PlanSummary {
   updated_at: string;
   /** Attention types computed by backend when include_attention=true */
   attention_types?: AttentionType[];
+  /** Initiative association */
+  initiative_id?: string;
+  initiative?: InitiativeBadgeData;
+  /** Organization association */
+  org_id?: string;
+  /** Owner user ID for "My Plans" filtering */
+  owner_user_id?: string;
 }
 
 // Navigation state for sub-plan breadcrumbs
@@ -278,4 +292,51 @@ export interface ChangeRequest {
   revision_status?: RevisionStatus;
   created_at: string;
   updated_at: string;
+}
+
+// Question Queue types
+export type QuestionBlockingLevel = 'hard_block' | 'soft_block' | 'preference' | 'fyi';
+export type QuestionStatus = 'pending' | 'answered' | 'dismissed';
+
+/**
+ * Question from an agent awaiting human answer.
+ * Questions are prioritized by blocking level, steps blocked, subscribers, and wait time.
+ */
+export interface Question {
+  question_id: string;
+  plan_id: string;
+  agent_id: string;
+  agent_role: string;
+  text: string;
+  context?: string;
+  /** Multiple choice options (if any) */
+  options?: string[];
+  blocking_level: QuestionBlockingLevel;
+  /** Number of steps blocked by this question */
+  steps_blocked: number;
+  /** Whether the agent can proceed with a default value */
+  can_use_default: boolean;
+  /** Default value if can_use_default is true */
+  default_value?: string;
+  /** Other agent IDs waiting for this answer */
+  subscribers: string[];
+  /** Question IDs that were deduplicated/merged into this one */
+  merged_from: string[];
+  status: QuestionStatus;
+  answer?: string;
+  answered_at?: string;
+  /** Computed priority score for queue ordering */
+  priority_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * State for the question queue UI.
+ */
+export interface QuestionQueueState {
+  questions: Question[];
+  currentQuestion: Question | null;
+  isTriageOpen: boolean;
+  lastUpdated: string;
 }

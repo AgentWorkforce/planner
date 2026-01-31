@@ -178,8 +178,12 @@ export function createImportHandlers(storage: PlanStorage) {
           throw badRequest('steps must be an array');
         }
 
-        // Create plan
-        const plan = createPlan();
+        // Create plan with default org
+        const orgId = storage.listOrganizations().find((o) => o.slug === 'default')?.org_id;
+        if (!orgId) {
+          throw new Error('Default organization not found');
+        }
+        const plan = createPlan(orgId);
         storage.createPlan(plan);
 
         // Create initial version with steps
