@@ -1,12 +1,16 @@
 /**
  * Migration script: Import flow feature files into the planner database
  *
+ * This script imports the plans that were used to build the Planner itself,
+ * giving you sample content to explore the UI and understand plan structure.
+ *
  * Reads docs/flow/catalog.json and feature files, transforms them to
  * PlanVersion format, and inserts into SQLite database.
  *
  * Key behavior:
  * - Idempotent: safe to re-run to pick up new features or changes
  * - Uses deterministic UUIDs: same feature_id always produces same plan_id
+ * - Creates "Planner Development" org and "Planner v1" initiative
  * - Regular features: steps from plan_implementation.steps
  * - Epics (with sub_features): creates steps pointing to child plans via sub_plan_id
  *
@@ -14,6 +18,9 @@
  * - Update existing plans with any changes
  * - Add new plans for new features
  * - Remove steps that no longer exist in the flow files
+ *
+ * Usage:
+ *   npx tsx scripts/migrate-flow-to-db.ts
  */
 
 import fs from 'fs';
@@ -28,6 +35,29 @@ const ROOT = path.resolve(__dirname, '..');
 // Namespace UUID for generating deterministic UUIDs from feature_id
 // This ensures the same feature_id always produces the same plan_id
 const NAMESPACE_UUID = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace (standard)
+
+/**
+ * Generate a deterministic UUID v5 from a name.
+ * Uses SHA-1 hash of namespace + name, formatted as UUID.
+ * This ensures the same name always produces the same UUID.
+ */
+function deterministicUUID(name: string): string {
+  const hash = createHash('sha1');
+  const namespaceBytes = NAMESPACE_UUID.replace(/-/g, '');
+  const namespaceBuffer = Buffer.from(namespaceBytes, 'hex');
+  hash.update(namespaceBuffer);
+  hash.update(name);
+  const hashBytes = hash.digest();
+  // Format as UUID v5: Set version (5) in byte 6, variant (10xx) in byte 8
+  hashBytes[6] = (hashBytes[6] & 0x0f) | 0x50;
+  hashBytes[8] = (hashBytes[8] & 0x3f) | 0x80;
+  const hex = hashBytes.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+// Deterministic UUID for the sample initiative
+// Stable across re-runs so data is updated, not duplicated
+const SAMPLE_INITIATIVE_ID = deterministicUUID('planner-v1-initiative');
 
 interface FlowAcceptanceCriterion {
   id: string;
@@ -88,34 +118,6 @@ interface FlowCatalog {
   }>;
 }
 
-/**
- * Generate a deterministic UUID v5 from a feature_id.
- * Uses SHA-1 hash of namespace + name, formatted as UUID.
- * This ensures the same feature_id always produces the same plan_id.
- */
-function deterministicUUID(featureId: string): string {
-  // Create SHA-1 hash of namespace + feature_id
-  const hash = createHash('sha1');
-
-  // Parse namespace UUID to bytes
-  const namespaceBytes = NAMESPACE_UUID.replace(/-/g, '');
-  const namespaceBuffer = Buffer.from(namespaceBytes, 'hex');
-
-  hash.update(namespaceBuffer);
-  hash.update(featureId);
-
-  const hashBytes = hash.digest();
-
-  // Format as UUID v5:
-  // Set version (5) in byte 6, variant (10xx) in byte 8
-  hashBytes[6] = (hashBytes[6] & 0x0f) | 0x50; // version 5
-  hashBytes[8] = (hashBytes[8] & 0x3f) | 0x80; // variant 10xx
-
-  // Format as UUID string
-  const hex = hashBytes.subarray(0, 16).toString('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
-
 function mapStatus(flowStatus: string): 'draft' | 'approved' | 'published' {
   // Map flow status to DB status
   if (flowStatus === 'published') return 'published';
@@ -125,6 +127,7 @@ function mapStatus(flowStatus: string): 'draft' | 'approved' | 'published' {
 
 async function migrate() {
   console.log('Starting migration from flow files to database...\n');
+  console.log(`Initiative ID: ${SAMPLE_INITIATIVE_ID}\n`);
 
   // Read catalog
   const catalogPath = path.join(ROOT, 'docs/flow/catalog.json');
@@ -149,12 +152,45 @@ async function migrate() {
   const dbPath = path.join(ROOT, 'planner.db');
   const db = new Database(dbPath);
 
-  // Create tables if they don't exist
+  // Create organization table if needed
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS organizations (
+      org_id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  // Create initiatives table if needed
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS initiatives (
+      initiative_id TEXT PRIMARY KEY NOT NULL,
+      org_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'archived')),
+      icon TEXT,
+      color TEXT,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (org_id) REFERENCES organizations(org_id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create plans table with org_id and initiative_id
   db.exec(`
     CREATE TABLE IF NOT EXISTS plans (
       plan_id TEXT PRIMARY KEY NOT NULL,
+      org_id TEXT NOT NULL,
+      initiative_id TEXT,
+      owner_user_id TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (org_id) REFERENCES organizations(org_id) ON DELETE CASCADE,
+      FOREIGN KEY (initiative_id) REFERENCES initiatives(initiative_id) ON DELETE SET NULL
     )
   `);
 
@@ -167,6 +203,7 @@ async function migrate() {
       submitted_at TEXT,
       approval_info_json TEXT,
       change_request_id TEXT,
+      metadata_json TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       PRIMARY KEY (plan_id, version),
@@ -186,10 +223,50 @@ async function migrate() {
     )
   `);
 
-  // Prepare statements
+  const now = new Date().toISOString();
+
+  // Ensure default organization exists (matches the one created by storage/migration.ts)
+  const existingOrg = db.prepare<string, { org_id: string }>(
+    `SELECT org_id FROM organizations WHERE slug = ?`
+  ).get('default');
+
+  let defaultOrgId: string;
+  if (existingOrg) {
+    defaultOrgId = existingOrg.org_id;
+    console.log(`Using existing organization: default (${defaultOrgId.slice(0, 8)}...)\n`);
+  } else {
+    // Create default org if running standalone (before server startup)
+    defaultOrgId = deterministicUUID('default-org');
+    db.prepare(`
+      INSERT INTO organizations (org_id, name, slug, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(defaultOrgId, 'Default', 'default', now, now);
+    console.log(`Created organization: Default (${defaultOrgId.slice(0, 8)}...)\n`);
+  }
+
+  // Create or update the Planner v1 initiative under the default org
+  const insertInitiative = db.prepare(`
+    INSERT OR REPLACE INTO initiatives (initiative_id, org_id, name, description, status, icon, color, display_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertInitiative.run(
+    SAMPLE_INITIATIVE_ID,
+    defaultOrgId,
+    'Planner v1',
+    'The plans used to build the Planner itself - dogfooding our own tool!',
+    'active',
+    '🚀',
+    '#00d9ff',
+    0,
+    now,
+    now
+  );
+  console.log('Created initiative: Planner v1\n');
+
+  // Prepare plan statements
   const insertPlan = db.prepare(`
-    INSERT OR REPLACE INTO plans (plan_id, created_at, updated_at)
-    VALUES (?, ?, ?)
+    INSERT OR REPLACE INTO plans (plan_id, org_id, initiative_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
   `);
 
   const insertVersion = db.prepare(`
@@ -216,7 +293,6 @@ async function migrate() {
     featureIdToPlanId.set(featureId, deterministicUUID(featureId));
   }
 
-  const now = new Date().toISOString();
   let importedCount = 0;
   let stepsCount = 0;
   let epicsWithSubPlans = 0;
@@ -228,7 +304,7 @@ async function migrate() {
       const status = mapStatus(feature.status);
 
       // Create plan
-      insertPlan.run(planId, now, now);
+      insertPlan.run(planId, defaultOrgId, SAMPLE_INITIATIVE_ID, now, now);
 
       // Build summary
       const summary = {
@@ -329,11 +405,13 @@ async function migrate() {
   transaction();
 
   console.log(`\nMigration complete!`);
+  console.log(`  Initiative: Planner v1`);
   console.log(`  Plans imported/updated: ${importedCount}`);
   console.log(`  Steps imported: ${stepsCount}`);
   console.log(`  Epics with sub-plans: ${epicsWithSubPlans}`);
   console.log(`  Database: ${dbPath}`);
-  console.log(`\n  Note: Uses deterministic UUIDs - safe to re-run for updates.`);
+  console.log(`\n  All plans are attached to the "Planner v1" initiative.`);
+  console.log(`  Note: Uses deterministic UUIDs - safe to re-run for updates.`);
 
   db.close();
 }

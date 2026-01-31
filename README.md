@@ -17,11 +17,19 @@ npm install
 npm run dev
 
 # Or run components separately
-npm run dev:backend   # API server on :3000
-npm run dev:frontend  # UI on :5173
+npm run dev:backend   # API server on :3001
+npm run dev:frontend  # UI on :3000
 ```
 
-Then open http://localhost:5173 to create your first plan.
+Then open http://localhost:3000 to explore.
+
+**On first run**, the database is automatically seeded with the "Planner v1" initiative - the actual plans used to build the Planner itself (~70 plans covering domain model, REST API, UI components, and relay integration). This gives you real content to explore immediately.
+
+To re-seed or update after changes to `docs/flow/`:
+
+```bash
+npx tsx scripts/migrate-flow-to-db.ts
+```
 
 ## Architecture
 

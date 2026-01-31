@@ -1,4 +1,6 @@
 import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import type { Plan, PlanVersion } from '../domain/plan.js';
 import type { Step } from '../domain/step.js';
 import type { Summary } from '../domain/summary.js';
@@ -27,6 +29,10 @@ import type { DecisionEvent, TrajectoryEventFilter } from '../domain/trajectory.
 import type { PlanStorage, PlanWithAttentionData, Session, SessionStatus, PlanFilter } from './interface.js';
 import { ALL_SCHEMA_STATEMENTS } from './schema.js';
 import { runMigrations } from './migration.js';
+import { seedIfEmpty } from './seed.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Row types for database queries
@@ -240,6 +246,23 @@ export class SqliteStorage implements PlanStorage {
     if (!plansTableExists) {
       // New database - run migrations after schema to create default org
       runMigrations(this.db);
+
+      // Seed with sample data on first run
+      this.seedOnFirstRun();
+    }
+  }
+
+  /**
+   * Seed database with sample plans on first run.
+   * Only runs if no plans exist.
+   */
+  private seedOnFirstRun(): void {
+    try {
+      // Project root is two levels up from src/storage/
+      const projectRoot = path.resolve(__dirname, '../..');
+      seedIfEmpty(this.db, projectRoot);
+    } catch {
+      // Seed files may not exist in all environments (e.g., tests)
     }
   }
 
