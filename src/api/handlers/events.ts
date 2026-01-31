@@ -9,6 +9,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { PlanStorage } from '../../storage/interface.js';
 import { onPlanChange, offPlanChange, type PlanChangeEvent, type PlanChangeCallback } from '../../events/plan-events.js';
+import { onQuestionEvent, offQuestionEvent, type QuestionEvent, type QuestionEventCallback } from '../../events/question-events.js';
 import { notFound } from '../middleware.js';
 
 interface PlanIdParams {
@@ -60,6 +61,20 @@ export function createEventsHandler(storage: PlanStorage) {
       // Subscribe to plan changes
       onPlanChange(planId, handleChange);
 
+      // Create callback for question events
+      const handleQuestion: QuestionEventCallback = (event: QuestionEvent) => {
+        const data = JSON.stringify({
+          questionId: event.questionId,
+          eventType: event.eventType,
+          question: event.question,
+          timestamp: event.timestamp,
+        });
+        res.write(`event: question_event\ndata: ${data}\n\n`);
+      };
+
+      // Subscribe to question events
+      onQuestionEvent(planId, handleQuestion);
+
       // Send keepalive comments to prevent connection timeout
       const keepaliveInterval = setInterval(() => {
         res.write(':keepalive\n\n');
@@ -69,6 +84,7 @@ export function createEventsHandler(storage: PlanStorage) {
       req.on('close', () => {
         clearInterval(keepaliveInterval);
         offPlanChange(planId, handleChange);
+        offQuestionEvent(planId, handleQuestion);
       });
 
       // Don't call next() - we're handling the response

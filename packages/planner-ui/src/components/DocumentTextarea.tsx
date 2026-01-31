@@ -41,10 +41,10 @@ export function DocumentTextarea({
   const wordCount = countWords(value);
 
   return (
-    <div className="document-textarea">
+    <div className="space-y-2">
       <textarea
         ref={textareaRef}
-        className="document-textarea-input"
+        className="w-full px-4 py-3 bg-bg-secondary border border-border-subtle rounded-lg font-mono text-sm text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -52,7 +52,7 @@ export function DocumentTextarea({
         disabled={disabled}
         spellCheck={false}
       />
-      <div className="document-textarea-counter" aria-live="polite">
+      <div className="text-xs text-text-muted text-right" aria-live="polite">
         {charCount.toLocaleString()} chars &bull; {wordCount.toLocaleString()} words
       </div>
     </div>

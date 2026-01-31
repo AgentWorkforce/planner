@@ -1,0 +1,166 @@
+{
+  "feature_id": "schema-org-initiative",
+  "title": "Organization & Initiative Schema",
+  "type": "feature",
+  "status": "complete",
+  "priority": "high",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Add database schema for organizations, initiatives, and org membership to enable plan grouping and future multi-tenancy",
+    "context": "Current schema has plans as top-level entities with no context. Need org_id on plans (required), initiative_id on plans (optional), and supporting tables. Single implicit org for v1 (no UI picker).",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "organizations table exists with org_id, name, slug, timestamps" },
+      { "id": "ac2", "description": "initiatives table exists with initiative_id, org_id FK, name, description, status, icon, color, timestamps" },
+      { "id": "ac3", "description": "org_members table exists with org_id, user_id, role (owner/admin/member)" },
+      { "id": "ac4", "description": "plans table has org_id column (NOT NULL) with FK to organizations" },
+      { "id": "ac5", "description": "plans table has initiative_id column (nullable) with FK to initiatives" },
+      { "id": "ac6", "description": "plans table has owner_user_id column (nullable) for plan ownership" },
+      { "id": "ac7", "description": "Default organization created on first run if none exists" },
+      { "id": "ac8", "description": "Existing plans migrated to default org with null initiative_id" },
+      { "id": "ac9", "description": "Zod schemas exist for Organization, Initiative, OrgMember domain types" },
+      { "id": "ac10", "description": "REST endpoints exist: GET/POST /initiatives, GET/PUT/DELETE /initiatives/:id" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "s001",
+        "title": "Add Organization, Initiative, OrgMember Zod schemas",
+        "scope": "planner-core",
+        "description": "Create src/domain/organization.ts with Zod schemas for Organization, Initiative, OrgMember, and InitiativeStatus enum.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "OrganizationSchema: { org_id: uuid, name: string, slug: string, created_at: datetime, updated_at: datetime }" },
+          { "id": "ac2", "description": "InitiativeSchema: { initiative_id: uuid, org_id: uuid, name: string, description?: string, status: 'active'|'completed'|'archived', icon?: string, color?: string, display_order: number, created_at, updated_at }" },
+          { "id": "ac3", "description": "OrgMemberSchema: { org_id: uuid, user_id: string, role: 'owner'|'admin'|'member', created_at }" },
+          { "id": "ac4", "description": "Export createOrganization(), createInitiative() factory functions" }
+        ]
+      },
+      {
+        "step_id": "s002",
+        "title": "Add new tables to schema.ts",
+        "scope": "planner-core",
+        "description": "Add CREATE_ORGANIZATIONS_TABLE, CREATE_INITIATIVES_TABLE, CREATE_ORG_MEMBERS_TABLE to src/storage/schema.ts with proper indexes.",
+        "dependencies": ["s001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "organizations table: org_id PK, name, slug UNIQUE, timestamps" },
+          { "id": "ac2", "description": "initiatives table: initiative_id PK, org_id FK, name, description, status, icon, color, display_order, timestamps" },
+          { "id": "ac3", "description": "org_members table: composite PK (org_id, user_id), role, created_at" },
+          { "id": "ac4", "description": "Index on initiatives(org_id) for fast filtering" }
+        ]
+      },
+      {
+        "step_id": "s003",
+        "title": "Add org_id, initiative_id, owner_user_id columns to plans",
+        "scope": "planner-core",
+        "description": "Modify CREATE_PLANS_TABLE to include org_id (NOT NULL FK), initiative_id (nullable FK), owner_user_id (nullable). Add migration support.",
+        "dependencies": ["s002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "plans.org_id column NOT NULL with FK to organizations(org_id)" },
+          { "id": "ac2", "description": "plans.initiative_id column nullable with FK to initiatives(initiative_id)" },
+          { "id": "ac3", "description": "plans.owner_user_id column nullable (string, no FK - external user system)" },
+          { "id": "ac4", "description": "Index on plans(org_id) and plans(initiative_id)" }
+        ]
+      },
+      {
+        "step_id": "s004",
+        "title": "Update Plan domain type and storage interface",
+        "scope": "planner-core",
+        "description": "Update PlanSchema in domain/plan.ts to include new fields. Update PlanStorage interface with new methods.",
+        "dependencies": ["s003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanSchema includes org_id: uuid, initiative_id?: uuid, owner_user_id?: string" },
+          { "id": "ac2", "description": "createPlan(org_id, owner_user_id?) accepts new required/optional params" },
+          { "id": "ac3", "description": "PlanStorage interface adds: createOrganization, getOrganization, listOrganizations" },
+          { "id": "ac4", "description": "PlanStorage interface adds: createInitiative, getInitiative, updateInitiative, deleteInitiative, listInitiatives(org_id)" },
+          { "id": "ac5", "description": "PlanStorage interface adds: listPlans filter param: { org_id?, initiative_id?, owner_user_id? }" }
+        ]
+      },
+      {
+        "step_id": "s005",
+        "title": "Implement storage methods in sqlite.ts",
+        "scope": "planner-core",
+        "description": "Implement all new storage interface methods for organizations, initiatives, and updated plan queries.",
+        "dependencies": ["s004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createOrganization inserts and returns Organization" },
+          { "id": "ac2", "description": "getOrganization(org_id) returns Organization | null" },
+          { "id": "ac3", "description": "createInitiative, getInitiative, updateInitiative, deleteInitiative work correctly" },
+          { "id": "ac4", "description": "listInitiatives(org_id) returns Initiative[] ordered by display_order" },
+          { "id": "ac5", "description": "listPlans accepts filter object and applies WHERE clauses" },
+          { "id": "ac6", "description": "createPlan requires org_id parameter" }
+        ]
+      },
+      {
+        "step_id": "s006",
+        "title": "Add database migration for existing data",
+        "scope": "planner-core",
+        "description": "Create migration that: (1) creates new tables, (2) creates default org, (3) adds columns to plans, (4) migrates existing plans to default org.",
+        "dependencies": ["s005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Migration creates 'Default' organization with slug 'default'" },
+          { "id": "ac2", "description": "Existing plans get org_id = default org's ID" },
+          { "id": "ac3", "description": "Migration is idempotent (safe to run multiple times)" },
+          { "id": "ac4", "description": "Migration runs automatically on server start" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead", "reason": "Data migration requires verification" }
+      },
+      {
+        "step_id": "s007",
+        "title": "Add Initiative REST endpoints",
+        "scope": "planner-core",
+        "description": "Create src/api/handlers/initiatives.ts with CRUD endpoints. Wire into router.",
+        "dependencies": ["s005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /initiatives returns [{ initiative_id, org_id, name, description, status, icon, color, plan_count }]" },
+          { "id": "ac2", "description": "GET /initiatives/:id returns { initiative_id, ..., plans: [{ plan_id, goal, status }] }" },
+          { "id": "ac3", "description": "POST /initiatives accepts { name, description?, icon?, color? }, returns created Initiative" },
+          { "id": "ac4", "description": "PUT /initiatives/:id accepts partial update, returns updated Initiative" },
+          { "id": "ac5", "description": "DELETE /initiatives/:id returns 204 (soft delete via status='archived')" },
+          { "id": "ac6", "description": "All endpoints scoped to implicit default org (no org_id param needed v1)" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "s008",
+        "title": "Update plans endpoints with initiative filter",
+        "scope": "planner-core",
+        "description": "Update GET /plans to accept initiative_id query param. Update POST /plans to accept initiative_id in body.",
+        "dependencies": ["s005", "s007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /plans?initiative_id=xxx returns only plans in that initiative" },
+          { "id": "ac2", "description": "GET /plans response includes initiative_id and initiative: { name, icon, color } if set" },
+          { "id": "ac3", "description": "POST /plans accepts optional initiative_id, associates plan with initiative" },
+          { "id": "ac4", "description": "PUT /plans/:id allows changing initiative_id" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "s009",
+        "title": "Add tests for new functionality",
+        "scope": "planner-core",
+        "description": "Add unit tests for domain types, storage methods, and API endpoints.",
+        "dependencies": ["s006", "s007", "s008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Organization/Initiative Zod schemas validate correctly" },
+          { "id": "ac2", "description": "Storage CRUD operations tested with in-memory SQLite" },
+          { "id": "ac3", "description": "Initiative API endpoints return expected shapes" },
+          { "id": "ac4", "description": "Plan filtering by initiative_id works" },
+          { "id": "ac5", "description": "Migration creates default org and migrates plans" }
+        ]
+      }
+    ]
+  }
+}

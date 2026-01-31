@@ -4,7 +4,17 @@ import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createStep, validateStepDag, type Step } from '../../domain/step.js';
 import { PlanStatus } from '../../domain/status.js';
 import { createImprovement, type ImprovementType } from '../../domain/improvement.js';
+import { createQuestion as createQuestionEntity } from '../../domain/question.js';
+import { emitQuestionEvent } from '../../events/question-events.js';
 import { success, error, toCallToolResult, type ToolResponse } from './types.js';
+import {
+  emitAgentJoined,
+  emitAgentStatusUpdate,
+  getActiveAgents,
+  type AgentRole,
+  type AgentState,
+} from '../../relay/agent-status.js';
+import { getClient, sendMessage } from '../../relay/client.js';
 
 /**
  * All available tools with their schemas.
@@ -332,6 +342,169 @@ export const tools: Tool[] = [
       required: ['plan_id', 'source_version'],
     },
   },
+  // Agent status tools - unified interface for all agents (persistent and spawned)
+  {
+    name: 'report_agent_status',
+    description:
+      'Report agent status to the system. On first call, registers the agent. On subsequent calls, updates state. Both persistent and spawned agents use this tool identically.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent_id: {
+          type: 'string',
+          description: 'Unique identifier for this agent instance',
+        },
+        role: {
+          type: 'string',
+          enum: ['planner-lead', 'architect', 'ui-designer', 'data-modeler', 'coder', 'tester', 'security'],
+          description: 'The agent\'s role for visual identification',
+        },
+        display_name: {
+          type: 'string',
+          description: 'Human-readable name shown in UI (required on first call)',
+        },
+        state: {
+          type: 'string',
+          enum: ['idle', 'working', 'needs_input', 'error'],
+          description: 'Current state of the agent',
+        },
+        activity: {
+          type: 'string',
+          description: 'Description of current activity (e.g., "Processing user request")',
+        },
+        thought: {
+          type: 'string',
+          description: 'Current thought or question text (shown in UI popover)',
+        },
+      },
+      required: ['agent_id', 'role', 'state'],
+    },
+  },
+  {
+    name: 'ask_user_question',
+    description:
+      'Ask a question to the user. Creates a question in the queue and sets the agent state to needs_input. Use this when you need user input to proceed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent_id: {
+          type: 'string',
+          description: 'The agent asking the question',
+        },
+        agent_role: {
+          type: 'string',
+          description: 'The role of the agent (e.g., "architect", "coder", "tester")',
+        },
+        plan_id: {
+          type: 'string',
+          description: 'The plan this question relates to',
+        },
+        text: {
+          type: 'string',
+          description: 'The question text',
+        },
+        blocking_level: {
+          type: 'string',
+          enum: ['hard_block', 'soft_block', 'preference', 'fyi'],
+          description: 'How severely this blocks progress (default: soft_block)',
+        },
+        options: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional predefined answer options for the user',
+        },
+        context: {
+          type: 'string',
+          description: 'Additional context to help the user answer',
+        },
+      },
+      required: ['agent_id', 'agent_role', 'plan_id', 'text'],
+    },
+  },
+  {
+    name: 'join_plan_channel',
+    description:
+      'Join a plan channel to participate in plan discussions. Call this to enable messaging in a specific plan\'s channel.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent_id: {
+          type: 'string',
+          description: 'The agent joining the channel',
+        },
+        plan_id: {
+          type: 'string',
+          description: 'The plan ID (channel will be #plan-{plan_id})',
+        },
+      },
+      required: ['agent_id', 'plan_id'],
+    },
+  },
+  {
+    name: 'remove_criteria',
+    description: 'Remove an acceptance criterion from a step',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        step_id: { type: 'string', description: 'The step ID' },
+        criterion_id: { type: 'string', description: 'The criterion ID to remove' },
+        expected_version: { type: 'number', description: 'Expected version for optimistic locking' }
+      },
+      required: ['plan_id', 'step_id', 'criterion_id']
+    }
+  },
+  {
+    name: 'edit_criteria',
+    description: 'Edit an existing acceptance criterion on a step',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        step_id: { type: 'string', description: 'The step ID' },
+        criterion_id: { type: 'string', description: 'The criterion ID to edit' },
+        description: { type: 'string', description: 'New description for the criterion' },
+        type: { type: 'string', description: 'New type for the criterion' },
+        expected_version: { type: 'number', description: 'Expected version for optimistic locking' }
+      },
+      required: ['plan_id', 'step_id', 'criterion_id']
+    }
+  },
+  {
+    name: 'remove_gate',
+    description: 'Remove an approval gate from a step',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        step_id: { type: 'string', description: 'The step ID' },
+        expected_version: { type: 'number', description: 'Expected version for optimistic locking' }
+      },
+      required: ['plan_id', 'step_id']
+    }
+  },
+  {
+    name: 'approve_plan',
+    description: 'Approve a plan, transitioning it from draft to approved status',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' }
+      },
+      required: ['plan_id']
+    }
+  },
+  {
+    name: 'publish_plan',
+    description: 'Publish an approved plan, transitioning it to published status',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' }
+      },
+      required: ['plan_id']
+    }
+  }
 ];
 
 /**
@@ -376,6 +549,22 @@ function executeToolCall(
       return handleSuggestImprovement(storage, args);
     case 'create_draft_version':
       return handleCreateDraftVersion(storage, args);
+    case 'report_agent_status':
+      return handleReportAgentStatus(args);
+    case 'ask_user_question':
+      return handleAskUserQuestion(storage, args);
+    case 'join_plan_channel':
+      return handleJoinPlanChannel(args);
+    case 'remove_criteria':
+      return handleRemoveCriteria(storage, args);
+    case 'edit_criteria':
+      return handleEditCriteria(storage, args);
+    case 'remove_gate':
+      return handleRemoveGate(storage, args);
+    case 'approve_plan':
+      return handleApprovePlan(storage, args);
+    case 'publish_plan':
+      return handlePublishPlan(storage, args);
     default:
       return error(`Unknown tool: ${name}`);
   }
@@ -419,7 +608,8 @@ function handleListPlans(
   args: Record<string, unknown>
 ): ToolResponse {
   const status = args.status as PlanStatus | undefined;
-  const plans = storage.listPlans(status);
+  const filter = status ? { status } : undefined;
+  const plans = storage.listPlans(filter);
 
   const summaries = plans.map((plan) => {
     const version = storage.getLatestVersion(plan.plan_id);
@@ -464,7 +654,13 @@ function handleCreatePlan(
     return error('goal is required');
   }
 
-  const plan = createPlan();
+  // Get default org for plan creation
+  const orgId = storage.listOrganizations().find((o) => o.slug === 'default')?.org_id;
+  if (!orgId) {
+    return error('Default organization not found');
+  }
+
+  const plan = createPlan(orgId);
   storage.createPlan(plan);
 
   const version = createPlanVersion(plan.plan_id, goal, context);
@@ -872,6 +1068,246 @@ function handleAddGate(
   return success({ version: newVersion, step: updatedStep });
 }
 
+function handleRemoveGate(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const stepId = args.step_id as string;
+  const expectedVersion = args.expected_version as number | undefined;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!stepId) {
+    return error('step_id is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error('Can only remove gates from draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
+  }
+
+  const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
+  if (stepIndex === -1) {
+    return error(`Step not found: ${stepId}`);
+  }
+
+  const existingStep = latestVersion.steps[stepIndex]!;
+
+  // Check if step has a gate to remove
+  if (!existingStep.gate) {
+    return error('Step does not have a gate to remove');
+  }
+
+  const updatedStep: Step = {
+    ...existingStep,
+    gate: undefined,
+  };
+
+  const newSteps = [...latestVersion.steps];
+  newSteps[stepIndex] = updatedStep;
+
+  const now = new Date().toISOString();
+  const newVersion = {
+    ...latestVersion,
+    version: latestVersion.version + 1,
+    steps: newSteps,
+    created_at: now,
+    updated_at: now,
+  };
+
+  storage.createVersion(newVersion);
+  return success({ version: newVersion, step: updatedStep });
+}
+
+function handleRemoveCriteria(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const stepId = args.step_id as string;
+  const criterionId = args.criterion_id as string;
+  const expectedVersion = args.expected_version as number | undefined;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!stepId) {
+    return error('step_id is required');
+  }
+  if (!criterionId) {
+    return error('criterion_id is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error('Can only remove criteria from draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
+  }
+
+  const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
+  if (stepIndex === -1) {
+    return error(`Step not found: ${stepId}`);
+  }
+
+  const existingStep = latestVersion.steps[stepIndex]!;
+  const acceptanceCriteria = existingStep.acceptance_criteria ?? [];
+
+  const criterionIndex = acceptanceCriteria.findIndex((c) => c.id === criterionId);
+  if (criterionIndex === -1) {
+    return error(`Criterion not found: ${criterionId}`);
+  }
+
+  // Remove the criterion
+  const updatedCriteria = acceptanceCriteria.filter((c) => c.id !== criterionId);
+
+  const updatedStep: Step = {
+    ...existingStep,
+    acceptance_criteria: updatedCriteria,
+  };
+
+  const newSteps = [...latestVersion.steps];
+  newSteps[stepIndex] = updatedStep;
+
+  const now = new Date().toISOString();
+  const newVersion = {
+    ...latestVersion,
+    version: latestVersion.version + 1,
+    steps: newSteps,
+    created_at: now,
+    updated_at: now,
+  };
+
+  storage.createVersion(newVersion);
+  return success({ version: newVersion, step: updatedStep });
+}
+
+function handleEditCriteria(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const stepId = args.step_id as string;
+  const criterionId = args.criterion_id as string;
+  const description = args.description as string | undefined;
+  const type = args.type as string | undefined;
+  const expectedVersion = args.expected_version as number | undefined;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!stepId) {
+    return error('step_id is required');
+  }
+  if (!criterionId) {
+    return error('criterion_id is required');
+  }
+
+  // Require at least one field to update
+  if (description === undefined && type === undefined) {
+    return error('At least one of description or type must be provided');
+  }
+
+  // Validate non-empty strings if provided
+  if (description !== undefined && description.trim() === '') {
+    return error('description cannot be empty');
+  }
+  if (type !== undefined && type.trim() === '') {
+    return error('type cannot be empty');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error('Can only edit criteria in draft version');
+  }
+
+  // Optimistic locking check
+  const conflict = checkVersionConflict(expectedVersion, latestVersion.version);
+  if (conflict) {
+    return conflict;
+  }
+
+  const stepIndex = latestVersion.steps.findIndex((s) => s.step_id === stepId);
+  if (stepIndex === -1) {
+    return error(`Step not found: ${stepId}`);
+  }
+
+  const existingStep = latestVersion.steps[stepIndex]!;
+  const acceptanceCriteria = existingStep.acceptance_criteria ?? [];
+
+  const criterionIndex = acceptanceCriteria.findIndex((c) => c.id === criterionId);
+  if (criterionIndex === -1) {
+    return error(`Criterion not found: ${criterionId}`);
+  }
+
+  // Update the criterion with provided fields
+  const existingCriterion = acceptanceCriteria[criterionIndex]!;
+  const updatedCriterion = {
+    ...existingCriterion,
+    ...(description !== undefined && { description }),
+    ...(type !== undefined && { type }),
+  };
+
+  const updatedCriteria = [...acceptanceCriteria];
+  updatedCriteria[criterionIndex] = updatedCriterion;
+
+  const updatedStep: Step = {
+    ...existingStep,
+    acceptance_criteria: updatedCriteria,
+  };
+
+  const newSteps = [...latestVersion.steps];
+  newSteps[stepIndex] = updatedStep;
+
+  const now = new Date().toISOString();
+  const newVersion = {
+    ...latestVersion,
+    version: latestVersion.version + 1,
+    steps: newSteps,
+    created_at: now,
+    updated_at: now,
+  };
+
+  storage.createVersion(newVersion);
+  return success({ version: newVersion, step: updatedStep, criterion: updatedCriterion });
+}
+
 function handleSubmitPlan(
   storage: PlanStorage,
   args: Record<string, unknown>
@@ -1042,4 +1478,255 @@ function handleCreateDraftVersion(
   }
 
   return success({ version: newVersion });
+}
+
+// ============================================================================
+// Agent Status Tool Handlers
+// ============================================================================
+
+function handleReportAgentStatus(args: Record<string, unknown>): ToolResponse {
+  const agentId = args.agent_id as string;
+  const role = args.role as AgentRole;
+  const state = args.state as AgentState;
+  const displayName = args.display_name as string | undefined;
+  const activity = args.activity as string | undefined;
+  const thought = args.thought as string | undefined;
+
+  if (!agentId) {
+    return error('agent_id is required');
+  }
+  if (!role) {
+    return error('role is required');
+  }
+  if (!state) {
+    return error('state is required');
+  }
+
+  // Validate state
+  const validStates: AgentState[] = ['idle', 'working', 'needs_input', 'error'];
+  if (!validStates.includes(state)) {
+    return error(`Invalid state: ${state}. Must be one of: ${validStates.join(', ')}`);
+  }
+
+  // Check if agent is already registered
+  const activeAgents = getActiveAgents();
+  const isFirstReport = !activeAgents.has(agentId);
+
+  if (isFirstReport) {
+    // First report - register the agent
+    if (!displayName) {
+      return error('display_name is required on first status report (agent registration)');
+    }
+    emitAgentJoined(agentId, role, displayName);
+  }
+
+  // Update state (emitAgentJoined sets initial state to idle, so update if different or always for subsequent calls)
+  if (!isFirstReport || state !== 'idle' || activity || thought) {
+    emitAgentStatusUpdate(agentId, state, { activity, thought });
+  }
+
+  return success({
+    agent_id: agentId,
+    registered: isFirstReport,
+    state,
+  });
+}
+
+function handleAskUserQuestion(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const agentId = args.agent_id as string;
+  const agentRole = args.agent_role as string;
+  const planId = args.plan_id as string;
+  const text = args.text as string;
+  const blockingLevel = (args.blocking_level as string) || 'soft_block';
+  const options = args.options as string[] | undefined;
+  const context = args.context as string | undefined;
+
+  if (!agentId) {
+    return error('agent_id is required');
+  }
+  if (!agentRole) {
+    return error('agent_role is required');
+  }
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!text) {
+    return error('text is required');
+  }
+
+  // Validate blocking_level
+  const validLevels = ['hard_block', 'soft_block', 'preference', 'fyi'];
+  if (!validLevels.includes(blockingLevel)) {
+    return error(`Invalid blocking_level: ${blockingLevel}. Must be one of: ${validLevels.join(', ')}`);
+  }
+
+  // Verify plan exists
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  // Create question using domain function (sets all defaults properly)
+  const question = createQuestionEntity({
+    plan_id: planId,
+    agent_id: agentId,
+    agent_role: agentRole,
+    text,
+    context,
+    options,
+    blocking_level: blockingLevel as 'hard_block' | 'soft_block' | 'preference' | 'fyi',
+  });
+
+  // Store the question
+  storage.createQuestion(question);
+
+  // Emit SSE event for real-time UI updates
+  emitQuestionEvent(planId, question.question_id, 'question_added', question);
+
+  // Broadcast to relay for WebSocket clients (StatusBar pendingQuestions counter)
+  sendMessage('*', 'question_added', 'question_event', {
+    type: 'question_added',
+    questionId: question.question_id,
+    planId,
+    agentId,
+    question,
+  });
+
+  // Set agent state to needs_input
+  emitAgentStatusUpdate(agentId, 'needs_input', {
+    activity: `Waiting for answer: ${text}`,
+  });
+
+  return success({
+    question_id: question.question_id,
+    agent_id: agentId,
+    plan_id: planId,
+    status: 'pending',
+    message: 'Question submitted. Your state has been set to needs_input.',
+  });
+}
+
+function handleJoinPlanChannel(args: Record<string, unknown>): ToolResponse {
+  const agentId = args.agent_id as string;
+  const planId = args.plan_id as string;
+
+  if (!agentId) {
+    return error('agent_id is required');
+  }
+  if (!planId) {
+    return error('plan_id is required');
+  }
+
+  const client = getClient();
+  if (!client) {
+    return error('Not connected to relay daemon');
+  }
+
+  // Derive channel name from plan ID
+  const channel = `#plan-${planId}`;
+
+  // Use adminJoinChannel to add the agent to the channel
+  const joined = client.adminJoinChannel(channel, agentId);
+
+  if (!joined) {
+    return error(`Failed to join channel ${channel}`);
+  }
+
+  return success({
+    channel,
+    agent_id: agentId,
+    joined: true,
+  });
+}
+
+function handleApprovePlan(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error(`Cannot approve version in '${latestVersion.status}' status`);
+  }
+
+  if (!latestVersion.submitted_at) {
+    return error('Version must be submitted before approval');
+  }
+
+  // Validate plan has at least one step
+  if (latestVersion.steps.length === 0) {
+    return error('Cannot approve plan with no steps');
+  }
+
+  // Create approval info
+  const approvalInfo = {
+    approver: 'system',
+    approved_at: new Date().toISOString(),
+  };
+
+  const updatedVersion = storage.approveVersion(
+    planId,
+    latestVersion.version,
+    approvalInfo
+  );
+
+  if (!updatedVersion) {
+    return error('Failed to approve version');
+  }
+
+  return success({ version: updatedVersion });
+}
+
+function handlePublishPlan(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+
+  if (latestVersion.status !== PlanStatus.Approved) {
+    return error(`Cannot publish version in '${latestVersion.status}' status. Version must be approved first.`);
+  }
+
+  const updatedVersion = storage.updateVersionStatus(
+    planId,
+    latestVersion.version,
+    PlanStatus.Published
+  );
+
+  if (!updatedVersion) {
+    return error('Failed to publish version');
+  }
+
+  return success({ version: updatedVersion });
 }

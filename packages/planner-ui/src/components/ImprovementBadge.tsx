@@ -1,28 +1,18 @@
 import { useState } from 'react';
 import type { Improvement, FlaggedConcern, ActivityEntry } from '@/types';
+import { CloseIcon, AlertIcon } from './icons';
 
 interface ImprovementBadgeProps {
-  /** Count of applied improvements */
   count: number;
-  /** List of improvements */
   improvements: Improvement[];
-  /** Flagged concerns */
   concerns: FlaggedConcern[];
-  /** Activity log */
   activityLog: ActivityEntry[];
-  /** Whether analysis is in progress */
   isAnalyzing: boolean;
-  /** Callback to undo an improvement */
   onUndo: (improvementId: string) => void;
-  /** Callback to dismiss a concern */
   onDismissConcern: (concernId: string) => void;
-  /** Callback to navigate to a step */
   onNavigateToStep?: (stepId: string) => void;
 }
 
-/**
- * Badge showing count of AI improvements with expandable details panel.
- */
 export function ImprovementBadge({
   count,
   improvements,
@@ -40,67 +30,88 @@ export function ImprovementBadge({
   const activeConcerns = concerns.filter((c) => !c.dismissed);
   const hasConcerns = activeConcerns.length > 0;
 
-  // Don't show if no improvements and no concerns
   if (count === 0 && !hasConcerns && !isAnalyzing) {
     return null;
   }
 
   return (
-    <div className="improvement-badge-container">
+    <div className="relative">
       <button
-        className={`improvement-badge ${hasConcerns ? 'has-concerns' : ''} ${isAnalyzing ? 'analyzing' : ''}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+          isAnalyzing
+            ? 'bg-accent-cyan/10 text-accent-cyan'
+            : hasConcerns
+            ? 'bg-warning/10 text-warning'
+            : 'bg-accent-purple/10 text-accent-purple'
+        } hover:ring-2 hover:ring-current/30`}
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
         aria-label={`AI Improvements: ${count} applied${hasConcerns ? `, ${activeConcerns.length} concerns` : ''}`}
       >
         {isAnalyzing ? (
-          <span className="improvement-badge-icon analyzing">
-            <span className="spinner-small" />
-          </span>
+          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ) : hasConcerns ? (
-          <span className="improvement-badge-icon warning">!</span>
+          <AlertIcon size="sm" />
         ) : (
-          <span className="improvement-badge-icon">AI</span>
+          <span className="font-bold">AI</span>
         )}
-        {count > 0 && <span className="improvement-badge-count">{count}</span>}
-        {hasConcerns && <span className="improvement-badge-concerns">{activeConcerns.length}</span>}
+        {count > 0 && <span>{count}</span>}
+        {hasConcerns && <span className="text-warning">{activeConcerns.length}</span>}
       </button>
 
       {isExpanded && (
-        <div className="improvement-panel" role="dialog" aria-label="AI Improvements">
-          <div className="improvement-panel-header">
-            <h4>AI Assistant</h4>
+        <div
+          className="absolute right-0 top-full mt-2 w-80 bg-bg-card border border-border-subtle rounded-xl shadow-lg z-50 animate-fade-in"
+          role="dialog"
+          aria-label="AI Improvements"
+        >
+          <div className="flex items-center justify-between p-3 border-b border-border-subtle">
+            <h4 className="font-display text-sm text-text-primary">AI Assistant</h4>
             <button
-              className="improvement-panel-close"
+              className="p-1 text-text-muted hover:text-text-primary transition-colors"
               onClick={() => setIsExpanded(false)}
               aria-label="Close"
             >
-              ×
+              <CloseIcon size="sm" />
             </button>
           </div>
 
-          <div className="improvement-panel-tabs">
+          <div className="flex border-b border-border-subtle">
             <button
-              className={`improvement-tab ${activeTab === 'improvements' ? 'active' : ''}`}
+              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                activeTab === 'improvements'
+                  ? 'text-accent-cyan border-b-2 border-accent-cyan -mb-px'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
               onClick={() => setActiveTab('improvements')}
             >
               Improvements ({appliedImprovements.length})
             </button>
             <button
-              className={`improvement-tab ${activeTab === 'concerns' ? 'active' : ''} ${hasConcerns ? 'has-items' : ''}`}
+              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                activeTab === 'concerns'
+                  ? 'text-accent-cyan border-b-2 border-accent-cyan -mb-px'
+                  : hasConcerns
+                  ? 'text-warning'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
               onClick={() => setActiveTab('concerns')}
             >
               Concerns ({activeConcerns.length})
             </button>
             <button
-              className={`improvement-tab ${activeTab === 'activity' ? 'active' : ''}`}
+              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                activeTab === 'activity'
+                  ? 'text-accent-cyan border-b-2 border-accent-cyan -mb-px'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
               onClick={() => setActiveTab('activity')}
             >
               Activity
             </button>
           </div>
 
-          <div className="improvement-panel-content">
+          <div className="max-h-64 overflow-y-auto p-3">
             {activeTab === 'improvements' && (
               <ImprovementsList
                 improvements={appliedImprovements}
@@ -132,9 +143,9 @@ interface ImprovementsListProps {
 function ImprovementsList({ improvements, onUndo, onNavigateToStep }: ImprovementsListProps) {
   if (improvements.length === 0) {
     return (
-      <div className="improvement-empty">
-        <p>No improvements yet.</p>
-        <p className="improvement-empty-hint">
+      <div className="text-center py-4">
+        <p className="text-sm text-text-secondary">No improvements yet.</p>
+        <p className="text-xs text-text-muted mt-1">
           AI will suggest improvements as you work on your plan.
         </p>
       </div>
@@ -142,28 +153,31 @@ function ImprovementsList({ improvements, onUndo, onNavigateToStep }: Improvemen
   }
 
   return (
-    <ul className="improvement-list">
+    <ul className="space-y-2">
       {improvements.map((improvement) => (
-        <li key={improvement.id} className="improvement-item">
-          <div className="improvement-item-header">
-            <span className={`improvement-type improvement-type--${improvement.type}`}>
+        <li key={improvement.id} className="p-2 bg-bg-elevated rounded-lg">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-accent-purple/10 text-accent-purple capitalize">
               {improvement.type}
             </span>
-            <span className="improvement-time">
+            <span className="text-xs text-text-muted">
               {new Date(improvement.timestamp).toLocaleTimeString()}
             </span>
           </div>
-          <p className="improvement-description">{improvement.description}</p>
-          <div className="improvement-actions">
+          <p className="text-xs text-text-secondary mb-2">{improvement.description}</p>
+          <div className="flex items-center gap-2">
             {onNavigateToStep && (
               <button
-                className="btn btn-sm btn-link"
+                className="text-xs text-accent-cyan hover:underline"
                 onClick={() => onNavigateToStep(improvement.step_id)}
               >
                 View step
               </button>
             )}
-            <button className="btn btn-sm btn-secondary" onClick={() => onUndo(improvement.id)}>
+            <button
+              className="text-xs text-text-muted hover:text-text-primary"
+              onClick={() => onUndo(improvement.id)}
+            >
               Undo
             </button>
           </div>
@@ -182,40 +196,60 @@ interface ConcernsListProps {
 function ConcernsList({ concerns, onDismiss, onNavigateToStep }: ConcernsListProps) {
   if (concerns.length === 0) {
     return (
-      <div className="improvement-empty">
-        <p>No concerns flagged.</p>
+      <div className="text-center py-4">
+        <p className="text-sm text-text-secondary">No concerns flagged.</p>
       </div>
     );
   }
 
+  const severityClasses: Record<string, string> = {
+    error: 'border-l-error',
+    warning: 'border-l-warning',
+    info: 'border-l-accent-cyan',
+  };
+
   return (
-    <ul className="concern-list">
+    <ul className="space-y-2">
       {concerns.map((concern) => (
-        <li key={concern.id} className={`concern-item concern-item--${concern.severity}`}>
-          <div className="concern-header">
-            <span className={`concern-severity concern-severity--${concern.severity}`}>
+        <li
+          key={concern.id}
+          className={`p-2 bg-bg-elevated rounded-lg border-l-2 ${severityClasses[concern.severity] || ''}`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                concern.severity === 'error'
+                  ? 'bg-error/10 text-error'
+                  : concern.severity === 'warning'
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-accent-cyan/10 text-accent-cyan'
+              }`}
+            >
               {concern.severity === 'error' ? '!' : concern.severity === 'warning' ? '?' : 'i'}
             </span>
-            <span className="concern-title">{concern.title}</span>
+            <span className="text-sm font-medium text-text-primary">{concern.title}</span>
           </div>
-          <p className="concern-description">{concern.description}</p>
+          <p className="text-xs text-text-secondary mb-2">{concern.description}</p>
           {concern.suggestions && concern.suggestions.length > 0 && (
-            <ul className="concern-suggestions">
+            <ul className="list-disc list-inside text-xs text-text-muted mb-2 space-y-0.5">
               {concern.suggestions.map((suggestion, idx) => (
                 <li key={idx}>{suggestion}</li>
               ))}
             </ul>
           )}
-          <div className="concern-actions">
+          <div className="flex items-center gap-2">
             {onNavigateToStep && (
               <button
-                className="btn btn-sm btn-link"
+                className="text-xs text-accent-cyan hover:underline"
                 onClick={() => onNavigateToStep(concern.step_id)}
               >
                 View step
               </button>
             )}
-            <button className="btn btn-sm btn-secondary" onClick={() => onDismiss(concern.id)}>
+            <button
+              className="text-xs text-text-muted hover:text-text-primary"
+              onClick={() => onDismiss(concern.id)}
+            >
               Dismiss
             </button>
           </div>
@@ -232,8 +266,8 @@ interface ActivityLogProps {
 function ActivityLog({ entries }: ActivityLogProps) {
   if (entries.length === 0) {
     return (
-      <div className="improvement-empty">
-        <p>No activity yet.</p>
+      <div className="text-center py-4">
+        <p className="text-sm text-text-secondary">No activity yet.</p>
       </div>
     );
   }
@@ -241,27 +275,30 @@ function ActivityLog({ entries }: ActivityLogProps) {
   const getActivityIcon = (type: ActivityEntry['type']) => {
     switch (type) {
       case 'ai_improvement':
-        return '+';
+        return { icon: '+', class: 'text-success' };
       case 'ai_concern':
-        return '!';
+        return { icon: '!', class: 'text-warning' };
       case 'undo':
-        return '↩';
+        return { icon: '↩', class: 'text-text-muted' };
       default:
-        return '•';
+        return { icon: '•', class: 'text-text-muted' };
     }
   };
 
   return (
-    <ul className="activity-log">
-      {entries.slice(0, 20).map((entry) => (
-        <li key={entry.id} className={`activity-entry activity-entry--${entry.type}`}>
-          <span className="activity-icon">{getActivityIcon(entry.type)}</span>
-          <span className="activity-description">{entry.description}</span>
-          <span className="activity-time">
-            {new Date(entry.timestamp).toLocaleTimeString()}
-          </span>
-        </li>
-      ))}
+    <ul className="space-y-1">
+      {entries.slice(0, 20).map((entry) => {
+        const { icon, class: iconClass } = getActivityIcon(entry.type);
+        return (
+          <li key={entry.id} className="flex items-center gap-2 text-xs py-1">
+            <span className={`w-4 text-center font-mono ${iconClass}`}>{icon}</span>
+            <span className="flex-1 text-text-secondary truncate">{entry.description}</span>
+            <span className="text-text-muted">
+              {new Date(entry.timestamp).toLocaleTimeString()}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

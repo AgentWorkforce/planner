@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { Comment, Step } from '@/types';
+import { CloseIcon, CheckIcon } from './icons';
 
 interface CommentThreadProps {
   step: Step;
@@ -58,18 +59,23 @@ function CommentItem({
   const isReplyingToThis = replyingTo === comment.comment_id;
 
   return (
-    <div className={`comment-item ${comment.resolved ? 'resolved' : ''}`}>
-      <div className="comment-header">
-        <span className="comment-author">{comment.author}</span>
-        <span className="comment-time">{formatDate(comment.created_at)}</span>
-        {comment.resolved && <span className="comment-resolved-badge">Resolved</span>}
+    <div className={`p-3 rounded-lg ${comment.resolved ? 'bg-bg-primary opacity-60' : 'bg-bg-elevated'}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium text-text-primary">{comment.author}</span>
+        <span className="text-xs text-text-muted">{formatDate(comment.created_at)}</span>
+        {comment.resolved && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success/10 text-success">
+            <CheckIcon size="sm" />
+            Resolved
+          </span>
+        )}
       </div>
-      <div className="comment-content">{comment.content}</div>
-      <div className="comment-actions">
+      <div className="text-sm text-text-secondary mb-2">{comment.content}</div>
+      <div className="flex items-center gap-2">
         {!comment.resolved && (
           <button
             type="button"
-            className="comment-action-btn"
+            className="text-xs text-text-muted hover:text-accent-cyan transition-colors"
             onClick={() => onReply(comment.comment_id)}
           >
             Reply
@@ -78,7 +84,7 @@ function CommentItem({
         {onResolve && !comment.resolved && (
           <button
             type="button"
-            className="comment-action-btn"
+            className="text-xs text-text-muted hover:text-success transition-colors"
             onClick={() => onResolve(comment.comment_id)}
           >
             Resolve
@@ -87,7 +93,7 @@ function CommentItem({
         {onUnresolve && comment.resolved && (
           <button
             type="button"
-            className="comment-action-btn"
+            className="text-xs text-text-muted hover:text-warning transition-colors"
             onClick={() => onUnresolve(comment.comment_id)}
           >
             Unresolve
@@ -96,19 +102,19 @@ function CommentItem({
       </div>
 
       {isReplyingToThis && (
-        <div className="comment-reply-form">
+        <div className="mt-3 space-y-2">
           <textarea
             value={replyContent}
             onChange={(e) => onReplyContentChange(e.target.value)}
             placeholder="Write a reply..."
             rows={2}
-            className="comment-input"
+            className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-sm text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors"
             disabled={submitting}
           />
-          <div className="comment-reply-actions">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="px-3 py-1.5 text-xs bg-accent-cyan text-bg-deep font-medium rounded-md transition-all hover:shadow-glow-cyan disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={onSubmitReply}
               disabled={!replyContent.trim() || submitting}
             >
@@ -116,7 +122,7 @@ function CommentItem({
             </button>
             <button
               type="button"
-              className="btn btn-secondary btn-sm"
+              className="px-3 py-1.5 text-xs bg-bg-tertiary text-text-primary font-medium rounded-md transition-colors hover:bg-bg-hover disabled:opacity-50"
               onClick={onCancelReply}
               disabled={submitting}
             >
@@ -127,7 +133,7 @@ function CommentItem({
       )}
 
       {replies.length > 0 && (
-        <div className="comment-replies">
+        <div className="mt-3 ml-4 space-y-2 border-l-2 border-border-subtle pl-4">
           {replies.map((reply) => (
             <CommentItem
               key={reply.comment_id}
@@ -255,29 +261,35 @@ export function CommentThread({
   );
 
   return (
-    <div className="comment-thread-overlay" onClick={onClose}>
-      <div className="comment-thread-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="comment-thread-header">
-          <div className="comment-thread-title">
-            <h3>Comments</h3>
-            <span className="comment-thread-step">{step.title}</span>
+    <div
+      className="fixed inset-0 bg-bg-deep/50 backdrop-blur-sm z-50 flex justify-end"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md h-full bg-bg-secondary border-l border-border-subtle flex flex-col animate-slide-in-right"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 p-4 border-b border-border-subtle">
+          <div className="min-w-0">
+            <h3 className="font-display text-lg text-text-primary">Comments</h3>
+            <span className="text-sm text-text-muted truncate block">{step.title}</span>
           </div>
           <button
             type="button"
-            className="comment-thread-close"
+            className="p-1 text-text-muted hover:text-text-primary transition-colors"
             onClick={onClose}
             aria-label="Close"
           >
-            ×
+            <CloseIcon size="md" />
           </button>
         </div>
 
-        <div className="comment-thread-stats">
-          <span className="comment-stat">{unresolvedCount} unresolved</span>
+        <div className="flex items-center gap-4 px-4 py-2 border-b border-border-subtle bg-bg-primary">
+          <span className="text-sm text-warning">{unresolvedCount} unresolved</span>
           {resolvedCount > 0 && (
             <button
               type="button"
-              className="comment-toggle-resolved"
+              className="text-sm text-text-muted hover:text-accent-cyan transition-colors"
               onClick={() => setShowResolved(!showResolved)}
             >
               {showResolved ? 'Hide' : 'Show'} {resolvedCount} resolved
@@ -285,15 +297,15 @@ export function CommentThread({
           )}
         </div>
 
-        <div className="comment-thread-body">
+        <div className="flex-1 overflow-y-auto p-4">
           {visibleComments.length === 0 ? (
-            <div className="comment-empty">
+            <div className="text-center py-8 text-text-muted">
               {unresolvedCount === 0 && resolvedCount === 0
                 ? 'No comments yet. Start the conversation!'
                 : 'All comments resolved.'}
             </div>
           ) : (
-            <div className="comment-list">
+            <div className="space-y-3">
               {visibleComments.map((comment) => (
                 <CommentItem
                   key={comment.comment_id}
@@ -315,22 +327,24 @@ export function CommentThread({
           )}
         </div>
 
-        <div className="comment-thread-footer">
-          <div className="comment-new-form">
+        <div className="p-4 border-t border-border-subtle bg-bg-primary">
+          <div className="space-y-3">
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Add a comment..."
               rows={3}
-              className="comment-input"
+              className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors"
               disabled={submitting}
             />
-            <div className="comment-new-actions">
-              <span className="comment-hint">⌘+Enter to submit</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-muted">
+                <kbd className="px-1 py-0.5 bg-bg-tertiary rounded">Cmd</kbd>+<kbd className="px-1 py-0.5 bg-bg-tertiary rounded">Enter</kbd> to submit
+              </span>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="px-4 py-2 bg-accent-cyan text-bg-deep text-sm font-medium rounded-lg transition-all hover:shadow-glow-cyan disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleSubmit}
                 disabled={!newComment.trim() || submitting}
               >

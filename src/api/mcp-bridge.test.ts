@@ -4,14 +4,26 @@ import { createApp } from './app.js';
 import { SqliteStorage } from '../storage/sqlite.js';
 import { createPlan, createPlanVersion } from '../domain/plan.js';
 import { createStep } from '../domain/step.js';
+import { createOrganization } from '../domain/organization.js';
 
 describe('MCP Bridge Integration Tests', () => {
   let storage: SqliteStorage;
   let app: ReturnType<typeof createApp>;
+  let testOrgId: string;
 
   beforeEach(() => {
     storage = new SqliteStorage(':memory:');
     app = createApp(storage);
+
+    // Get default org created by migrations, or create a test org
+    const orgs = storage.listOrganizations();
+    if (orgs.length > 0) {
+      testOrgId = orgs[0]!.org_id;
+    } else {
+      const org = createOrganization('Test Org', 'test-org');
+      storage.createOrganization(org);
+      testOrgId = org.org_id;
+    }
   });
 
   afterEach(() => {
@@ -57,7 +69,7 @@ describe('MCP Bridge Integration Tests', () => {
   describe('POST /api/mcp/tools/call', () => {
     it('should call list_plans tool without auth', async () => {
       // Create a plan first
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -89,7 +101,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should call read_plan tool', async () => {
       // Create a plan first
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal', 'Test context');
       storage.createVersion(version);
@@ -109,7 +121,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should call add_step tool and persist to database', async () => {
       // Create a plan first
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -137,7 +149,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should call edit_step tool and persist to database', async () => {
       // Create a plan with a step
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       const step = createStep('Original title');
@@ -166,7 +178,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should call remove_step tool and persist to database', async () => {
       // Create a plan with a step
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       const step = createStep('Step to remove');
@@ -216,7 +228,7 @@ describe('MCP Bridge Integration Tests', () => {
   describe('Session authentication', () => {
     it('should use session plan_id when no plan_id provided in read_plan', async () => {
       // Create a plan and session
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       const version = createPlanVersion(plan.plan_id, 'Test goal');
       storage.createVersion(version);
@@ -251,11 +263,11 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should reject access to other plans when authenticated', async () => {
       // Create two plans
-      const plan1 = createPlan();
+      const plan1 = createPlan(testOrgId);
       storage.createPlan(plan1);
       storage.createVersion(createPlanVersion(plan1.plan_id, 'Plan 1'));
 
-      const plan2 = createPlan();
+      const plan2 = createPlan(testOrgId);
       storage.createPlan(plan2);
       storage.createVersion(createPlanVersion(plan2.plan_id, 'Plan 2'));
 
@@ -292,7 +304,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should work without auth for backward compatibility', async () => {
       // Create a plan
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       storage.createVersion(createPlanVersion(plan.plan_id, 'Test goal'));
 
@@ -310,7 +322,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should ignore expired tokens', async () => {
       // Create a plan
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       storage.createVersion(createPlanVersion(plan.plan_id, 'Test goal'));
 
@@ -347,7 +359,7 @@ describe('MCP Bridge Integration Tests', () => {
   describe('Optimistic locking via HTTP', () => {
     it('should succeed with correct expected_version', async () => {
       // Create a plan
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       storage.createVersion(createPlanVersion(plan.plan_id, 'Test goal'));
 
@@ -368,7 +380,7 @@ describe('MCP Bridge Integration Tests', () => {
 
     it('should return VERSION_CONFLICT with stale version', async () => {
       // Create a plan
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
       storage.createVersion(createPlanVersion(plan.plan_id, 'Test goal'));
 

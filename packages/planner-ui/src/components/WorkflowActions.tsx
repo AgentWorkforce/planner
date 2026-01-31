@@ -66,23 +66,48 @@ export function WorkflowActions({
   const canApprove = version.status === 'draft' && version.submitted_at;
   const canPublish = version.status === 'approved';
 
-  return (
-    <div className="workflow-actions">
-      {error && <div className="workflow-error">{error}</div>}
+  const getStatusBadgeClasses = (status: string) => {
+    switch (status) {
+      case 'draft':
+        return 'bg-warning/10 text-warning border-warning/20';
+      case 'approved':
+        return 'bg-success/10 text-success border-success/20';
+      case 'published':
+        return 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20';
+      default:
+        return 'bg-bg-tertiary text-text-secondary border-border-subtle';
+    }
+  };
 
-      <div className="workflow-status">
-        <span className="workflow-status-label">Status:</span>
-        <span className={`workflow-status-value status-${version.status}`}>
-          {version.status}
-          {version.submitted_at && version.status === 'draft' && ' (submitted)'}
-        </span>
+  return (
+    <div className="space-y-3 p-4 bg-bg-secondary rounded-xl border border-border-subtle">
+      {error && (
+        <div className="p-2 bg-error/10 border border-error/30 rounded-lg text-error text-xs">
+          {error}
+        </div>
+      )}
+
+      {/* Status badge - prominent */}
+      <div
+        className={`inline-flex items-center px-3 py-1.5 text-sm font-semibold uppercase tracking-wide rounded-lg border ${getStatusBadgeClasses(version.status)}`}
+      >
+        {version.status}
       </div>
 
-      <div className="workflow-buttons">
+      {/* Approval info */}
+      {version.approval_info && (
+        <div className="text-xs text-text-muted">
+          <div>Approved by {version.approval_info.approver}</div>
+          <div>{new Date(version.approval_info.approved_at).toLocaleString()}</div>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="pt-1">
         {canSubmit && (
           <button
             type="button"
-            className="btn btn-primary"
+            className="w-full px-4 py-2 bg-accent-orange text-white font-medium rounded-lg transition-all duration-150 hover:shadow-glow-orange disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSubmit}
             disabled={loading !== null}
           >
@@ -93,7 +118,7 @@ export function WorkflowActions({
         {canApprove && (
           <button
             type="button"
-            className="btn btn-success"
+            className="w-full px-4 py-2 bg-success text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-green disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => setShowApproveModal(true)}
             disabled={loading !== null}
           >
@@ -104,7 +129,7 @@ export function WorkflowActions({
         {canPublish && (
           <button
             type="button"
-            className="btn btn-primary"
+            className="w-full px-4 py-2 bg-accent-cyan text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-cyan disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handlePublish}
             disabled={loading !== null}
           >
@@ -113,48 +138,50 @@ export function WorkflowActions({
         )}
 
         {version.status === 'published' && (
-          <span className="workflow-published-badge">
-            Published - Ready for Orchestrator
-          </span>
+          <div className="text-xs text-accent-cyan font-medium text-center">
+            Ready for Orchestrator
+          </div>
         )}
       </div>
 
-      {version.approval_info && (
-        <div className="workflow-approval-info">
-          <span>Approved by {version.approval_info.approver}</span>
-          <span>on {new Date(version.approval_info.approved_at).toLocaleString()}</span>
-        </div>
-      )}
-
       {showApproveModal && (
-        <div className="modal-overlay" onClick={() => setShowApproveModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Approve Plan</h3>
-            <p>
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center animate-fade-in"
+          onClick={() => setShowApproveModal(false)}
+        >
+          <div
+            className="bg-bg-tertiary rounded-2xl shadow-modal max-w-md w-full mx-4 p-6 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-xl text-text-primary mb-4">Approve Plan</h3>
+            <p className="text-text-secondary text-sm mb-6">
               By approving this plan, you confirm that the steps and acceptance criteria are
               correct and ready for execution.
             </p>
-            <div className="form-group">
-              <label htmlFor="approver">Your Name</label>
+            <div className="mb-6">
+              <label htmlFor="approver" className="block text-sm font-medium text-text-secondary mb-1.5">
+                Your Name
+              </label>
               <input
                 id="approver"
                 type="text"
                 value={approverName}
                 onChange={(e) => setApproverName(e.target.value)}
                 placeholder="Enter your name"
+                className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors"
               />
             </div>
-            <div className="modal-actions">
+            <div className="flex gap-3 justify-end">
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="px-4 py-2 bg-bg-tertiary text-text-primary border border-border-subtle font-medium rounded-lg transition-all duration-150 hover:border-border-light"
                 onClick={() => setShowApproveModal(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="btn btn-success"
+                className="px-4 py-2 bg-success text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-green disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleApprove}
                 disabled={loading === 'approve'}
               >

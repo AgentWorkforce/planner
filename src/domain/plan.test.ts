@@ -52,19 +52,24 @@ describe('Summary', () => {
 });
 
 describe('Plan', () => {
+  const testOrgId = '123e4567-e89b-12d3-a456-426614174001';
+
   it('should validate a valid plan', () => {
     const plan = {
       plan_id: '123e4567-e89b-12d3-a456-426614174000',
+      org_id: testOrgId,
       created_at: '2026-01-28T12:00:00.000Z',
       updated_at: '2026-01-28T12:00:00.000Z',
     };
     const result = PlanSchema.parse(plan);
     expect(result.plan_id).toBe(plan.plan_id);
+    expect(result.org_id).toBe(testOrgId);
   });
 
   it('should reject invalid UUID', () => {
     const plan = {
       plan_id: 'not-a-uuid',
+      org_id: testOrgId,
       created_at: '2026-01-28T12:00:00.000Z',
       updated_at: '2026-01-28T12:00:00.000Z',
     };
@@ -74,10 +79,44 @@ describe('Plan', () => {
   it('should reject invalid datetime', () => {
     const plan = {
       plan_id: '123e4567-e89b-12d3-a456-426614174000',
+      org_id: testOrgId,
       created_at: 'not-a-date',
       updated_at: '2026-01-28T12:00:00.000Z',
     };
     expect(() => PlanSchema.parse(plan)).toThrow();
+  });
+
+  it('should reject missing org_id', () => {
+    const plan = {
+      plan_id: '123e4567-e89b-12d3-a456-426614174000',
+      created_at: '2026-01-28T12:00:00.000Z',
+      updated_at: '2026-01-28T12:00:00.000Z',
+    };
+    expect(() => PlanSchema.parse(plan)).toThrow();
+  });
+
+  it('should accept optional initiative_id', () => {
+    const plan = {
+      plan_id: '123e4567-e89b-12d3-a456-426614174000',
+      org_id: testOrgId,
+      initiative_id: '123e4567-e89b-12d3-a456-426614174002',
+      created_at: '2026-01-28T12:00:00.000Z',
+      updated_at: '2026-01-28T12:00:00.000Z',
+    };
+    const result = PlanSchema.parse(plan);
+    expect(result.initiative_id).toBe('123e4567-e89b-12d3-a456-426614174002');
+  });
+
+  it('should accept optional owner_user_id', () => {
+    const plan = {
+      plan_id: '123e4567-e89b-12d3-a456-426614174000',
+      org_id: testOrgId,
+      owner_user_id: 'user-123',
+      created_at: '2026-01-28T12:00:00.000Z',
+      updated_at: '2026-01-28T12:00:00.000Z',
+    };
+    const result = PlanSchema.parse(plan);
+    expect(result.owner_user_id).toBe('user-123');
   });
 });
 
@@ -125,16 +164,19 @@ describe('PlanVersion', () => {
 });
 
 describe('createPlan', () => {
+  const testOrgId = '123e4567-e89b-12d3-a456-426614174001';
+
   it('should create a valid plan with UUID', () => {
-    const plan = createPlan();
+    const plan = createPlan(testOrgId);
     expect(plan.plan_id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     );
+    expect(plan.org_id).toBe(testOrgId);
   });
 
   it('should set timestamps to current time', () => {
     const before = new Date().toISOString();
-    const plan = createPlan();
+    const plan = createPlan(testOrgId);
     const after = new Date().toISOString();
 
     expect(plan.created_at >= before).toBe(true);
@@ -143,14 +185,24 @@ describe('createPlan', () => {
   });
 
   it('should create unique plan_ids', () => {
-    const plan1 = createPlan();
-    const plan2 = createPlan();
+    const plan1 = createPlan(testOrgId);
+    const plan2 = createPlan(testOrgId);
     expect(plan1.plan_id).not.toBe(plan2.plan_id);
   });
 
   it('should pass schema validation', () => {
-    const plan = createPlan();
+    const plan = createPlan(testOrgId);
     expect(() => PlanSchema.parse(plan)).not.toThrow();
+  });
+
+  it('should set owner_user_id when provided', () => {
+    const plan = createPlan(testOrgId, 'user-123');
+    expect(plan.owner_user_id).toBe('user-123');
+  });
+
+  it('should leave owner_user_id undefined when not provided', () => {
+    const plan = createPlan(testOrgId);
+    expect(plan.owner_user_id).toBeUndefined();
   });
 });
 

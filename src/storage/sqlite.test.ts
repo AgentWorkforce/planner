@@ -3,12 +3,23 @@ import { SqliteStorage } from './sqlite.js';
 import { createPlan, createPlanVersion } from '../domain/plan.js';
 import { createStep } from '../domain/step.js';
 import { PlanStatus } from '../domain/status.js';
+import { createOrganization, createInitiative, InitiativeStatus } from '../domain/organization.js';
 
 describe('SqliteStorage', () => {
   let storage: SqliteStorage;
+  let testOrgId: string;
 
   beforeEach(() => {
     storage = new SqliteStorage(':memory:');
+    // Get default org created by migrations, or create a test org
+    const orgs = storage.listOrganizations();
+    if (orgs.length > 0) {
+      testOrgId = orgs[0]!.org_id;
+    } else {
+      const org = createOrganization('Test Org', 'test-org');
+      storage.createOrganization(org);
+      testOrgId = org.org_id;
+    }
   });
 
   afterEach(() => {
@@ -17,7 +28,7 @@ describe('SqliteStorage', () => {
 
   describe('Plan operations', () => {
     it('should create and retrieve a plan', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       const retrieved = storage.getPlan(plan.plan_id);
@@ -33,7 +44,7 @@ describe('SqliteStorage', () => {
 
     it('should update a plan', () => {
       // Create plan with a past timestamp to ensure update produces different timestamp
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       const pastTime = '2020-01-01T00:00:00.000Z';
       const planWithPastTime = { ...plan, updated_at: pastTime };
       storage.createPlan(planWithPastTime);
@@ -50,7 +61,7 @@ describe('SqliteStorage', () => {
     });
 
     it('should delete a plan', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       const deleted = storage.deletePlan(plan.plan_id);
@@ -66,8 +77,8 @@ describe('SqliteStorage', () => {
     });
 
     it('should list all plans', () => {
-      const plan1 = createPlan();
-      const plan2 = createPlan();
+      const plan1 = createPlan(testOrgId);
+      const plan2 = createPlan(testOrgId);
       storage.createPlan(plan1);
       storage.createPlan(plan2);
 
@@ -76,8 +87,8 @@ describe('SqliteStorage', () => {
     });
 
     it('should list plans by version status', () => {
-      const plan1 = createPlan();
-      const plan2 = createPlan();
+      const plan1 = createPlan(testOrgId);
+      const plan2 = createPlan(testOrgId);
       storage.createPlan(plan1);
       storage.createPlan(plan2);
 
@@ -87,17 +98,17 @@ describe('SqliteStorage', () => {
       storage.createVersion(version2);
       storage.updateVersionStatus(plan2.plan_id, 1, PlanStatus.Approved);
 
-      const draftPlans = storage.listPlans(PlanStatus.Draft);
+      const draftPlans = storage.listPlans({ status: PlanStatus.Draft });
       expect(draftPlans).toHaveLength(1);
       expect(draftPlans[0]!.plan_id).toBe(plan1.plan_id);
 
-      const approvedPlans = storage.listPlans(PlanStatus.Approved);
+      const approvedPlans = storage.listPlans({ status: PlanStatus.Approved });
       expect(approvedPlans).toHaveLength(1);
       expect(approvedPlans[0]!.plan_id).toBe(plan2.plan_id);
     });
 
     it('should cascade delete versions and steps when plan is deleted', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       const version = createPlanVersion(plan.plan_id, 'Goal');
@@ -115,7 +126,7 @@ describe('SqliteStorage', () => {
     let plan: ReturnType<typeof createPlan>;
 
     beforeEach(() => {
-      plan = createPlan();
+      plan = createPlan(testOrgId);
       storage.createPlan(plan);
     });
 
@@ -242,7 +253,7 @@ describe('SqliteStorage', () => {
 
   describe('Transaction support', () => {
     it('should execute operations in a transaction', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
 
       storage.transaction(() => {
         storage.createPlan(plan);
@@ -258,7 +269,7 @@ describe('SqliteStorage', () => {
     });
 
     it('should rollback on error', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       try {
@@ -278,7 +289,7 @@ describe('SqliteStorage', () => {
     });
 
     it('should return value from transaction', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
 
       const result = storage.transaction(() => {
         storage.createPlan(plan);
@@ -293,7 +304,7 @@ describe('SqliteStorage', () => {
     let plan: ReturnType<typeof createPlan>;
 
     beforeEach(() => {
-      plan = createPlan();
+      plan = createPlan(testOrgId);
       storage.createPlan(plan);
     });
 
@@ -343,7 +354,7 @@ describe('SqliteStorage', () => {
 
   describe('Edge cases', () => {
     it('should handle empty steps array', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       const version = createPlanVersion(plan.plan_id, 'Goal');
@@ -355,7 +366,7 @@ describe('SqliteStorage', () => {
     });
 
     it('should handle special characters in summary', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       const version = createPlanVersion(
@@ -371,7 +382,7 @@ describe('SqliteStorage', () => {
     });
 
     it('should handle unicode in step titles', () => {
-      const plan = createPlan();
+      const plan = createPlan(testOrgId);
       storage.createPlan(plan);
 
       const version = createPlanVersion(plan.plan_id, 'Goal');

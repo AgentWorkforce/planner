@@ -4,16 +4,24 @@ import { getPlan, updatePlan, ApiError, getComments, createComment, resolveComme
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
 import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
 import { StepEditor } from '@/components/StepEditor';
+import { EditableText } from '@/components/EditableText';
 import { ChatPanel } from '@/components/ChatPanel';
 import { CommentThread } from '@/components/CommentThread';
 import { WorkflowActions } from '@/components/WorkflowActions';
 import { SwimlaneView } from '@/components/SwimlaneView';
 import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { DependencyLinesOverlay } from '@/components/DependencyLinesOverlay';
+import { MessagingSidebar } from '@/components/MessagingSidebar';
+import { Badge } from '@/components/ui/Badge';
+import { MessageIcon, DocumentIcon, DecisionsIcon } from '@/components/icons';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
 
 /** Panel type for coexistence - only one panel can be open at a time */
 type ActivePanel = 'chat' | 'comments' | null;
+
+/** Storage key for sidebar collapsed state */
+const SIDEBAR_COLLAPSED_KEY = 'planner-sidebar-collapsed';
 
 export function PlanEditorPage() {
   const { planId } = useParams<{ planId: string }>();
@@ -22,6 +30,18 @@ export function PlanEditorPage() {
   const [version, setVersion] = useState<PlanVersion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Messaging sidebar collapsed state (persisted)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return stored === 'true';
+  });
+
+  // Persist sidebar collapsed state
+  const handleSidebarCollapseChange = useCallback((collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  }, []);
 
   // Get parent chain from navigation state
   const navState = location.state as SubPlanNavigationState | null;
@@ -43,7 +63,22 @@ export function PlanEditorPage() {
   // View mode state (list vs swimlane)
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [hoveredStepId, setHoveredStepId] = useState<string | null>(null);
+  const [hoveredDirection, setHoveredDirection] = useState<'incoming' | 'outgoing' | null>(null);
   const stepsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to and highlight a step (used by dependency indicator click)
+  const handleScrollToStep = useCallback((stepId: string) => {
+    const container = stepsContainerRef.current;
+    if (!container) return;
+
+    const stepElement = container.querySelector(`[data-step-id="${stepId}"]`);
+    if (stepElement) {
+      stepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Temporarily highlight the step
+      setHoveredStepId(stepId);
+      setTimeout(() => setHoveredStepId(null), 2000);
+    }
+  }, []);
 
   // AI connection status - check if planning agent is active
   const {
@@ -99,10 +134,10 @@ export function PlanEditorPage() {
     };
   }, []);
 
-  // Real-time sync: Subscribe to plan changes when AI agent is connected
+  // Real-time sync: Subscribe to plan changes (always enabled since PlannerLead is persistent)
   const { isConnected: isEventStreamConnected, error: eventStreamError } = usePlanEvents(
     planId ?? null,
-    connectionStatus === 'connected',
+    true, // Always subscribe - PlannerLead may update plans at any time
     handlePlanEvent
   );
 
@@ -286,6 +321,16 @@ export function PlanEditorPage() {
     setVersion(result.version);
   }, [planId, version]);
 
+  // Handler for updating the plan goal (title)
+  const handleGoalUpdate = useCallback(
+    async (newGoal: string) => {
+      if (!planId || !version) return;
+      const result = await updatePlan(planId, { goal: newGoal });
+      setVersion(result.version);
+    },
+    [planId, version]
+  );
+
   // Get comments for a specific step
   const getStepComments = useCallback(
     (stepId: string): Comment[] => {
@@ -325,17 +370,22 @@ export function PlanEditorPage() {
 
   if (loading) {
     return (
-      <div className="plan-editor-page">
-        <div className="loading">Loading plan...</div>
+      <div className="min-h-screen p-6">
+        <LoadingSpinner message="Loading plan..." />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="plan-editor-page">
-        <div className="error-message">{error}</div>
-        <Link to="/plans" className="btn btn-secondary">
+      <div className="min-h-screen p-6 space-y-4">
+        <div className="px-4 py-3 bg-error/10 border border-error/30 rounded-lg text-error">
+          {error}
+        </div>
+        <Link
+          to="/plans"
+          className="inline-flex px-4 py-2 bg-bg-tertiary text-text-primary font-medium rounded-lg hover:bg-bg-hover transition-colors"
+        >
           Back to Plans
         </Link>
       </div>
@@ -344,158 +394,236 @@ export function PlanEditorPage() {
 
   if (!plan || !version) {
     return (
-      <div className="plan-editor-page">
-        <div className="error-message">Plan not found</div>
-        <Link to="/plans" className="btn btn-secondary">
+      <div className="min-h-screen p-6 space-y-4">
+        <div className="px-4 py-3 bg-error/10 border border-error/30 rounded-lg text-error">
+          Plan not found
+        </div>
+        <Link
+          to="/plans"
+          className="inline-flex px-4 py-2 bg-bg-tertiary text-text-primary font-medium rounded-lg hover:bg-bg-hover transition-colors"
+        >
           Back to Plans
         </Link>
       </div>
     );
   }
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'badge badge-draft';
-      case 'approved':
-        return 'badge badge-approved';
-      case 'published':
-        return 'badge badge-published';
-      default:
-        return 'badge';
-    }
+  // Plan context for messaging sidebar
+  const planContext = {
+    planId: plan.plan_id,
+    planTitle: version.summary.goal || 'Untitled Plan',
+    stepId: selectedStep?.step_id,
+    stepTitle: selectedStep?.title,
   };
 
   return (
-    <div className="plan-editor-page">
-      <div className="plan-header">
-        <div className="plan-header-main">
+    <div className="h-full flex">
+      {/* Main content area - higher z-index so popovers appear above sidebar */}
+      <div className="flex-1 min-w-0 overflow-auto relative z-10">
+        {/* Header */}
+        <div className="border-b border-border-subtle bg-bg-card">
+          <div className="px-6 py-4">
+          {/* Breadcrumb row */}
           <PlanBreadcrumb parents={parents} currentGoal={version.summary.goal} />
-          <h1 className="plan-goal">{version.summary.goal || 'Untitled Plan'}</h1>
-          <div className="plan-meta">
-            <span className={getStatusBadgeClass(version.status)}>{version.status}</span>
-            <span className="plan-version">Version {version.version}</span>
-            {version.submitted_at && <span className="badge badge-submitted">Submitted</span>}
+
+          {/* Tab navigation */}
+          <div className="flex items-center gap-2 mt-3 mb-1 border-b border-border-subtle pb-3">
+            <Link
+              to={`/plans/${planId}`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                location.pathname === `/plans/${planId}`
+                  ? 'bg-bg-tertiary text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+              }`}
+            >
+              <DocumentIcon size="sm" />
+              <span>Plan</span>
+            </Link>
+            <Link
+              to={`/plans/${planId}/decisions`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                location.pathname === `/plans/${planId}/decisions`
+                  ? 'bg-bg-tertiary text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+              }`}
+            >
+              <DecisionsIcon size="sm" />
+              <span>Decisions</span>
+            </Link>
           </div>
-          <WorkflowActions
-            version={version}
-            onSubmit={handleWorkflowSubmit}
-            onApprove={handleWorkflowApprove}
-            onPublish={handleWorkflowPublish}
-          />
+
+          {/* Main header: 2-column layout */}
+          <div className="mt-4 flex gap-8">
+            {/* Left column: Title and metadata */}
+            <div className="flex-1 min-w-0">
+              <EditableText
+                value={version.summary.goal || ''}
+                onSave={handleGoalUpdate}
+                placeholder="Enter plan goal..."
+                disabled={version.status !== 'draft'}
+                as="h1"
+                className="text-2xl font-semibold text-text-primary"
+              />
+              {version.summary.context && (
+                <p className="mt-2 text-sm text-text-secondary line-clamp-2">
+                  {version.summary.context}
+                </p>
+              )}
+              <div className="flex items-center gap-3 mt-2 text-sm text-text-muted">
+                <span>Version {version.version}</span>
+                {version.submitted_at && (
+                  <>
+                    <span className="text-text-dim">•</span>
+                    <span>Submitted for review</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Right column: Status and actions */}
+            <div className="flex-shrink-0 w-72">
+              <WorkflowActions
+                version={version}
+                onSubmit={handleWorkflowSubmit}
+                onApprove={handleWorkflowApprove}
+                onPublish={handleWorkflowPublish}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      {version.summary.context && (
-        <div className="plan-context">
-          <h2>Context</h2>
-          <p>{version.summary.context}</p>
-        </div>
-      )}
-
-      <div className="plan-steps">
-        <div className="plan-steps-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
-          <h2 style={{ margin: 0 }}>Steps ({version.steps.length})</h2>
-          {version.steps.length > 0 && (
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          )}
-        </div>
-        {version.steps.length === 0 ? (
-          <div className="empty-state">
-            <p>No steps yet. Add steps to define the work needed to achieve your goal.</p>
+      {/* Content */}
+      <div className="px-6 py-6 space-y-6">
+        {/* Steps section */}
+        <div className="bg-bg-tertiary rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Steps ({version.steps.length})
+            </h2>
+            {version.steps.length > 0 && (
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            )}
           </div>
-        ) : (
-          <div ref={stepsContainerRef} className="steps-container" style={{ position: 'relative' }}>
-            {viewMode === 'list' ? (
-              <div className="steps-list">
-                {version.steps.map((step) => {
-                  const hasSubPlan = !!step.sub_plan_id;
-                  const isExpanded = expandedStepId === step.step_id;
-                  const isSelected = selectedStep?.step_id === step.step_id;
-                  const isEditable = version.status === 'draft';
-                  const unresolvedComments = getUnresolvedCount(step.step_id);
 
-                  // Sub-plan steps render as links
-                  if (hasSubPlan) {
-                    const newParents: ParentPlanInfo[] = [
-                      ...parents,
-                      { plan_id: plan.plan_id, goal: version.summary.goal },
-                    ];
+          {version.steps.length === 0 ? (
+            <div className="text-center py-12 text-text-muted">
+              No steps yet. Add steps to define the work needed to achieve your goal.
+            </div>
+          ) : (
+            <div ref={stepsContainerRef} className="relative pl-10 pr-10">
+              {/* Left/right 40px gutters for dependency lines */}
+              {viewMode === 'list' ? (
+                <div className="space-y-2">
+                  {version.steps.map((step) => {
+                    const hasSubPlan = !!step.sub_plan_id;
+                    const isExpanded = expandedStepId === step.step_id;
+                    const isSelected = selectedStep?.step_id === step.step_id;
+                    const isEditable = version.status === 'draft';
+                    const unresolvedComments = getUnresolvedCount(step.step_id);
 
-                    return (
-                      <div key={step.step_id} className="step-item has-subplan" data-step-id={step.step_id}>
-                        <Link
-                          to={`/plans/${step.sub_plan_id}`}
-                          className="step-subplan-link"
-                          state={{ parents: newParents }}
-                          aria-label={`Navigate to sub-plan: ${step.title}`}
+                    // Sub-plan steps render as links
+                    if (hasSubPlan) {
+                      const newParents: ParentPlanInfo[] = [
+                        ...parents,
+                        { plan_id: plan.plan_id, goal: version.summary.goal },
+                      ];
+
+                      return (
+                        <div
+                          key={step.step_id}
+                          data-step-id={step.step_id}
+                          className="bg-bg-card border border-border-subtle rounded-lg overflow-hidden hover:border-border-light transition-colors"
                         >
-                          <div className="step-header">
-                            <span className="step-title">{step.title}</span>
-                            {step.scope && <span className="step-scope">{step.scope}</span>}
-                            <span className="badge badge-subplan">Sub-plan</span>
-                          </div>
-                        </Link>
+                          <Link
+                            to={`/plans/${step.sub_plan_id}`}
+                            className="block p-4"
+                            state={{ parents: newParents }}
+                            aria-label={`Navigate to sub-plan: ${step.title}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium text-text-primary">{step.title}</span>
+                              {step.scope && (
+                                <span className="text-xs px-2 py-0.5 bg-bg-tertiary text-text-muted rounded">
+                                  {step.scope}
+                                </span>
+                              )}
+                              <Badge variant="info">Sub-plan</Badge>
+                            </div>
+                          </Link>
+                        </div>
+                      );
+                    }
+
+                    // Regular steps use StepEditor
+                    return (
+                      <div
+                        key={step.step_id}
+                        data-step-id={step.step_id}
+                        className={`rounded-lg transition-colors ${
+                          isSelected ? 'ring-1 ring-accent-cyan' : ''
+                        }`}
+                        onClick={(e) => {
+                          // Don't toggle selection if clicking interactive elements (buttons, inputs, etc.)
+                          const target = e.target as HTMLElement;
+                          const isInteractive = target.closest('button, input, select, textarea, a, [role="button"]');
+                          if (!isInteractive) {
+                            setSelectedStep(isSelected ? undefined : step);
+                          }
+                        }}
+                        onMouseEnter={() => setHoveredStepId(step.step_id)}
+                        onMouseLeave={() => setHoveredStepId(null)}
+                      >
+                        <StepEditor
+                          step={step}
+                          allSteps={version.steps}
+                          onUpdate={handleStepUpdate}
+                          onDelete={handleStepDelete}
+                          disabled={!isEditable}
+                          isExpanded={isExpanded}
+                          onToggleExpand={() =>
+                            setExpandedStepId(isExpanded ? null : step.step_id)
+                          }
+                          commentCount={unresolvedComments}
+                          onOpenComments={openCommentsPanel}
+                          onIndicatorHover={setHoveredDirection}
+                          onScrollToStep={handleScrollToStep}
+                          isHovered={hoveredStepId === step.step_id}
+                        />
                       </div>
                     );
-                  }
+                  })}
+                </div>
+              ) : (
+                <SwimlaneView
+                  steps={version.steps}
+                  onStepClick={(step) => setSelectedStep(step)}
+                  selectedStepId={selectedStep?.step_id}
+                  hoveredStepId={hoveredStepId ?? undefined}
+                  onStepHover={setHoveredStepId}
+                  onIndicatorHover={setHoveredDirection}
+                  onScrollToStep={handleScrollToStep}
+                />
+              )}
+              {/* Dependency lines only for list view - swimlane has its own cross-scope lines */}
+              {viewMode === 'list' && (
+                <DependencyLinesOverlay
+                  steps={version.steps}
+                  containerRef={stepsContainerRef}
+                  hoveredStepId={hoveredStepId}
+                  hoveredDirection={hoveredDirection}
+                  viewMode={viewMode}
+                />
+              )}
+            </div>
+          )}
+        </div>
 
-                  // Regular steps use StepEditor
-                  return (
-                    <div
-                      key={step.step_id}
-                      data-step-id={step.step_id}
-                      className={`step-item${isSelected ? ' step-item--selected' : ''}`}
-                      onClick={(e) => {
-                        // Don't toggle selection if clicking interactive elements (buttons, inputs, etc.)
-                        const target = e.target as HTMLElement;
-                        const isInteractive = target.closest('button, input, select, textarea, a, [role="button"]');
-                        if (!isInteractive) {
-                          setSelectedStep(isSelected ? undefined : step);
-                        }
-                      }}
-                      onMouseEnter={() => setHoveredStepId(step.step_id)}
-                      onMouseLeave={() => setHoveredStepId(null)}
-                    >
-                      <StepEditor
-                        step={step}
-                        allSteps={version.steps}
-                        onUpdate={handleStepUpdate}
-                        onDelete={handleStepDelete}
-                        disabled={!isEditable}
-                        isExpanded={isExpanded}
-                        onToggleExpand={() =>
-                          setExpandedStepId(isExpanded ? null : step.step_id)
-                        }
-                        commentCount={unresolvedComments}
-                        onOpenComments={openCommentsPanel}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <SwimlaneView
-                steps={version.steps}
-                onStepClick={(step) => setSelectedStep(step)}
-                selectedStepId={selectedStep?.step_id}
-                hoveredStepId={hoveredStepId}
-                onStepHover={setHoveredStepId}
-              />
-            )}
-            <DependencyLinesOverlay
-              steps={version.steps}
-              containerRef={stepsContainerRef}
-              hoveredStepId={hoveredStepId}
-              viewMode={viewMode}
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="plan-timestamps">
-        <span>Created: {new Date(version.created_at).toLocaleString()}</span>
-        <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
+        {/* Timestamps */}
+        <div className="flex items-center gap-6 text-sm text-text-muted">
+          <span>Created: {new Date(version.created_at).toLocaleString()}</span>
+          <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
+        </div>
       </div>
 
       {/* AI Chat Panel */}
@@ -530,19 +658,28 @@ export function PlanEditorPage() {
         />
       )}
 
-      {/* Panel toggle buttons (visible when panels closed) */}
-      {activePanel === null && (
-        <div className="panel-toggle-buttons">
+      {/* Panel toggle button (visible when panels closed and sidebar collapsed) */}
+      {activePanel === null && sidebarCollapsed && (
+        <div className="fixed bottom-6 right-6 z-40">
           <button
-            className="chat-toggle-button"
+            className="p-4 bg-accent-cyan text-bg-deep rounded-full shadow-glow-cyan hover:bg-accent-cyan/90 transition-colors"
             onClick={openChatPanel}
             aria-label="Open AI Chat (Cmd+/)"
             title="AI Chat (Cmd+/)"
           >
-            💬
+            <MessageIcon size="lg" />
           </button>
         </div>
       )}
+      </div>
+
+      {/* Messaging Sidebar */}
+      <MessagingSidebar
+        planContext={planContext}
+        isCollapsed={sidebarCollapsed}
+        onCollapseChange={handleSidebarCollapseChange}
+        displayName="User"
+      />
     </div>
   );
 }

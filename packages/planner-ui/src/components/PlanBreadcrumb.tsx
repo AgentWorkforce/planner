@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { ParentPlanInfo } from '@/types';
+import { ChevronIcon } from './icons';
 
 interface PlanBreadcrumbProps {
   parents: ParentPlanInfo[];
@@ -9,23 +10,27 @@ interface PlanBreadcrumbProps {
 export function PlanBreadcrumb({ parents, currentGoal }: PlanBreadcrumbProps) {
   if (parents.length === 0) {
     return (
-      <Link to="/plans" className="back-link">
-        &larr; Back to Plans
+      <Link
+        to="/plans"
+        className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-accent-cyan transition-colors"
+      >
+        <ChevronIcon direction="left" size="sm" />
+        Back to Plans
       </Link>
     );
   }
 
   return (
-    <nav className="plan-breadcrumb" aria-label="Plan navigation">
-      <Link to="/plans" className="breadcrumb-link">
+    <nav className="flex items-center flex-wrap gap-1 text-sm" aria-label="Plan navigation">
+      <Link to="/plans" className="text-text-secondary hover:text-accent-cyan transition-colors">
         Plans
       </Link>
       {parents.map((parent, index) => (
-        <span key={parent.plan_id}>
-          <span className="breadcrumb-separator">&gt;</span>
+        <span key={parent.plan_id} className="flex items-center gap-1">
+          <ChevronIcon direction="right" size="sm" className="text-text-muted" />
           <Link
             to={`/plans/${parent.plan_id}`}
-            className="breadcrumb-link"
+            className="text-text-secondary hover:text-accent-cyan transition-colors max-w-[200px] truncate"
             state={{
               parents: parents.slice(0, index),
             }}
@@ -34,8 +39,12 @@ export function PlanBreadcrumb({ parents, currentGoal }: PlanBreadcrumbProps) {
           </Link>
         </span>
       ))}
-      <span className="breadcrumb-separator">&gt;</span>
-      <span className="breadcrumb-current">{currentGoal || 'Untitled Plan'}</span>
+      <span className="flex items-center gap-1">
+        <ChevronIcon direction="right" size="sm" className="text-text-muted" />
+        <span className="text-text-primary font-medium max-w-[200px] truncate">
+          {currentGoal || 'Untitled Plan'}
+        </span>
+      </span>
     </nav>
   );
 }

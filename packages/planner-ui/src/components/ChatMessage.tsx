@@ -1,4 +1,5 @@
 import type { ChatMessage as ChatMessageType } from '@/types';
+import { CheckIcon } from './icons';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -6,39 +7,46 @@ interface ChatMessageProps {
   onDismissSuggestion?: (messageId: string, suggestionId: string) => void;
 }
 
-/**
- * Individual chat message component.
- * User messages are right-aligned, AI messages are left-aligned with avatar.
- */
 export function ChatMessage({
   message,
   onApplySuggestion,
   onDismissSuggestion,
 }: ChatMessageProps) {
+  const isUser = message.role === 'user';
+
   return (
-    <div className={`chat-message chat-message--${message.role}`}>
-      {message.role === 'assistant' && (
-        <span className="chat-avatar" aria-hidden="true">
-          🤖
-        </span>
-      )}
-      <div className="chat-message-content">
-        <div className="chat-message-text">
-          <MarkdownContent content={message.content} />
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+      {!isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-purple/20 flex items-center justify-center text-sm">
+          AI
         </div>
-        {message.suggestion && message.suggestion.status === 'pending' && (
-          <ChatSuggestion
-            message={message}
-            onApply={onApplySuggestion}
-            onDismiss={onDismissSuggestion}
-          />
-        )}
-        {message.suggestion && message.suggestion.status === 'applied' && (
-          <div className="chat-suggestion chat-suggestion--applied">
-            <span className="suggestion-applied">✓ Change applied</span>
+      )}
+      <div className={`flex-1 max-w-[85%] ${isUser ? 'ml-8' : 'mr-8'}`}>
+        <div
+          className={`rounded-lg p-3 ${
+            isUser
+              ? 'bg-accent-cyan/10 text-text-primary'
+              : 'bg-bg-tertiary text-text-primary'
+          }`}
+        >
+          <div className="text-sm">
+            <MarkdownContent content={message.content} />
           </div>
-        )}
-        <span className="chat-message-time">
+          {message.suggestion && message.suggestion.status === 'pending' && (
+            <ChatSuggestion
+              message={message}
+              onApply={onApplySuggestion}
+              onDismiss={onDismissSuggestion}
+            />
+          )}
+          {message.suggestion && message.suggestion.status === 'applied' && (
+            <div className="mt-2 flex items-center gap-1 text-xs text-success">
+              <CheckIcon size="sm" />
+              <span>Change applied</span>
+            </div>
+          )}
+        </div>
+        <span className="text-xs text-text-muted mt-1 block">
           {new Date(message.timestamp).toLocaleTimeString()}
         </span>
       </div>
@@ -52,28 +60,25 @@ interface ChatSuggestionProps {
   onDismiss?: (messageId: string, suggestionId: string) => void;
 }
 
-/**
- * Suggestion card within a chat message.
- */
 function ChatSuggestion({ message, onApply, onDismiss }: ChatSuggestionProps) {
   const suggestion = message.suggestion!;
 
   return (
-    <div className="chat-suggestion">
-      <div className="chat-suggestion-header">
-        <span className="suggestion-label">Suggested change:</span>
-      </div>
-      <div className="chat-suggestion-description">{suggestion.description}</div>
-      <pre className="chat-suggestion-preview">{suggestion.preview}</pre>
-      <div className="chat-suggestion-actions">
+    <div className="mt-3 p-3 bg-bg-elevated rounded-lg border border-border-subtle">
+      <div className="text-xs font-medium text-accent-cyan mb-2">Suggested change:</div>
+      <div className="text-sm text-text-secondary mb-2">{suggestion.description}</div>
+      <pre className="text-xs bg-bg-secondary p-2 rounded overflow-x-auto text-text-muted font-mono">
+        {suggestion.preview}
+      </pre>
+      <div className="flex gap-2 mt-3">
         <button
-          className="btn btn-sm btn-primary"
+          className="px-3 py-1.5 text-xs bg-accent-cyan text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-cyan"
           onClick={() => onApply?.(message.id, suggestion.id)}
         >
           Apply
         </button>
         <button
-          className="btn btn-sm btn-secondary"
+          className="px-3 py-1.5 text-xs bg-bg-tertiary text-text-primary border border-border-subtle font-medium rounded-lg transition-colors hover:border-border-light"
           onClick={() => onDismiss?.(message.id, suggestion.id)}
         >
           Dismiss
@@ -87,28 +92,20 @@ interface MarkdownContentProps {
   content: string;
 }
 
-/**
- * Simple markdown renderer for chat messages.
- * Supports: bold, italic, code, code blocks, lists, and links.
- */
 function MarkdownContent({ content }: MarkdownContentProps) {
-  // Split by code blocks first to preserve them
   const parts = content.split(/(```[\s\S]*?```)/g);
 
   return (
     <>
       {parts.map((part, index) => {
-        // Code block
         if (part.startsWith('```')) {
           const code = part.replace(/^```\w*\n?/, '').replace(/```$/, '');
           return (
-            <pre key={index} className="chat-code-block">
+            <pre key={index} className="my-2 p-2 bg-bg-secondary rounded text-xs overflow-x-auto font-mono">
               <code>{code}</code>
             </pre>
           );
         }
-
-        // Process inline markdown
         return <InlineMarkdown key={index} content={part} />;
       })}
     </>
@@ -116,7 +113,6 @@ function MarkdownContent({ content }: MarkdownContentProps) {
 }
 
 function InlineMarkdown({ content }: { content: string }) {
-  // Process line by line for lists
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   let currentList: string[] = [];
@@ -126,7 +122,7 @@ function InlineMarkdown({ content }: { content: string }) {
     if (currentList.length > 0) {
       const ListTag = listType === 'ol' ? 'ol' : 'ul';
       elements.push(
-        <ListTag key={elements.length} className="chat-list">
+        <ListTag key={elements.length} className={`my-2 ${listType === 'ol' ? 'list-decimal' : 'list-disc'} list-inside text-text-secondary`}>
           {currentList.map((item, i) => (
             <li key={i}>{processInlineMarkdown(item)}</li>
           ))}
@@ -138,7 +134,6 @@ function InlineMarkdown({ content }: { content: string }) {
   };
 
   lines.forEach((line, lineIndex) => {
-    // Ordered list
     const olMatch = line.match(/^(\d+)\.\s+(.+)$/);
     if (olMatch) {
       if (listType !== 'ol') {
@@ -149,7 +144,6 @@ function InlineMarkdown({ content }: { content: string }) {
       return;
     }
 
-    // Unordered list
     const ulMatch = line.match(/^[-*]\s+(.+)$/);
     if (ulMatch) {
       if (listType !== 'ul') {
@@ -160,7 +154,6 @@ function InlineMarkdown({ content }: { content: string }) {
       return;
     }
 
-    // Regular line
     flushList();
     if (line.trim()) {
       elements.push(
@@ -179,21 +172,16 @@ function InlineMarkdown({ content }: { content: string }) {
   return <>{elements}</>;
 }
 
-/**
- * Process inline markdown: bold, italic, code, links
- */
 function processInlineMarkdown(text: string): React.ReactNode {
-  // Simple regex-based parsing
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
 
   while (remaining.length > 0) {
-    // Inline code
     const codeMatch = remaining.match(/^`([^`]+)`/);
     if (codeMatch) {
       parts.push(
-        <code key={key++} className="chat-inline-code">
+        <code key={key++} className="px-1 py-0.5 bg-bg-secondary rounded text-xs font-mono text-accent-cyan">
           {codeMatch[1]}
         </code>
       );
@@ -201,27 +189,24 @@ function processInlineMarkdown(text: string): React.ReactNode {
       continue;
     }
 
-    // Bold
     const boldMatch = remaining.match(/^\*\*([^*]+)\*\*/);
     if (boldMatch) {
-      parts.push(<strong key={key++}>{boldMatch[1]}</strong>);
+      parts.push(<strong key={key++} className="font-semibold text-text-primary">{boldMatch[1]}</strong>);
       remaining = remaining.slice(boldMatch[0].length);
       continue;
     }
 
-    // Italic
     const italicMatch = remaining.match(/^\*([^*]+)\*/);
     if (italicMatch) {
-      parts.push(<em key={key++}>{italicMatch[1]}</em>);
+      parts.push(<em key={key++} className="italic">{italicMatch[1]}</em>);
       remaining = remaining.slice(italicMatch[0].length);
       continue;
     }
 
-    // Link
     const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
     if (linkMatch) {
       parts.push(
-        <a key={key++} href={linkMatch[2]} target="_blank" rel="noopener noreferrer">
+        <a key={key++} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline">
           {linkMatch[1]}
         </a>
       );
@@ -229,13 +214,11 @@ function processInlineMarkdown(text: string): React.ReactNode {
       continue;
     }
 
-    // Plain text until next special character
     const nextSpecial = remaining.search(/[`*\[]/);
     if (nextSpecial === -1) {
       parts.push(remaining);
       break;
     } else if (nextSpecial === 0) {
-      // Special char at start but no match, treat as plain text
       parts.push(remaining[0]);
       remaining = remaining.slice(1);
     } else {
@@ -247,20 +230,19 @@ function processInlineMarkdown(text: string): React.ReactNode {
   return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
 
-/**
- * Typing indicator shown while AI is responding.
- */
 export function ChatTypingIndicator() {
   return (
-    <div className="chat-message chat-message--assistant">
-      <span className="chat-avatar" aria-hidden="true">
-        🤖
-      </span>
-      <div className="chat-message-content">
-        <div className="chat-typing-indicator" role="status" aria-label="AI is typing">
-          <span></span>
-          <span></span>
-          <span></span>
+    <div className="flex gap-3">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-purple/20 flex items-center justify-center text-sm">
+        AI
+      </div>
+      <div className="flex-1 mr-8">
+        <div className="bg-bg-tertiary rounded-lg p-3">
+          <div className="flex gap-1" role="status" aria-label="AI is typing">
+            <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
       </div>
     </div>

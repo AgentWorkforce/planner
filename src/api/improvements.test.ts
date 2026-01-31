@@ -7,18 +7,24 @@ import type { PlanVersion } from '../domain/plan.js';
 import { createImprovement, type ImprovementType } from '../domain/improvement.js';
 
 describe('Improvements API Integration Tests', () => {
-  let storage: PlanStorage & { close: () => void };
+  let storage: PlanStorage & { close: () => void; listOrganizations: () => { org_id: string }[] };
   let app: ReturnType<typeof createApp>;
   let planId: string;
   let version: PlanVersion;
+  let testOrgId: string;
 
   beforeEach(() => {
     storage = new SqliteStorage(':memory:');
     app = createApp(storage);
 
+    // Get default org created by migrations
+    const orgs = storage.listOrganizations();
+    testOrgId = orgs[0]!.org_id;
+
     // Create a test plan
     const plan = storage.createPlan({
       plan_id: crypto.randomUUID(),
+      org_id: testOrgId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });

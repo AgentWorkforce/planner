@@ -1,7 +1,7 @@
+import { AlertIcon } from './icons';
+
 interface ChangeRequestLinkBadgeProps {
-  /** The change request ID this version was created from */
   changeRequestId: string;
-  /** Callback when user clicks to view the change request */
   onClick?: (changeRequestId: string) => void;
 }
 
@@ -22,15 +22,13 @@ export function ChangeRequestLinkBadge({
 
   return (
     <button
-      className="change-request-link-badge"
+      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-warning/10 text-warning border border-warning/30 hover:bg-warning/20 transition-colors"
       onClick={handleClick}
       title={`Created from change request: ${changeRequestId}`}
       aria-label="View originating change request"
     >
-      <span className="badge-icon" aria-hidden="true">
-        ⚠️
-      </span>
-      <span className="badge-text">From CR: {displayId}...</span>
+      <AlertIcon size="sm" />
+      <span>From CR: {displayId}...</span>
     </button>
   );
 }

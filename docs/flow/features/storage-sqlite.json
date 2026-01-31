@@ -23,6 +23,22 @@
     { "type": "doc", "title": "better-sqlite3", "url": "https://github.com/WiseLibs/better-sqlite3" }
   ],
 
+  "extended_by": [
+    {
+      "feature_id": "schema-org-initiative",
+      "impact": "New tables and columns added to support organization/initiative hierarchy",
+      "changes": [
+        "New table: organizations (org_id, name, slug, timestamps)",
+        "New table: initiatives (initiative_id, org_id FK, name, description, status, icon, color, timestamps)",
+        "New table: org_members (org_id, user_id, role)",
+        "plans table: add org_id column (NOT NULL, FK to organizations)",
+        "plans table: add initiative_id column (nullable, FK to initiatives)",
+        "plans table: add owner_user_id column (nullable)",
+        "Migration to add columns with default org for existing data"
+      ]
+    }
+  ],
+
   "plan_implementation": {
     "scopes": ["planner-core"],
     "steps": [

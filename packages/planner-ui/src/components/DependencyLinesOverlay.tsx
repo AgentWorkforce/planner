@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Step } from '@/types';
 import { useDependencyPositions } from '@/hooks/useDependencyPositions';
 import type { ViewMode } from './ViewModeToggle';
@@ -7,70 +7,81 @@ interface DependencyLinesOverlayProps {
   steps: Step[];
   containerRef: React.RefObject<HTMLElement | null>;
   hoveredStepId?: string | null;
+  /** Direction being hovered: 'incoming' (left indicator) or 'outgoing' (right indicator) */
+  hoveredDirection?: 'incoming' | 'outgoing' | null;
   viewMode: ViewMode;
   criticalPath?: Set<string>;
 }
 
-interface DependencyLine {
+interface GutterLine {
   fromId: string;
   toId: string;
+  direction: 'incoming' | 'outgoing';
   isCrossScope: boolean;
   isHighlighted: boolean;
   isCritical: boolean;
 }
 
 /**
- * Generate SVG path for a dependency line.
- * List view: vertical for intra-scope, bezier for cross-scope
- * Swimlane view: horizontal for intra-scope, bezier for cross-scope
+ * Generate SVG path for a dependency line connecting two cards.
+ *
+ * Uses smooth cubic bezier curves that flow naturally between cards:
+ * - Incoming (left): curve from source card to target card's left side
+ * - Outgoing (right): curve from source card's right side to target card
  */
-function generatePath(
+function generateGutterPath(
   from: DOMRect,
   to: DOMRect,
-  isCrossScope: boolean,
-  viewMode: ViewMode
+  direction: 'incoming' | 'outgoing',
+  _containerWidth: number
 ): string {
-  if (viewMode === 'list') {
-    if (isCrossScope) {
-      // Bezier: source.right-center, control1 (+60px, 0), control2 (+60px, +dy), target.left-center
-      const startX = from.right;
-      const startY = from.y + from.height / 2;
-      const endX = to.x;
-      const endY = to.y + to.height / 2;
-      const cp1X = startX + 60;
-      const cp1Y = startY;
-      const cp2X = endX - 60;
-      const cp2Y = endY;
-      return `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
-    } else {
-      // Vertical: source.bottom-center -> target.top-center
-      const startX = from.x + from.width / 2;
-      const startY = from.bottom;
-      const endX = to.x + to.width / 2;
-      const endY = to.y;
-      return `M ${startX} ${startY} L ${endX} ${endY}`;
-    }
+  const sourceY = from.y + from.height / 2;
+  const targetY = to.y + to.height / 2;
+  const verticalDist = Math.abs(targetY - sourceY);
+
+  // Control point offset based on vertical distance (min 30px, max 80px)
+  const controlOffset = Math.min(80, Math.max(30, verticalDist * 0.4));
+
+  if (direction === 'incoming') {
+    // Connect from source's left edge to target's left edge
+    const sourceX = from.x; // Left edge of source
+    const targetX = to.x;   // Left edge of target
+
+    // Start point: slightly left of source card
+    const startX = sourceX - 8;
+    const startY = sourceY;
+
+    // End point: left edge of target (where indicator is)
+    const endX = targetX - 8;
+    const endY = targetY;
+
+    // Cubic bezier with horizontal control points for smooth S-curve
+    const cp1x = startX - controlOffset;
+    const cp1y = startY;
+    const cp2x = endX - controlOffset;
+    const cp2y = endY;
+
+    return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
   } else {
-    // Swimlane view
-    if (isCrossScope) {
-      // Bezier: source.bottom-center, control1 (0, +40px), control2 (dx, +40px), target.top-center
-      const startX = from.x + from.width / 2;
-      const startY = from.bottom;
-      const endX = to.x + to.width / 2;
-      const endY = to.y;
-      const cp1X = startX;
-      const cp1Y = startY + 40;
-      const cp2X = endX;
-      const cp2Y = endY - 40;
-      return `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
-    } else {
-      // Horizontal: source.right-center -> target.left-center
-      const startX = from.right;
-      const startY = from.y + from.height / 2;
-      const endX = to.x;
-      const endY = to.y + to.height / 2;
-      return `M ${startX} ${startY} L ${endX} ${endY}`;
-    }
+    // Connect from source's right edge to target's right edge
+    const sourceX = from.x + from.width; // Right edge of source
+    const targetX = to.x + to.width;     // Right edge of target
+
+    // Start point: right edge of source (where indicator is)
+    const startX = sourceX + 8;
+    const startY = sourceY;
+
+    // End point: slightly right of target card
+    const endX = targetX + 8;
+    const endY = targetY;
+
+    // Cubic bezier with horizontal control points for smooth S-curve
+    const cp1x = startX + controlOffset;
+    const cp1y = startY;
+    const cp2x = endX + controlOffset;
+    const cp2y = endY;
+
+    return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
   }
 }
 
@@ -78,14 +89,15 @@ export function DependencyLinesOverlay({
   steps,
   containerRef,
   hoveredStepId,
-  viewMode,
+  hoveredDirection,
+  viewMode: _viewMode, // Kept for API compatibility; gutter approach works same for both modes
   criticalPath = new Set(),
 }: DependencyLinesOverlayProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   const stepIds = steps.map((s) => s.step_id);
-  const positions = useDependencyPositions(containerRef, stepIds);
+  // Only compute positions when actually hovering
+  const positions = useDependencyPositions(containerRef, stepIds, !!hoveredStepId);
 
   // Update SVG dimensions to match container
   useEffect(() => {
@@ -114,65 +126,84 @@ export function DependencyLinesOverlay({
     scopeMap.set(step.step_id, step.scope || '');
   }
 
-  // Build set of hovered step's dependencies and dependents for highlighting
-  const highlightedSteps = new Set<string>();
-  if (hoveredStepId) {
-    highlightedSteps.add(hoveredStepId);
+  // Build dependency maps for quick lookup
+  const incomingDeps = new Map<string, string[]>(); // stepId -> [steps it depends on]
+  const outgoingDeps = new Map<string, string[]>(); // stepId -> [steps that depend on it]
 
-    // Find all ancestors (steps this depends on)
-    const findAncestors = (stepId: string) => {
-      const step = steps.find((s) => s.step_id === stepId);
-      if (step) {
-        for (const depId of step.dependencies || []) {
-          if (!highlightedSteps.has(depId)) {
-            highlightedSteps.add(depId);
-            findAncestors(depId);
-          }
-        }
+  for (const step of steps) {
+    incomingDeps.set(step.step_id, step.dependencies || []);
+    for (const depId of step.dependencies || []) {
+      if (!outgoingDeps.has(depId)) {
+        outgoingDeps.set(depId, []);
       }
-    };
-
-    // Find all descendants (steps that depend on this)
-    const findDescendants = (stepId: string) => {
-      for (const step of steps) {
-        if ((step.dependencies || []).includes(stepId)) {
-          if (!highlightedSteps.has(step.step_id)) {
-            highlightedSteps.add(step.step_id);
-            findDescendants(step.step_id);
-          }
-        }
-      }
-    };
-
-    findAncestors(hoveredStepId);
-    findDescendants(hoveredStepId);
+      outgoingDeps.get(depId)!.push(step.step_id);
+    }
   }
 
-  // Compute all dependency lines
-  const lines: DependencyLine[] = [];
-  for (const step of steps) {
-    for (const depId of step.dependencies || []) {
+  // Only render lines when a step is hovered
+  if (!hoveredStepId) {
+    return null;
+  }
+
+  // Compute lines to render based on hover state
+  const lines: GutterLine[] = [];
+
+  // If hovering step card (no specific direction), show both incoming and outgoing
+  // If hovering specific indicator, only show that direction
+  const showIncoming = !hoveredDirection || hoveredDirection === 'incoming';
+  const showOutgoing = !hoveredDirection || hoveredDirection === 'outgoing';
+
+  if (showIncoming) {
+    // Incoming lines: what the hovered step depends on
+    const deps = incomingDeps.get(hoveredStepId) || [];
+    for (const depId of deps) {
       if (stepIds.includes(depId)) {
         const fromScope = scopeMap.get(depId) || '';
-        const toScope = scopeMap.get(step.step_id) || '';
+        const toScope = scopeMap.get(hoveredStepId) || '';
         const isCrossScope = fromScope !== toScope;
-        const isHighlighted = highlightedSteps.has(depId) && highlightedSteps.has(step.step_id);
-        const isCritical = criticalPath.has(depId) && criticalPath.has(step.step_id);
+        const isCritical = criticalPath.has(depId) && criticalPath.has(hoveredStepId);
 
         lines.push({
           fromId: depId,
-          toId: step.step_id,
+          toId: hoveredStepId,
+          direction: 'incoming',
           isCrossScope,
-          isHighlighted,
+          isHighlighted: true,
           isCritical,
         });
       }
     }
   }
 
+  if (showOutgoing) {
+    // Outgoing lines: steps that depend on the hovered step
+    const dependents = outgoingDeps.get(hoveredStepId) || [];
+    for (const depId of dependents) {
+      if (stepIds.includes(depId)) {
+        const fromScope = scopeMap.get(hoveredStepId) || '';
+        const toScope = scopeMap.get(depId) || '';
+        const isCrossScope = fromScope !== toScope;
+        const isCritical = criticalPath.has(hoveredStepId) && criticalPath.has(depId);
+
+        lines.push({
+          fromId: hoveredStepId,
+          toId: depId,
+          direction: 'outgoing',
+          isCrossScope,
+          isHighlighted: true,
+          isCritical,
+        });
+      }
+    }
+  }
+
+  // Don't render if no lines
+  if (lines.length === 0) {
+    return null;
+  }
+
   return (
     <svg
-      ref={svgRef}
       className="dependency-lines-overlay"
       style={{
         position: 'absolute',
@@ -181,55 +212,44 @@ export function DependencyLinesOverlay({
         width: dimensions.width,
         height: dimensions.height,
         pointerEvents: 'none',
-        zIndex: 10,
+        zIndex: 5, // Below cards (indicators at z-20)
         overflow: 'visible',
       }}
     >
       <defs>
-        {/* Arrowhead marker 8x8 */}
+        {/* Small circle markers instead of arrowheads */}
         <marker
-          id="arrowhead"
-          markerWidth="8"
-          markerHeight="8"
-          refX="7"
-          refY="4"
+          id="arrowhead-incoming"
+          markerWidth="4"
+          markerHeight="4"
+          refX="2"
+          refY="2"
           orient="auto"
-          markerUnits="strokeWidth"
+          markerUnits="userSpaceOnUse"
         >
-          <path d="M 0 0 L 8 4 L 0 8 Z" fill="var(--color-border)" />
+          <circle cx="2" cy="2" r="2" fill="#2563eb" />
         </marker>
         <marker
-          id="arrowhead-cross"
-          markerWidth="8"
-          markerHeight="8"
-          refX="7"
-          refY="4"
+          id="arrowhead-outgoing"
+          markerWidth="4"
+          markerHeight="4"
+          refX="2"
+          refY="2"
           orient="auto"
-          markerUnits="strokeWidth"
+          markerUnits="userSpaceOnUse"
         >
-          <path d="M 0 0 L 8 4 L 0 8 Z" fill="#2563eb" />
-        </marker>
-        <marker
-          id="arrowhead-highlight"
-          markerWidth="8"
-          markerHeight="8"
-          refX="7"
-          refY="4"
-          orient="auto"
-          markerUnits="strokeWidth"
-        >
-          <path d="M 0 0 L 8 4 L 0 8 Z" fill="#2563eb" />
+          <circle cx="2" cy="2" r="2" fill="#22c55e" />
         </marker>
         <marker
           id="arrowhead-critical"
-          markerWidth="8"
-          markerHeight="8"
-          refX="7"
-          refY="4"
+          markerWidth="4"
+          markerHeight="4"
+          refX="2"
+          refY="2"
           orient="auto"
-          markerUnits="strokeWidth"
+          markerUnits="userSpaceOnUse"
         >
-          <path d="M 0 0 L 8 4 L 0 8 Z" fill="#ef4444" />
+          <circle cx="2" cy="2" r="2" fill="#ef4444" />
         </marker>
       </defs>
 
@@ -239,55 +259,47 @@ export function DependencyLinesOverlay({
 
         if (!fromRect || !toRect) return null;
 
-        const path = generatePath(fromRect, toRect, line.isCrossScope, viewMode);
+        const path = generateGutterPath(fromRect, toRect, line.direction, dimensions.width);
 
         // Determine style based on line type
-        let stroke = '#e2e8f0'; // intra-scope
-        let strokeWidth = 2;
-        let strokeDasharray = 'none';
-        let opacity = 0.6;
-        let filter = '';
-        let marker = 'url(#arrowhead)';
-
-        if (line.isCrossScope) {
-          stroke = '#2563eb';
-          strokeDasharray = '6 4';
-          opacity = 0.7;
-          marker = 'url(#arrowhead-cross)';
-        }
+        // Direction determines color: incoming = blue, outgoing = green
+        // Cross-scope uses dotted line style (same color as direction)
+        // Critical path uses red
+        let stroke: string;
+        let marker: string;
 
         if (line.isCritical) {
-          stroke = '#ef4444';
-          strokeDasharray = 'none';
-          opacity = 0.8;
+          stroke = '#ef4444'; // error red
           marker = 'url(#arrowhead-critical)';
+        } else if (line.direction === 'incoming') {
+          stroke = '#2563eb'; // blue
+          marker = 'url(#arrowhead-incoming)';
+        } else {
+          stroke = '#22c55e'; // green
+          marker = 'url(#arrowhead-outgoing)';
         }
 
-        if (line.isHighlighted) {
-          stroke = '#2563eb';
-          strokeWidth = 3;
-          opacity = 1.0;
-          filter = 'drop-shadow(0 0 3px #2563eb)';
-          marker = 'url(#arrowhead-highlight)';
-        }
+        const strokeWidth = 2;
+        const opacity = 1.0;
+        // Cross-scope: dotted line, same-scope: solid line
+        const strokeDasharray = line.isCrossScope ? '6 4' : undefined;
 
         return (
-          <g key={`${line.fromId}-${line.toId}`}>
+          <g key={`${line.fromId}-${line.toId}-${line.direction}`}>
             <path
-              className={`dependency-line dependency-line--${line.isCrossScope ? 'cross' : 'intra'}${line.isHighlighted ? ' dependency-line--highlighted' : ''}${line.isCritical ? ' dependency-line--critical' : ''}`}
+              className={`dependency-line dependency-line--${line.direction}${line.isCrossScope ? ' dependency-line--cross' : ''}${line.isCritical ? ' dependency-line--critical' : ''}`}
               d={path}
               fill="none"
               stroke={stroke}
               strokeWidth={strokeWidth}
-              strokeDasharray={strokeDasharray === 'none' ? undefined : strokeDasharray}
+              strokeDasharray={strokeDasharray}
               opacity={opacity}
-              style={{ filter: filter || undefined }}
               markerEnd={marker}
             />
-            {/* Invisible wider path for hover detection */}
             <title>
-              {steps.find((s) => s.step_id === line.toId)?.title || line.toId} depends on{' '}
-              {steps.find((s) => s.step_id === line.fromId)?.title || line.fromId}
+              {line.direction === 'incoming'
+                ? `${steps.find((s) => s.step_id === line.toId)?.title} depends on ${steps.find((s) => s.step_id === line.fromId)?.title}`
+                : `${steps.find((s) => s.step_id === line.toId)?.title} is blocked by ${steps.find((s) => s.step_id === line.fromId)?.title}`}
             </title>
           </g>
         );

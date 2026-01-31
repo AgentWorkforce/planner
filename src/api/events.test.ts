@@ -11,18 +11,30 @@ import { createApp } from './app.js';
 import { SqliteStorage } from '../storage/sqlite.js';
 import { emitPlanChange } from '../events/plan-events.js';
 import { createPlan, createPlanVersion } from '../domain/plan.js';
+import { createOrganization } from '../domain/organization.js';
 
 describe('GET /plans/:id/events', () => {
   let storage: SqliteStorage;
   let app: ReturnType<typeof createApp>;
   let planId: string;
+  let testOrgId: string;
 
   beforeEach(() => {
     storage = new SqliteStorage(':memory:');
     app = createApp(storage);
 
+    // Get default org created by migrations, or create a test org
+    const orgs = storage.listOrganizations();
+    if (orgs.length > 0) {
+      testOrgId = orgs[0]!.org_id;
+    } else {
+      const org = createOrganization('Test Org', 'test-org');
+      storage.createOrganization(org);
+      testOrgId = org.org_id;
+    }
+
     // Create a test plan
-    const plan = createPlan();
+    const plan = createPlan(testOrgId);
     storage.createPlan(plan);
     const version = createPlanVersion(plan.plan_id, 'Test Plan for SSE');
     storage.createVersion(version);
@@ -145,7 +157,7 @@ describe('GET /plans/:id/events', () => {
 
   it('only sends events for subscribed plan', (done) => {
     // Create another plan
-    const otherPlanData = createPlan();
+    const otherPlanData = createPlan(testOrgId);
     storage.createPlan(otherPlanData);
     const otherVersion = createPlanVersion(otherPlanData.plan_id, 'Other Plan');
     storage.createVersion(otherVersion);

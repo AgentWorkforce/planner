@@ -1,0 +1,35 @@
+{
+  "feature_id": "ui-agent-orchestration",
+  "title": "Agent Orchestration UX",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["ui-relay-messaging", "planner-lead-service"],
+
+  "summary": {
+    "goal": "Provide a 'mission control' experience for humans overseeing multiple planning agents working in parallel. Enable ambient awareness of agent activity, focused interaction when decisions are needed, and intelligent question queuing to prevent overwhelm.",
+    "design_reference": "docs/ux-agent-orchestration.md",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Permanent bottom status bar is visible across all views" },
+      { "id": "ac2", "description": "Agent avatars show real-time state (working, waiting, idle, error)" },
+      { "id": "ac3", "description": "Chat bubbles pop up for @user questions, one at a time" },
+      { "id": "ac4", "description": "Questions queue by priority (blocking > preference > confirmation)" },
+      { "id": "ac5", "description": "User answers are stored as trajectory events" },
+      { "id": "ac6", "description": "Agents can query user trajectory before asking questions" },
+      { "id": "ac7", "description": "User preference model builds over time from decisions" }
+    ],
+    "out_of_scope": [
+      "Full trajectory persistence service (use existing relay trajectories)",
+      "Cross-plan global preferences (plan-scoped only for v1)",
+      "Voice/audio notifications"
+    ]
+  },
+
+  "sub_features": [
+    "ui-status-bar",
+    "ui-agent-avatars",
+    "ui-chat-bubbles",
+    "ui-question-queue",
+    "ui-user-trajectory"
+  ]
+}

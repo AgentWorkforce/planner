@@ -1,5 +1,6 @@
 export type {
   PlanStatus,
+  AttentionType,
   AcceptanceCriterion,
   Gate,
   Step,
@@ -33,6 +34,11 @@ export type {
   SuggestedChanges,
   ChangeRequest,
   RevisionStatus,
+  // Question queue types
+  QuestionBlockingLevel,
+  QuestionStatus,
+  Question,
+  QuestionQueueState,
 } from './plan';
 
 export {
@@ -42,3 +48,37 @@ export {
   isStepFailed,
   isStepPending,
 } from './plan';
+
+export type {
+  RelayEntityType,
+  RelayConnectionState,
+  ChannelType,
+  Channel,
+  PresenceEntry,
+  RelayMessage,
+  BrowserOutgoingMessage,
+  ServerIncomingMessage,
+  UseRelayConnectionResult,
+  UseChannelsResult,
+  UseChannelMessagesResult,
+  UsePresenceResult,
+} from './relay';
+
+export type {
+  InitiativeStatus,
+  Initiative,
+  PlanCounts,
+  InitiativeWithPlanCounts,
+  CreateInitiativeInput,
+  UpdateInitiativeInput,
+} from './initiative';
+
+export type {
+  DecisionEvent,
+  DerivedPreference,
+  EventFilter,
+  SimilarQuestion,
+} from './trajectory';
+
+// Simplified channel message type for UI display (vs RelayMessage for protocol)
+export type { ChannelMessage } from './channel';
