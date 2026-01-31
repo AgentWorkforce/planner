@@ -7,6 +7,13 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# Load .env file if it exists
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    source "$PROJECT_DIR/.env"
+    set +a
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -102,7 +109,7 @@ start_backend() {
     fi
 
     log "Starting backend API server..."
-    npm run dev > "$PROJECT_DIR/.dev-backend.log" 2>&1 &
+    npm run start > "$PROJECT_DIR/.dev-backend.log" 2>&1 &
     local pid=$!
     echo "$pid" > "$BACKEND_PID_FILE"
 

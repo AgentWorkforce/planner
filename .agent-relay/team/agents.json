@@ -1,0 +1,2157 @@
+{
+  "agents": [
+    {
+      "id": "agent-mkzifpu2-0000-18bhr489",
+      "name": "__status__",
+      "firstSeen": "2026-01-29T13:48:59.402Z",
+      "lastSeen": "2026-01-31T00:26:38.888Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzifuyf-0001-18bhr489",
+      "name": "Dashboard",
+      "cli": "dashboard",
+      "firstSeen": "2026-01-29T13:49:06.039Z",
+      "lastSeen": "2026-01-31T01:16:04.922Z",
+      "messagesSent": 0,
+      "messagesReceived": 172
+    },
+    {
+      "id": "agent-mkziibey-0001-18bhr489",
+      "name": "planner-core",
+      "firstSeen": "2026-01-29T13:51:00.682Z",
+      "lastSeen": "2026-01-31T01:16:02.083Z",
+      "messagesSent": 87,
+      "messagesReceived": 103
+    },
+    {
+      "id": "agent-mkzr1dtn-0000-10z101yg",
+      "name": "PlannerLead",
+      "cli": "claude",
+      "workingDirectory": "/Users/flysikring/conductor/workspaces/plannr/auckland",
+      "firstSeen": "2026-01-29T17:49:47.195Z",
+      "lastSeen": "2026-01-29T18:02:47.408Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzs59sa-0001-f7xxzim",
+      "name": "user-e6cf4df1",
+      "firstSeen": "2026-01-29T18:20:48.202Z",
+      "lastSeen": "2026-01-29T18:23:37.505Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzs5bee-0001-f7xxzim",
+      "name": "user-66c62275",
+      "firstSeen": "2026-01-29T18:20:50.294Z",
+      "lastSeen": "2026-01-29T18:23:37.498Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzs5hur-0001-f7xxzim",
+      "name": "user-f0cb5c87",
+      "firstSeen": "2026-01-29T18:20:58.659Z",
+      "lastSeen": "2026-01-29T18:23:37.503Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzs5lfw-0000-f7xxzim",
+      "name": "user-fdf3c021",
+      "firstSeen": "2026-01-29T18:21:03.308Z",
+      "lastSeen": "2026-01-29T18:23:37.500Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzs96zx-0000-f7xxzim",
+      "name": "user-8df2da12",
+      "firstSeen": "2026-01-29T18:23:51.213Z",
+      "lastSeen": "2026-01-29T18:24:48.082Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzsb6vd-0001-f7xxzim",
+      "name": "user-0fc803f0",
+      "firstSeen": "2026-01-29T18:25:24.361Z",
+      "lastSeen": "2026-01-29T18:26:35.999Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzscsqz-0000-f7xxzim",
+      "name": "user-c62b11cb",
+      "firstSeen": "2026-01-29T18:26:39.370Z",
+      "lastSeen": "2026-01-29T19:34:31.099Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzscvao-0001-f7xxzim",
+      "name": "user-1cc40692",
+      "firstSeen": "2026-01-29T18:26:42.672Z",
+      "lastSeen": "2026-01-29T19:09:08.486Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkztvhmf-0001-f7xxzim",
+      "name": "user-f185466b",
+      "firstSeen": "2026-01-29T19:09:11.031Z",
+      "lastSeen": "2026-01-29T19:10:03.736Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzu6tc9-0001-f7xxzim",
+      "name": "user-60696329",
+      "firstSeen": "2026-01-29T19:17:59.433Z",
+      "lastSeen": "2026-01-29T19:18:52.457Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzusg9p-0003-x5q07ut",
+      "name": "user-4121f93a",
+      "firstSeen": "2026-01-29T19:34:48.925Z",
+      "lastSeen": "2026-01-29T19:37:20.497Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuswfs-0003-x5q07ut",
+      "name": "user-a5a26987",
+      "firstSeen": "2026-01-29T19:35:09.880Z",
+      "lastSeen": "2026-01-29T19:37:20.496Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzutrjg-0000-x5q07ut",
+      "name": "user-52f47afe",
+      "firstSeen": "2026-01-29T19:35:50.188Z",
+      "lastSeen": "2026-01-29T19:37:20.499Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzutwds-0001-x5q07ut",
+      "name": "user-46182f14",
+      "firstSeen": "2026-01-29T19:35:56.464Z",
+      "lastSeen": "2026-01-29T19:37:20.500Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuu59z-0001-x5q07ut",
+      "name": "user-8bb4051e",
+      "firstSeen": "2026-01-29T19:36:07.991Z",
+      "lastSeen": "2026-01-29T19:37:20.498Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuurlc-0001-x5q07ut",
+      "name": "user-6ef0459d",
+      "firstSeen": "2026-01-29T19:36:36.912Z",
+      "lastSeen": "2026-01-29T19:37:20.501Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuurlq-0003-x5q07ut",
+      "name": "user-889dda14",
+      "firstSeen": "2026-01-29T19:36:36.926Z",
+      "lastSeen": "2026-01-29T19:37:20.502Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuvnyr-0003-x5q07ut",
+      "name": "user-387beec4",
+      "firstSeen": "2026-01-29T19:37:18.867Z",
+      "lastSeen": "2026-01-29T19:37:20.503Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuvylc-0001-1i64rvh2",
+      "name": "user-1323061f",
+      "firstSeen": "2026-01-29T19:37:32.640Z",
+      "lastSeen": "2026-01-29T20:02:51.616Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuw486-0000-1i64rvh2",
+      "name": "user-0063a98a",
+      "firstSeen": "2026-01-29T19:37:39.941Z",
+      "lastSeen": "2026-01-29T20:02:51.618Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuw48m-0000-1i64rvh2",
+      "name": "user-f60a7d27",
+      "firstSeen": "2026-01-29T19:37:39.958Z",
+      "lastSeen": "2026-01-29T20:02:51.621Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuwj8b-0000-1i64rvh2",
+      "name": "user-4cf94a42",
+      "firstSeen": "2026-01-29T19:37:59.387Z",
+      "lastSeen": "2026-01-29T20:02:51.625Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuwza7-0000-1i64rvh2",
+      "name": "user-9e282600",
+      "firstSeen": "2026-01-29T19:38:20.191Z",
+      "lastSeen": "2026-01-29T20:02:51.631Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuxp45-0001-1i64rvh2",
+      "name": "user-615c3bd3",
+      "firstSeen": "2026-01-29T19:38:53.669Z",
+      "lastSeen": "2026-01-29T20:02:51.633Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzuygrr-0000-1i64rvh2",
+      "name": "user-5d097835",
+      "firstSeen": "2026-01-29T19:39:29.511Z",
+      "lastSeen": "2026-01-29T20:02:51.637Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzv01d7-0003-1i64rvh2",
+      "name": "user-49b66900",
+      "firstSeen": "2026-01-29T19:40:42.859Z",
+      "lastSeen": "2026-01-29T20:02:51.639Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzv01dr-0000-1i64rvh2",
+      "name": "user-c05ac26d",
+      "firstSeen": "2026-01-29T19:40:42.879Z",
+      "lastSeen": "2026-01-29T20:02:51.642Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzv0gc9-0001-1i64rvh2",
+      "name": "user-305552a0",
+      "firstSeen": "2026-01-29T19:41:02.265Z",
+      "lastSeen": "2026-01-29T20:02:51.644Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzv0gcm-0003-1i64rvh2",
+      "name": "user-8ac1b8e0",
+      "firstSeen": "2026-01-29T19:41:02.278Z",
+      "lastSeen": "2026-01-29T20:02:51.646Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzv0jft-0003-1i64rvh2",
+      "name": "user-58a414ca",
+      "firstSeen": "2026-01-29T19:41:06.281Z",
+      "lastSeen": "2026-01-29T20:02:51.608Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzvuuug-0001-64eu3nz",
+      "name": "user-33340b88",
+      "firstSeen": "2026-01-29T20:04:40.744Z",
+      "lastSeen": "2026-01-29T20:08:13.470Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzvuxxi-0000-64eu3nz",
+      "name": "user-3703d127",
+      "firstSeen": "2026-01-29T20:04:44.742Z",
+      "lastSeen": "2026-01-29T20:08:13.468Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzvzjmt-0000-64eu3nz",
+      "name": "user-96dead2b",
+      "firstSeen": "2026-01-29T20:08:19.493Z",
+      "lastSeen": "2026-01-29T20:08:42.506Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzw061h-0003-64eu3nz",
+      "name": "user-472e2c3b",
+      "firstSeen": "2026-01-29T20:08:48.533Z",
+      "lastSeen": "2026-01-29T20:09:03.783Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzw0mg8-0003-64eu3nz",
+      "name": "user-d7957b01",
+      "firstSeen": "2026-01-29T20:09:09.800Z",
+      "lastSeen": "2026-01-29T20:11:52.976Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzw48zz-0003-64eu3nz",
+      "name": "user-7f28da1f",
+      "firstSeen": "2026-01-29T20:11:58.991Z",
+      "lastSeen": "2026-01-29T20:14:57.465Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzw87d2-0003-64eu3nz",
+      "name": "user-2601a622",
+      "firstSeen": "2026-01-29T20:15:03.494Z",
+      "lastSeen": "2026-01-29T20:16:03.335Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzw9m6j-0004-64eu3nz",
+      "name": "user-7415ddae",
+      "firstSeen": "2026-01-29T20:16:09.355Z",
+      "lastSeen": "2026-01-29T20:17:47.063Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwbpks-0003-64eu3nz",
+      "name": "user-b4e35a43",
+      "firstSeen": "2026-01-29T20:17:47.068Z",
+      "lastSeen": "2026-01-29T20:32:53.967Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwbsnx-0004-64eu3nz",
+      "name": "user-ca782968",
+      "firstSeen": "2026-01-29T20:17:51.069Z",
+      "lastSeen": "2026-01-29T20:23:12.049Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwioc8-0003-64eu3nz",
+      "name": "user-76c41185",
+      "firstSeen": "2026-01-29T20:23:12.056Z",
+      "lastSeen": "2026-01-29T20:32:53.968Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwirff-0003-64eu3nz",
+      "name": "user-7e18784b",
+      "firstSeen": "2026-01-29T20:23:16.059Z",
+      "lastSeen": "2026-01-29T20:32:53.430Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwvdu9-0000-zgcewwd",
+      "name": "user-81cf8d24",
+      "firstSeen": "2026-01-29T20:33:04.977Z",
+      "lastSeen": "2026-01-29T20:55:30.299Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwvgxm-0000-zgcewwd",
+      "name": "user-a1322059",
+      "firstSeen": "2026-01-29T20:33:08.986Z",
+      "lastSeen": "2026-01-29T20:35:06.132Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwxzbu-0000-zgcewwd",
+      "name": "user-ed2cbad2",
+      "firstSeen": "2026-01-29T20:35:06.138Z",
+      "lastSeen": "2026-01-29T20:55:30.299Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzwy2f4-0003-zgcewwd",
+      "name": "user-4b279b62",
+      "firstSeen": "2026-01-29T20:35:10.144Z",
+      "lastSeen": "2026-01-29T20:39:22.997Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx3huu-0000-zgcewwd",
+      "name": "user-a218213f",
+      "firstSeen": "2026-01-29T20:39:23.430Z",
+      "lastSeen": "2026-01-29T20:55:30.300Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx3ky7-0001-zgcewwd",
+      "name": "user-cc091a0e",
+      "firstSeen": "2026-01-29T20:39:27.439Z",
+      "lastSeen": "2026-01-29T20:39:48.291Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx42lc-0003-zgcewwd",
+      "name": "user-c149409a",
+      "firstSeen": "2026-01-29T20:39:50.304Z",
+      "lastSeen": "2026-01-29T20:52:20.353Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx4b2m-0001-zgcewwd",
+      "name": "user-0bbea889",
+      "firstSeen": "2026-01-29T20:40:01.294Z",
+      "lastSeen": "2026-01-29T20:55:30.301Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx4e5z-0001-zgcewwd",
+      "name": "user-02d5a9d7",
+      "firstSeen": "2026-01-29T20:40:05.303Z",
+      "lastSeen": "2026-01-29T20:40:12.651Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx4ldz-0000-zgcewwd",
+      "name": "user-cf95c2b8",
+      "firstSeen": "2026-01-29T20:40:14.663Z",
+      "lastSeen": "2026-01-29T20:52:20.360Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx4mrn-0000-zgcewwd",
+      "name": "user-81a0942b",
+      "firstSeen": "2026-01-29T20:40:16.451Z",
+      "lastSeen": "2026-01-29T20:55:30.302Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx4pv4-0000-zgcewwd",
+      "name": "user-a185490e",
+      "firstSeen": "2026-01-29T20:40:20.464Z",
+      "lastSeen": "2026-01-29T20:40:47.348Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx5c5q-0000-zgcewwd",
+      "name": "user-680fead0",
+      "firstSeen": "2026-01-29T20:40:49.358Z",
+      "lastSeen": "2026-01-29T20:52:20.362Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx5ckm-0001-zgcewwd",
+      "name": "user-63c56533",
+      "firstSeen": "2026-01-29T20:40:49.894Z",
+      "lastSeen": "2026-01-29T20:55:30.303Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx5fnv-0000-zgcewwd",
+      "name": "user-6605b12a",
+      "firstSeen": "2026-01-29T20:40:53.899Z",
+      "lastSeen": "2026-01-29T20:42:27.006Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx7h23-0004-zgcewwd",
+      "name": "user-82f17cbc",
+      "firstSeen": "2026-01-29T20:42:29.019Z",
+      "lastSeen": "2026-01-29T20:52:20.359Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx85m8-0003-zgcewwd",
+      "name": "user-f6310248",
+      "firstSeen": "2026-01-29T20:43:00.848Z",
+      "lastSeen": "2026-01-29T20:55:30.304Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx8a4x-0000-zgcewwd",
+      "name": "user-e31b1314",
+      "firstSeen": "2026-01-29T20:43:06.705Z",
+      "lastSeen": "2026-01-29T20:55:30.305Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzx8d8f-0003-zgcewwd",
+      "name": "user-c16ffd55",
+      "firstSeen": "2026-01-29T20:43:10.719Z",
+      "lastSeen": "2026-01-29T20:49:39.231Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxgqkb-0003-zgcewwd",
+      "name": "user-eaf1b160",
+      "firstSeen": "2026-01-29T20:49:41.243Z",
+      "lastSeen": "2026-01-29T20:52:20.355Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxjep4-0003-zgcewwd",
+      "name": "user-f028c2ae",
+      "firstSeen": "2026-01-29T20:51:45.832Z",
+      "lastSeen": "2026-01-29T20:55:30.306Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxjhs8-0004-zgcewwd",
+      "name": "user-91447a64",
+      "firstSeen": "2026-01-29T20:51:49.832Z",
+      "lastSeen": "2026-01-29T20:52:20.357Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxk8rx-0003-zgcewwd",
+      "name": "user-867cd9fc",
+      "firstSeen": "2026-01-29T20:52:24.813Z",
+      "lastSeen": "2026-01-29T20:55:29.758Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxogrl-0000-ck54f3o",
+      "name": "user-4827f83b",
+      "firstSeen": "2026-01-29T20:55:41.792Z",
+      "lastSeen": "2026-01-29T20:55:41.892Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxolgt-0000-ck54f3o",
+      "name": "user-5f211604",
+      "firstSeen": "2026-01-29T20:55:47.885Z",
+      "lastSeen": "2026-01-29T20:58:09.377Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxro6v-0003-ck54f3o",
+      "name": "user-db9e9460",
+      "firstSeen": "2026-01-29T20:58:11.383Z",
+      "lastSeen": "2026-01-29T20:59:06.481Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxs5vx-0001-ck54f3o",
+      "name": "user-21119651",
+      "firstSeen": "2026-01-29T20:58:34.317Z",
+      "lastSeen": "2026-01-29T20:59:06.484Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxsuyf-0001-ck54f3o",
+      "name": "user-e2df5a1a",
+      "firstSeen": "2026-01-29T20:59:06.807Z",
+      "lastSeen": "2026-01-29T20:59:06.846Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxsy23-0003-ck54f3o",
+      "name": "user-88b919dc",
+      "firstSeen": "2026-01-29T20:59:10.827Z",
+      "lastSeen": "2026-01-29T21:01:37.690Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxw3e1-0000-ck54f3o",
+      "name": "user-ee1632cc",
+      "firstSeen": "2026-01-29T21:01:37.705Z",
+      "lastSeen": "2026-01-29T21:01:42.123Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxw4xc-0003-ck54f3o",
+      "name": "user-b6c2d07c",
+      "firstSeen": "2026-01-29T21:01:39.696Z",
+      "lastSeen": "2026-01-29T21:01:41.569Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxwoyb-0001-1reb6uoy",
+      "name": "user-28a5bf57",
+      "firstSeen": "2026-01-29T21:02:05.651Z",
+      "lastSeen": "2026-01-29T21:17:00.074Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzxws17-0001-1reb6uoy",
+      "name": "user-ca944549",
+      "firstSeen": "2026-01-29T21:02:09.643Z",
+      "lastSeen": "2026-01-29T21:10:21.740Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy7daa-0001-1reb6uoy",
+      "name": "user-c6639cfa",
+      "firstSeen": "2026-01-29T21:10:23.746Z",
+      "lastSeen": "2026-01-29T21:16:59.526Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy7r35-0000-1reb6uoy",
+      "name": "user-d1c4ce62",
+      "firstSeen": "2026-01-29T21:10:41.633Z",
+      "lastSeen": "2026-01-29T21:17:00.075Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy7u6g-0000-1reb6uoy",
+      "name": "user-e3d3c3d9",
+      "firstSeen": "2026-01-29T21:10:45.640Z",
+      "lastSeen": "2026-01-29T21:10:45.866Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy7vwr-0000-1reb6uoy",
+      "name": "user-bcfb0e47",
+      "firstSeen": "2026-01-29T21:10:47.883Z",
+      "lastSeen": "2026-01-29T21:16:59.525Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy881i-0000-1reb6uoy",
+      "name": "user-5d8f2199",
+      "firstSeen": "2026-01-29T21:11:03.606Z",
+      "lastSeen": "2026-01-29T21:17:00.077Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy8uqv-0003-1reb6uoy",
+      "name": "user-c38c1cb3",
+      "firstSeen": "2026-01-29T21:11:33.031Z",
+      "lastSeen": "2026-01-29T21:17:00.078Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzy921j-0000-1reb6uoy",
+      "name": "user-857553f8",
+      "firstSeen": "2026-01-29T21:11:42.487Z",
+      "lastSeen": "2026-01-29T21:16:59.524Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzyg5ii-0000-rif7doa",
+      "name": "user-0c1c5119",
+      "firstSeen": "2026-01-29T21:17:13.578Z",
+      "lastSeen": "2026-01-29T21:29:14.411Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzyg5it-0000-rif7doa",
+      "name": "user-0035d9db",
+      "firstSeen": "2026-01-29T21:17:13.589Z",
+      "lastSeen": "2026-01-29T21:29:14.414Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzyg5jn-0001-rif7doa",
+      "name": "user-d3f32b35",
+      "firstSeen": "2026-01-29T21:17:13.619Z",
+      "lastSeen": "2026-01-29T21:29:14.417Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzyvm4w-0003-rif7doa",
+      "name": "user-aa5c04c5",
+      "firstSeen": "2026-01-29T21:29:14.960Z",
+      "lastSeen": "2026-01-30T18:46:16.662Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzyvp8h-0000-rif7doa",
+      "name": "user-dbb47302",
+      "firstSeen": "2026-01-29T21:29:18.977Z",
+      "lastSeen": "2026-01-29T21:47:02.096Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzziio0-0000-rif7doa",
+      "name": "user-7a542092",
+      "firstSeen": "2026-01-29T21:47:03.551Z",
+      "lastSeen": "2026-01-29T21:47:03.597Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-mkzzimjq-0003-rif7doa",
+      "name": "user-b67502d9",
+      "firstSeen": "2026-01-29T21:47:08.582Z",
+      "lastSeen": "2026-01-30T12:13:22.751Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml19mpro-0003-rif7doa",
+      "name": "user-decdbfb8",
+      "firstSeen": "2026-01-30T19:18:01.716Z",
+      "lastSeen": "2026-01-30T20:53:58.926Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml19mwlv-0000-rif7doa",
+      "name": "user-91ffe3b4",
+      "firstSeen": "2026-01-30T19:18:10.579Z",
+      "lastSeen": "2026-01-30T19:18:18.286Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml19n44c-0003-rif7doa",
+      "name": "user-71c5efb6",
+      "firstSeen": "2026-01-30T19:18:20.316Z",
+      "lastSeen": "2026-01-30T19:27:21.166Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1ao97u-0003-rif7doa",
+      "name": "user-f9463376",
+      "firstSeen": "2026-01-30T19:47:13.194Z",
+      "lastSeen": "2026-01-30T20:53:58.922Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1aocb5-0003-rif7doa",
+      "name": "user-be373329",
+      "firstSeen": "2026-01-30T19:47:17.201Z",
+      "lastSeen": "2026-01-30T19:47:17.737Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1aoedd-0004-rif7doa",
+      "name": "user-06f84cda",
+      "firstSeen": "2026-01-30T19:47:19.873Z",
+      "lastSeen": "2026-01-30T19:48:36.993Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bb66g-0000-rif7doa",
+      "name": "user-132c1242",
+      "firstSeen": "2026-01-30T20:05:02.344Z",
+      "lastSeen": "2026-01-30T20:53:58.924Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bb671-0001-rif7doa",
+      "name": "user-011be57e",
+      "firstSeen": "2026-01-30T20:05:02.365Z",
+      "lastSeen": "2026-01-30T20:53:58.923Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bb9a5-0001-rif7doa",
+      "name": "user-c8a29060",
+      "firstSeen": "2026-01-30T20:05:06.365Z",
+      "lastSeen": "2026-01-30T20:05:12.894Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bbeca-0001-rif7doa",
+      "name": "user-39cc2913",
+      "firstSeen": "2026-01-30T20:05:12.922Z",
+      "lastSeen": "2026-01-30T20:53:58.936Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bbhfp-0000-rif7doa",
+      "name": "user-d38f7e5a",
+      "firstSeen": "2026-01-30T20:05:16.933Z",
+      "lastSeen": "2026-01-30T20:05:19.137Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bbj5j-0000-rif7doa",
+      "name": "user-f99b6ff7",
+      "firstSeen": "2026-01-30T20:05:19.159Z",
+      "lastSeen": "2026-01-30T20:53:58.934Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bbm8s-0003-rif7doa",
+      "name": "user-05301b23",
+      "firstSeen": "2026-01-30T20:05:23.164Z",
+      "lastSeen": "2026-01-30T20:06:16.263Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bcsrn-0001-rif7doa",
+      "name": "user-c68d71e7",
+      "firstSeen": "2026-01-30T20:06:18.275Z",
+      "lastSeen": "2026-01-30T20:06:20.239Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bcv5w-0003-rif7doa",
+      "name": "user-50f1829b",
+      "firstSeen": "2026-01-30T20:06:21.380Z",
+      "lastSeen": "2026-01-30T20:53:58.938Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bcv67-0000-rif7doa",
+      "name": "user-8096504e",
+      "firstSeen": "2026-01-30T20:06:21.391Z",
+      "lastSeen": "2026-01-30T20:53:58.917Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bcy7f-0000-rif7doa",
+      "name": "user-0246f755",
+      "firstSeen": "2026-01-30T20:06:25.323Z",
+      "lastSeen": "2026-01-30T20:06:37.842Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bd7vo-0001-rif7doa",
+      "name": "user-a484d6af",
+      "firstSeen": "2026-01-30T20:06:37.860Z",
+      "lastSeen": "2026-01-30T20:53:58.921Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bdb02-0003-rif7doa",
+      "name": "user-131538f7",
+      "firstSeen": "2026-01-30T20:06:41.906Z",
+      "lastSeen": "2026-01-30T20:07:16.729Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1be1we-0000-rif7doa",
+      "name": "user-1f25a4cb",
+      "firstSeen": "2026-01-30T20:07:16.766Z",
+      "lastSeen": "2026-01-30T20:53:58.935Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1be4zr-0004-rif7doa",
+      "name": "user-730e78d7",
+      "firstSeen": "2026-01-30T20:07:20.775Z",
+      "lastSeen": "2026-01-30T20:07:26.298Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1be99w-0000-rif7doa",
+      "name": "user-bf434c5a",
+      "firstSeen": "2026-01-30T20:07:26.324Z",
+      "lastSeen": "2026-01-30T20:07:26.368Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1becee-0004-rif7doa",
+      "name": "user-b4d7eec2",
+      "firstSeen": "2026-01-30T20:07:30.374Z",
+      "lastSeen": "2026-01-30T20:07:46.417Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1beosg-0000-rif7doa",
+      "name": "user-fa5997cc",
+      "firstSeen": "2026-01-30T20:07:46.432Z",
+      "lastSeen": "2026-01-30T20:07:46.443Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1berw7-0004-rif7doa",
+      "name": "user-e65bf7bd",
+      "firstSeen": "2026-01-30T20:07:50.455Z",
+      "lastSeen": "2026-01-30T20:07:52.152Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bet7v-0001-rif7doa",
+      "name": "user-598bfd8f",
+      "firstSeen": "2026-01-30T20:07:52.171Z",
+      "lastSeen": "2026-01-30T20:53:58.944Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bewbf-0000-rif7doa",
+      "name": "user-ad9d362a",
+      "firstSeen": "2026-01-30T20:07:56.187Z",
+      "lastSeen": "2026-01-30T20:08:57.151Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bg7dt-0001-rif7doa",
+      "name": "user-602b8a23",
+      "firstSeen": "2026-01-30T20:08:57.185Z",
+      "lastSeen": "2026-01-30T20:53:58.941Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bgagr-0001-rif7doa",
+      "name": "user-2fd5c108",
+      "firstSeen": "2026-01-30T20:09:01.179Z",
+      "lastSeen": "2026-01-30T20:10:01.203Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bhlgd-0001-rif7doa",
+      "name": "user-2f6f8d85",
+      "firstSeen": "2026-01-30T20:10:02.077Z",
+      "lastSeen": "2026-01-30T20:10:02.178Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bhlh0-0001-rif7doa",
+      "name": "user-1ece4a71",
+      "firstSeen": "2026-01-30T20:10:02.100Z",
+      "lastSeen": "2026-01-30T20:10:02.223Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bhons-0003-rif7doa",
+      "name": "user-9488942b",
+      "firstSeen": "2026-01-30T20:10:06.232Z",
+      "lastSeen": "2026-01-30T20:10:30.476Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bi7r7-0003-rif7doa",
+      "name": "user-6608b7a6",
+      "firstSeen": "2026-01-30T20:10:30.979Z",
+      "lastSeen": "2026-01-30T20:10:31.025Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bi7s5-0001-rif7doa",
+      "name": "user-fdbe4ce2",
+      "firstSeen": "2026-01-30T20:10:31.013Z",
+      "lastSeen": "2026-01-30T20:10:31.065Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1biawl-0000-rif7doa",
+      "name": "user-d2a59013",
+      "firstSeen": "2026-01-30T20:10:35.060Z",
+      "lastSeen": "2026-01-30T20:10:54.359Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bipsq-0001-rif7doa",
+      "name": "user-4fef3289",
+      "firstSeen": "2026-01-30T20:10:54.362Z",
+      "lastSeen": "2026-01-30T20:53:58.920Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bisw4-0003-rif7doa",
+      "name": "user-5fa6c527",
+      "firstSeen": "2026-01-30T20:10:58.372Z",
+      "lastSeen": "2026-01-30T20:17:31.482Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bkp5d-0001-rif7doa",
+      "name": "user-9aff025f",
+      "firstSeen": "2026-01-30T20:12:26.833Z",
+      "lastSeen": "2026-01-30T20:12:26.882Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bkp5y-0003-rif7doa",
+      "name": "user-b2be6d2e",
+      "firstSeen": "2026-01-30T20:12:26.854Z",
+      "lastSeen": "2026-01-30T20:12:26.947Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bksbw-0003-rif7doa",
+      "name": "user-513be27e",
+      "firstSeen": "2026-01-30T20:12:30.956Z",
+      "lastSeen": "2026-01-30T20:12:42.880Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1br8xu-0000-rif7doa",
+      "name": "user-e0b1ab2e",
+      "firstSeen": "2026-01-30T20:17:32.418Z",
+      "lastSeen": "2026-01-30T20:53:58.945Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1br8ym-0001-rif7doa",
+      "name": "user-8dbe0c03",
+      "firstSeen": "2026-01-30T20:17:32.446Z",
+      "lastSeen": "2026-01-30T20:17:32.499Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1brc3c-0000-rif7doa",
+      "name": "user-c77f11a2",
+      "firstSeen": "2026-01-30T20:17:36.504Z",
+      "lastSeen": "2026-01-30T20:17:39.833Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1brf63-0001-rif7doa",
+      "name": "user-0cd70251",
+      "firstSeen": "2026-01-30T20:17:40.491Z",
+      "lastSeen": "2026-01-30T20:17:40.531Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1brf6z-0001-rif7doa",
+      "name": "user-b245849f",
+      "firstSeen": "2026-01-30T20:17:40.523Z",
+      "lastSeen": "2026-01-30T20:17:40.562Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1briar-0000-rif7doa",
+      "name": "user-05d3982a",
+      "firstSeen": "2026-01-30T20:17:44.547Z",
+      "lastSeen": "2026-01-30T20:17:44.570Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1brib8-0000-rif7doa",
+      "name": "user-2f3deb46",
+      "firstSeen": "2026-01-30T20:17:44.564Z",
+      "lastSeen": "2026-01-30T20:17:44.600Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1brlbi-0004-rif7doa",
+      "name": "user-61f496c0",
+      "firstSeen": "2026-01-30T20:17:48.462Z",
+      "lastSeen": "2026-01-30T20:17:48.499Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1brlcb-0000-rif7doa",
+      "name": "user-9ec381e7",
+      "firstSeen": "2026-01-30T20:17:48.491Z",
+      "lastSeen": "2026-01-30T20:17:48.534Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1broh1-0003-rif7doa",
+      "name": "user-eb81ff13",
+      "firstSeen": "2026-01-30T20:17:52.549Z",
+      "lastSeen": "2026-01-30T20:18:25.651Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsef1-0001-rif7doa",
+      "name": "user-6a14064b",
+      "firstSeen": "2026-01-30T20:18:26.173Z",
+      "lastSeen": "2026-01-30T20:53:58.946Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsefw-0000-rif7doa",
+      "name": "user-f933f8bb",
+      "firstSeen": "2026-01-30T20:18:26.204Z",
+      "lastSeen": "2026-01-30T20:53:58.928Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bshje-0004-rif7doa",
+      "name": "user-15de4993",
+      "firstSeen": "2026-01-30T20:18:30.218Z",
+      "lastSeen": "2026-01-30T20:18:31.324Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsiyi-0000-rif7doa",
+      "name": "user-88296fa6",
+      "firstSeen": "2026-01-30T20:18:32.058Z",
+      "lastSeen": "2026-01-30T20:53:58.942Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsiz9-0001-rif7doa",
+      "name": "user-65fa345c",
+      "firstSeen": "2026-01-30T20:18:32.085Z",
+      "lastSeen": "2026-01-30T20:53:58.913Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsm34-0000-rif7doa",
+      "name": "user-9e19b628",
+      "firstSeen": "2026-01-30T20:18:36.112Z",
+      "lastSeen": "2026-01-30T20:18:42.637Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsrpx-0001-rif7doa",
+      "name": "user-4bc30a8c",
+      "firstSeen": "2026-01-30T20:18:43.413Z",
+      "lastSeen": "2026-01-30T20:53:58.943Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsrqd-0001-rif7doa",
+      "name": "user-36829a9f",
+      "firstSeen": "2026-01-30T20:18:43.429Z",
+      "lastSeen": "2026-01-30T20:18:43.463Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bsuur-0000-rif7doa",
+      "name": "user-b20e2918",
+      "firstSeen": "2026-01-30T20:18:47.475Z",
+      "lastSeen": "2026-01-30T20:19:36.352Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1btwwi-0000-rif7doa",
+      "name": "user-817e3ad1",
+      "firstSeen": "2026-01-30T20:19:36.786Z",
+      "lastSeen": "2026-01-30T20:53:58.927Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1btwxc-0003-rif7doa",
+      "name": "user-00d6de21",
+      "firstSeen": "2026-01-30T20:19:36.816Z",
+      "lastSeen": "2026-01-30T20:19:36.841Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bu01l-0003-rif7doa",
+      "name": "user-4b91fbb0",
+      "firstSeen": "2026-01-30T20:19:40.857Z",
+      "lastSeen": "2026-01-30T20:21:45.741Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bwop6-0000-rif7doa",
+      "name": "user-ab378f61",
+      "firstSeen": "2026-01-30T20:21:46.122Z",
+      "lastSeen": "2026-01-30T20:53:58.918Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bwopp-0003-rif7doa",
+      "name": "user-fabd9b9b",
+      "firstSeen": "2026-01-30T20:21:46.141Z",
+      "lastSeen": "2026-01-30T20:21:46.159Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bwrtp-0001-rif7doa",
+      "name": "user-848417e5",
+      "firstSeen": "2026-01-30T20:21:50.173Z",
+      "lastSeen": "2026-01-30T20:23:45.571Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bz9lf-0001-rif7doa",
+      "name": "user-cd5c418f",
+      "firstSeen": "2026-01-30T20:23:46.515Z",
+      "lastSeen": "2026-01-30T20:53:58.937Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bz9md-0003-rif7doa",
+      "name": "user-9f7e19ca",
+      "firstSeen": "2026-01-30T20:23:46.549Z",
+      "lastSeen": "2026-01-30T20:23:46.571Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1bzcq7-0003-rif7doa",
+      "name": "user-0e97e97a",
+      "firstSeen": "2026-01-30T20:23:50.575Z",
+      "lastSeen": "2026-01-30T20:24:23.304Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c0202-0001-rif7doa",
+      "name": "user-413e3fd9",
+      "firstSeen": "2026-01-30T20:24:23.330Z",
+      "lastSeen": "2026-01-30T20:53:58.933Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c0536-0003-rif7doa",
+      "name": "user-436736b4",
+      "firstSeen": "2026-01-30T20:24:27.330Z",
+      "lastSeen": "2026-01-30T20:26:10.961Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c2d24-0001-rif7doa",
+      "name": "user-6752674a",
+      "firstSeen": "2026-01-30T20:26:10.972Z",
+      "lastSeen": "2026-01-30T20:53:58.929Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c2g5f-0004-rif7doa",
+      "name": "user-4fe7087c",
+      "firstSeen": "2026-01-30T20:26:14.979Z",
+      "lastSeen": "2026-01-30T20:27:51.023Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c4i9k-0001-rif7doa",
+      "name": "user-3f6737f9",
+      "firstSeen": "2026-01-30T20:27:51.032Z",
+      "lastSeen": "2026-01-30T20:53:58.939Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c4ldc-0003-rif7doa",
+      "name": "user-d8c46412",
+      "firstSeen": "2026-01-30T20:27:55.056Z",
+      "lastSeen": "2026-01-30T20:28:23.769Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c57jc-0001-rif7doa",
+      "name": "user-14c6cd70",
+      "firstSeen": "2026-01-30T20:28:23.784Z",
+      "lastSeen": "2026-01-30T20:53:58.931Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1c5amq-0004-rif7doa",
+      "name": "user-42d14f8e",
+      "firstSeen": "2026-01-30T20:28:27.794Z",
+      "lastSeen": "2026-01-30T20:32:54.146Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1cb05v-0000-rif7doa",
+      "name": "user-967bf8ae",
+      "firstSeen": "2026-01-30T20:32:54.163Z",
+      "lastSeen": "2026-01-30T20:53:58.914Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1cb38y-0001-rif7doa",
+      "name": "user-0fde674c",
+      "firstSeen": "2026-01-30T20:32:58.162Z",
+      "lastSeen": "2026-01-30T20:33:27.000Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1cbqln-0003-rif7doa",
+      "name": "user-c54d2a88",
+      "firstSeen": "2026-01-30T20:33:28.427Z",
+      "lastSeen": "2026-01-30T20:53:58.930Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1cbqm4-0003-rif7doa",
+      "name": "user-09a241ed",
+      "firstSeen": "2026-01-30T20:33:28.444Z",
+      "lastSeen": "2026-01-30T20:33:28.459Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1cbtpu-0001-rif7doa",
+      "name": "user-65ca51a6",
+      "firstSeen": "2026-01-30T20:33:32.466Z",
+      "lastSeen": "2026-01-30T20:48:15.147Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1d2cbz-0000-rif7doa",
+      "name": "user-78ffd62b",
+      "firstSeen": "2026-01-30T20:54:09.647Z",
+      "lastSeen": "2026-01-30T20:54:34.345Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1d2ccm-0001-rif7doa",
+      "name": "user-1f6d30c4",
+      "firstSeen": "2026-01-30T20:54:09.670Z",
+      "lastSeen": "2026-01-30T20:54:09.711Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1d2fge-0004-rif7doa",
+      "name": "user-f2569eda",
+      "firstSeen": "2026-01-30T20:54:13.694Z",
+      "lastSeen": "2026-01-30T20:54:15.437Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1d2hdn-0000-rif7doa",
+      "name": "user-30e45b68",
+      "firstSeen": "2026-01-30T20:54:16.187Z",
+      "lastSeen": "2026-01-30T20:54:34.343Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1d2hdt-0000-rif7doa",
+      "name": "user-5c386bfc",
+      "firstSeen": "2026-01-30T20:54:16.193Z",
+      "lastSeen": "2026-01-30T20:54:16.219Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1d2khu-0003-rif7doa",
+      "name": "user-42253dde",
+      "firstSeen": "2026-01-30T20:54:20.226Z",
+      "lastSeen": "2026-01-30T20:54:34.346Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dcmqc-0003-16w2d7io",
+      "name": "user-baa630ec",
+      "firstSeen": "2026-01-30T21:02:09.684Z",
+      "lastSeen": "2026-01-30T21:02:09.794Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dcmrc-0000-16w2d7io",
+      "name": "user-b89ef932",
+      "firstSeen": "2026-01-30T21:02:09.719Z",
+      "lastSeen": "2026-01-30T21:02:09.808Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dcpx3-0003-16w2d7io",
+      "name": "user-70c1903b",
+      "firstSeen": "2026-01-30T21:02:13.815Z",
+      "lastSeen": "2026-01-30T21:05:10.043Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1ddz1e-0000-16w2d7io",
+      "name": "user-f8dd3bd5",
+      "firstSeen": "2026-01-30T21:03:12.290Z",
+      "lastSeen": "2026-01-30T21:03:12.327Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1ddz2a-0001-16w2d7io",
+      "name": "user-8b3015dd",
+      "firstSeen": "2026-01-30T21:03:12.322Z",
+      "lastSeen": "2026-01-30T21:03:12.381Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1de278-0003-16w2d7io",
+      "name": "user-281bff47",
+      "firstSeen": "2026-01-30T21:03:16.388Z",
+      "lastSeen": "2026-01-30T21:03:26.679Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1deafw-0000-16w2d7io",
+      "name": "user-e665e0cd",
+      "firstSeen": "2026-01-30T21:03:27.068Z",
+      "lastSeen": "2026-01-30T21:03:27.126Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1deagk-0003-16w2d7io",
+      "name": "user-e3c6a4ca",
+      "firstSeen": "2026-01-30T21:03:27.092Z",
+      "lastSeen": "2026-01-30T21:03:27.151Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dedlg-0001-16w2d7io",
+      "name": "user-233e8158",
+      "firstSeen": "2026-01-30T21:03:31.156Z",
+      "lastSeen": "2026-01-30T21:07:43.450Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dgilo-0000-16w2d7io",
+      "name": "user-c9be2f1b",
+      "firstSeen": "2026-01-30T21:05:10.956Z",
+      "lastSeen": "2026-01-30T21:24:12.426Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dgim1-0000-16w2d7io",
+      "name": "user-2cf61216",
+      "firstSeen": "2026-01-30T21:05:10.969Z",
+      "lastSeen": "2026-01-30T21:05:11.004Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dglqd-0003-16w2d7io",
+      "name": "user-430f4c09",
+      "firstSeen": "2026-01-30T21:05:15.013Z",
+      "lastSeen": "2026-01-30T21:09:35.474Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1djvnp-0004-16w2d7io",
+      "name": "user-05f6be5a",
+      "firstSeen": "2026-01-30T21:07:47.845Z",
+      "lastSeen": "2026-01-30T21:09:35.439Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dm6p6-0000-16w2d7io",
+      "name": "user-8fd35aa7",
+      "firstSeen": "2026-01-30T21:09:35.466Z",
+      "lastSeen": "2026-01-30T21:09:35.509Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dm6qa-0000-16w2d7io",
+      "name": "user-4fa19da6",
+      "firstSeen": "2026-01-30T21:09:35.506Z",
+      "lastSeen": "2026-01-30T21:24:12.417Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dm9t2-0003-16w2d7io",
+      "name": "user-5104ff01",
+      "firstSeen": "2026-01-30T21:09:39.494Z",
+      "lastSeen": "2026-01-30T21:10:00.404Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dm9t8-0003-16w2d7io",
+      "name": "user-154f1bd1",
+      "firstSeen": "2026-01-30T21:09:39.500Z",
+      "lastSeen": "2026-01-30T21:10:00.388Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmpzn-0000-16w2d7io",
+      "name": "user-1990a6ef",
+      "firstSeen": "2026-01-30T21:10:00.467Z",
+      "lastSeen": "2026-01-30T21:24:12.424Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmq0a-0000-16w2d7io",
+      "name": "user-4f7be736",
+      "firstSeen": "2026-01-30T21:10:00.489Z",
+      "lastSeen": "2026-01-30T21:24:12.420Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmt1r-0003-16w2d7io",
+      "name": "user-68041767",
+      "firstSeen": "2026-01-30T21:10:04.431Z",
+      "lastSeen": "2026-01-30T21:10:07.220Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmt1y-0003-16w2d7io",
+      "name": "user-178c34fc",
+      "firstSeen": "2026-01-30T21:10:04.438Z",
+      "lastSeen": "2026-01-30T21:10:07.194Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmv7n-0000-16w2d7io",
+      "name": "user-4fa6770e",
+      "firstSeen": "2026-01-30T21:10:07.235Z",
+      "lastSeen": "2026-01-30T21:10:07.278Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmv9g-0000-16w2d7io",
+      "name": "user-a9f3fbe2",
+      "firstSeen": "2026-01-30T21:10:07.300Z",
+      "lastSeen": "2026-01-30T21:24:12.431Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmyb2-0000-16w2d7io",
+      "name": "user-df5d2804",
+      "firstSeen": "2026-01-30T21:10:11.246Z",
+      "lastSeen": "2026-01-30T21:13:36.557Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dmybi-0001-16w2d7io",
+      "name": "user-ef06f917",
+      "firstSeen": "2026-01-30T21:10:11.262Z",
+      "lastSeen": "2026-01-30T21:10:13.533Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dn0i3-0000-16w2d7io",
+      "name": "user-77e9918f",
+      "firstSeen": "2026-01-30T21:10:14.091Z",
+      "lastSeen": "2026-01-30T21:10:14.130Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dn0im-0001-16w2d7io",
+      "name": "user-6958c0fc",
+      "firstSeen": "2026-01-30T21:10:14.110Z",
+      "lastSeen": "2026-01-30T21:10:14.160Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dn3nc-0003-16w2d7io",
+      "name": "user-04b420b3",
+      "firstSeen": "2026-01-30T21:10:18.168Z",
+      "lastSeen": "2026-01-30T21:13:02.190Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dqmgs-0001-16w2d7io",
+      "name": "user-1647ac9c",
+      "firstSeen": "2026-01-30T21:13:02.524Z",
+      "lastSeen": "2026-01-30T21:13:02.565Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dqmh2-0003-16w2d7io",
+      "name": "user-a393ab7b",
+      "firstSeen": "2026-01-30T21:13:02.534Z",
+      "lastSeen": "2026-01-30T21:13:02.595Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dqpmd-0000-16w2d7io",
+      "name": "user-ac488b1b",
+      "firstSeen": "2026-01-30T21:13:06.613Z",
+      "lastSeen": "2026-01-30T21:13:36.714Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drd6w-0003-16w2d7io",
+      "name": "user-6a64803a",
+      "firstSeen": "2026-01-30T21:13:37.160Z",
+      "lastSeen": "2026-01-30T21:13:37.192Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drd7p-0001-16w2d7io",
+      "name": "user-ebfd1f27",
+      "firstSeen": "2026-01-30T21:13:37.189Z",
+      "lastSeen": "2026-01-30T21:13:37.239Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drdgv-0000-16w2d7io",
+      "name": "user-e4208207",
+      "firstSeen": "2026-01-30T21:13:37.519Z",
+      "lastSeen": "2026-01-30T21:13:37.572Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drdhn-0001-16w2d7io",
+      "name": "user-0c239939",
+      "firstSeen": "2026-01-30T21:13:37.547Z",
+      "lastSeen": "2026-01-30T21:13:37.635Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drgcb-0003-16w2d7io",
+      "name": "user-da5a864c",
+      "firstSeen": "2026-01-30T21:13:41.243Z",
+      "lastSeen": "2026-01-30T21:13:43.308Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drgnf-0003-16w2d7io",
+      "name": "user-6e42fdad",
+      "firstSeen": "2026-01-30T21:13:41.643Z",
+      "lastSeen": "2026-01-30T21:13:43.228Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dri9j-0001-16w2d7io",
+      "name": "user-ed11ae46",
+      "firstSeen": "2026-01-30T21:13:43.735Z",
+      "lastSeen": "2026-01-30T21:24:12.437Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dria2-0000-16w2d7io",
+      "name": "user-9af5de2a",
+      "firstSeen": "2026-01-30T21:13:43.754Z",
+      "lastSeen": "2026-01-30T21:24:12.440Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1driam-0001-16w2d7io",
+      "name": "user-abdcbf6c",
+      "firstSeen": "2026-01-30T21:13:43.774Z",
+      "lastSeen": "2026-01-30T21:24:12.446Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1driat-0001-16w2d7io",
+      "name": "user-456417c5",
+      "firstSeen": "2026-01-30T21:13:43.781Z",
+      "lastSeen": "2026-01-30T21:24:12.434Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drlce-0000-16w2d7io",
+      "name": "user-3840ab6f",
+      "firstSeen": "2026-01-30T21:13:47.726Z",
+      "lastSeen": "2026-01-30T21:13:48.498Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drldl-0001-16w2d7io",
+      "name": "user-474387f8",
+      "firstSeen": "2026-01-30T21:13:47.769Z",
+      "lastSeen": "2026-01-30T21:24:04.583Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1drpa2-0001-16w2d7io",
+      "name": "user-6dda7a07",
+      "firstSeen": "2026-01-30T21:13:52.826Z",
+      "lastSeen": "2026-01-30T21:16:40.898Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dveg2-0003-16w2d7io",
+      "name": "user-db42d1b2",
+      "firstSeen": "2026-01-30T21:16:45.410Z",
+      "lastSeen": "2026-01-30T21:17:03.823Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1dvw0z-0004-16w2d7io",
+      "name": "user-c75dece6",
+      "firstSeen": "2026-01-30T21:17:08.195Z",
+      "lastSeen": "2026-01-30T21:21:22.269Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e1ccf-0001-16w2d7io",
+      "name": "user-1fd802e5",
+      "firstSeen": "2026-01-30T21:21:22.623Z",
+      "lastSeen": "2026-01-30T21:21:22.647Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e1ccr-0000-16w2d7io",
+      "name": "user-0898e0bf",
+      "firstSeen": "2026-01-30T21:21:22.635Z",
+      "lastSeen": "2026-01-30T21:21:22.688Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e1fhg-0003-16w2d7io",
+      "name": "user-5f27da71",
+      "firstSeen": "2026-01-30T21:21:26.692Z",
+      "lastSeen": "2026-01-30T21:22:39.794Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e3kin-0003-16w2d7io",
+      "name": "user-03c85f0b",
+      "firstSeen": "2026-01-30T21:23:06.527Z",
+      "lastSeen": "2026-01-30T21:24:04.800Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e4txs-0001-16w2d7io",
+      "name": "user-f378616c",
+      "firstSeen": "2026-01-30T21:24:05.392Z",
+      "lastSeen": "2026-01-30T21:24:12.442Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e4tyw-0000-16w2d7io",
+      "name": "user-90105c31",
+      "firstSeen": "2026-01-30T21:24:05.432Z",
+      "lastSeen": "2026-01-30T21:24:12.448Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e4u9q-0001-16w2d7io",
+      "name": "user-b1f40069",
+      "firstSeen": "2026-01-30T21:24:05.822Z",
+      "lastSeen": "2026-01-30T21:24:05.864Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e4ual-0000-16w2d7io",
+      "name": "user-25e46643",
+      "firstSeen": "2026-01-30T21:24:05.853Z",
+      "lastSeen": "2026-01-30T21:24:05.948Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e4x30-0001-16w2d7io",
+      "name": "user-d63522ec",
+      "firstSeen": "2026-01-30T21:24:09.468Z",
+      "lastSeen": "2026-01-30T21:24:11.865Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e4xgh-0003-16w2d7io",
+      "name": "user-8b0486e2",
+      "firstSeen": "2026-01-30T21:24:09.953Z",
+      "lastSeen": "2026-01-30T21:24:11.862Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1e8724-0003-609ij29",
+      "name": "user-3f12e372",
+      "firstSeen": "2026-01-30T21:26:42.364Z",
+      "lastSeen": "2026-01-30T21:32:31.544Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1efoi3-0000-609ij29",
+      "name": "user-f35978e8",
+      "firstSeen": "2026-01-30T21:32:31.563Z",
+      "lastSeen": "2026-01-30T22:07:44.527Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1efrlm-0000-609ij29",
+      "name": "user-3118b535",
+      "firstSeen": "2026-01-30T21:32:35.578Z",
+      "lastSeen": "2026-01-30T21:32:49.311Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1eg27y-0000-609ij29",
+      "name": "user-a38b5056",
+      "firstSeen": "2026-01-30T21:32:49.342Z",
+      "lastSeen": "2026-01-30T22:07:44.524Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1eg5az-0004-609ij29",
+      "name": "user-70f94685",
+      "firstSeen": "2026-01-30T21:32:53.339Z",
+      "lastSeen": "2026-01-30T21:33:32.342Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1egzf6-0001-609ij29",
+      "name": "user-cca4a806",
+      "firstSeen": "2026-01-30T21:33:32.370Z",
+      "lastSeen": "2026-01-30T22:07:44.529Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1eh2i2-0003-609ij29",
+      "name": "user-8d12862f",
+      "firstSeen": "2026-01-30T21:33:36.362Z",
+      "lastSeen": "2026-01-30T21:34:43.184Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1eii2t-0001-609ij29",
+      "name": "user-99b14162",
+      "firstSeen": "2026-01-30T21:34:43.205Z",
+      "lastSeen": "2026-01-30T22:07:44.535Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1eil8m-0001-609ij29",
+      "name": "user-8b053449",
+      "firstSeen": "2026-01-30T21:34:47.302Z",
+      "lastSeen": "2026-01-30T21:41:50.272Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1ero44-0000-609ij29",
+      "name": "user-636c2482",
+      "firstSeen": "2026-01-30T21:41:50.932Z",
+      "lastSeen": "2026-01-30T21:41:50.975Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1ero56-0000-609ij29",
+      "name": "user-6b2b9e89",
+      "firstSeen": "2026-01-30T21:41:50.970Z",
+      "lastSeen": "2026-01-30T21:41:51.008Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1erras-0003-609ij29",
+      "name": "user-2d7a23cc",
+      "firstSeen": "2026-01-30T21:41:55.060Z",
+      "lastSeen": "2026-01-30T22:07:44.532Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1errp5-0001-609ij29",
+      "name": "user-62933485",
+      "firstSeen": "2026-01-30T21:41:55.577Z",
+      "lastSeen": "2026-01-30T21:41:55.637Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1errqo-0000-609ij29",
+      "name": "user-61ed4fb8",
+      "firstSeen": "2026-01-30T21:41:55.632Z",
+      "lastSeen": "2026-01-30T22:07:44.547Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1erutv-0001-609ij29",
+      "name": "user-f0023a52",
+      "firstSeen": "2026-01-30T21:41:59.635Z",
+      "lastSeen": "2026-01-30T21:42:05.461Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1erzse-0000-609ij29",
+      "name": "user-9477dcc5",
+      "firstSeen": "2026-01-30T21:42:06.062Z",
+      "lastSeen": "2026-01-30T22:07:44.541Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1erztg-0000-609ij29",
+      "name": "user-d32804c6",
+      "firstSeen": "2026-01-30T21:42:06.100Z",
+      "lastSeen": "2026-01-30T21:42:06.201Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1es30i-0000-609ij29",
+      "name": "user-a223a134",
+      "firstSeen": "2026-01-30T21:42:10.242Z",
+      "lastSeen": "2026-01-30T21:43:49.032Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1evhnz-0000-609ij29",
+      "name": "user-727cd852",
+      "firstSeen": "2026-01-30T21:44:49.199Z",
+      "lastSeen": "2026-01-30T21:44:49.345Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1evhp2-0001-609ij29",
+      "name": "user-28eb95da",
+      "firstSeen": "2026-01-30T21:44:49.238Z",
+      "lastSeen": "2026-01-30T21:44:49.409Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1evhsp-0001-609ij29",
+      "name": "user-9538fe22",
+      "firstSeen": "2026-01-30T21:44:49.369Z",
+      "lastSeen": "2026-01-30T21:44:49.520Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1evhtk-0000-609ij29",
+      "name": "user-c5ace7e1",
+      "firstSeen": "2026-01-30T21:44:49.400Z",
+      "lastSeen": "2026-01-30T21:44:49.850Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1evl9q-0000-609ij29",
+      "name": "user-f9652b29",
+      "firstSeen": "2026-01-30T21:44:53.870Z",
+      "lastSeen": "2026-01-30T21:48:34.132Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1evlbw-0000-609ij29",
+      "name": "user-82661f39",
+      "firstSeen": "2026-01-30T21:44:53.948Z",
+      "lastSeen": "2026-01-30T21:48:34.017Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1f1j23-0000-609ij29",
+      "name": "user-cacd0bbf",
+      "firstSeen": "2026-01-30T21:49:30.939Z",
+      "lastSeen": "2026-01-30T21:49:31.611Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1f1j40-0001-609ij29",
+      "name": "user-54b13085",
+      "firstSeen": "2026-01-30T21:49:31.008Z",
+      "lastSeen": "2026-01-30T21:49:31.878Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1f1jnh-0001-609ij29",
+      "name": "user-5d3a62bc",
+      "firstSeen": "2026-01-30T21:49:31.709Z",
+      "lastSeen": "2026-01-30T21:49:31.968Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1f1jou-0001-609ij29",
+      "name": "user-37a5c9d5",
+      "firstSeen": "2026-01-30T21:49:31.758Z",
+      "lastSeen": "2026-01-30T21:49:32.376Z",
+      "messagesSent": 0,
+      "messagesReceived": 0
+    },
+    {
+      "id": "agent-ml1f1lm2-0001-609ij29",
+      "name": "dev-user-001",
+      "firstSeen": "2026-01-30T21:49:34.250Z",
+      "lastSeen": "2026-01-31T01:16:04.296Z",
+      "messagesSent": 95,
+      "messagesReceived": 571
+    },
+    {
+      "id": "agent-ml1g49vg-0001-cjc69be",
+      "name": "step-creator-test",
+      "cli": "claude",
+      "workingDirectory": "/Users/flysikring/conductor/workspaces/plannr/auckland",
+      "firstSeen": "2026-01-30T22:19:38.620Z",
+      "lastSeen": "2026-01-30T23:17:09.142Z",
+      "messagesSent": 3,
+      "messagesReceived": 14
+    },
+    {
+      "id": "agent-ml1ic3mq-0000-14xj9ka6",
+      "name": "Bob",
+      "cli": "claude",
+      "workingDirectory": "/Users/flysikring/conductor/workspaces/plannr/auckland",
+      "firstSeen": "2026-01-30T23:21:43.010Z",
+      "lastSeen": "2026-01-30T23:46:17.572Z",
+      "messagesSent": 4,
+      "messagesReceived": 18
+    },
+    {
+      "id": "agent-ml1m924f-0004-22p2juie",
+      "name": "docs-reader-orchestrator",
+      "cli": "claude",
+      "workingDirectory": "/Users/flysikring/conductor/workspaces/plannr/auckland",
+      "firstSeen": "2026-01-31T01:11:19.551Z",
+      "lastSeen": "2026-01-31T01:16:04.616Z",
+      "messagesSent": 1,
+      "messagesReceived": 6
+    }
+  ]
+}

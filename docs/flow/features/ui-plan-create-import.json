@@ -2,7 +2,9 @@
   "feature_id": "ui-plan-create-import",
   "title": "Import from Document",
   "type": "feature",
-  "status": "approved",
+  "status": "completed",
+  "completed_at": "2026-01-29",
+  "audit_note": "Complete - TabNavigation, DocumentTextarea, UploadDropZone, FormatDetectionBadge, ExtractionPreview integrated into NewPlanPage. Backend: document-parser.ts (markdown/yaml/json/text), format-detection.ts, document-converter.ts. API: POST /plans/import, /plans/import/detect, /plans/import/create. PDF not supported (only .md/.txt/.yaml/.json) - intentional MVP limitation.",
   "priority": "medium",
   "dependencies": ["ui-plan-create-goal"],
 

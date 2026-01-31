@@ -23,6 +23,19 @@
     { "type": "spec", "title": "Planner Vision - PlanVersion", "path": "docs/github-issue-planner-vision.md" }
   ],
 
+  "extended_by": [
+    {
+      "feature_id": "schema-org-initiative",
+      "impact": "Plan entity gains org_id (required), initiative_id (optional), owner_user_id (optional) fields",
+      "changes": [
+        "PlanSchema extended with org_id: z.string().uuid()",
+        "PlanSchema extended with initiative_id: z.string().uuid().optional()",
+        "PlanSchema extended with owner_user_id: z.string().optional()",
+        "createPlan() factory needs org_id parameter"
+      ]
+    }
+  ],
+
   "plan_implementation": {
     "scopes": ["planner-core"],
     "steps": [

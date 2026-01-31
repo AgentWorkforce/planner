@@ -1,0 +1,180 @@
+{
+  "feature_id": "ui-question-notification-bubble",
+  "title": "Mini Question Notification Bubble",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": ["ui-question-queue", "ui-agent-avatars", "ui-status-bar"],
+
+  "summary": {
+    "goal": "When an agent has a new question (state changes to needs_input), show a mini chat bubble above their avatar in the status bar displaying a truncated preview of the question. Auto-dismiss after 5 seconds. Click to open triage panel. Queue multiple notifications to show one at a time.",
+    "in_scope": [
+      "useQuestionNotifications hook to manage notification queue",
+      "Extend AgentAvatar with notification props (notificationContent, showNotification)",
+      "Mini bubble rendered via AgentAvatar's tooltip infrastructure",
+      "Question text preview (truncated to ~50 chars)",
+      "5-second auto-dismiss timer with queue advancement",
+      "Click to open triage panel with that question selected",
+      "Slide-in/fade-out animations"
+    ],
+    "out_of_scope": [
+      "Sound notifications",
+      "Desktop/browser notifications",
+      "Persistent notification history"
+    ],
+    "acceptance_criteria": [
+      { "id": "qnb-ac1", "description": "When agent state changes to needs_input, a mini bubble appears above their avatar in the status bar" },
+      { "id": "qnb-ac2", "description": "Bubble displays truncated question text (max ~50 characters with ellipsis)" },
+      { "id": "qnb-ac3", "description": "Bubble shows agent role icon and blocking level badge" },
+      { "id": "qnb-ac4", "description": "Bubble auto-dismisses after 5 seconds" },
+      { "id": "qnb-ac5", "description": "Clicking the bubble opens the triage panel with that question selected" },
+      { "id": "qnb-ac6", "description": "Multiple notifications are queued and shown one at a time (5s each)" },
+      { "id": "qnb-ac7", "description": "Notification has slide-up entrance and fade-out exit animation" },
+      { "id": "qnb-ac8", "description": "Bubble positioned correctly above the relevant agent's avatar (uses tooltip positioning)" }
+    ]
+  },
+
+  "design_spec": {
+    "architecture": {
+      "description": "Extend AgentAvatar to support auto-display notification mode, with queue logic in a dedicated hook",
+      "components": [
+        {
+          "name": "useQuestionNotifications",
+          "type": "hook",
+          "responsibility": "Manage notification queue - listen for question_added events, queue them, expose current notification and dismiss function, auto-advance after 5 seconds"
+        },
+        {
+          "name": "AgentAvatar (extended)",
+          "type": "component",
+          "responsibility": "New props: notificationContent (ReactNode), showNotification (boolean). When showNotification=true, render mini bubble instead of hover tooltip using same positioning infrastructure"
+        },
+        {
+          "name": "Layout/StatusBar",
+          "type": "integration",
+          "responsibility": "Use useQuestionNotifications to get current notification, pass notificationContent and showNotification=true to the matching AgentAvatar"
+        }
+      ]
+    },
+    "bubble_styling": {
+      "width": "max-w-64 (256px)",
+      "padding": "px-3 py-2",
+      "background": "bg-bg-tertiary",
+      "border": "border border-border-subtle",
+      "borderRadius": "rounded-xl rounded-bl-sm (speech bubble tail toward avatar)",
+      "shadow": "shadow-lg"
+    },
+    "bubble_content": {
+      "layout": "flex flex-col gap-1",
+      "header": "flex items-center gap-1.5 - role icon (text-xs) + blocking badge",
+      "body": "text-sm text-text-primary line-clamp-2 (truncated question text)",
+      "blocking_badges": {
+        "hard_block": "bg-error/20 text-error text-[10px] px-1.5 py-0.5 rounded",
+        "soft_block": "bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded",
+        "preference": "bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded",
+        "fyi": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1.5 py-0.5 rounded"
+      }
+    },
+    "animations": {
+      "enter": "animate-in fade-in-0 slide-in-from-bottom-2 duration-200",
+      "exit": "animate-out fade-out-0 duration-300"
+    }
+  },
+
+  "plan_implementation": {
+    "approach": "Extend AgentAvatar with notification mode, queue logic in useQuestionNotifications hook",
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "qnb-001",
+        "title": "Create useQuestionNotifications hook",
+        "scope": "planner-ui",
+        "description": "Create hook at packages/planner-ui/src/hooks/useQuestionNotifications.ts that manages the notification queue. Listen to question_added events from useQuestionQueue, queue new questions, expose current notification with 5-second auto-advance timer.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "qnb-001-ac1", "description": "Hook returns { currentNotification: { question: Question, agentId: string } | null, dismiss: () => void, queue: Question[] }" },
+          { "id": "qnb-001-ac2", "description": "When question_added event fires, question is added to queue" },
+          { "id": "qnb-001-ac3", "description": "Current notification auto-advances to next in queue after 5 seconds" },
+          { "id": "qnb-001-ac4", "description": "dismiss() immediately removes current notification and advances queue" },
+          { "id": "qnb-001-ac5", "description": "Hook accepts optional onNotificationClick callback" }
+        ]
+      },
+      {
+        "step_id": "qnb-002",
+        "title": "Create QuestionNotificationContent component",
+        "scope": "planner-ui",
+        "description": "Create component at packages/planner-ui/src/components/QuestionNotificationContent.tsx that renders the mini bubble content (role icon, blocking badge, truncated question text). This will be passed as notificationContent to AgentAvatar.",
+        "dependencies": ["qnb-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "qnb-002-ac1", "description": "Component accepts { question: Question, onClick: () => void }" },
+          { "id": "qnb-002-ac2", "description": "Displays role icon from getRoleConfig(question.agent_role)" },
+          { "id": "qnb-002-ac3", "description": "Displays blocking level badge with correct color per design_spec.bubble_content.blocking_badges" },
+          { "id": "qnb-002-ac4", "description": "Displays question.text truncated to 50 chars with ellipsis" },
+          { "id": "qnb-002-ac5", "description": "Entire component is clickable (cursor-pointer, onClick handler)" },
+          { "id": "qnb-002-ac6", "description": "Styling matches design_spec.bubble_styling (max-w-64, px-3 py-2, bg-bg-tertiary, border-border-subtle, rounded-xl rounded-bl-sm, shadow-lg)" }
+        ]
+      },
+      {
+        "step_id": "qnb-003",
+        "title": "Extend AgentAvatar with notification mode",
+        "scope": "planner-ui",
+        "description": "Add new props to AgentAvatar: notificationContent (ReactNode), showNotification (boolean), onNotificationClick (() => void). When showNotification=true, render the Tooltip in open state with notificationContent instead of default tooltip content.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "qnb-003-ac1", "description": "AgentAvatar accepts notificationContent?: ReactNode prop" },
+          { "id": "qnb-003-ac2", "description": "AgentAvatar accepts showNotification?: boolean prop (default false)" },
+          { "id": "qnb-003-ac3", "description": "AgentAvatar accepts onNotificationClick?: () => void prop" },
+          { "id": "qnb-003-ac4", "description": "When showNotification=true, Tooltip is forced open with notificationContent" },
+          { "id": "qnb-003-ac5", "description": "When showNotification=true, clicking avatar OR bubble calls onNotificationClick" },
+          { "id": "qnb-003-ac6", "description": "Tooltip has animate-in/animate-out classes per design_spec.animations" },
+          { "id": "qnb-003-ac7", "description": "Normal hover tooltip behavior preserved when showNotification=false" }
+        ]
+      },
+      {
+        "step_id": "qnb-004",
+        "title": "Integrate into Layout component",
+        "scope": "planner-ui",
+        "description": "In Layout.tsx, use useQuestionNotifications hook. Pass notification data to StatusBar. StatusBar passes notificationContent and showNotification to the matching AgentAvatar. When notification is clicked, call setSelectedQuestionId and setTriagePanelOpen.",
+        "dependencies": ["qnb-001", "qnb-002", "qnb-003"],
+        "owner_role": "frontend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "qnb-004-ac1", "description": "Layout uses useQuestionNotifications hook" },
+          { "id": "qnb-004-ac2", "description": "StatusBar receives currentNotification prop with { agentId, content, onClick }" },
+          { "id": "qnb-004-ac3", "description": "StatusBar passes showNotification=true and notificationContent to AgentAvatar where agent.id matches currentNotification.agentId" },
+          { "id": "qnb-004-ac4", "description": "Clicking notification calls setSelectedQuestionId(question.question_id) and opens triage panel" },
+          { "id": "qnb-004-ac5", "description": "Notification dismisses and queue advances correctly" }
+        ]
+      },
+      {
+        "step_id": "qnb-005",
+        "title": "Add animation keyframes to globals.css",
+        "scope": "planner-ui",
+        "description": "Ensure animate-in, animate-out, fade-in-0, fade-out-0, slide-in-from-bottom-2 are defined in globals.css for the notification bubble animations.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "qnb-005-ac1", "description": "Animation classes animate-in fade-in-0 slide-in-from-bottom-2 duration-200 work for enter" },
+          { "id": "qnb-005-ac2", "description": "Animation classes animate-out fade-out-0 duration-300 work for exit" }
+        ]
+      },
+      {
+        "step_id": "qnb-006",
+        "title": "Write tests for useQuestionNotifications hook",
+        "scope": "planner-ui",
+        "description": "Create test file packages/planner-ui/src/hooks/useQuestionNotifications.test.ts with tests for queue management, auto-advance timing, dismiss behavior.",
+        "dependencies": ["qnb-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "qnb-006-ac1", "description": "Test: adding question to queue shows it as currentNotification" },
+          { "id": "qnb-006-ac2", "description": "Test: after 5 seconds, queue advances to next notification" },
+          { "id": "qnb-006-ac3", "description": "Test: dismiss() advances queue immediately" },
+          { "id": "qnb-006-ac4", "description": "Test: multiple questions queue correctly (FIFO)" },
+          { "id": "qnb-006-ac5", "description": "Test: onNotificationClick callback fires when provided" }
+        ]
+      }
+    ]
+  }
+}

@@ -2,7 +2,9 @@
   "feature_id": "ui-attention-navigation",
   "title": "Attention-Based Plan Navigation",
   "type": "epic",
-  "status": "draft",
+  "status": "completed",
+  "completed_at": "2026-01-29",
+  "audit_note": "Frontend fully implemented: NeedsAttentionSection, WorkingOnSection, CollapsibleSection, ScopeGroup, CommandPalette all integrated into PlansListPage. Backend attention signal computation uses frontend-only categorization (useAttentionPlans hook) which works for MVP.",
   "priority": "high",
   "dependencies": [],
 

@@ -241,17 +241,6 @@ export function DependencyLinesOverlay({
           <circle cx="2" cy="2" r="2" fill="#22c55e" />
         </marker>
         <marker
-          id="arrowhead-cross"
-          markerWidth="4"
-          markerHeight="4"
-          refX="2"
-          refY="2"
-          orient="auto"
-          markerUnits="userSpaceOnUse"
-        >
-          <circle cx="2" cy="2" r="2" fill="#f59e0b" />
-        </marker>
-        <marker
           id="arrowhead-critical"
           markerWidth="4"
           markerHeight="4"
@@ -273,15 +262,15 @@ export function DependencyLinesOverlay({
         const path = generateGutterPath(fromRect, toRect, line.direction, dimensions.width);
 
         // Determine style based on line type
+        // Direction determines color: incoming = blue, outgoing = green
+        // Cross-scope uses dotted line style (same color as direction)
+        // Critical path uses red
         let stroke: string;
         let marker: string;
 
         if (line.isCritical) {
           stroke = '#ef4444'; // error red
           marker = 'url(#arrowhead-critical)';
-        } else if (line.isCrossScope) {
-          stroke = '#f59e0b'; // warning orange
-          marker = 'url(#arrowhead-cross)';
         } else if (line.direction === 'incoming') {
           stroke = '#2563eb'; // blue
           marker = 'url(#arrowhead-incoming)';
@@ -292,6 +281,7 @@ export function DependencyLinesOverlay({
 
         const strokeWidth = 2;
         const opacity = 1.0;
+        // Cross-scope: dotted line, same-scope: solid line
         const strokeDasharray = line.isCrossScope ? '6 4' : undefined;
 
         return (

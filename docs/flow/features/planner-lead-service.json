@@ -1,0 +1,300 @@
+{
+  "feature_id": "planner-lead-service",
+  "title": "PlannerLead Persistent Agent Service",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["relay-core"],
+
+  "summary": {
+    "goal": "Implement PlannerLead as a persistent agent service that connects to agent-relay as a RelayClient (not spawn), listens for channel messages, uses Anthropic API to generate intelligent responses, and can read/modify plans via the planner API. Runs integrated with planner-core backend.",
+
+    "context": "The original relay-planning-agent feature used agent-relay's spawn() function, which is designed for task-oriented CLI workers that execute and exit. For an always-on planning assistant, we need a different pattern: a persistent Node.js service that connects as a RelayClient, sets up message handlers, and stays running indefinitely. This matches how agent-relay is actually designed to work.",
+
+    "in_scope": [
+      "PlannerLead connects as RelayClient (not spawn)",
+      "Auto-joins #planner channel on startup",
+      "Joins #plan-{id} channels for specific plans",
+      "Receives and responds to channel messages",
+      "Uses Anthropic API for intelligent responses",
+      "Tool use: read_plan, list_plans, add_step, edit_step",
+      "Per-channel conversation history",
+      "Integrated startup with planner-core backend"
+    ],
+
+    "out_of_scope": [
+      "Spawning other agents (keep for future)",
+      "Shadow agent patterns",
+      "Consensus/voting features",
+      "Multi-model support (Anthropic only for v1)",
+      "Persistent conversation storage (in-memory for v1)"
+    ],
+
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "PlannerLead connects to agent-relay automatically when planner-core backend starts" },
+      { "id": "ac2", "description": "PlannerLead joins #planner channel on startup and announces availability" },
+      { "id": "ac3", "description": "PlannerLead joins #plan-{id} channels when plans are created or when explicitly invited" },
+      { "id": "ac4", "description": "Messages sent to PlannerLead's channels are received and trigger response generation" },
+      { "id": "ac5", "description": "PlannerLead uses Anthropic API with appropriate system prompt to generate contextual responses" },
+      { "id": "ac6", "description": "PlannerLead can read plan data using read_plan tool when users ask about specific plans" },
+      { "id": "ac7", "description": "PlannerLead can modify plans (add_step, edit_step) when users request changes" },
+      { "id": "ac8", "description": "Conversation history is maintained per-channel for contextual follow-up responses" },
+      { "id": "ac9", "description": "PlannerLead reconnects automatically when agent-relay connection is lost" },
+      { "id": "ac10", "description": "Response latency is under 10 seconds (API call time, not spawn overhead)" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "i001",
+        "title": "Add @anthropic-ai/sdk dependency",
+        "scope": "planner-core",
+        "description": "Install the Anthropic SDK for direct API access. This enables calling Claude models programmatically with full control over system prompts, tools, and conversation history.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "@anthropic-ai/sdk is added to package.json dependencies" },
+          { "id": "ac2", "description": "Package installs successfully with npm install" },
+          { "id": "ac3", "description": "TypeScript types are available for Anthropic client" }
+        ]
+      },
+      {
+        "step_id": "i002",
+        "title": "Create Anthropic client configuration",
+        "scope": "planner-core",
+        "description": "Create src/relay/anthropic-config.ts with configuration for the Anthropic client. Reads ANTHROPIC_API_KEY from environment. Exports configured client instance and model constants.",
+        "dependencies": ["i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports getAnthropicClient() that returns configured Anthropic instance" },
+          { "id": "ac2", "description": "Reads ANTHROPIC_API_KEY from process.env" },
+          { "id": "ac3", "description": "Exports MODEL constant (claude-sonnet-4-20250514 or similar)" },
+          { "id": "ac4", "description": "Logs warning if API key is missing (does not throw - allows mock mode)" }
+        ]
+      },
+      {
+        "step_id": "i003",
+        "title": "Define PlannerLead tool schemas",
+        "scope": "planner-core",
+        "description": "Create src/relay/planner-lead-tools.ts defining the tool schemas for Anthropic tool use. Tools: read_plan (get plan by ID), list_plans (list all plans), add_step (add step to plan), edit_step (modify existing step). Use Zod for validation.",
+        "dependencies": ["i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports PLANNER_LEAD_TOOLS array in Anthropic tool format: [{ name: string, description: string, input_schema: JSONSchema }]" },
+          { "id": "ac2", "description": "read_plan tool: input { plan_id: string }, returns plan summary with goal, status, step count" },
+          { "id": "ac3", "description": "list_plans tool: input { status?: 'draft'|'approved'|'published' }, returns array of { plan_id, goal, status }" },
+          { "id": "ac4", "description": "add_step tool: input { plan_id, title, description, scope?, dependencies?: string[] }, returns created step_id" },
+          { "id": "ac5", "description": "edit_step tool: input { plan_id, step_id, title?, description?, dependencies? }, returns updated step" }
+        ]
+      },
+      {
+        "step_id": "i004",
+        "title": "Implement tool execution handlers",
+        "scope": "planner-core",
+        "description": "Add tool execution logic to planner-lead-tools.ts. Each handler receives tool input, calls the appropriate storage/domain methods, and returns the result. Handlers need access to storage (passed via closure or parameter).",
+        "dependencies": ["i003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports executeTool(toolName, input, storage) function" },
+          { "id": "ac2", "description": "read_plan handler: calls storage.getPlan(), storage.getLatestVersion(), returns { plan_id, goal, status, steps: [{ step_id, title }] } or error" },
+          { "id": "ac3", "description": "list_plans handler: calls storage.listPlans(), returns [{ plan_id, goal, status, step_count }]" },
+          { "id": "ac4", "description": "add_step handler: gets latest version, adds step via domain logic, returns { step_id, title }" },
+          { "id": "ac5", "description": "edit_step handler: gets version, finds step, updates via domain logic, returns updated step" },
+          { "id": "ac6", "description": "All handlers return { success: true, result: ... } or { success: false, error: string }" }
+        ]
+      },
+      {
+        "step_id": "i005",
+        "title": "Create conversation history manager",
+        "scope": "planner-core",
+        "description": "Create src/relay/conversation-history.ts to manage per-channel conversation history. Stores messages in memory with channel ID as key. Implements sliding window to prevent context overflow (keep last N messages or tokens).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports ConversationHistory class or module" },
+          { "id": "ac2", "description": "addMessage(channelId, role: 'user'|'assistant', content) appends to channel history" },
+          { "id": "ac3", "description": "getHistory(channelId) returns array of { role, content } for Anthropic messages format" },
+          { "id": "ac4", "description": "Implements max message limit (e.g., 50 messages per channel) with FIFO eviction" },
+          { "id": "ac5", "description": "clearHistory(channelId) removes all messages for a channel" }
+        ]
+      },
+      {
+        "step_id": "i006",
+        "title": "Define PlannerLead system prompt",
+        "scope": "planner-core",
+        "description": "Create src/relay/planner-lead-prompt.ts with the system prompt for PlannerLead. Describes role, capabilities, available tools, and behavioral guidelines. Prompt should encourage helpful planning assistance while being concise.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports PLANNER_LEAD_SYSTEM_PROMPT string" },
+          { "id": "ac2", "description": "Describes PlannerLead as a planning assistant" },
+          { "id": "ac3", "description": "Lists available tools and when to use them" },
+          { "id": "ac4", "description": "Includes guidelines: be concise, use tools when asked about plans, suggest improvements when appropriate" },
+          { "id": "ac5", "description": "Mentions channel context (#planner vs #plan-{id})" }
+        ]
+      },
+      {
+        "step_id": "i007",
+        "title": "Implement PlannerLead RelayClient service",
+        "scope": "planner-core",
+        "description": "Rewrite src/relay/planner-lead.ts to use RelayClient pattern instead of spawn(). Creates a dedicated RelayClient with agentName 'PlannerLead', entityType 'agent'. Sets up onChannelMessage handler to receive messages. Integrates with channel management for auto-join.",
+        "dependencies": ["i002", "i005", "i006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Creates RelayClient with agentName='PlannerLead', entityType='agent', cli='anthropic-api', model='claude-sonnet-4-20250514', program='planner-core'" },
+          { "id": "ac2", "description": "Exports initPlannerLead(storage) that connects and sets up handlers" },
+          { "id": "ac3", "description": "onChannelMessage handler receives (from, channel, body, envelope)" },
+          { "id": "ac4", "description": "Auto-joins #planner channel on successful connection" },
+          { "id": "ac5", "description": "Exports joinPlannerLeadToChannel(channelId) for dynamic channel joins" },
+          { "id": "ac6", "description": "Handles reconnection via client's built-in reconnect logic" },
+          { "id": "ac7", "description": "Exports terminatePlannerLead() for graceful shutdown" }
+        ]
+      },
+      {
+        "step_id": "i008",
+        "title": "Implement message handling and response generation",
+        "scope": "planner-core",
+        "description": "Add message handling logic to PlannerLead. When a channel message is received: (1) add to conversation history, (2) call Anthropic API with history + tools, (3) handle tool_use blocks by executing tools, (4) send response back to channel.",
+        "dependencies": ["i003", "i004", "i007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "handleChannelMessage(from, channel, body) is called for each incoming message" },
+          { "id": "ac2", "description": "Adds user message to conversation history for that channel" },
+          { "id": "ac3", "description": "Calls Anthropic messages API with: model, system prompt, history, tools" },
+          { "id": "ac4", "description": "If response contains tool_use blocks: executes each tool, collects results, continues conversation" },
+          { "id": "ac5", "description": "Extracts final text response and sends via client.sendChannelMessage()" },
+          { "id": "ac6", "description": "Adds assistant response to conversation history" },
+          { "id": "ac7", "description": "Handles API errors gracefully (logs, sends error message to channel)" }
+        ]
+      },
+      {
+        "step_id": "i009",
+        "title": "Add startup announcement",
+        "scope": "planner-core",
+        "description": "When PlannerLead joins #planner channel, send a brief availability announcement. Should be non-intrusive but indicate the assistant is ready.",
+        "dependencies": ["i007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After joining #planner, sends message: 'PlannerLead online. Ask me about your plans!'" },
+          { "id": "ac2", "description": "Announcement is sent only once per connection (not on every reconnect)" },
+          { "id": "ac3", "description": "Announcement is configurable (can be disabled via config)" }
+        ]
+      },
+      {
+        "step_id": "i010",
+        "title": "Integrate with plan channel lifecycle",
+        "scope": "planner-core",
+        "description": "Hook PlannerLead into plan creation flow. When a new plan is created and its channel is set up, automatically join PlannerLead to that channel. Uses existing createPlanChannel callback or event.",
+        "dependencies": ["i007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When createPlanChannel(planId) is called, PlannerLead joins the new channel" },
+          { "id": "ac2", "description": "On server startup, PlannerLead joins all existing plan channels (via syncPlanChannels flow)" },
+          { "id": "ac3", "description": "joinPlannerLeadToChannel is called from channels.ts after successful channel creation" }
+        ]
+      },
+      {
+        "step_id": "i011",
+        "title": "Update server startup integration",
+        "scope": "planner-core",
+        "description": "Update src/server.ts to initialize PlannerLead with the new pattern. Pass storage instance to initPlannerLead. Update shutdown sequence to call terminatePlannerLead.",
+        "dependencies": ["i007", "i010"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "initPlannerLead(storage) is called after relay connection attempt" },
+          { "id": "ac2", "description": "PlannerLead initializes even if relay is disconnected (will connect when available)" },
+          { "id": "ac3", "description": "terminatePlannerLead() is called in shutdown sequence" },
+          { "id": "ac4", "description": "Startup logs indicate PlannerLead initialization status" }
+        ]
+      },
+      {
+        "step_id": "i012",
+        "title": "Add mock mode for PlannerLead",
+        "scope": "planner-core",
+        "description": "When ANTHROPIC_API_KEY is not set or relay is unavailable, PlannerLead should operate in mock mode. In mock mode, it still joins channels but responds with helpful mock messages instead of calling Anthropic API.",
+        "dependencies": ["i008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "If ANTHROPIC_API_KEY is not set, response generation uses mock responses" },
+          { "id": "ac2", "description": "Mock responses are contextually appropriate: 'I'm in demo mode. In production, I would help you with...' " },
+          { "id": "ac3", "description": "Mock mode is logged on startup: '[planner-lead] Running in mock mode (no API key)'" },
+          { "id": "ac4", "description": "Tool use in mock mode returns simulated but realistic data" }
+        ]
+      },
+      {
+        "step_id": "i013",
+        "title": "Add @mention filtering",
+        "scope": "planner-core",
+        "description": "PlannerLead should only respond when explicitly mentioned (@PlannerLead) or when it's a direct message. Filter out messages that don't mention the agent to avoid responding to every message in busy channels.",
+        "dependencies": ["i008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "In #planner channel: responds only if message contains @PlannerLead or @planner-lead" },
+          { "id": "ac2", "description": "In #plan-{id} channels: responds only if message contains @PlannerLead" },
+          { "id": "ac3", "description": "Mention check is case-insensitive" },
+          { "id": "ac4", "description": "Direct messages (non-channel) always trigger response" }
+        ]
+      },
+      {
+        "step_id": "i014",
+        "title": "Write unit tests for tool execution",
+        "scope": "planner-core",
+        "description": "Create src/relay/planner-lead-tools.test.ts with unit tests for tool handlers. Test each tool with valid input, invalid input, and error conditions. Mock storage for isolation.",
+        "dependencies": ["i004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for read_plan: valid plan, non-existent plan" },
+          { "id": "ac2", "description": "Tests for list_plans: all plans, filtered by status, empty result" },
+          { "id": "ac3", "description": "Tests for add_step: valid input, invalid plan_id" },
+          { "id": "ac4", "description": "Tests for edit_step: valid input, non-existent step" },
+          { "id": "ac5", "description": "All tests pass with npm run test:backend" }
+        ]
+      },
+      {
+        "step_id": "i015",
+        "title": "Write integration tests for message flow",
+        "scope": "planner-core",
+        "description": "Create src/relay/planner-lead.test.ts with integration tests. Test message receipt, conversation history, tool use flow. May use mock Anthropic responses or real API in CI.",
+        "dependencies": ["i008", "i013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: message without mention is ignored" },
+          { "id": "ac2", "description": "Test: message with @PlannerLead triggers response generation" },
+          { "id": "ac3", "description": "Test: conversation history accumulates across messages" },
+          { "id": "ac4", "description": "Test: tool use in response triggers tool execution" },
+          { "id": "ac5", "description": "Test: mock mode returns mock responses" }
+        ]
+      }
+    ]
+  },
+
+  "design_decisions": [
+    {
+      "decision": "Use RelayClient pattern instead of spawn()",
+      "rationale": "spawn() is for task-oriented CLI workers that exit. RelayClient is the correct pattern for persistent agents that listen for messages.",
+      "alternatives_considered": ["spawn() with keep-alive prompt", "External Claude Code process"]
+    },
+    {
+      "decision": "Integrate with planner-core backend (same process)",
+      "rationale": "Simpler deployment, shared database access, easier to manage lifecycle. Can extract to separate process later if needed.",
+      "alternatives_considered": ["Separate Node.js process", "Docker sidecar"]
+    },
+    {
+      "decision": "Anthropic API for response generation",
+      "rationale": "Direct API call gives us control over system prompt, tools, conversation history. Lower latency than spawning CLI tools.",
+      "alternatives_considered": ["Spawn Claude CLI on-demand", "Use MCP for AI responses"]
+    },
+    {
+      "decision": "In-memory conversation history (v1)",
+      "rationale": "Simpler implementation, sufficient for initial use. Can add persistence to SQLite later.",
+      "alternatives_considered": ["SQLite persistence from start", "Redis for distributed state"]
+    },
+    {
+      "decision": "@mention filtering for responses",
+      "rationale": "Prevents PlannerLead from responding to every message in channels, which would be noisy. Users explicitly invoke the assistant when needed.",
+      "alternatives_considered": ["Respond to all messages", "Keyword detection"]
+    }
+  ]
+}

@@ -5,6 +5,7 @@
   "status": "approved",
   "priority": "high",
   "dependencies": ["ui-editor-steps"],
+  "audit_note": "Swimlane view fully implemented (SwimlaneView, ViewModeToggle integrated). Dependency visualization complete with gutter-based lines. DependencyIndicator now always shows circles on both sides (empty placeholders visible as subtle dots - UX improvement over spec). Missing: list-view scope grouping (uem001-002), zoom levels (uem004), add-step per-scope (uem005-006). 8/11 acceptance criteria met.",
 
   "summary": {
     "goal": "Visualize plans with multiple scopes showing steps grouped by scope with cross-scope dependencies",

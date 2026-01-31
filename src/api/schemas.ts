@@ -10,6 +10,8 @@ export const CreatePlanRequestSchema = z.object({
   context: z.string().optional(),
   /** Request AI assistance for plan creation */
   ai_assist: z.boolean().optional().default(false),
+  /** Associate plan with an initiative */
+  initiative_id: z.string().uuid().optional(),
 });
 
 export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;
@@ -51,6 +53,8 @@ export const UpdatePlanRequestSchema = z.object({
   goal: z.string().min(1).optional(),
   context: z.string().optional(),
   steps: z.array(StepSchema).optional(),
+  /** Update the initiative association */
+  initiative_id: z.string().uuid().optional().nullable(),
 });
 
 export type UpdatePlanRequest = z.infer<typeof UpdatePlanRequestSchema>;
@@ -65,6 +69,8 @@ export const ListPlansQuerySchema = z.object({
     .string()
     .transform((val) => val === 'true')
     .optional(),
+  /** Filter plans by initiative */
+  initiative_id: z.string().uuid().optional(),
 });
 
 export type ListPlansQuery = z.infer<typeof ListPlansQuerySchema>;

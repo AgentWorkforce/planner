@@ -82,10 +82,10 @@ export function AttentionItem({ plan, timeContext, className = '' }: AttentionIt
   return (
     <Link
       to={`/plans/${plan.plan_id}`}
-      className={`group relative block bg-bg-card border border-border-subtle rounded-xl pl-5 pr-4 py-4 hover:border-border-light hover:bg-bg-hover/50 transition-all duration-150 ${hoverGlow} ${className}`}
+      className={`group relative block bg-bg-card border border-border-subtle rounded-xl pl-5 pr-4 py-2.5 hover:border-border-light hover:bg-bg-hover/50 transition-all duration-150 ${hoverGlow} ${className}`}
     >
       {/* Left accent bar */}
-      <div className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-full ${accentBar}`} />
+      <div className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full ${accentBar}`} />
 
       <div className="flex items-center justify-between gap-3">
         {/* Left: Goal and metadata */}

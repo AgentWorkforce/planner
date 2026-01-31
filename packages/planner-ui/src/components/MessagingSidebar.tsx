@@ -14,12 +14,8 @@ import { ChannelHeader } from './ChannelHeader';
 import { MessageStream } from './MessageStream';
 import { MessageInput } from './MessageInput';
 import { ChevronIcon } from './icons';
-import {
-  useRelayConnection,
-  useChannels,
-  useChannelMessages,
-  usePresence,
-} from '@/hooks';
+import { useChannels, useChannelMessages, usePresence } from '@/hooks';
+import { useRelay } from '@/contexts';
 
 interface PlanContext {
   planId: string;
@@ -35,18 +31,15 @@ interface MessagingSidebarProps {
   isCollapsed?: boolean;
   /** Callback when collapse state changes */
   onCollapseChange?: (collapsed: boolean) => void;
-  /** Custom display name for the user */
-  displayName?: string;
 }
 
 export function MessagingSidebar({
   planContext,
   isCollapsed = false,
   onCollapseChange,
-  displayName = 'User',
 }: MessagingSidebarProps) {
-  // Relay connection
-  const connection = useRelayConnection(displayName);
+  // Relay connection from shared context
+  const { connection } = useRelay();
 
   // Channel management
   const channels = useChannels(connection, planContext?.planId);
@@ -65,12 +58,14 @@ export function MessagingSidebar({
   // Presence for active channel
   const presence = usePresence(connection, activeChannelId);
 
-  // Get other channels for the switcher dropdown (global channels when in plan context)
+  // Get other channels for the switcher dropdown
+  // When in plan context: show #planner (global) and the current plan's channel
   const otherChannels = useMemo(() => {
     if (!planContext) return [];
-    // Show global channels (non-plan channels) and other plan channels
     return channels.channels.filter(
-      (c) => c.id !== activeChannelId && (c.type === 'global' || c.type !== 'plan')
+      (c) =>
+        c.id !== activeChannelId &&
+        (c.type === 'global' || c.planId === planContext.planId)
     );
   }, [channels.channels, activeChannelId, planContext]);
 
@@ -135,7 +130,7 @@ export function MessagingSidebar({
   const showChannelList = !planContext;
 
   return (
-    <div className={`${showChannelList ? 'w-80' : 'w-72'} h-full bg-bg-secondary border-l border-border-subtle flex flex-col flex-shrink-0 z-0`}>
+    <div className={`${showChannelList ? 'w-96' : 'w-[340px]'} h-full bg-bg-secondary border-l border-border-subtle flex flex-col flex-shrink-0 relative z-0`}>
       {/* Channel header */}
       <ChannelHeader
         channel={activeChannel}
@@ -147,7 +142,7 @@ export function MessagingSidebar({
         onDirectMessage={handleDirectMessage}
       />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Channel list (only shown when not in plan context) */}
         {showChannelList && (
           <div className="w-48 border-r border-border-subtle overflow-y-auto flex-shrink-0">
@@ -162,7 +157,7 @@ export function MessagingSidebar({
         )}
 
         {/* Message area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {activeChannelId ? (
             <>
               <MessageStream
@@ -221,7 +216,7 @@ function CollapsedSidebar({ onExpand, connectionState, isMock }: CollapsedSideba
   const isConnected = connectionState === 'connected';
 
   return (
-    <div className="w-12 h-full bg-bg-secondary border-l border-border-subtle flex flex-col items-center py-4 flex-shrink-0 z-0">
+    <div className="w-12 h-full bg-bg-secondary border-l border-border-subtle flex flex-col items-center py-4 flex-shrink-0 relative z-0">
       <button
         onClick={onExpand}
         className="p-2 text-text-muted hover:text-text-primary transition-colors rounded-lg hover:bg-bg-hover"

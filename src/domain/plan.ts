@@ -9,6 +9,9 @@ import { ApprovalInfoSchema } from './workflow.js';
  */
 export const PlanSchema = z.object({
   plan_id: z.string().uuid(),
+  org_id: z.string().uuid(),
+  initiative_id: z.string().uuid().optional(),
+  owner_user_id: z.string().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -28,6 +31,7 @@ export const PlanVersionSchema = z.object({
   submitted_at: z.string().datetime().optional(),
   approval_info: ApprovalInfoSchema.optional(),
   change_request_id: z.string().uuid().optional(),
+  metadata: z.record(z.unknown()).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -37,10 +41,12 @@ export type PlanVersion = z.infer<typeof PlanVersionSchema>;
 /**
  * Creates a new Plan with generated UUID and timestamps
  */
-export function createPlan(): Plan {
+export function createPlan(org_id: string, owner_user_id?: string): Plan {
   const now = new Date().toISOString();
   const plan: Plan = {
     plan_id: crypto.randomUUID(),
+    org_id,
+    owner_user_id,
     created_at: now,
     updated_at: now,
   };

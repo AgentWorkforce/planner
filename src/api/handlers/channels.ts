@@ -151,15 +151,26 @@ export function createChannelHandlers(storage: PlanStorage) {
             // so we filter client-side for now
           });
 
+          // Debug: log what we got from relay
+          console.log(`[channels] queryMessages returned ${relayMessages.length} messages for ${channelId}`);
+          if (relayMessages.length > 0) {
+            console.log(`[channels] Sample message:`, JSON.stringify(relayMessages[0], null, 2));
+          }
+
           // Filter to channel messages and transform
-          // Channel messages have 'to' field starting with #
+          // Channel messages may have channel in 'to' field OR 'channel' field
           const channelMessages = relayMessages
-            .filter((msg) => msg.to === channelId)
+            .filter((msg) => msg.to === channelId || msg.channel === channelId)
             .map((msg) => ({
               id: msg.id,
               from: msg.from,
-              content: msg.body || '',
-              timestamp: msg.timestamp,
+              fromName: msg.from, // Use from as display name
+              entityType: 'agent' as const, // Default to agent for relay messages
+              channel: channelId,
+              body: msg.body || '',
+              timestamp: typeof msg.timestamp === 'number'
+                ? new Date(msg.timestamp).toISOString()
+                : msg.timestamp,
               data: msg.data,
             }));
 

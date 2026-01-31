@@ -9,6 +9,9 @@ build/
 *.db
 *.sqlite
 
+# Trajectory storage
+.trajectories/
+
 # Environment
 .env
 .env.local

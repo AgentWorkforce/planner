@@ -34,6 +34,11 @@ export type {
   SuggestedChanges,
   ChangeRequest,
   RevisionStatus,
+  // Question queue types
+  QuestionBlockingLevel,
+  QuestionStatus,
+  Question,
+  QuestionQueueState,
 } from './plan';
 
 export {
@@ -58,3 +63,22 @@ export type {
   UseChannelMessagesResult,
   UsePresenceResult,
 } from './relay';
+
+export type {
+  InitiativeStatus,
+  Initiative,
+  PlanCounts,
+  InitiativeWithPlanCounts,
+  CreateInitiativeInput,
+  UpdateInitiativeInput,
+} from './initiative';
+
+export type {
+  DecisionEvent,
+  DerivedPreference,
+  EventFilter,
+  SimilarQuestion,
+} from './trajectory';
+
+// Simplified channel message type for UI display (vs RelayMessage for protocol)
+export type { ChannelMessage } from './channel';

@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "lockfileVersion": 1,
+  "packages": {
+    "@agent-relay/agent-relay-snippet": {
+      "version": "1.1.2",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fagent-relay-snippet/1.1.2.tar.gz",
+      "integrity": "sha256-1b575f52991910e379b7e1828ee4d593135e774e2a2cea139c76d683e831ad72",
+      "format": "generic",
+      "subtype": "snippet",
+      "installedPath": ".prompts/agent-relay-snippet.md"
+    },
+    "@agent-relay/agent-relay-snippet#claude.md:CLAUDE.md": {
+      "version": "1.1.2",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fagent-relay-snippet/1.1.2.tar.gz",
+      "integrity": "sha256-1b575f52991910e379b7e1828ee4d593135e774e2a2cea139c76d683e831ad72",
+      "format": "claude.md",
+      "subtype": "snippet",
+      "sourceFormat": "generic",
+      "sourceSubtype": "snippet",
+      "installedPath": "CLAUDE.md",
+      "snippetMetadata": {
+        "targetPath": "CLAUDE.md",
+        "config": {
+          "target": "CLAUDE.md",
+          "position": "append"
+        }
+      }
+    },
+    "@agent-relay/agent-relay-snippet#claude.md:GEMINI.md": {
+      "version": "1.1.2",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fagent-relay-snippet/1.1.2.tar.gz",
+      "integrity": "sha256-1b575f52991910e379b7e1828ee4d593135e774e2a2cea139c76d683e831ad72",
+      "format": "claude.md",
+      "subtype": "snippet",
+      "sourceFormat": "generic",
+      "sourceSubtype": "snippet",
+      "installedPath": "GEMINI.md",
+      "snippetMetadata": {
+        "targetPath": "GEMINI.md",
+        "config": {
+          "target": "GEMINI.md",
+          "position": "append"
+        }
+      }
+    },
+    "@agent-relay/agent-relay-snippet#gemini.md:AGENTS.md": {
+      "version": "1.1.2",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fagent-relay-snippet/1.1.2.tar.gz",
+      "integrity": "sha256-1b575f52991910e379b7e1828ee4d593135e774e2a2cea139c76d683e831ad72",
+      "format": "gemini.md",
+      "subtype": "snippet",
+      "sourceFormat": "generic",
+      "sourceSubtype": "snippet",
+      "installedPath": "AGENTS.md",
+      "snippetMetadata": {
+        "targetPath": "AGENTS.md",
+        "config": {
+          "target": "AGENTS.md",
+          "position": "append"
+        }
+      }
+    }
+  },
+  "generated": "2026-01-30T22:08:08.559Z"
+}

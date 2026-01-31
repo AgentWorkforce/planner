@@ -14,7 +14,7 @@ import { getRelayMode } from './relay/service.js';
 import { createSessionTimeoutService } from './relay/session-timeout.js';
 import { initWebSocketProxy } from './relay/ws-proxy.js';
 import { initChannelManagement, syncPlanChannels } from './relay/channels.js';
-import { initPlannerLead, terminatePlannerLead } from './relay/planner-lead.js';
+import { initPlannerLead, stopPlannerLead } from './relay/planner-lead.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,7 +59,7 @@ async function start(): Promise<void> {
   }
 
   // Initialize PlannerLead agent
-  initPlannerLead();
+  initPlannerLead(storage);
 
   // Start session timeout service
   sessionTimeoutService.start();
@@ -94,8 +94,8 @@ async function start(): Promise<void> {
   const shutdown = async (signal: string) => {
     console.log(`\n[server] Received ${signal}, shutting down gracefully...`);
 
-    // Terminate PlannerLead agent
-    await terminatePlannerLead();
+    // Stop PlannerLead service
+    stopPlannerLead();
 
     // Stop session timeout service
     sessionTimeoutService.stop();

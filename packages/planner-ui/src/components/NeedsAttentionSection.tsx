@@ -128,11 +128,11 @@ export function NeedsAttentionSection({ plans }: NeedsAttentionSectionProps) {
       emptyState={emptyState}
     >
       {groupedPlans.length > 0 && (
-        <div className="space-y-5">
+        <div className="space-y-3.5">
           {groupedPlans.map(({ type, plans: groupPlans }) => (
             <div key={type}>
               {/* Group header */}
-              <div className="flex items-center gap-2.5 mb-3 pl-1">
+              <div className="flex items-center gap-2.5 mb-2 pl-1">
                 <AttentionBadge type={type} variant="full" />
                 <span className="text-xs text-text-dim font-medium">
                   {groupPlans.length} {groupPlans.length === 1 ? 'plan' : 'plans'}
@@ -140,7 +140,7 @@ export function NeedsAttentionSection({ plans }: NeedsAttentionSectionProps) {
               </div>
 
               {/* Group items */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {groupPlans.map((plan) => (
                   <AttentionItem
                     key={plan.plan_id}
