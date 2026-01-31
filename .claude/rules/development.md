@@ -16,6 +16,17 @@ The `dev.sh` script manages the development environment:
 - **tsconfig.json**: Exclude test files (`.test.ts`) from build output; Vitest handles transpilation separately
 - **Kill hanging tests**: Terminate test runner process if it hangs or doesn't exit
 
+## Path Aliases & Imports
+
+- **Consistent casing**: macOS is case-insensitive but case-preserving. Use consistent casing for path aliases to avoid issues on Linux CI or case-sensitive filesystems.
+  ```typescript
+  // Pick one convention and stick to it
+  import { Button } from '@/components/ui/button';  // lowercase (recommended)
+  import { Button } from '@/components/ui/Button';  // PascalCase
+  // Don't mix both in the same codebase
+  ```
+- **tsconfig paths**: Ensure `paths` in `tsconfig.json` match actual directory structure casing
+
 ## API Design
 
 - **Validation**: Use Zod schemas (`CreatePlanRequestSchema`, `ListPlansQuerySchema`) for request/query validation
