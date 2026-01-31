@@ -51,30 +51,33 @@ export function createAgentHandlers() {
           }
         }
 
-        // Build merged agent list - only include CONNECTED agents
+        // Build merged agent list
         const agents: AgentInfo[] = [];
+        const processedAgentIds = new Set<string>();
 
-        // Add connected agents from state registry (with their state info)
+        // Add agents from state registry (PlannerLead and other registered agents)
+        // These are considered "connected" if the backend service is running
         for (const [agentId, state] of activeAgents) {
-          if (connectedAgentNames.has(agentId)) {
-            agents.push({
-              agentId,
-              name: agentId,
-              role: state.role,
-              displayName: state.displayName,
-              state: state.state,
-              isConnected: true,
-            });
-          }
+          agents.push({
+            agentId,
+            name: agentId,
+            role: state.role,
+            displayName: state.displayName,
+            state: state.state,
+            // Backend agents (like planner-lead) are connected through planner-core
+            isConnected: connectedAgentNames.has(agentId) || connectedAgentNames.has('planner-core'),
+          });
+          processedAgentIds.add(agentId);
         }
 
-        // Add connected agents that aren't in state registry (newly connected, no state yet)
+        // Add connected agents that aren't in state registry (newly spawned agents, etc.)
         for (const name of connectedAgentNames) {
-          if (!activeAgents.has(name)) {
+          if (!processedAgentIds.has(name) && name !== 'planner-core') {
+            // Don't add planner-core itself as an agent - it's just the connection
             agents.push({
               agentId: name,
               name,
-              displayName: name, // Use agent name as displayName when not registered
+              displayName: name,
               state: 'idle',
               isConnected: true,
             });

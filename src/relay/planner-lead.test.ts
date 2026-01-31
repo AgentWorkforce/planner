@@ -285,7 +285,7 @@ describe('planner-lead', () => {
 
       initPlannerLead(storage);
 
-      expect(getPlannerLeadAgentId()).toBe('planner-core');
+      expect(getPlannerLeadAgentId()).toBe('planner-lead');
 
       stopPlannerLead();
     });

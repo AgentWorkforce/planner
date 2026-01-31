@@ -317,9 +317,9 @@ export function initPlannerLead(storageInstance: PlanStorage): void {
     return;
   }
 
-  // Use the same name as the relay client for proper matching
-  // This must match the agentName in client.ts ('planner-core')
-  agentId = 'planner-core';
+  // PlannerLead's agent ID for status tracking and question matching
+  // This must match the agent_id in the system prompt
+  agentId = 'planner-lead';
 
   storage = storageInstance;
 
