@@ -41,6 +41,67 @@ This improves testability and organization.
 ### Idempotent Initialization
 Ensure initialization logic (relay connections, agent setup) handles being called multiple times without side effects.
 
+### Preventing Infinite Render Loops
+
+Incorrect dependency arrays in `useEffect` or `useCallback` cause "Maximum update depth exceeded" errors:
+
+```tsx
+// WRONG: Array reference changes every render, triggers infinite loop
+useEffect(() => {
+  doSomething(items);
+}, [items]); // if items = [...oldItems] each render
+
+// CORRECT: Stabilize with useMemo or useRef
+const stableItems = useMemo(() => items, [items.length, items.map(i => i.id).join(',')]);
+useEffect(() => {
+  doSomething(stableItems);
+}, [stableItems]);
+```
+
+Key patterns:
+- Use `useRef` to track previous values and skip unnecessary updates
+- Memoize array/object dependencies with `useMemo`
+- For callbacks, ensure `useCallback` dependencies are primitives or stable references
+
+## DOM Position Detection
+
+For UI elements that render relative to other DOM elements (tooltips, connecting lines, overlays):
+
+```tsx
+// Robust position calculation after DOM changes
+useEffect(() => {
+  const updatePositions = () => {
+    requestAnimationFrame(() => {
+      const rect = elementRef.current?.getBoundingClientRect();
+      if (rect) setPosition({ x: rect.x, y: rect.y });
+    });
+  };
+
+  // Handle dynamic content changes
+  const resizeObserver = new ResizeObserver(updatePositions);
+  const mutationObserver = new MutationObserver(updatePositions);
+
+  if (containerRef.current) {
+    resizeObserver.observe(containerRef.current);
+    mutationObserver.observe(containerRef.current, { childList: true, subtree: true });
+  }
+
+  // Initial calculation after render
+  updatePositions();
+
+  return () => {
+    resizeObserver.disconnect();
+    mutationObserver.disconnect();
+  };
+}, [dependencies]);
+```
+
+Key techniques:
+- `ResizeObserver` for size changes
+- `MutationObserver` for DOM structure changes
+- `requestAnimationFrame` for layout-stable reads
+- Multiple `setTimeout` calls may be needed for complex render sequences
+
 ## Type Safety
 
 ### Backend/Frontend Contract

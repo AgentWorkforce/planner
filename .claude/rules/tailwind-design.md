@@ -7,6 +7,20 @@
 - **Nested color scales**: In `tailwind.config.js`, use `theme.extend` with nested scales (`bg.deep`, `text.primary`) that reference CSS variables via `var(--color-...)`.
 - **@config directive**: Must be present in `globals.css` for Tailwind to load configuration and generate utility classes.
 
+### Arbitrary Value Syntax
+
+When using CSS variables within Tailwind's arbitrary value syntax, **always wrap with `var()`**:
+
+```css
+/* CORRECT - Tailwind v4 */
+w-[var(--sidebar-width)]
+
+/* WRONG - will not work in v4 */
+w-[--sidebar-width]
+```
+
+Note: Tailwind v3 allowed the unwrapped syntax, but v4 requires explicit `var()`.
+
 ## Component Architecture
 
 - **Reusable components**: Extract common patterns into components (e.g., `PlanCard`, `CollapsibleSection`, `AttentionBadge`, `EditableText`, `DependencyIndicator`).
@@ -61,8 +75,31 @@ const toggleGroupItemVariants = cva(
 - **WebSocket proxy**: Explicitly configure WebSocket upgrades (`ws://`) in `vite.config.ts` proxy settings. HTTP-only proxy config breaks real-time connections.
 - **Aliases**: Use `@` path alias for cleaner imports.
 
+## CSS Stacking & z-index
+
+`z-index` alone may not work as expected. Parent element positioning affects stacking contexts:
+
+- A parent without `position: relative/absolute/fixed` can break child `z-index` behavior
+- Use React portals for overlays that need to escape parent stacking contexts
+- Set explicit `position` on parent elements when children need `z-index` control
+
+## Shadcn Variable Mapping
+
+When shadcn components expect specific CSS variable names (e.g., `--sidebar-*`), map them to project variables in `globals.css`:
+
+```css
+:root {
+  /* Map shadcn expectations to project design system */
+  --sidebar-background: var(--color-sidebar-bg);
+  --sidebar-foreground: var(--color-sidebar-text);
+}
+```
+
+This avoids forking component internals while maintaining design system consistency.
+
 ## Common Mistakes
 
 - **Inconsistent class names**: Ensure Tailwind config (nested colors) matches component class usage.
 - **Double borders**: Avoid applying borders at multiple hierarchy levels.
 - **Race conditions**: Use `useEffect` with `requestAnimationFrame` when depending on DOM positions after dynamic content changes.
+- **z-index without positioning**: Setting high `z-index` values won't help if parent stacking context is broken.
