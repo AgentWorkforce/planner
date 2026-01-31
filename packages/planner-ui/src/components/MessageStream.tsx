@@ -30,7 +30,7 @@ export function MessageStream({
 
   if (isLoading && messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="flex gap-1">
           <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
           <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -42,7 +42,7 @@ export function MessageStream({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+      <div className="h-full flex flex-col items-center justify-center text-center p-4">
         <p className="text-text-secondary">No messages yet</p>
         <p className="text-sm text-text-muted mt-1">
           Start the conversation by sending a message below
@@ -55,7 +55,7 @@ export function MessageStream({
   const groupedMessages = groupMessagesByDate(messages);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="h-full overflow-y-auto p-4 space-y-4">
       {Object.entries(groupedMessages).map(([dateLabel, dateMessages]) => (
         <div key={dateLabel}>
           <DateSeparator label={dateLabel} />

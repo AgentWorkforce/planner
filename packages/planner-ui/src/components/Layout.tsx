@@ -231,7 +231,7 @@ export function Layout() {
           <span className="font-display font-medium">Planner</span>
         </header>
 
-        <main className="flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden pb-12">
+        <main className="flex h-full w-full flex-1 flex-col overflow-hidden pb-12">
           <Outlet />
         </main>
       </SidebarInset>

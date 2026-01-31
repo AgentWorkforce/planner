@@ -32,7 +32,7 @@ export function ChannelHeader({
 }: ChannelHeaderProps) {
   if (!channel) {
     return (
-      <div className="h-14 border-b border-border-subtle px-4 flex items-center justify-between">
+      <div className="h-12 border-b border-border-subtle px-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-text-muted">
           <ChannelIcon size="lg" />
           <span className="font-medium">Select a channel</span>
@@ -60,7 +60,7 @@ export function ChannelHeader({
   const showSwitcher = (hasOtherChannels || hasAgents) && (onSwitchChannel || onDirectMessage);
 
   return (
-    <div className="h-14 border-b border-border-subtle px-4 flex items-center justify-between">
+    <div className="h-12 border-b border-border-subtle px-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <ChannelIcon size="lg" className="text-accent-cyan" />
         <div>

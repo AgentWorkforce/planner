@@ -8,16 +8,9 @@ interface PlanBreadcrumbProps {
 }
 
 export function PlanBreadcrumb({ parents, currentGoal }: PlanBreadcrumbProps) {
+  // When no parents, return nothing - the title is already shown in the header
   if (parents.length === 0) {
-    return (
-      <Link
-        to="/plans"
-        className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-accent-cyan transition-colors"
-      >
-        <ChevronIcon direction="left" size="sm" />
-        Back to Plans
-      </Link>
-    );
+    return null;
   }
 
   return (
