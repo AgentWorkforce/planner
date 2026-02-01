@@ -315,15 +315,13 @@ export function StepEditor({
               <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
                 Scope
               </label>
-              <div className="px-3 py-2 bg-bg-secondary rounded-md">
-                <EditableText
-                  value={step.scope || ''}
-                  onSave={(value) => handleUpdate('scope', value)}
-                  placeholder="e.g., api-service, frontend"
-                  disabled={!isEditable}
-                  className="text-sm"
-                />
-              </div>
+              <EditableText
+                value={step.scope || ''}
+                onSave={(value) => handleUpdate('scope', value)}
+                placeholder="e.g., api-service, frontend"
+                disabled={!isEditable}
+                className="text-sm"
+              />
             </div>
 
             <div>
@@ -491,20 +489,18 @@ export function StepEditor({
                 <label className="block text-xs font-medium text-text-muted mb-1.5">
                   Approver Role (optional)
                 </label>
-                <div className="px-3 py-2 bg-bg-secondary rounded-md max-w-xs">
-                  <EditableText
-                    value={step.gate.approver_role || ''}
-                    onSave={(value) => {
-                      handleUpdate('gate', {
-                        ...step.gate,
-                        approver_role: value || undefined,
-                      });
-                    }}
-                    placeholder="e.g., tech-lead"
-                    disabled={!isEditable}
-                    className="text-sm"
-                  />
-                </div>
+                <EditableText
+                  value={step.gate.approver_role || ''}
+                  onSave={(value) => {
+                    handleUpdate('gate', {
+                      ...step.gate,
+                      approver_role: value || undefined,
+                    });
+                  }}
+                  placeholder="e.g., tech-lead"
+                  disabled={!isEditable}
+                  className="text-sm max-w-xs"
+                />
               </div>
             )}
           </div>

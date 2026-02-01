@@ -5,7 +5,7 @@ import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, C
 import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
 import { StepEditor } from '@/components/StepEditor';
 import { EditableText } from '@/components/EditableText';
-import { ChatPanel } from '@/components/ChatPanel';
+import { EditableTextarea } from '@/components/EditableTextarea';
 import { CommentThread } from '@/components/CommentThread';
 import { WorkflowActions } from '@/components/WorkflowActions';
 import { SwimlaneView } from '@/components/SwimlaneView';
@@ -15,9 +15,9 @@ import { MessagingSidebar } from '@/components/MessagingSidebar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { MessageIcon, DocumentIcon, DecisionsIcon, PlusIcon, ChevronLeftIcon } from '@/components/icons';
+import { DocumentIcon, DecisionsIcon, PlusIcon, ChevronLeftIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
+import { usePlanEvents } from '@/hooks';
 import { useUserTrajectory } from '@/hooks/useUserTrajectory';
 import { DecisionLogHeader } from '@/components/trajectory/DecisionLogHeader';
 import { DecisionList } from '@/components/trajectory/DecisionList';
@@ -25,8 +25,8 @@ import { DecisionEmptyState } from '@/components/trajectory/DecisionEmptyState';
 import { DecisionDetailSheet } from '@/components/trajectory/DecisionDetailSheet';
 import { PreferencesSummary } from '@/components/trajectory/PreferencesSummary';
 
-/** Panel type for coexistence - only one panel can be open at a time */
-type ActivePanel = 'chat' | 'comments' | null;
+/** Panel type for comments */
+type ActivePanel = 'comments' | null;
 
 /** Storage key for sidebar collapsed state */
 const SIDEBAR_COLLAPSED_KEY = 'planner-sidebar-collapsed';
@@ -136,21 +136,6 @@ export function PlanEditorPage() {
     }
   }, []);
 
-  // AI connection status - check if planning agent is active
-  const {
-    status: connectionStatus,
-    connect: connectToAgent,
-    isConnecting,
-    connectError,
-  } = useAIConnectionStatus(planId ?? null);
-
-  // Clear connection error handler
-  const [localConnectError, setLocalConnectError] = useState<string | null>(null);
-  useEffect(() => {
-    setLocalConnectError(connectError);
-  }, [connectError]);
-  const clearConnectError = useCallback(() => setLocalConnectError(null), []);
-
   // Debounced refetch plan data (used by real-time sync)
   const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refetchPlan = useCallback(async () => {
@@ -206,10 +191,6 @@ export function PlanEditorPage() {
       console.debug('[PlanEditorPage] Event stream connected for real-time plan updates');
     }
   }, [eventStreamError, isEventStreamConnected]);
-
-  // AI chat hook - must be called unconditionally (before early returns)
-  // Use mock when not connected to real agent
-  const aiChat = useAIChat(version, { useMock: connectionStatus !== 'connected' });
 
   // Fetch plan on mount
   useEffect(() => {
@@ -305,13 +286,7 @@ export function PlanEditorPage() {
     [planId, version, selectedStep, expandedStepId, commentStepId]
   );
 
-  // Panel coexistence handlers
-  const openChatPanel = useCallback(() => {
-    setActivePanel('chat');
-    // Also call aiChat.open to ensure its internal state is synced
-    aiChat.open();
-  }, [aiChat]);
-
+  // Panel handlers
   const openCommentsPanel = useCallback((stepId: string) => {
     setCommentStepId(stepId);
     setActivePanel('comments');
@@ -320,8 +295,7 @@ export function PlanEditorPage() {
   const closeActivePanel = useCallback(() => {
     setActivePanel(null);
     setCommentStepId(null);
-    aiChat.close();
-  }, [aiChat]);
+  }, []);
 
   // Comment handlers
   const handleAddComment = useCallback(
@@ -387,6 +361,16 @@ export function PlanEditorPage() {
     [planId, version]
   );
 
+  // Handler for updating the plan context
+  const handleContextUpdate = useCallback(
+    async (newContext: string) => {
+      if (!planId || !version) return;
+      const result = await updatePlan(planId, { context: newContext });
+      setVersion(result.version);
+    },
+    [planId, version]
+  );
+
   // Get comments for a specific step
   const getStepComments = useCallback(
     (stepId: string): Comment[] => {
@@ -407,22 +391,6 @@ export function PlanEditorPage() {
   const commentStep = commentStepId
     ? version?.steps.find((s) => s.step_id === commentStepId)
     : null;
-
-  // Keyboard shortcut: Cmd+/ (or Ctrl+/) toggles chat panel
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
-        e.preventDefault();
-        if (activePanel === 'chat') {
-          closeActivePanel();
-        } else {
-          openChatPanel();
-        }
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activePanel, openChatPanel, closeActivePanel]);
 
   if (loading) {
     return (
@@ -528,19 +496,24 @@ export function PlanEditorPage() {
           <div className="mt-4 flex gap-8">
             {/* Left column: Title and metadata */}
             <div className="flex-1 min-w-0">
-              <EditableText
+              <EditableTextarea
                 value={version.summary.goal || ''}
                 onSave={handleGoalUpdate}
                 placeholder="Enter plan goal..."
                 disabled={version.status !== 'draft'}
-                as="h1"
+                rows={1}
                 className="text-2xl font-semibold text-text-primary"
               />
-              {version.summary.context && (
-                <p className="mt-2 text-sm text-text-secondary line-clamp-2">
-                  {version.summary.context}
-                </p>
-              )}
+              <div className="mt-2">
+                <EditableTextarea
+                  value={version.summary.context || ''}
+                  onSave={handleContextUpdate}
+                  placeholder="Add context or background for this plan..."
+                  disabled={version.status !== 'draft'}
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
               <div className="flex items-center gap-3 mt-2 text-sm text-text-muted">
                 <span>Version {version.version}</span>
                 {version.submitted_at && (
@@ -747,25 +720,6 @@ export function PlanEditorPage() {
         </div>
       )}
 
-      {/* AI Chat Panel */}
-      <ChatPanel
-        isOpen={activePanel === 'chat'}
-        onClose={closeActivePanel}
-        version={version}
-        messages={aiChat.messages}
-        isLoading={aiChat.isLoading}
-        selectedStep={selectedStep}
-        connectionStatus={connectionStatus}
-        planStatus={version.status}
-        isConnecting={isConnecting}
-        connectError={localConnectError}
-        onConnect={connectToAgent}
-        onClearConnectError={clearConnectError}
-        onSendMessage={aiChat.sendMessage}
-        onApplySuggestion={aiChat.applySuggestion}
-        onDismissSuggestion={aiChat.dismissSuggestion}
-      />
-
       {/* Comment Thread Panel */}
       {activePanel === 'comments' && commentStep && (
         <CommentThread
@@ -779,19 +733,6 @@ export function PlanEditorPage() {
         />
       )}
 
-      {/* Panel toggle button (visible when panels closed and sidebar collapsed) */}
-      {activePanel === null && sidebarCollapsed && (
-        <div className="fixed bottom-6 right-6 z-40">
-          <button
-            className="p-4 bg-accent-cyan text-bg-deep rounded-full shadow-glow-cyan hover:bg-accent-cyan/90 transition-colors"
-            onClick={openChatPanel}
-            aria-label="Open AI Chat (Cmd+/)"
-            title="AI Chat (Cmd+/)"
-          >
-            <MessageIcon size="lg" />
-          </button>
-        </div>
-      )}
       </div>
 
       {/* Messaging Sidebar */}
