@@ -199,15 +199,14 @@ class InterviewerService {
     // Get session for context
     const session = await this.deps.storage.getSession(sessionId);
     const activeSpecialists = session?.active_specialists.map(s => s.name) ?? [];
-    const pendingInsights = specialistQueue.getPendingCount(sessionId.slice(0, 8));
 
-    // Build prompt context
+    // Build prompt context (pendingInsights text is appended later)
     const promptContext = {
       sessionId,
       channelId,
       initialIntent: session?.source.initial_intent,
+      understanding: session?.understanding,
       activeSpecialists,
-      pendingInsights,
     };
 
     // Mock mode

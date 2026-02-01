@@ -18,3 +18,6 @@ export * from './api/index.js';
 
 // Interviewer (Lead Agent)
 export * from './interviewer/index.js';
+
+// Specialists (Dynamic Agents)
+export * from './specialists/index.js';
