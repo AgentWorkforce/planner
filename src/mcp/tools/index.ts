@@ -16,6 +16,7 @@ import {
 } from '../../relay/agent-status.js';
 import { getClient, sendMessage } from '../../relay/client.js';
 import { getPlanChannelId } from '../../relay/channels.js';
+import { RoleContextSchema } from '../../domain/context.js';
 
 /**
  * All available tools with their schemas.
@@ -39,7 +40,7 @@ export const tools: Tool[] = [
   {
     name: 'read_plan',
     description:
-      'Read a plan with its current (latest) version. Returns the full plan with all steps, summary, status, and version number for optimistic locking.',
+      'Read a plan with its current (latest) version. Returns the full plan including: summary (goal, context), understanding (agent observations keyed by role), steps (each with optional specification per domain: architecture, design, testing, security), status, and version number for optimistic locking.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -505,6 +506,67 @@ export const tools: Tool[] = [
       },
       required: ['plan_id']
     }
+  },
+  {
+    name: 'update_understanding',
+    description:
+      'Update agent observations for a specific role in a plan. Use this to record insights, questions, or concerns discovered during ideation. Observations are merged with existing data for that role.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        role: { type: 'string', description: 'The agent role (e.g., "architect", "designer", "tester", "security")' },
+        observations: { type: 'array', items: { type: 'string' }, description: 'List of observations or insights' },
+        keywords: { type: 'array', items: { type: 'string' }, description: 'Keywords or themes identified' },
+        questions: { type: 'array', items: { type: 'string' }, description: 'Questions that arose during analysis' },
+        concerns: { type: 'array', items: { type: 'string' }, description: 'Potential issues or risks identified' },
+        references: { type: 'array', items: { type: 'string' }, description: 'References to relevant resources' },
+        confidence: { type: 'string', enum: ['exploring', 'forming', 'confident'], description: 'Confidence level in observations' }
+      },
+      required: ['plan_id', 'role']
+    }
+  },
+  {
+    name: 'update_step_specification',
+    description:
+      'Update specification for a specific step and domain. Use this to add architecture decisions, design notes, test cases, or security considerations to a step.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        step_id: { type: 'string', description: 'The UUID of the step' },
+        domain: { type: 'string', enum: ['architecture', 'design', 'testing', 'security'], description: 'The specification domain' },
+        specification: { type: 'object', description: 'Domain-specific specification data (varies by domain)' }
+      },
+      required: ['plan_id', 'step_id', 'domain', 'specification']
+    }
+  },
+  {
+    name: 'get_plan_context',
+    description:
+      'Returns context for a plan version. Context captures formalized decisions by role at plan level (e.g., designer, architect, tester). Returns empty object if context is not set.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        version: { type: 'number', description: 'The version number (optional, defaults to latest)' }
+      },
+      required: ['plan_id']
+    }
+  },
+  {
+    name: 'update_plan_context',
+    description:
+      'Update context for a specific role in a plan. Context captures formalized decisions (e.g., designer decisions about theme, architect decisions about tech stack). Fields are merged with existing context for that role.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'The UUID of the plan' },
+        role: { type: 'string', description: 'The role (e.g., "designer", "architect", "tester", "security", or any custom role)' },
+        fields: { type: 'object', description: 'Context fields to merge for this role (any key-value pairs)' }
+      },
+      required: ['plan_id', 'role', 'fields']
+    }
   }
 ];
 
@@ -566,6 +628,14 @@ function executeToolCall(
       return handleApprovePlan(storage, args);
     case 'publish_plan':
       return handlePublishPlan(storage, args);
+    case 'update_understanding':
+      return handleUpdateUnderstanding(storage, args);
+    case 'update_step_specification':
+      return handleUpdateStepSpecification(storage, args);
+    case 'get_plan_context':
+      return handleGetPlanContext(storage, args);
+    case 'update_plan_context':
+      return handleUpdatePlanContext(storage, args);
     default:
       return error(`Unknown tool: ${name}`);
   }
@@ -1730,4 +1800,246 @@ function handlePublishPlan(
   }
 
   return success({ version: updatedVersion });
+}
+
+// ============================================================================
+// Understanding & Specification Tool Handlers
+// ============================================================================
+
+function handleUpdateUnderstanding(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const role = args.role as string;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!role) {
+    return error('role is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error('Can only update understanding on draft versions');
+  }
+
+  // Build observations object from provided fields
+  const observations: Record<string, unknown> = {};
+  if (args.observations !== undefined) {
+    observations.observations = args.observations;
+  }
+  if (args.keywords !== undefined) {
+    observations.keywords = args.keywords;
+  }
+  if (args.questions !== undefined) {
+    observations.questions = args.questions;
+  }
+  if (args.concerns !== undefined) {
+    observations.concerns = args.concerns;
+  }
+  if (args.references !== undefined) {
+    observations.references = args.references;
+  }
+  if (args.confidence !== undefined) {
+    // Validate confidence value
+    const validConfidence = ['exploring', 'forming', 'confident'];
+    if (!validConfidence.includes(args.confidence as string)) {
+      return error(`Invalid confidence: ${args.confidence}. Must be one of: ${validConfidence.join(', ')}`);
+    }
+    observations.confidence = args.confidence;
+  }
+
+  if (Object.keys(observations).length === 0) {
+    return error('At least one observation field must be provided');
+  }
+
+  const updated = storage.updateVersionUnderstanding(
+    planId,
+    latestVersion.version,
+    role,
+    observations
+  );
+
+  if (!updated) {
+    return error('Failed to update understanding');
+  }
+
+  return success({
+    plan_id: planId,
+    role,
+    observations: updated.understanding?.[role] ?? {},
+  });
+}
+
+function handleUpdateStepSpecification(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const stepId = args.step_id as string;
+  const domain = args.domain as string;
+  const specification = args.specification as Record<string, unknown>;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!stepId) {
+    return error('step_id is required');
+  }
+  if (!domain) {
+    return error('domain is required');
+  }
+  if (!specification || typeof specification !== 'object') {
+    return error('specification is required and must be an object');
+  }
+
+  // Validate domain
+  const validDomains = ['architecture', 'design', 'testing', 'security'];
+  if (!validDomains.includes(domain)) {
+    return error(`Invalid domain: ${domain}. Must be one of: ${validDomains.join(', ')}`);
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error('Can only update specification on draft versions');
+  }
+
+  // Check if step exists
+  const step = latestVersion.steps.find((s) => s.step_id === stepId);
+  if (!step) {
+    return error(`Step not found: ${stepId}`);
+  }
+
+  const updated = storage.updateStepSpecification(
+    planId,
+    latestVersion.version,
+    stepId,
+    domain,
+    specification
+  );
+
+  if (!updated) {
+    return error('Failed to update specification');
+  }
+
+  const updatedStep = updated.steps.find((s) => s.step_id === stepId);
+  const updatedSpec = (updatedStep?.specification as Record<string, unknown>)?.[domain];
+
+  return success({
+    plan_id: planId,
+    step_id: stepId,
+    domain,
+    specification: updatedSpec ?? {},
+  });
+}
+
+function handleGetPlanContext(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const version = args.version as number | undefined;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  // Get specified version or latest
+  const planVersion = version !== undefined
+    ? storage.getVersion(planId, version)
+    : storage.getLatestVersion(planId);
+
+  if (!planVersion) {
+    return error(version !== undefined
+      ? `Version ${version} not found for plan ${planId}`
+      : `No version found for plan ${planId}`
+    );
+  }
+
+  // Return context or empty object if not set
+  return success({
+    plan_id: planId,
+    version: planVersion.version,
+    context: planVersion.context ?? {},
+  });
+}
+
+function handleUpdatePlanContext(
+  storage: PlanStorage,
+  args: Record<string, unknown>
+): ToolResponse {
+  const planId = args.plan_id as string;
+  const role = args.role as string;
+  const fields = args.fields as Record<string, unknown>;
+
+  if (!planId) {
+    return error('plan_id is required');
+  }
+  if (!role) {
+    return error('role is required');
+  }
+  if (!fields || typeof fields !== 'object') {
+    return error('fields is required and must be an object');
+  }
+
+  const plan = storage.getPlan(planId);
+  if (!plan) {
+    return error(`Plan not found: ${planId}`);
+  }
+
+  const latestVersion = storage.getLatestVersion(planId);
+  if (!latestVersion) {
+    return error('No version found for plan');
+  }
+  if (latestVersion.status !== PlanStatus.Draft) {
+    return error('Can only update context on draft versions');
+  }
+
+  // Validate fields against RoleContextSchema
+  // Note: RoleContextSchema is z.record(z.string(), z.unknown()) so any fields are valid
+  // This validation is mainly for consistency with the pattern
+  const validation = RoleContextSchema.safeParse(fields);
+  if (!validation.success) {
+    return error(`Invalid context fields: ${validation.error.message}`);
+  }
+
+  const updated = storage.updateVersionContext(
+    planId,
+    latestVersion.version,
+    role,
+    fields
+  );
+
+  if (!updated) {
+    return error('Failed to update context');
+  }
+
+  return success({
+    plan_id: planId,
+    role,
+    context: (updated.context as Record<string, Record<string, unknown>>)?.[role] ?? {},
+  });
 }

@@ -1062,4 +1062,528 @@ describe('MCP Tools', () => {
       expect(result.error).toContain('does not belong to plan');
     });
   });
+
+  describe('update_understanding', () => {
+    it('should be in the tools registry', () => {
+      const toolNames = tools.map((t) => t.name);
+      expect(toolNames).toContain('update_understanding');
+    });
+
+    it('should add observations for a new role', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_understanding', {
+        plan_id: plan.plan_id,
+        role: 'architect',
+        observations: ['Found existing auth pattern'],
+        keywords: ['auth', 'security'],
+        confidence: 'forming',
+      });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { role: string }).role).toBe('architect');
+      const obs = (result.data as { observations: { observations: string[]; keywords: string[]; confidence: string } }).observations;
+      expect(obs.observations).toContain('Found existing auth pattern');
+      expect(obs.keywords).toContain('auth');
+      expect(obs.confidence).toBe('forming');
+    });
+
+    it('should merge with existing observations', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      // First update
+      callTool('update_understanding', {
+        plan_id: plan.plan_id,
+        role: 'architect',
+        observations: ['First observation'],
+        keywords: ['keyword1'],
+      });
+
+      // Second update should merge
+      const result = callTool('update_understanding', {
+        plan_id: plan.plan_id,
+        role: 'architect',
+        observations: ['Second observation'],
+        keywords: ['keyword2'],
+      });
+
+      expect(result.success).toBe(true);
+      const obs = (result.data as { observations: { observations: string[]; keywords: string[] } }).observations;
+      expect(obs.observations).toContain('First observation');
+      expect(obs.observations).toContain('Second observation');
+      expect(obs.keywords).toContain('keyword1');
+      expect(obs.keywords).toContain('keyword2');
+    });
+
+    it('should return error for invalid confidence', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_understanding', {
+        plan_id: plan.plan_id,
+        role: 'architect',
+        confidence: 'invalid',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid confidence');
+    });
+
+    it('should return error for non-draft version', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+      storage.submitVersion(plan.plan_id, version.version);
+      storage.approveVersion(plan.plan_id, version.version, {
+        approver: 'test',
+        approved_at: new Date().toISOString(),
+      });
+
+      const result = callTool('update_understanding', {
+        plan_id: plan.plan_id,
+        role: 'architect',
+        observations: ['Test'],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('draft');
+    });
+
+    it('should return error for missing plan', () => {
+      const result = callTool('update_understanding', {
+        plan_id: 'nonexistent',
+        role: 'architect',
+        observations: ['Test'],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Plan not found');
+    });
+  });
+
+  describe('update_step_specification', () => {
+    it('should be in the tools registry', () => {
+      const toolNames = tools.map((t) => t.name);
+      expect(toolNames).toContain('update_step_specification');
+    });
+
+    it('should add specification to step', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      const step = createStep('Test step');
+      version.steps = [step];
+      storage.createVersion(version);
+
+      const result = callTool('update_step_specification', {
+        plan_id: plan.plan_id,
+        step_id: step.step_id,
+        domain: 'architecture',
+        specification: {
+          decisions: [{ decision_id: 'd001', decision: 'Use PostgreSQL', rationale: 'Better for relational data' }],
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { domain: string }).domain).toBe('architecture');
+      const spec = (result.data as { specification: { decisions: Array<{ decision_id: string }> } }).specification;
+      expect(spec.decisions).toHaveLength(1);
+      expect(spec.decisions[0].decision_id).toBe('d001');
+    });
+
+    it('should merge with existing specification', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      const step = createStep('Test step');
+      version.steps = [step];
+      storage.createVersion(version);
+
+      // First update
+      callTool('update_step_specification', {
+        plan_id: plan.plan_id,
+        step_id: step.step_id,
+        domain: 'testing',
+        specification: {
+          test_cases: [{ case_id: 't1', type: 'happy', description: 'Test 1' }],
+        },
+      });
+
+      // Second update should merge
+      const result = callTool('update_step_specification', {
+        plan_id: plan.plan_id,
+        step_id: step.step_id,
+        domain: 'testing',
+        specification: {
+          test_cases: [{ case_id: 't2', type: 'edge', description: 'Test 2' }],
+          coverage_notes: '80% target',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      const spec = (result.data as { specification: { test_cases: Array<{ case_id: string }>; coverage_notes: string } }).specification;
+      expect(spec.test_cases).toHaveLength(2);
+      expect(spec.coverage_notes).toBe('80% target');
+    });
+
+    it('should return error for invalid domain', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      const step = createStep('Test step');
+      version.steps = [step];
+      storage.createVersion(version);
+
+      const result = callTool('update_step_specification', {
+        plan_id: plan.plan_id,
+        step_id: step.step_id,
+        domain: 'invalid',
+        specification: { test: 'data' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid domain');
+    });
+
+    it('should return error for unknown step', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_step_specification', {
+        plan_id: plan.plan_id,
+        step_id: 'nonexistent',
+        domain: 'architecture',
+        specification: { test: 'data' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Step not found');
+    });
+
+    it('should return error for non-draft version', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      const step = createStep('Test step');
+      version.steps = [step];
+      storage.createVersion(version);
+      storage.submitVersion(plan.plan_id, version.version);
+      storage.approveVersion(plan.plan_id, version.version, {
+        approver: 'test',
+        approved_at: new Date().toISOString(),
+      });
+
+      const result = callTool('update_step_specification', {
+        plan_id: plan.plan_id,
+        step_id: step.step_id,
+        domain: 'architecture',
+        specification: { test: 'data' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('draft');
+    });
+  });
+
+  describe('read_plan with understanding and specification', () => {
+    it('should include understanding in response', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      // Add understanding
+      storage.updateVersionUnderstanding(plan.plan_id, version.version, 'architect', {
+        observations: ['Test observation'],
+      });
+
+      const result = callTool('read_plan', { plan_id: plan.plan_id });
+
+      expect(result.success).toBe(true);
+      const data = result.data as { version: { understanding: { architect: { observations: string[] } } } };
+      expect(data.version.understanding.architect.observations).toContain('Test observation');
+    });
+
+    it('should include step specification in response', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      const step = createStep('Test step');
+      version.steps = [step];
+      storage.createVersion(version);
+
+      // Add specification
+      storage.updateStepSpecification(plan.plan_id, version.version, step.step_id, 'architecture', {
+        decisions: [{ decision_id: 'd1', decision: 'Test decision' }],
+      });
+
+      const result = callTool('read_plan', { plan_id: plan.plan_id });
+
+      expect(result.success).toBe(true);
+      const data = result.data as { version: { steps: Array<{ specification: { architecture: { decisions: Array<{ decision_id: string }> } } }> } };
+      expect(data.version.steps[0].specification.architecture.decisions[0].decision_id).toBe('d1');
+    });
+  });
+
+  describe('get_plan_context', () => {
+    it('should be in the tools registry', () => {
+      const toolNames = tools.map((t) => t.name);
+      expect(toolNames).toContain('get_plan_context');
+    });
+
+    it('should return empty context when not set', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('get_plan_context', {
+        plan_id: plan.plan_id,
+      });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { context: Record<string, unknown> }).context).toEqual({});
+    });
+
+    it('should return context when present', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      // Add context
+      storage.updateVersionContext(plan.plan_id, version.version, 'designer', {
+        library: 'shadcn/ui',
+        theme: 'dark mode',
+      });
+
+      const result = callTool('get_plan_context', {
+        plan_id: plan.plan_id,
+      });
+
+      expect(result.success).toBe(true);
+      const data = result.data as { context: Record<string, Record<string, unknown>> };
+      expect(data.context.designer).toBeDefined();
+      expect(data.context.designer!.library).toBe('shadcn/ui');
+      expect(data.context.designer!.theme).toBe('dark mode');
+    });
+
+    it('should return specific version context', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version1 = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version1);
+
+      // Add context to version 1
+      storage.updateVersionContext(plan.plan_id, version1.version, 'designer', {
+        library: 'shadcn/ui',
+      });
+
+      const result = callTool('get_plan_context', {
+        plan_id: plan.plan_id,
+        version: 1,
+      });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { version: number }).version).toBe(1);
+    });
+
+    it('should return error for missing plan', () => {
+      const result = callTool('get_plan_context', {
+        plan_id: 'nonexistent',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Plan not found');
+    });
+
+    it('should return error for missing version', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('get_plan_context', {
+        plan_id: plan.plan_id,
+        version: 99,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Version 99 not found');
+    });
+  });
+
+  describe('update_plan_context', () => {
+    it('should be in the tools registry', () => {
+      const toolNames = tools.map((t) => t.name);
+      expect(toolNames).toContain('update_plan_context');
+    });
+
+    it('should add context for a new role', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'designer',
+        fields: {
+          library: 'shadcn/ui',
+          theme: 'dark mode',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { role: string }).role).toBe('designer');
+      const context = (result.data as { context: Record<string, unknown> }).context;
+      expect(context.library).toBe('shadcn/ui');
+      expect(context.theme).toBe('dark mode');
+    });
+
+    it('should merge with existing context', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      // First update
+      callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'designer',
+        fields: {
+          library: 'shadcn/ui',
+        },
+      });
+
+      // Second update should merge
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'designer',
+        fields: {
+          theme: 'dark mode',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      const context = (result.data as { context: Record<string, unknown> }).context;
+      expect(context.library).toBe('shadcn/ui');
+      expect(context.theme).toBe('dark mode');
+    });
+
+    it('should support custom role names', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'qa_lead',
+        fields: {
+          custom_field: 'custom value',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { role: string }).role).toBe('qa_lead');
+    });
+
+    it('should support nested objects and arrays', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'architect',
+        fields: {
+          boundaries: {
+            components: ['auth', 'api'],
+            services: ['planner-core', 'orchestrator'],
+          },
+          tech_stack: ['TypeScript', 'Express'],
+        },
+      });
+
+      expect(result.success).toBe(true);
+      const context = (result.data as { context: Record<string, unknown> }).context;
+      expect((context.boundaries as Record<string, unknown>).components).toEqual(['auth', 'api']);
+      expect(context.tech_stack).toEqual(['TypeScript', 'Express']);
+    });
+
+    it('should return error for non-draft version', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+      storage.submitVersion(plan.plan_id, version.version);
+      storage.approveVersion(plan.plan_id, version.version, {
+        approver: 'test',
+        approved_at: new Date().toISOString(),
+      });
+
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'designer',
+        fields: { library: 'test' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('draft');
+    });
+
+    it('should return error for missing plan', () => {
+      const result = callTool('update_plan_context', {
+        plan_id: 'nonexistent',
+        role: 'designer',
+        fields: { library: 'test' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Plan not found');
+    });
+
+    it('should return error for missing role', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        fields: { library: 'test' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('role is required');
+    });
+
+    it('should return error for missing fields', () => {
+      const plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+      const version = createPlanVersion(plan.plan_id, 'Test goal');
+      storage.createVersion(version);
+
+      const result = callTool('update_plan_context', {
+        plan_id: plan.plan_id,
+        role: 'designer',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('fields is required');
+    });
+  });
 });
