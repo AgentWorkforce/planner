@@ -35,9 +35,10 @@ const dmChannels = new Map<string, ChannelInfo>(); // channelId -> ChannelInfo
 
 /**
  * Get channel ID for a plan.
+ * Uses full UUID for consistency - display truncation happens in UI layer.
  */
 export function getPlanChannelId(planId: string): string {
-  return `#plan-${planId.slice(0, 8)}`;
+  return `#plan-${planId}`;
 }
 
 /**

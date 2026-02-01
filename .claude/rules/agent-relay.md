@@ -25,8 +25,9 @@ The `ws-proxy.ts` handles message routing between clients:
 
 ## Plan Channel IDs
 
-- Format: `#plan-{partial-uuid}` (prefix with shortened UUID)
-- Resolving to full UUID: Use `findPlanByIdPrefix()` lookup
+- Format: `#plan-{full-uuid}` (uses full UUID for consistency)
+- Display truncation happens in UI layer, not in channel IDs
+- Use `getPlanChannelId()` from `src/relay/channels.ts` for channel ID generation
 
 ## Real-time Updates
 

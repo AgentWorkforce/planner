@@ -330,7 +330,7 @@ After calling ask_user_question, you must WAIT for the answer. Poll the question
     context += `
 
 3. **join_plan_channel** - Join plan channel for messaging
-   - You've been pre-joined to #plan-${options.planId.slice(0, 8)}
+   - You've been pre-joined to #plan-${options.planId}
    - Use relay messaging to communicate in this channel
 
 Plan context: You are working on plan ${options.planId}`;
@@ -379,8 +379,8 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
 
       // Pre-join agent to plan channel for immediate communication
       if (options.planId) {
-        // Use 8-char prefix to match getPlanChannelId() format
-        const channel = `#plan-${options.planId.slice(0, 8)}`;
+        // Use full UUID - display truncation happens in UI layer
+        const channel = `#plan-${options.planId}`;
         const joined = client.adminJoinChannel(channel, options.name);
         if (joined) {
           console.log(`[relay] Pre-joined ${options.name} to ${channel}`);

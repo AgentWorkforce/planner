@@ -12,7 +12,7 @@ describe('MCP Bridge Integration Tests', () => {
   let testOrgId: string;
 
   beforeEach(() => {
-    storage = new SqliteStorage(':memory:');
+    storage = new SqliteStorage(':memory:', { skipSeed: true });
     app = createApp(storage);
 
     // Get default org created by migrations, or create a test org

@@ -28,11 +28,11 @@ import {
   type AgentRole,
   type AgentState,
 } from './agent-status.js';
+import { getPlanChannelId } from './channels.js';
 
 /**
  * Find a plan by ID or ID prefix.
- * Channel names only contain 8 characters of the UUID (e.g., #plan-042265be),
- * so we need to resolve the prefix to the full plan ID.
+ * Supports both full UUIDs and partial prefixes for backwards compatibility.
  */
 function findPlanByIdPrefix(storage: PlanStorage, idPrefix: string): Plan | null {
   // If it looks like a full UUID, try direct lookup first
@@ -910,7 +910,7 @@ async function executeJoinPlanChannel(input: JoinPlanChannelInput): Promise<Tool
       };
     }
 
-    const channel = `#plan-${input.plan_id.slice(0, 8)}`;
+    const channel = getPlanChannelId(input.plan_id);
     const joined = client.adminJoinChannel(channel, input.agent_id);
 
     if (!joined) {
@@ -1041,7 +1041,7 @@ export function getMockToolResult(toolName: string, input: Record<string, unknow
         success: true,
         result: {
           agent_id: input.agent_id || 'mock-agent',
-          channel: `#plan-${String(input.plan_id || 'mock').slice(0, 8)}`,
+          channel: getPlanChannelId(String(input.plan_id || 'mock')),
           message: '[Mock] Would join channel in production',
         },
       };

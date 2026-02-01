@@ -201,14 +201,22 @@ interface PlanWithAttentionRow {
   unresolved_comment_count: number;
 }
 
+/** Options for SqliteStorage constructor */
+export interface SqliteStorageOptions {
+  /** Skip seeding sample data (useful for tests) */
+  skipSeed?: boolean;
+}
+
 /**
  * SQLite implementation of PlanStorage.
  */
 export class SqliteStorage implements PlanStorage {
   private db: Database.Database;
+  private options: SqliteStorageOptions;
 
-  constructor(dbPath: string = ':memory:') {
+  constructor(dbPath: string = ':memory:', options: SqliteStorageOptions = {}) {
     this.db = new Database(dbPath);
+    this.options = options;
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.initialize();
@@ -247,8 +255,10 @@ export class SqliteStorage implements PlanStorage {
       // New database - run migrations after schema to create default org
       runMigrations(this.db);
 
-      // Seed with sample data on first run
-      this.seedOnFirstRun();
+      // Seed with sample data on first run (unless skipSeed option is set)
+      if (!this.options.skipSeed) {
+        this.seedOnFirstRun();
+      }
     }
   }
 

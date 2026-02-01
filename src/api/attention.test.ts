@@ -10,7 +10,7 @@ describe('Attention Signals Integration Tests', () => {
   let app: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    storage = new SqliteStorage(':memory:');
+    storage = new SqliteStorage(':memory:', { skipSeed: true });
     app = createApp(storage);
   });
 

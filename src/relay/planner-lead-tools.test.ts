@@ -61,7 +61,7 @@ describe('planner-lead-tools', () => {
     let testOrgId: string;
 
     beforeEach(() => {
-      storage = new SqliteStorage(':memory:');
+      storage = new SqliteStorage(':memory:', { skipSeed: true });
 
       // Get default org created by migrations, or create a test org
       const orgs = storage.listOrganizations();
