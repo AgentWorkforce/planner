@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AcceptanceCriterionSchema, type AcceptanceCriterion } from './criterion.js';
 import { GateSchema, type Gate } from './gate.js';
+import { StepSpecificationSchema, type StepSpecification } from './specification.js';
 
 /**
  * Step is the atomic unit of work within a plan.
@@ -24,6 +25,7 @@ export const StepSchema = z.object({
   acceptance_criteria: z.array(AcceptanceCriterionSchema).optional(),
   gate: GateSchema.optional(),
   sub_plan_id: z.string().uuid().optional(),
+  specification: StepSpecificationSchema.optional(),
 });
 
 export type Step = z.infer<typeof StepSchema>;
@@ -36,6 +38,7 @@ export interface CreateStepOptions {
   acceptance_criteria?: AcceptanceCriterion[];
   gate?: Gate;
   sub_plan_id?: string;
+  specification?: StepSpecification;
 }
 
 /**
@@ -56,6 +59,7 @@ export function createStep(title: string, options: CreateStepOptions = {}): Step
   }
   if (options.gate !== undefined) step.gate = options.gate;
   if (options.sub_plan_id !== undefined) step.sub_plan_id = options.sub_plan_id;
+  if (options.specification !== undefined) step.specification = options.specification;
 
   return StepSchema.parse(step);
 }

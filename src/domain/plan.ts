@@ -3,6 +3,8 @@ import { PlanStatusSchema, PlanStatus } from './status.js';
 import { SummarySchema, type Summary } from './summary.js';
 import { StepSchema } from './step.js';
 import { ApprovalInfoSchema } from './workflow.js';
+import { UnderstandingSchema } from './understanding.js';
+import { ContextSchema } from './context.js';
 
 /**
  * Plan is a container for versions. It tracks the plan_id and timestamps.
@@ -28,6 +30,8 @@ export const PlanVersionSchema = z.object({
   status: PlanStatusSchema,
   summary: SummarySchema,
   steps: z.array(StepSchema),
+  understanding: UnderstandingSchema.optional(),
+  context: ContextSchema.optional(),
   submitted_at: z.string().datetime().optional(),
   approval_info: ApprovalInfoSchema.optional(),
   change_request_id: z.string().uuid().optional(),
