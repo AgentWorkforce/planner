@@ -322,6 +322,121 @@ export const PLANNER_LEAD_TOOLS: Anthropic.Tool[] = [
       required: ['agent_id', 'plan_id'],
     },
   },
+  // === Understanding, Context, and Specification Tools ===
+  {
+    name: 'update_understanding',
+    description:
+      'Update agent observations for a specific role in a plan. Use this to record insights, questions, or concerns discovered during ideation. Observations are merged with existing data for that role.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The ID of the plan',
+        },
+        role: {
+          type: 'string',
+          description: 'The role making observations (e.g., "architect", "security", "designer")',
+        },
+        observations: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of observation strings',
+        },
+        keywords: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Keywords extracted from analysis',
+        },
+        questions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Questions that need clarification',
+        },
+        concerns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Concerns or risks identified',
+        },
+        references: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'References to relevant files or docs',
+        },
+        confidence: {
+          type: 'string',
+          enum: ['exploring', 'forming', 'confident'],
+          description: 'Confidence level in observations',
+        },
+      },
+      required: ['plan_id', 'role'],
+    },
+  },
+  {
+    name: 'get_plan_context',
+    description:
+      'Returns context for a plan. Context captures formalized decisions by role at plan level (e.g., designer, architect, tester). Returns empty object if context is not set.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The ID of the plan',
+        },
+      },
+      required: ['plan_id'],
+    },
+  },
+  {
+    name: 'update_plan_context',
+    description:
+      'Update context for a specific role in a plan. Context captures formalized decisions (e.g., designer decisions about theme, architect decisions about tech stack). Fields are merged with existing context for that role.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The ID of the plan',
+        },
+        role: {
+          type: 'string',
+          description: 'The role making decisions (e.g., "designer", "architect")',
+        },
+        fields: {
+          type: 'object',
+          description: 'Key-value pairs of context fields for this role',
+        },
+      },
+      required: ['plan_id', 'role', 'fields'],
+    },
+  },
+  {
+    name: 'update_step_specification',
+    description:
+      'Add or update specification for a specific domain within a step. Use this to record architecture decisions, design notes, test cases, or security considerations. Any domain name is allowed (freeform).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The ID of the plan',
+        },
+        step_id: {
+          type: 'string',
+          description: 'The ID of the step',
+        },
+        domain: {
+          type: 'string',
+          description: 'Domain name (e.g., "architecture", "design", "testing", "security", or any custom domain)',
+        },
+        spec: {
+          type: 'object',
+          description: 'Specification fields for this domain (freeform key-value pairs)',
+        },
+      },
+      required: ['plan_id', 'step_id', 'domain', 'spec'],
+    },
+  },
 ];
 
 /**
@@ -355,6 +470,14 @@ export async function executeTool(
       return executeAskUserQuestion(input as unknown as AskUserQuestionInput, storage);
     case 'join_plan_channel':
       return executeJoinPlanChannel(input as unknown as JoinPlanChannelInput);
+    case 'update_understanding':
+      return executeUpdateUnderstanding(input as unknown as UpdateUnderstandingInput, storage);
+    case 'get_plan_context':
+      return executeGetPlanContext(input as unknown as { plan_id: string }, storage);
+    case 'update_plan_context':
+      return executeUpdatePlanContext(input as unknown as UpdatePlanContextInput, storage);
+    case 'update_step_specification':
+      return executeUpdateStepSpecification(input as unknown as UpdateStepSpecificationInput, storage);
     default:
       return { success: false, error: `Unknown tool: ${toolName}` };
   }
@@ -417,6 +540,33 @@ interface AskUserQuestionInput {
 interface JoinPlanChannelInput {
   agent_id: string;
   plan_id: string;
+}
+
+/** Input type for update_understanding */
+interface UpdateUnderstandingInput {
+  plan_id: string;
+  role: string;
+  observations?: string[];
+  keywords?: string[];
+  questions?: string[];
+  concerns?: string[];
+  references?: string[];
+  confidence?: 'exploring' | 'forming' | 'confident';
+}
+
+/** Input type for update_plan_context */
+interface UpdatePlanContextInput {
+  plan_id: string;
+  role: string;
+  fields: Record<string, unknown>;
+}
+
+/** Input type for update_step_specification */
+interface UpdateStepSpecificationInput {
+  plan_id: string;
+  step_id: string;
+  domain: string;
+  spec: Record<string, unknown>;
 }
 
 /**
@@ -934,6 +1084,201 @@ async function executeJoinPlanChannel(input: JoinPlanChannelInput): Promise<Tool
   }
 }
 
+// === Understanding, Context, and Specification Tool Handlers ===
+
+/**
+ * Execute update_understanding tool.
+ * Updates agent observations for a specific role in a plan.
+ */
+async function executeUpdateUnderstanding(
+  input: UpdateUnderstandingInput,
+  storage: PlanStorage
+): Promise<ToolResult> {
+  try {
+    const plan = findPlanByIdPrefix(storage, input.plan_id);
+    if (!plan) {
+      return { success: false, error: `Plan not found: ${input.plan_id}` };
+    }
+
+    const version = storage.getLatestVersion(plan.plan_id);
+    if (!version) {
+      return { success: false, error: `No version found for plan: ${plan.plan_id}` };
+    }
+
+    if (version.status !== 'draft') {
+      return { success: false, error: 'Can only update understanding on draft versions' };
+    }
+
+    const observations: Record<string, unknown> = {};
+    if (input.observations) observations.observations = input.observations;
+    if (input.keywords) observations.keywords = input.keywords;
+    if (input.questions) observations.questions = input.questions;
+    if (input.concerns) observations.concerns = input.concerns;
+    if (input.references) observations.references = input.references;
+    if (input.confidence) observations.confidence = input.confidence;
+
+    const updated = storage.updateVersionUnderstanding(plan.plan_id, version.version, input.role, observations);
+    if (!updated) {
+      return { success: false, error: 'Failed to update understanding' };
+    }
+
+    emitPlanChange(plan.plan_id, updated.version, 'understanding_updated');
+
+    return {
+      success: true,
+      result: {
+        plan_id: plan.plan_id,
+        role: input.role,
+        version: updated.version,
+        observations: (updated.understanding as Record<string, Record<string, unknown>>)?.[input.role] ?? {},
+        message: `Updated understanding for role "${input.role}"`,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Execute get_plan_context tool.
+ * Returns context for a plan version.
+ */
+async function executeGetPlanContext(
+  input: { plan_id: string },
+  storage: PlanStorage
+): Promise<ToolResult> {
+  try {
+    const plan = findPlanByIdPrefix(storage, input.plan_id);
+    if (!plan) {
+      return { success: false, error: `Plan not found: ${input.plan_id}` };
+    }
+
+    const version = storage.getLatestVersion(plan.plan_id);
+    if (!version) {
+      return { success: false, error: `No version found for plan: ${plan.plan_id}` };
+    }
+
+    return {
+      success: true,
+      result: {
+        plan_id: plan.plan_id,
+        version: version.version,
+        context: version.context ?? {},
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Execute update_plan_context tool.
+ * Updates context for a specific role in a plan.
+ */
+async function executeUpdatePlanContext(
+  input: UpdatePlanContextInput,
+  storage: PlanStorage
+): Promise<ToolResult> {
+  try {
+    const plan = findPlanByIdPrefix(storage, input.plan_id);
+    if (!plan) {
+      return { success: false, error: `Plan not found: ${input.plan_id}` };
+    }
+
+    const version = storage.getLatestVersion(plan.plan_id);
+    if (!version) {
+      return { success: false, error: `No version found for plan: ${plan.plan_id}` };
+    }
+
+    if (version.status !== 'draft') {
+      return { success: false, error: 'Can only update context on draft versions' };
+    }
+
+    const updated = storage.updateVersionContext(plan.plan_id, version.version, input.role, input.fields);
+    if (!updated) {
+      return { success: false, error: 'Failed to update context' };
+    }
+
+    emitPlanChange(plan.plan_id, updated.version, 'context_updated');
+
+    return {
+      success: true,
+      result: {
+        plan_id: plan.plan_id,
+        role: input.role,
+        version: updated.version,
+        context: (updated.context as Record<string, Record<string, unknown>>)?.[input.role] ?? {},
+        message: `Updated context for role "${input.role}"`,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Execute update_step_specification tool.
+ * Updates specification for a specific domain within a step.
+ */
+async function executeUpdateStepSpecification(
+  input: UpdateStepSpecificationInput,
+  storage: PlanStorage
+): Promise<ToolResult> {
+  try {
+    const plan = findPlanByIdPrefix(storage, input.plan_id);
+    if (!plan) {
+      return { success: false, error: `Plan not found: ${input.plan_id}` };
+    }
+
+    const version = storage.getLatestVersion(plan.plan_id);
+    if (!version) {
+      return { success: false, error: `No version found for plan: ${plan.plan_id}` };
+    }
+
+    if (version.status !== 'draft') {
+      return { success: false, error: 'Can only update specification on draft versions' };
+    }
+
+    const step = version.steps.find((s: Step) => s.step_id === input.step_id);
+    if (!step) {
+      return { success: false, error: `Step not found: ${input.step_id}` };
+    }
+
+    const updated = storage.updateStepSpecification(
+      plan.plan_id,
+      version.version,
+      input.step_id,
+      input.domain,
+      input.spec
+    );
+    if (!updated) {
+      return { success: false, error: 'Failed to update step specification' };
+    }
+
+    emitPlanChange(plan.plan_id, updated.version, 'specification_updated', input.step_id);
+
+    const updatedStep = updated.steps.find((s: Step) => s.step_id === input.step_id);
+
+    return {
+      success: true,
+      result: {
+        plan_id: plan.plan_id,
+        step_id: input.step_id,
+        domain: input.domain,
+        version: updated.version,
+        specification: (updatedStep?.specification as Record<string, Record<string, unknown>>)?.[input.domain] ?? {},
+        message: `Updated "${input.domain}" specification for step "${step.title}"`,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
+}
+
 /**
  * Get mock tool result for demo mode.
  */
@@ -1043,6 +1388,52 @@ export function getMockToolResult(toolName: string, input: Record<string, unknow
           agent_id: input.agent_id || 'mock-agent',
           channel: getPlanChannelId(String(input.plan_id || 'mock')),
           message: '[Mock] Would join channel in production',
+        },
+      };
+    case 'update_understanding':
+      return {
+        success: true,
+        result: {
+          plan_id: input.plan_id || 'mock-plan',
+          role: input.role || 'architect',
+          version: 2,
+          observations: input,
+          message: '[Mock] Understanding would be updated in production',
+        },
+      };
+    case 'get_plan_context':
+      return {
+        success: true,
+        result: {
+          plan_id: input.plan_id || 'mock-plan',
+          version: 1,
+          context: {
+            designer: { library: 'shadcn/ui', theme: 'dark' },
+            architect: { tech_stack: ['TypeScript', 'Express'] },
+          },
+        },
+      };
+    case 'update_plan_context':
+      return {
+        success: true,
+        result: {
+          plan_id: input.plan_id || 'mock-plan',
+          role: input.role || 'designer',
+          version: 2,
+          context: input.fields || {},
+          message: '[Mock] Context would be updated in production',
+        },
+      };
+    case 'update_step_specification':
+      return {
+        success: true,
+        result: {
+          plan_id: input.plan_id || 'mock-plan',
+          step_id: input.step_id || 'mock-step',
+          domain: input.domain || 'architecture',
+          version: 2,
+          specification: input.spec || {},
+          message: '[Mock] Specification would be updated in production',
         },
       };
     default:
