@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { PlanStorage } from '../../storage/interface.js';
-import type { QuestionBlockingLevel } from '../../domain/question.js';
+import type { QuestionBlockingLevel, QuestionStatus } from '../../domain/question.js';
 import { createQuestion as createQuestionEntity } from '../../domain/question.js';
 import { emitQuestionEvent } from '../../events/question-events.js';
 import { notFound, badRequest } from '../middleware.js';
@@ -103,18 +103,24 @@ export function createQuestionHandlers(storage: PlanStorage) {
 
     /**
      * GET /plans/:id/questions
-     * List all pending questions for a plan, sorted by priority.
+     * List questions for a plan. Optionally filter by status.
+     * Without status filter, returns pending questions sorted by priority.
      */
     list: (req: Request<PlanParams>, res: Response, next: NextFunction) => {
       try {
         const { id } = req.params;
+        const status = req.query.status as QuestionStatus | undefined;
 
         const plan = storage.getPlan(id);
         if (!plan) {
           throw notFound('Plan');
         }
 
-        const questions = storage.listPendingQuestionsByPriority(id);
+        // If status filter provided, use listQuestionsByPlan
+        // Otherwise, use listPendingQuestionsByPriority for sorted pending questions
+        const questions = status
+          ? storage.listQuestionsByPlan(id, status)
+          : storage.listPendingQuestionsByPriority(id);
         res.json({ questions, total: questions.length });
       } catch (err) {
         next(err);
