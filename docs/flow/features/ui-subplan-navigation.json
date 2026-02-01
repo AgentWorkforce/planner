@@ -4,42 +4,24 @@
   "type": "feature",
   "status": "approved",
   "priority": "high",
-  "dependencies": [
-    "ui-editor-steps"
-  ],
+  "dependencies": ["ui-editor-steps"],
+
   "summary": {
     "goal": "Enable navigation to and from sub-plans when steps have sub_plan_id",
     "context": "Steps can reference other plans via sub_plan_id for nested complexity. Users need to drill down into sub-plans and navigate back. This supports the hierarchical plan structure described in docs/planner-scale.md.",
     "acceptance_criteria": [
-      {
-        "id": "ac1",
-        "description": "Steps with sub_plan_id show a 'sub-plan' indicator badge"
-      },
-      {
-        "id": "ac2",
-        "description": "Clicking a sub-plan step navigates to that plan's detail page"
-      },
-      {
-        "id": "ac3",
-        "description": "Breadcrumb shows navigation path (Parent Plan > Current Plan)"
-      },
-      {
-        "id": "ac4",
-        "description": "'Back to Parent' link visible when viewing a sub-plan"
-      },
-      {
-        "id": "ac5",
-        "description": "Sub-plan steps display child plan's goal as description"
-      }
+      { "id": "ac1", "description": "Steps with sub_plan_id show a 'sub-plan' indicator badge" },
+      { "id": "ac2", "description": "Clicking a sub-plan step navigates to that plan's detail page" },
+      { "id": "ac3", "description": "Breadcrumb shows navigation path (Parent Plan > Current Plan)" },
+      { "id": "ac4", "description": "'Back to Parent' link visible when viewing a sub-plan" },
+      { "id": "ac5", "description": "Sub-plan steps display child plan's goal as description" }
     ]
   },
+
   "references": [
-    {
-      "type": "spec",
-      "title": "Multi-Scope Plans - Nested Complexity",
-      "path": "docs/planner-scale.md"
-    }
+    { "type": "spec", "title": "Multi-Scope Plans - Nested Complexity", "path": "docs/planner-scale.md" }
   ],
+
   "design_spec": {
     "views": [
       {
@@ -127,12 +109,46 @@
           }
         ]
       }
+    ],
+    "patterns": {
+      "navigation": "Use react-router Link components for client-side navigation",
+      "data_fetching": "Sub-plan goals may require API call; consider caching or eager loading",
+      "accessibility": "Ensure clickable steps have proper aria-label describing destination"
+    },
+    "css_additions": [
+      {
+        "selector": ".badge-subplan",
+        "properties": "background-color: #e0e7ff; color: #3730a3;"
+      },
+      {
+        "selector": ".step-item.has-subplan",
+        "properties": "cursor: pointer;"
+      },
+      {
+        "selector": ".step-item.has-subplan:hover",
+        "properties": "border-color: var(--color-primary);"
+      },
+      {
+        "selector": ".plan-breadcrumb",
+        "properties": "display: flex; align-items: center; gap: var(--spacing-sm); font-size: 0.875rem; margin-bottom: var(--spacing-md);"
+      },
+      {
+        "selector": ".breadcrumb-separator",
+        "properties": "color: var(--color-text-muted);"
+      },
+      {
+        "selector": ".breadcrumb-current",
+        "properties": "color: var(--color-text);"
+      },
+      {
+        "selector": ".step-subplan-indicator",
+        "properties": "display: flex; align-items: center; gap: var(--spacing-xs);"
+      }
     ]
   },
+
   "plan_implementation": {
-    "scopes": [
-      "planner-ui"
-    ],
+    "scopes": ["planner-ui"],
     "steps": [
       {
         "step_id": "usn001",
@@ -142,77 +158,21 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": ".badge-subplan styled with indigo colors (bg: #e0e7ff, color: #3730a3)"
-          },
-          {
-            "id": "ac2",
-            "description": ".step-item.has-subplan has cursor: pointer and hover border highlight"
-          },
-          {
-            "id": "ac3",
-            "description": ".plan-breadcrumb styles match existing nav patterns"
-          }
-        ],
-        "specification": {
-          "design": {
-            "css_additions": [
-              {
-                "selector": ".badge-subplan",
-                "properties": "background-color: #e0e7ff; color: #3730a3;"
-              },
-              {
-                "selector": ".step-item.has-subplan",
-                "properties": "cursor: pointer;"
-              },
-              {
-                "selector": ".step-item.has-subplan:hover",
-                "properties": "border-color: var(--color-primary);"
-              },
-              {
-                "selector": ".plan-breadcrumb",
-                "properties": "display: flex; align-items: center; gap: var(--spacing-sm); font-size: 0.875rem; margin-bottom: var(--spacing-md);"
-              },
-              {
-                "selector": ".breadcrumb-separator",
-                "properties": "color: var(--color-text-muted);"
-              },
-              {
-                "selector": ".breadcrumb-current",
-                "properties": "color: var(--color-text);"
-              },
-              {
-                "selector": ".step-subplan-indicator",
-                "properties": "display: flex; align-items: center; gap: var(--spacing-xs);"
-              }
-            ],
-            "patterns": {
-              "navigation": "Use react-router Link components for client-side navigation",
-              "data_fetching": "Sub-plan goals may require API call; consider caching or eager loading",
-              "accessibility": "Ensure clickable steps have proper aria-label describing destination"
-            }
-          }
-        }
+          { "id": "ac1", "description": ".badge-subplan styled with indigo colors (bg: #e0e7ff, color: #3730a3)" },
+          { "id": "ac2", "description": ".step-item.has-subplan has cursor: pointer and hover border highlight" },
+          { "id": "ac3", "description": ".plan-breadcrumb styles match existing nav patterns" }
+        ]
       },
       {
         "step_id": "usn002",
         "title": "Update step rendering to show sub-plan badge",
         "scope": "planner-ui",
         "description": "In PlanEditorPage, render badge-subplan next to scope when step.sub_plan_id exists.",
-        "dependencies": [
-          "usn001"
-        ],
+        "dependencies": ["usn001"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Steps with sub_plan_id show 'Sub-plan' badge after scope badge"
-          },
-          {
-            "id": "ac2",
-            "description": "Badge uses existing .badge pattern with .badge-subplan variant"
-          }
+          { "id": "ac1", "description": "Steps with sub_plan_id show 'Sub-plan' badge after scope badge" },
+          { "id": "ac2", "description": "Badge uses existing .badge pattern with .badge-subplan variant" }
         ]
       },
       {
@@ -220,27 +180,13 @@
         "title": "Make sub-plan steps clickable",
         "scope": "planner-ui",
         "description": "Wrap step-item in Link component when sub_plan_id present. Navigate to /plans/{sub_plan_id}.",
-        "dependencies": [
-          "usn002"
-        ],
+        "dependencies": ["usn002"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Steps with sub_plan_id wrapped in react-router Link"
-          },
-          {
-            "id": "ac2",
-            "description": "Link navigates to /plans/{step.sub_plan_id}"
-          },
-          {
-            "id": "ac3",
-            "description": "Step item has .has-subplan class for hover styling"
-          },
-          {
-            "id": "ac4",
-            "description": "Non-subplan steps render without Link wrapper (unchanged)"
-          }
+          { "id": "ac1", "description": "Steps with sub_plan_id wrapped in react-router Link" },
+          { "id": "ac2", "description": "Link navigates to /plans/{step.sub_plan_id}" },
+          { "id": "ac3", "description": "Step item has .has-subplan class for hover styling" },
+          { "id": "ac4", "description": "Non-subplan steps render without Link wrapper (unchanged)" }
         ]
       },
       {
@@ -251,14 +197,8 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "PlanVersion type includes optional parent_plan_id?: string"
-          },
-          {
-            "id": "ac2",
-            "description": "Navigation state passes parent context when clicking sub-plan step"
-          }
+          { "id": "ac1", "description": "PlanVersion type includes optional parent_plan_id?: string" },
+          { "id": "ac2", "description": "Navigation state passes parent context when clicking sub-plan step" }
         ]
       },
       {
@@ -266,27 +206,13 @@
         "title": "Create Breadcrumb component",
         "scope": "planner-ui",
         "description": "Create PlanBreadcrumb component that shows navigation path. Uses navigation state to track parent chain.",
-        "dependencies": [
-          "usn004"
-        ],
+        "dependencies": ["usn004"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Renders 'Plans > Parent Goal > Current Goal' when viewing sub-plan"
-          },
-          {
-            "id": "ac2",
-            "description": "Each ancestor is a clickable Link"
-          },
-          {
-            "id": "ac3",
-            "description": "Current plan shown as plain text (not clickable)"
-          },
-          {
-            "id": "ac4",
-            "description": "Uses > separator between items"
-          }
+          { "id": "ac1", "description": "Renders 'Plans > Parent Goal > Current Goal' when viewing sub-plan" },
+          { "id": "ac2", "description": "Each ancestor is a clickable Link" },
+          { "id": "ac3", "description": "Current plan shown as plain text (not clickable)" },
+          { "id": "ac4", "description": "Uses > separator between items" }
         ]
       },
       {
@@ -294,23 +220,12 @@
         "title": "Integrate breadcrumb into PlanEditorPage",
         "scope": "planner-ui",
         "description": "Replace simple back-link with PlanBreadcrumb when viewing a sub-plan. Keep simple back-link for root plans.",
-        "dependencies": [
-          "usn005"
-        ],
+        "dependencies": ["usn005"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Root plans show existing 'Back to Plans' link"
-          },
-          {
-            "id": "ac2",
-            "description": "Sub-plans show full breadcrumb path"
-          },
-          {
-            "id": "ac3",
-            "description": "Breadcrumb positioned above plan goal"
-          }
+          { "id": "ac1", "description": "Root plans show existing 'Back to Plans' link" },
+          { "id": "ac2", "description": "Sub-plans show full breadcrumb path" },
+          { "id": "ac3", "description": "Breadcrumb positioned above plan goal" }
         ]
       },
       {
@@ -318,28 +233,13 @@
         "title": "Add tests for sub-plan navigation",
         "scope": "planner-ui",
         "description": "Unit tests for sub-plan badge rendering, Link wrapping, and breadcrumb component.",
-        "dependencies": [
-          "usn003",
-          "usn006"
-        ],
+        "dependencies": ["usn003", "usn006"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Test: step with sub_plan_id renders badge"
-          },
-          {
-            "id": "ac2",
-            "description": "Test: step with sub_plan_id is wrapped in Link"
-          },
-          {
-            "id": "ac3",
-            "description": "Test: breadcrumb renders correct path"
-          },
-          {
-            "id": "ac4",
-            "description": "Test: root plan shows simple back-link"
-          }
+          { "id": "ac1", "description": "Test: step with sub_plan_id renders badge" },
+          { "id": "ac2", "description": "Test: step with sub_plan_id is wrapped in Link" },
+          { "id": "ac3", "description": "Test: breadcrumb renders correct path" },
+          { "id": "ac4", "description": "Test: root plan shows simple back-link" }
         ]
       }
     ]

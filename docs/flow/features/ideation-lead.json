@@ -1,0 +1,205 @@
+{
+  "feature_id": "ideation-lead",
+  "title": "Interviewer Persistent Agent",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["ideation-api"],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Build the Interviewer as a persistent RelayClient service that facilitates brainstorming conversations. The Interviewer is a pure facilitator - it never reveals specialists to the user, spawns them lazily as needed, and weaves their insights into the conversation naturally.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Interviewer runs as persistent service (not spawn), using RelayClient" },
+      { "id": "ac2", "description": "Interviewer listens on #ideation channel and #ideation-{session_id} channels" },
+      { "id": "ac3", "description": "Interviewer uses Anthropic API for LLM responses (with mock mode fallback)" },
+      { "id": "ac4", "description": "Interviewer maintains conversation history per session" },
+      { "id": "ac5", "description": "Interviewer has tools: start_session, add_message, read_session, update_understanding, send_to_planner, spawn_specialist" },
+      { "id": "ac6", "description": "Interviewer spawns specialists LAZILY - on-demand when conversation needs specific expertise" },
+      { "id": "ac7", "description": "Interviewer NEVER reveals specialists to user - it's a pure 1:1 facilitated conversation" },
+      { "id": "ac8", "description": "Interviewer receives questions/observations from specialists via Relay and weaves them into its own questions naturally" },
+      { "id": "ac9", "description": "Interviewer facilitates without dominating (asks clarifying questions, draws out requirements)" },
+      { "id": "ac10", "description": "System prompt defines facilitator personality and lazy spawning strategy" },
+      { "id": "ac11", "description": "Mock mode provides canned responses when ANTHROPIC_API_KEY is missing" }
+    ],
+    "decisions": [
+      { "decision": "Lazy specialist spawning", "rationale": "Spawn specialists on-demand based on conversation needs, not all at start. More efficient, allows dynamic specialist types." },
+      { "decision": "Never reveal specialists", "rationale": "User sees only the Interviewer. Specialists are invisible infrastructure. Questions/insights are presented as Interviewer's own." },
+      { "decision": "Freeform specialist types", "rationale": "Not limited to 5 predefined roles. Interviewer decides what expertise is needed and spawns appropriate specialist." }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core"],
+    "steps": [
+      {
+        "step_id": "int001",
+        "title": "Create Interviewer config and constants",
+        "scope": "ideation-core",
+        "description": "Define Interviewer configuration matching PlannerLead pattern",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "INTERVIEWER_CONFIG = { name: 'Interviewer', displayName: 'Brainstorming Facilitator', role: 'interviewer' }" },
+          { "id": "ac2", "description": "IDEATION_CHANNEL = '#ideation'" },
+          { "id": "ac3", "description": "sessionChannelId(sessionId) = `#ideation-${sessionId.slice(0,8)}`" }
+        ]
+      },
+      {
+        "step_id": "int002",
+        "title": "Create Interviewer system prompt",
+        "scope": "ideation-core",
+        "description": "Define the facilitator personality and behavior guidelines",
+        "dependencies": ["int001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Prompt emphasizes: facilitation over direction, clarifying questions, drawing out requirements" },
+          { "id": "ac2", "description": "Prompt includes context about available specialists and when to surface their insights" },
+          { "id": "ac3", "description": "Prompt instructs: don't dominate, let human lead, ask 'what else?'" },
+          { "id": "ac4", "description": "getInterviewerPrompt({ sessionId, channelId }) returns contextual system prompt" }
+        ]
+      },
+      {
+        "step_id": "int003",
+        "title": "Define Interviewer tools",
+        "scope": "ideation-core",
+        "description": "Create Anthropic tool definitions for Interviewer capabilities (lazy spawning)",
+        "dependencies": ["int001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "start_session: { initial_intent: string } -> creates session, returns session_id (NO auto-spawn)" },
+          { "id": "ac2", "description": "read_session: { session_id: string } -> returns session with transcript and understanding" },
+          { "id": "ac3", "description": "add_message: { session_id, role, content } -> appends message to transcript" },
+          { "id": "ac4", "description": "update_understanding: { session_id, specialist_name: string, observations: Record<string, unknown> } -> updates specialist observations (freeform)" },
+          { "id": "ac5", "description": "send_to_planner: { session_id, goal?, context? } -> creates/updates plan from session understanding" },
+          { "id": "ac6", "description": "spawn_specialist: { session_id, name: string, focus: string, prompt_context?: string } -> spawns single specialist on-demand" }
+        ]
+      },
+      {
+        "step_id": "int004",
+        "title": "Implement tool execution",
+        "scope": "ideation-core",
+        "description": "Create executeTool function that calls storage/API",
+        "dependencies": ["int003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "executeTool(name, input, storage) dispatches to correct handler" },
+          { "id": "ac2", "description": "Returns ToolResult = { success: boolean, data?: unknown, error?: string }" },
+          { "id": "ac3", "description": "getMockToolResult(name, input) returns canned responses for mock mode" }
+        ]
+      },
+      {
+        "step_id": "int005",
+        "title": "Create lazy specialist spawning logic",
+        "scope": "ideation-core",
+        "description": "Implement on-demand specialist spawning (not all at once)",
+        "dependencies": ["int004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "spawnSpecialist(sessionId, name, focus, promptContext?) spawns single specialist on-demand" },
+          { "id": "ac2", "description": "Specialist name can be any string (not limited to fixed roles)" },
+          { "id": "ac3", "description": "Focus describes what expertise this specialist provides" },
+          { "id": "ac4", "description": "Specialist is spawned via Relay spawn() with session context and focus" },
+          { "id": "ac5", "description": "Specialist joins the session channel automatically" },
+          { "id": "ac6", "description": "Returns ActiveSpecialist { name, agent_id, spawned_at, role_hint }" },
+          { "id": "ac7", "description": "Session.active_specialists[] is updated with new specialist" }
+        ]
+      },
+      {
+        "step_id": "int006",
+        "title": "Implement conversation history",
+        "scope": "ideation-core",
+        "description": "Track conversation history per session channel",
+        "dependencies": ["int001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "addMessage(channelId, role, content) adds to history" },
+          { "id": "ac2", "description": "getHistory(channelId) returns ConversationMessage[]" },
+          { "id": "ac3", "description": "History is in-memory (persisted via session transcript in DB)" }
+        ]
+      },
+      {
+        "step_id": "int007",
+        "title": "Implement specialist input queue",
+        "scope": "ideation-core",
+        "description": "Queue specialist questions/observations for Interviewer to weave into conversation",
+        "dependencies": ["int006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistInput = { specialist_name: string, type: 'question' | 'observation' | 'concern', content: string, priority: number }" },
+          { "id": "ac2", "description": "queueSpecialistInput(sessionId, input) adds to queue" },
+          { "id": "ac3", "description": "getNextInput(sessionId) returns highest priority input" },
+          { "id": "ac4", "description": "Interviewer weaves specialist input into its own questions (never attributes to specialist)" }
+        ]
+      },
+      {
+        "step_id": "int008",
+        "title": "Create Interviewer service",
+        "scope": "ideation-core",
+        "description": "Main service file with init/stop lifecycle",
+        "dependencies": ["int007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "initInterviewer(storage) registers message handler via onMessage()" },
+          { "id": "ac2", "description": "stopInterviewer() unsubscribes and cleans up" },
+          { "id": "ac3", "description": "isInterviewerActive() returns boolean" },
+          { "id": "ac4", "description": "Service emits agent status events (joined, working, idle)" }
+        ]
+      },
+      {
+        "step_id": "int009",
+        "title": "Implement message handling",
+        "scope": "ideation-core",
+        "description": "Handle incoming messages and generate responses",
+        "dependencies": ["int008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "shouldHandleMessage() filters for #ideation and #ideation-* channels" },
+          { "id": "ac2", "description": "handleMessage() checks specialist queue, generates response with tools" },
+          { "id": "ac3", "description": "Messages from specialists are parsed and queued, not responded to directly" },
+          { "id": "ac4", "description": "Response sent via sendChannelMessage()" }
+        ]
+      },
+      {
+        "step_id": "int010",
+        "title": "Implement LLM response generation",
+        "scope": "ideation-core",
+        "description": "Generate responses using Anthropic API with tool loop",
+        "dependencies": ["int009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "generateResponse(channelId, message, sessionId) calls Anthropic API" },
+          { "id": "ac2", "description": "Handles tool_use responses in loop until text response" },
+          { "id": "ac3", "description": "Falls back to generateMockResponse() when no API key" },
+          { "id": "ac4", "description": "Updates agent status to 'working' during generation" }
+        ]
+      },
+      {
+        "step_id": "int011",
+        "title": "Implement session announcement",
+        "scope": "ideation-core",
+        "description": "Announce Interviewer when new session channel becomes active",
+        "dependencies": ["int010"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "notifyNewSession(sessionId, initialIntent) sends welcome message" },
+          { "id": "ac2", "description": "Welcome introduces Interviewer and explains process" },
+          { "id": "ac3", "description": "Asks first clarifying question based on intent" }
+        ]
+      },
+      {
+        "step_id": "int012",
+        "title": "Write Interviewer tests",
+        "scope": "ideation-core",
+        "description": "Unit and integration tests for Interviewer service",
+        "dependencies": ["int011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test tool execution" },
+          { "id": "ac2", "description": "Test message filtering" },
+          { "id": "ac3", "description": "Test specialist input queue" },
+          { "id": "ac4", "description": "Test mock mode responses" },
+          { "id": "ac5", "description": "Test session announcement" }
+        ]
+      }
+    ]
+  }
+}

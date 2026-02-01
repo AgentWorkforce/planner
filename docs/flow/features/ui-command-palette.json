@@ -4,43 +4,22 @@
   "type": "feature",
   "status": "completed",
   "priority": "low",
-  "dependencies": [
-    "ui-attention-sections"
-  ],
+  "dependencies": ["ui-attention-sections"],
+
   "summary": {
     "goal": "Provide Cmd+K command palette for quick plan navigation without leaving keyboard.",
     "context": "Power users expect Cmd+K for fast navigation (VSCode, Slack, Linear, etc.). Searches plans by goal, filters by status/scope, and shows recent plans. Optional enhancement that improves efficiency but isn't required for MVP.",
     "acceptance_criteria": [
-      {
-        "id": "ac1",
-        "description": "Cmd+K (Mac) / Ctrl+K (Windows) opens command palette from anywhere in app"
-      },
-      {
-        "id": "ac2",
-        "description": "Search matches plan goals with fuzzy matching"
-      },
-      {
-        "id": "ac3",
-        "description": "Results show plan goal, status badge, and scope"
-      },
-      {
-        "id": "ac4",
-        "description": "Recent plans shown before search results"
-      },
-      {
-        "id": "ac5",
-        "description": "Enter navigates to selected plan"
-      },
-      {
-        "id": "ac6",
-        "description": "Escape closes palette"
-      },
-      {
-        "id": "ac7",
-        "description": "Arrow keys navigate results"
-      }
+      { "id": "ac1", "description": "Cmd+K (Mac) / Ctrl+K (Windows) opens command palette from anywhere in app" },
+      { "id": "ac2", "description": "Search matches plan goals with fuzzy matching" },
+      { "id": "ac3", "description": "Results show plan goal, status badge, and scope" },
+      { "id": "ac4", "description": "Recent plans shown before search results" },
+      { "id": "ac5", "description": "Enter navigates to selected plan" },
+      { "id": "ac6", "description": "Escape closes palette" },
+      { "id": "ac7", "description": "Arrow keys navigate results" }
     ]
   },
+
   "design_spec": {
     "views": [
       {
@@ -48,31 +27,11 @@
         "name": "Command Palette",
         "layout": "Centered modal at 15vh from top, max-w-lg (560px), bg-bg-secondary with border-border-subtle, rounded-xl shadow-modal",
         "elements": [
-          {
-            "component": "SearchInput",
-            "use": "Search field with keyboard icon hint",
-            "props": "autofocus, bg-transparent, text-text-primary, placeholder text-text-muted"
-          },
-          {
-            "component": "KeyboardHint",
-            "use": "ESC badge in header",
-            "props": "bg-bg-tertiary border-border-default rounded px-1.5 py-0.5 text-xs text-text-muted"
-          },
-          {
-            "component": "ResultsList",
-            "use": "Scrollable list of plan results",
-            "props": "max-h-[60vh], overflow-y-auto, p-2"
-          },
-          {
-            "component": "ResultItem",
-            "use": "Plan row with goal, status, scope",
-            "props": "flex items-center gap-3 py-2.5 px-3 rounded-lg, selected state: bg-accent-cyan/10 border-accent-cyan/30"
-          },
-          {
-            "component": "SectionHeader",
-            "use": "Category label (Recent Plans, Search Results)",
-            "props": "text-xs font-semibold text-text-muted uppercase tracking-wider py-2 px-3"
-          }
+          { "component": "SearchInput", "use": "Search field with keyboard icon hint", "props": "autofocus, bg-transparent, text-text-primary, placeholder text-text-muted" },
+          { "component": "KeyboardHint", "use": "ESC badge in header", "props": "bg-bg-tertiary border-border-default rounded px-1.5 py-0.5 text-xs text-text-muted" },
+          { "component": "ResultsList", "use": "Scrollable list of plan results", "props": "max-h-[60vh], overflow-y-auto, p-2" },
+          { "component": "ResultItem", "use": "Plan row with goal, status, scope", "props": "flex items-center gap-3 py-2.5 px-3 rounded-lg, selected state: bg-accent-cyan/10 border-accent-cyan/30" },
+          { "component": "SectionHeader", "use": "Category label (Recent Plans, Search Results)", "props": "text-xs font-semibold text-text-muted uppercase tracking-wider py-2 px-3" }
         ],
         "states": {
           "empty": "Shows recent plans if available, otherwise 'No plans found' centered with text-text-muted",
@@ -81,12 +40,17 @@
           "selected": "Current selection has bg-accent-cyan/10 with subtle border highlight"
         }
       }
+    ],
+    "custom_needed": [
+      "CommandPalette - modal with keyboard handling, focus trap, and backdrop",
+      "useCommandPalette - hook for global keyboard shortcut and open state",
+      "useFuzzySearch - hook wrapping fuse.js for plan search",
+      "useRecentPlans - hook for localStorage-backed recent plan tracking"
     ]
   },
+
   "plan_implementation": {
-    "scopes": [
-      "planner-ui"
-    ],
+    "scopes": ["planner-ui"],
     "steps": [
       {
         "step_id": "i001",
@@ -96,34 +60,9 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "fuse.js added to package.json dependencies"
-          },
-          {
-            "id": "ac2",
-            "description": "TypeScript types available (@types/fuse.js or built-in)"
-          }
-        ],
-        "specification": {
-          "testing": {
-            "rationale": "Command palette is a power-user feature. Unit tests for hooks provide confidence in logic. Integration tests verify keyboard behavior. One E2E test confirms full flow. Skip visual/styling tests.",
-            "skip_rationale": [
-              "Visual styling tests (CSS classes) - verified manually, low regression risk",
-              "Exact positioning tests - layout is not critical to functionality",
-              "Performance tests for fuzzy search - fuse.js is battle-tested",
-              "Accessibility tests - should be added if this becomes high-traffic feature"
-            ]
-          },
-          "design": {
-            "custom_components": [
-              "CommandPalette - modal with keyboard handling, focus trap, and backdrop",
-              "useCommandPalette - hook for global keyboard shortcut and open state",
-              "useFuzzySearch - hook wrapping fuse.js for plan search",
-              "useRecentPlans - hook for localStorage-backed recent plan tracking"
-            ]
-          }
-        }
+          { "id": "ac1", "description": "fuse.js added to package.json dependencies" },
+          { "id": "ac2", "description": "TypeScript types available (@types/fuse.js or built-in)" }
+        ]
       },
       {
         "step_id": "i002",
@@ -133,26 +72,11 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Hook returns { isOpen: boolean, open: () => void, close: () => void, toggle: () => void }"
-          },
-          {
-            "id": "ac2",
-            "description": "Cmd+K opens palette on Mac (e.metaKey && e.key === 'k')"
-          },
-          {
-            "id": "ac3",
-            "description": "Ctrl+K opens palette on Windows/Linux (e.ctrlKey && e.key === 'k')"
-          },
-          {
-            "id": "ac4",
-            "description": "Event listener registered on mount, cleaned up on unmount"
-          },
-          {
-            "id": "ac5",
-            "description": "Prevents default browser behavior (Ctrl+K focuses address bar in some browsers)"
-          }
+          { "id": "ac1", "description": "Hook returns { isOpen: boolean, open: () => void, close: () => void, toggle: () => void }" },
+          { "id": "ac2", "description": "Cmd+K opens palette on Mac (e.metaKey && e.key === 'k')" },
+          { "id": "ac3", "description": "Ctrl+K opens palette on Windows/Linux (e.ctrlKey && e.key === 'k')" },
+          { "id": "ac4", "description": "Event listener registered on mount, cleaned up on unmount" },
+          { "id": "ac5", "description": "Prevents default browser behavior (Ctrl+K focuses address bar in some browsers)" }
         ]
       },
       {
@@ -160,35 +84,15 @@
         "title": "Create useFuzzySearch hook wrapping fuse.js",
         "scope": "planner-ui",
         "description": "Hook that takes plan list and search query, returns ranked fuzzy-matched results. Configure fuse.js to search plan.summary.goal field with reasonable threshold.",
-        "dependencies": [
-          "i001"
-        ],
+        "dependencies": ["i001"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Hook signature: useFuzzySearch(plans: Plan[], query: string) => Plan[]"
-          },
-          {
-            "id": "ac2",
-            "description": "Searches plan.summary.goal field"
-          },
-          {
-            "id": "ac3",
-            "description": "Returns empty array when query is empty (allows showing recent plans instead)"
-          },
-          {
-            "id": "ac4",
-            "description": "Results ranked by fuse.js score (best match first)"
-          },
-          {
-            "id": "ac5",
-            "description": "Threshold configured for reasonable typo tolerance (~0.4)"
-          },
-          {
-            "id": "ac6",
-            "description": "Fuse instance memoized to avoid recreation on every render"
-          }
+          { "id": "ac1", "description": "Hook signature: useFuzzySearch(plans: Plan[], query: string) => Plan[]" },
+          { "id": "ac2", "description": "Searches plan.summary.goal field" },
+          { "id": "ac3", "description": "Returns empty array when query is empty (allows showing recent plans instead)" },
+          { "id": "ac4", "description": "Results ranked by fuse.js score (best match first)" },
+          { "id": "ac5", "description": "Threshold configured for reasonable typo tolerance (~0.4)" },
+          { "id": "ac6", "description": "Fuse instance memoized to avoid recreation on every render" }
         ]
       },
       {
@@ -199,26 +103,11 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Hook returns { recentPlanIds: string[], addRecent: (planId: string) => void }"
-          },
-          {
-            "id": "ac2",
-            "description": "Stores in localStorage key 'planner:recentPlans'"
-          },
-          {
-            "id": "ac3",
-            "description": "Maintains max 5 entries (LRU - most recent first)"
-          },
-          {
-            "id": "ac4",
-            "description": "Adding existing ID moves it to front (no duplicates)"
-          },
-          {
-            "id": "ac5",
-            "description": "Gracefully handles localStorage unavailable (returns empty array)"
-          }
+          { "id": "ac1", "description": "Hook returns { recentPlanIds: string[], addRecent: (planId: string) => void }" },
+          { "id": "ac2", "description": "Stores in localStorage key 'planner:recentPlans'" },
+          { "id": "ac3", "description": "Maintains max 5 entries (LRU - most recent first)" },
+          { "id": "ac4", "description": "Adding existing ID moves it to front (no duplicates)" },
+          { "id": "ac5", "description": "Gracefully handles localStorage unavailable (returns empty array)" }
         ]
       },
       {
@@ -226,73 +115,24 @@
         "title": "Create CommandPalette component",
         "scope": "planner-ui",
         "description": "Modal component following relay-dashboard patterns: fixed inset-0 backdrop, centered dialog at 15vh from top, search input with keyboard hints, scrollable results list. Handles keyboard navigation (arrow keys, Enter, Escape). Uses design system colors/spacing.",
-        "dependencies": [
-          "i002",
-          "i003",
-          "i004"
-        ],
+        "dependencies": ["i002", "i003", "i004"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Renders as fixed overlay with bg-black/60 backdrop"
-          },
-          {
-            "id": "ac2",
-            "description": "Dialog positioned 15vh from top, max-w-[560px], max-h-[60vh]"
-          },
-          {
-            "id": "ac3",
-            "description": "Uses design system: bg-bg-secondary, border-border-subtle, rounded-xl, shadow-modal"
-          },
-          {
-            "id": "ac4",
-            "description": "Search input autofocuses on open, styled with bg-transparent text-text-primary"
-          },
-          {
-            "id": "ac5",
-            "description": "ESC keyboard hint shown in header (bg-bg-tertiary border-border-default)"
-          },
-          {
-            "id": "ac6",
-            "description": "Escape key closes palette"
-          },
-          {
-            "id": "ac7",
-            "description": "Click on backdrop closes palette"
-          },
-          {
-            "id": "ac8",
-            "description": "Arrow up/down moves selection through results"
-          },
-          {
-            "id": "ac9",
-            "description": "Enter navigates to selected plan (using react-router navigate)"
-          },
-          {
-            "id": "ac10",
-            "description": "Selection wraps at boundaries (down from last goes to first)"
-          },
-          {
-            "id": "ac11",
-            "description": "Selected item has bg-accent-cyan/10 with border-accent-cyan/30"
-          },
-          {
-            "id": "ac12",
-            "description": "Results show: plan goal (truncated), status badge, scopes"
-          },
-          {
-            "id": "ac13",
-            "description": "Empty query shows Recent Plans section (from useRecentPlans)"
-          },
-          {
-            "id": "ac14",
-            "description": "With query shows Search Results section (from useFuzzySearch)"
-          },
-          {
-            "id": "ac15",
-            "description": "No results shows 'No plans match [query]' message"
-          }
+          { "id": "ac1", "description": "Renders as fixed overlay with bg-black/60 backdrop" },
+          { "id": "ac2", "description": "Dialog positioned 15vh from top, max-w-[560px], max-h-[60vh]" },
+          { "id": "ac3", "description": "Uses design system: bg-bg-secondary, border-border-subtle, rounded-xl, shadow-modal" },
+          { "id": "ac4", "description": "Search input autofocuses on open, styled with bg-transparent text-text-primary" },
+          { "id": "ac5", "description": "ESC keyboard hint shown in header (bg-bg-tertiary border-border-default)" },
+          { "id": "ac6", "description": "Escape key closes palette" },
+          { "id": "ac7", "description": "Click on backdrop closes palette" },
+          { "id": "ac8", "description": "Arrow up/down moves selection through results" },
+          { "id": "ac9", "description": "Enter navigates to selected plan (using react-router navigate)" },
+          { "id": "ac10", "description": "Selection wraps at boundaries (down from last goes to first)" },
+          { "id": "ac11", "description": "Selected item has bg-accent-cyan/10 with border-accent-cyan/30" },
+          { "id": "ac12", "description": "Results show: plan goal (truncated), status badge, scopes" },
+          { "id": "ac13", "description": "Empty query shows Recent Plans section (from useRecentPlans)" },
+          { "id": "ac14", "description": "With query shows Search Results section (from useFuzzySearch)" },
+          { "id": "ac15", "description": "No results shows 'No plans match [query]' message" }
         ]
       },
       {
@@ -303,30 +143,12 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Displays plan.summary.goal truncated to ~60 chars with ellipsis"
-          },
-          {
-            "id": "ac2",
-            "description": "Shows status badge (draft/approved/published) using existing color scheme"
-          },
-          {
-            "id": "ac3",
-            "description": "Shows first scope if plan has scopes, styled as subtle tag"
-          },
-          {
-            "id": "ac4",
-            "description": "Hover state: bg-bg-hover transition-colors"
-          },
-          {
-            "id": "ac5",
-            "description": "Selected prop adds bg-accent-cyan/10 border-accent-cyan/30"
-          },
-          {
-            "id": "ac6",
-            "description": "Forwards ref for scroll-into-view behavior"
-          }
+          { "id": "ac1", "description": "Displays plan.summary.goal truncated to ~60 chars with ellipsis" },
+          { "id": "ac2", "description": "Shows status badge (draft/approved/published) using existing color scheme" },
+          { "id": "ac3", "description": "Shows first scope if plan has scopes, styled as subtle tag" },
+          { "id": "ac4", "description": "Hover state: bg-bg-hover transition-colors" },
+          { "id": "ac5", "description": "Selected prop adds bg-accent-cyan/10 border-accent-cyan/30" },
+          { "id": "ac6", "description": "Forwards ref for scroll-into-view behavior" }
         ]
       },
       {
@@ -334,32 +156,14 @@
         "title": "Integrate CommandPalette into Layout",
         "scope": "planner-ui",
         "description": "Add CommandPalette to Layout component (rendered on all pages). Wire up useCommandPalette hook for global open/close. Fetch plans list for search.",
-        "dependencies": [
-          "i005",
-          "i006"
-        ],
+        "dependencies": ["i005", "i006"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "CommandPalette rendered inside Layout component"
-          },
-          {
-            "id": "ac2",
-            "description": "useCommandPalette hook provides isOpen state to CommandPalette"
-          },
-          {
-            "id": "ac3",
-            "description": "Plans fetched on palette open (not on page load to avoid unnecessary requests)"
-          },
-          {
-            "id": "ac4",
-            "description": "Loading state shown while plans are fetching"
-          },
-          {
-            "id": "ac5",
-            "description": "Cmd+K works from any page in the app"
-          }
+          { "id": "ac1", "description": "CommandPalette rendered inside Layout component" },
+          { "id": "ac2", "description": "useCommandPalette hook provides isOpen state to CommandPalette" },
+          { "id": "ac3", "description": "Plans fetched on palette open (not on page load to avoid unnecessary requests)" },
+          { "id": "ac4", "description": "Loading state shown while plans are fetching" },
+          { "id": "ac5", "description": "Cmd+K works from any page in the app" }
         ]
       },
       {
@@ -367,99 +171,42 @@
         "title": "Track plan views for recent plans",
         "scope": "planner-ui",
         "description": "Call useRecentPlans.addRecent when viewing a plan in PlanEditorPage. This populates the recent plans list shown in command palette.",
-        "dependencies": [
-          "i004",
-          "i007"
-        ],
+        "dependencies": ["i004", "i007"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "PlanEditorPage calls addRecent(planId) on mount"
-          },
-          {
-            "id": "ac2",
-            "description": "Recent plans appear in command palette when opened with empty query"
-          },
-          {
-            "id": "ac3",
-            "description": "Recent list updates when navigating between plans"
-          }
+          { "id": "ac1", "description": "PlanEditorPage calls addRecent(planId) on mount" },
+          { "id": "ac2", "description": "Recent plans appear in command palette when opened with empty query" },
+          { "id": "ac3", "description": "Recent list updates when navigating between plans" }
         ]
       }
     ]
   },
+
   "user_flow": {
     "steps": [
-      {
-        "step_id": "s001",
-        "title": "[action] User presses Cmd+K (Mac) or Ctrl+K (Windows)"
-      },
-      {
-        "step_id": "s002",
-        "title": "[assert] Command palette modal appears centered on screen"
-      },
-      {
-        "step_id": "s003",
-        "title": "[assert] Search input is focused with cursor ready"
-      },
-      {
-        "step_id": "s004",
-        "title": "[assert] Recent plans section shows previously viewed plans (if any)"
-      },
-      {
-        "step_id": "s005",
-        "title": "[action] User types search query"
-      },
-      {
-        "step_id": "s006",
-        "title": "[assert] Results update live as user types, showing matching plans"
-      },
-      {
-        "step_id": "s007",
-        "title": "[assert] First result is automatically selected"
-      },
-      {
-        "step_id": "s008",
-        "title": "[action] User presses arrow down"
-      },
-      {
-        "step_id": "s009",
-        "title": "[assert] Selection moves to next result with visual highlight"
-      },
-      {
-        "step_id": "s010",
-        "title": "[action] User presses Enter"
-      },
-      {
-        "step_id": "s011",
-        "title": "[system] Navigation to selected plan occurs"
-      },
-      {
-        "step_id": "s012",
-        "title": "[assert] Palette closes and plan editor page loads"
-      },
-      {
-        "step_id": "s013",
-        "title": "[action] User presses Cmd+K again"
-      },
-      {
-        "step_id": "s014",
-        "title": "[assert] Recent plans now includes the just-viewed plan at top"
-      },
-      {
-        "step_id": "s015",
-        "title": "[action] User presses Escape"
-      },
-      {
-        "step_id": "s016",
-        "title": "[assert] Palette closes without navigation"
-      }
+      { "step_id": "s001", "title": "[action] User presses Cmd+K (Mac) or Ctrl+K (Windows)" },
+      { "step_id": "s002", "title": "[assert] Command palette modal appears centered on screen" },
+      { "step_id": "s003", "title": "[assert] Search input is focused with cursor ready" },
+      { "step_id": "s004", "title": "[assert] Recent plans section shows previously viewed plans (if any)" },
+      { "step_id": "s005", "title": "[action] User types search query" },
+      { "step_id": "s006", "title": "[assert] Results update live as user types, showing matching plans" },
+      { "step_id": "s007", "title": "[assert] First result is automatically selected" },
+      { "step_id": "s008", "title": "[action] User presses arrow down" },
+      { "step_id": "s009", "title": "[assert] Selection moves to next result with visual highlight" },
+      { "step_id": "s010", "title": "[action] User presses Enter" },
+      { "step_id": "s011", "title": "[system] Navigation to selected plan occurs" },
+      { "step_id": "s012", "title": "[assert] Palette closes and plan editor page loads" },
+      { "step_id": "s013", "title": "[action] User presses Cmd+K again" },
+      { "step_id": "s014", "title": "[assert] Recent plans now includes the just-viewed plan at top" },
+      { "step_id": "s015", "title": "[action] User presses Escape" },
+      { "step_id": "s016", "title": "[assert] Palette closes without navigation" }
     ]
   },
+
   "plan_tests": {
     "coverage": "integration",
     "priority": "medium",
+    "rationale": "Command palette is a power-user feature. Unit tests for hooks provide confidence in logic. Integration tests verify keyboard behavior. One E2E test confirms full flow. Skip visual/styling tests.",
     "cases": [
       {
         "type": "happy",
@@ -547,23 +294,18 @@
       "Plan goals should include: 'Authentication feature', 'Payment processing', 'User settings'",
       "Mock localStorage for useRecentPlans tests",
       "Mock react-router navigate function for navigation tests"
+    ],
+    "skip_rationale": [
+      "Visual styling tests (CSS classes) - verified manually, low regression risk",
+      "Exact positioning tests - layout is not critical to functionality",
+      "Performance tests for fuzzy search - fuse.js is battle-tested",
+      "Accessibility tests - should be added if this becomes high-traffic feature"
     ]
   },
+
   "references": [
-    {
-      "type": "doc",
-      "title": "Linear command menu",
-      "url": "https://linear.app/docs/command-menu"
-    },
-    {
-      "type": "doc",
-      "title": "relay-dashboard CommandPalette",
-      "path": ".context/relay-dashboard/packages/dashboard/src/components/CommandPalette.tsx"
-    },
-    {
-      "type": "doc",
-      "title": "fuse.js documentation",
-      "url": "https://fusejs.io/"
-    }
+    { "type": "doc", "title": "Linear command menu", "url": "https://linear.app/docs/command-menu" },
+    { "type": "doc", "title": "relay-dashboard CommandPalette", "path": ".context/relay-dashboard/packages/dashboard/src/components/CommandPalette.tsx" },
+    { "type": "doc", "title": "fuse.js documentation", "url": "https://fusejs.io/" }
   ]
 }

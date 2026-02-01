@@ -2,74 +2,25 @@
   "feature_id": "schema-specification",
   "title": "Step-Level Specification Schema",
   "type": "feature",
-  "status": "verified",
+  "status": "draft",
   "priority": "high",
   "dependencies": [],
   "parent_epic": "schema-enrichment",
   "summary": {
-    "goal": "Define freeform Zod schemas for step-level Specification - implementation details keyed by domain (architecture, model, design, testing, security, or any custom domain)",
+    "goal": "Define Zod schemas for step-level Specification - structured implementation details for architecture, design, testing, and security per step",
     "context": "Specification is STEP-LEVEL (not plan-level). Each step can have its own micro-specifications detailing architecture decisions, design elements, test cases, and security requirements relevant to that step.",
-    "model_decision": "Hybrid model: Plan-level Understanding (ideation context) + Plan-level Context (decisions) + Step-level Specification (implementation details per step)",
-    "freeform_rationale": "Different steps need different domains. The Orchestrator is an LLM that can understand any JSON structure. Suggested domains and fields are documented for agent prompts but not enforced in Zod schemas.",
+    "model_decision": "Hybrid model: Plan-level Understanding (ideation context) + Step-level Specification (implementation details per step)",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "StepSpecificationSchema = z.record(z.string(), z.record(z.string(), z.unknown())) - any domain key, any fields" },
-      { "id": "ac2", "description": "Suggested domains documented: architecture, model, design, testing, security (not enforced in schema)" },
-      { "id": "ac3", "description": "Suggested fields per domain documented in design_spec (for agent prompts, not schema validation)" },
-      { "id": "ac4", "description": "SUGGESTED_DOMAINS constant with domain names and field hints (for UI/agent prompts)" },
-      { "id": "ac5", "description": "All spec fields are optional for incremental population" },
-      { "id": "ac6", "description": "Schemas exported from src/domain/specification.ts" },
-      { "id": "ac7", "description": "TypeScript types exported for frontend use" },
-      { "id": "ac8", "description": "StepSchema in step.ts updated to include optional specification field" }
+      { "id": "ac1", "description": "StepSpecificationSchema added to Step schema as optional field" },
+      { "id": "ac2", "description": "ArchitectureSpec schema with: decisions[], api_contracts[], boundaries[] (step-scoped)" },
+      { "id": "ac3", "description": "DesignSpec schema with: components[], views[], interactions[] (step-scoped)" },
+      { "id": "ac4", "description": "TestingSpec schema with: test_cases[], coverage_notes (step-scoped)" },
+      { "id": "ac5", "description": "SecuritySpec schema with: requirements[], threats[] (step-scoped)" },
+      { "id": "ac6", "description": "All spec fields are optional for incremental population" },
+      { "id": "ac7", "description": "Schemas exported from src/domain/specification.ts" },
+      { "id": "ac8", "description": "TypeScript types exported for frontend use" },
+      { "id": "ac9", "description": "StepSchema in step.ts updated to include optional specification field" }
     ]
-  },
-  "design_spec": {
-    "schema_approach": "Freeform: z.record(z.string(), z.record(z.string(), z.unknown())). Suggested domains and fields below are documentation for agent prompts - NOT enforced by Zod validation.",
-    "suggested_domains": {
-      "architecture": {
-        "description": "Step-scoped architecture decisions and API contracts",
-        "suggested_fields": ["decisions", "api_contracts", "boundaries"],
-        "field_hints": {
-          "decisions": "Array of {decision_id, decision, rationale, alternatives?}",
-          "api_contracts": "Array of {endpoint, method, request_schema?, response_schema?}",
-          "boundaries": "Array of {component_id, name, technology?, owns?}"
-        }
-      },
-      "model": {
-        "description": "Step-scoped data model specifications",
-        "suggested_fields": ["entities", "relationships", "schemas", "migrations"],
-        "field_hints": {
-          "entities": "Array of {entity_id, name, attributes?, type?}",
-          "relationships": "Array of {from, to, cardinality, description?}",
-          "schemas": "Array of {schema_id, format, content}",
-          "migrations": "Array of {migration_id, description, sql?}"
-        }
-      },
-      "design": {
-        "description": "Step-scoped UI/UX specifications",
-        "suggested_fields": ["components", "views", "interactions"],
-        "field_hints": {
-          "components": "Array of {component_id, name, props?, variants?, states?}",
-          "views": "Array of {view_id, name, route?, components?}",
-          "interactions": "Array of {trigger, action, feedback?}"
-        }
-      },
-      "testing": {
-        "description": "Step-scoped test specifications",
-        "suggested_fields": ["test_cases", "coverage_notes"],
-        "field_hints": {
-          "test_cases": "Array of {case_id, type, priority, description, steps?, expected_result?}",
-          "coverage_notes": "String with coverage strategy notes"
-        }
-      },
-      "security": {
-        "description": "Step-scoped security specifications",
-        "suggested_fields": ["requirements", "threats"],
-        "field_hints": {
-          "requirements": "Array of {requirement_id, category, description, priority}",
-          "threats": "Array of {threat, likelihood, impact, mitigations?}"
-        }
-      }
-    }
   },
   "plan_implementation": {
     "scopes": ["planner-core"],
@@ -78,15 +29,24 @@
         "step_id": "s001",
         "title": "Create specification.ts domain file",
         "scope": "planner-core",
-        "description": "Create src/domain/specification.ts with freeform Zod schema for step specifications",
+        "description": "Create src/domain/specification.ts with Zod schemas for all spec domains",
         "dependencies": [],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "DomainSpecSchema = z.record(z.string(), z.unknown()) - any fields per domain" },
-          { "id": "ac2", "description": "StepSpecificationSchema = z.record(z.string(), DomainSpecSchema) - any domain keys" },
-          { "id": "ac3", "description": "SUGGESTED_DOMAINS constant with domain names and field hints (for UI/agent prompts)" },
-          { "id": "ac4", "description": "All schemas and types exported" },
-          { "id": "ac5", "description": "JSDoc comments document the freeform nature and point to suggested_domains" }
+          { "id": "ac1", "description": "DecisionSchema with: decision_id: string, decision: string, rationale: string, alternatives?: { option, pros?, cons? }[], decided_at?: string" },
+          { "id": "ac2", "description": "ApiContractSchema with: endpoint: string, method: enum, description?: string, request_schema?: string, response_schema?: string, errors?: { code, description }[]" },
+          { "id": "ac3", "description": "BoundarySchema with: component_id: string, name: string, description?: string, technology?: string, owns?: string[]" },
+          { "id": "ac4", "description": "ArchitectureSpecSchema with: decisions?: Decision[], api_contracts?: ApiContract[], boundaries?: Boundary[]" },
+          { "id": "ac5", "description": "ComponentSpecSchema with: component_id: string, name: string, description?: string, props?: { name, type, required?, description? }[], variants?: string[], states?: string[]" },
+          { "id": "ac6", "description": "ViewSpecSchema with: view_id: string, name: string, route?: string, description?: string, components?: string[], states?: { state, description? }[]" },
+          { "id": "ac7", "description": "InteractionSchema with: trigger: string, action: string, feedback?: string" },
+          { "id": "ac8", "description": "DesignSpecSchema with: components?: ComponentSpec[], views?: ViewSpec[], interactions?: Interaction[]" },
+          { "id": "ac9", "description": "TestCaseSchema with: case_id: string, type: enum('happy'|'edge'|'error'|'security'|'performance'), priority: enum('critical'|'high'|'medium'|'low'), description: string, preconditions?: string[], steps?: string[], expected_result?: string" },
+          { "id": "ac10", "description": "TestingSpecSchema with: test_cases?: TestCase[], coverage_notes?: string" },
+          { "id": "ac11", "description": "SecurityRequirementSchema with: requirement_id: string, category: enum('authentication'|'authorization'|'data'|'transport'|'compliance'), description: string, priority: enum" },
+          { "id": "ac12", "description": "ThreatSchema with: threat: string, likelihood: enum('high'|'medium'|'low'), impact: enum, mitigations?: string[]" },
+          { "id": "ac13", "description": "SecuritySpecSchema with: requirements?: SecurityRequirement[], threats?: Threat[]" },
+          { "id": "ac14", "description": "StepSpecificationSchema combining all domain specs as optional fields" }
         ]
       },
       {
@@ -111,42 +71,24 @@
         "dependencies": ["s001"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "src/domain/index.ts exports StepSpecificationSchema and DomainSpecSchema" },
-          { "id": "ac2", "description": "src/domain/index.ts exports StepSpecification and DomainSpec types" },
-          { "id": "ac3", "description": "src/domain/index.ts exports SUGGESTED_DOMAINS constant" }
+          { "id": "ac1", "description": "src/domain/index.ts exports all spec schemas" },
+          { "id": "ac2", "description": "src/domain/index.ts exports all spec types" }
         ]
       },
       {
         "step_id": "s004",
         "title": "Add specification.test.ts",
         "scope": "planner-core",
-        "description": "Create unit tests for freeform specification schemas",
+        "description": "Create unit tests for specification schemas",
         "dependencies": ["s001"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Test: StepSpecificationSchema accepts any domain key (architecture, model, custom_domain)" },
-          { "id": "ac2", "description": "Test: DomainSpecSchema accepts any field names and values" },
-          { "id": "ac3", "description": "Test: StepSpecificationSchema accepts empty object {}" },
-          { "id": "ac4", "description": "Test: StepSpecificationSchema accepts nested objects and arrays as field values" },
-          { "id": "ac5", "description": "Test: SUGGESTED_DOMAINS constant contains expected domains and field hints" }
+          { "id": "ac1", "description": "Test: Each domain spec schema validates with all fields" },
+          { "id": "ac2", "description": "Test: Each domain spec schema validates with no fields (all optional)" },
+          { "id": "ac3", "description": "Test: StepSpecificationSchema accepts any combination of domain specs" },
+          { "id": "ac4", "description": "Test: Enum fields reject invalid values" }
         ]
       }
     ]
-  },
-  "audit": {
-    "last_run": "2026-02-01",
-    "result": "pass",
-    "criteria": [
-      { "id": "ac1", "status": "satisfied", "evidence": "src/domain/specification.ts:27 - StepSpecificationSchema = z.record(z.string(), DomainSpecSchema)" },
-      { "id": "ac2", "status": "satisfied", "evidence": "src/domain/specification.ts:35-80 - SUGGESTED_DOMAINS contains architecture, model, design, testing, security" },
-      { "id": "ac3", "status": "satisfied", "evidence": "docs/flow/features/schema-specification.json design_spec.suggested_domains + src/domain/specification.ts field_hints" },
-      { "id": "ac4", "status": "satisfied", "evidence": "src/domain/specification.ts:35-80 - SUGGESTED_DOMAINS constant with domain names and field_hints" },
-      { "id": "ac5", "status": "satisfied", "evidence": "src/domain/step.ts:28 - specification: StepSpecificationSchema.optional()" },
-      { "id": "ac6", "status": "satisfied", "evidence": "src/domain/specification.ts exports DomainSpecSchema, StepSpecificationSchema, SUGGESTED_DOMAINS" },
-      { "id": "ac7", "status": "satisfied", "evidence": "src/domain/index.ts:21-29 exports types; packages/planner-ui/src/types/plan.ts has DomainSpec, Specification" },
-      { "id": "ac8", "status": "satisfied", "evidence": "src/domain/step.ts:28 - specification: StepSpecificationSchema.optional()" }
-    ],
-    "drift": [],
-    "notes": "Change request fix completed 2026-02-01. Implementation now matches freeform schema design. Typed schemas removed, freeform z.record pattern implemented. All 702 backend tests + 715 frontend tests pass."
   }
 }

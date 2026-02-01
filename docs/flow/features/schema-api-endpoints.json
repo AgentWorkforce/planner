@@ -1,18 +1,14 @@
 {
   "feature_id": "schema-api-endpoints",
-  "title": "API Endpoints for Understanding, Context & Specification",
+  "title": "API Endpoints for Understanding & Specification",
   "type": "feature",
-  "status": "complete",
+  "status": "draft",
   "priority": "high",
   "dependencies": ["schema-db-migration"],
   "parent_epic": "schema-enrichment",
-  "extends_for_context": {
-    "note": "Context API endpoints are part of schema-context feature (c007, c008)",
-    "see": "schema-context.json"
-  },
   "summary": {
     "goal": "Add REST API endpoints for reading and updating understanding and step specifications",
-    "context": "Agents and UI need to incrementally update specific parts of understanding (per role) and specification (per step, per domain) without replacing the whole object. Context endpoints will be added as part of schema-context feature.",
+    "context": "Agents and UI need to incrementally update specific parts of understanding (per role) and specification (per step, per domain) without replacing the whole object.",
     "acceptance_criteria": [
       { "id": "ac1", "description": "GET /plans/:id returns understanding in version response" },
       { "id": "ac2", "description": "GET /plans/:id returns specification in each step" },

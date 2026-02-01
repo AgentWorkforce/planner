@@ -5,213 +5,54 @@
   "status": "draft",
   "priority": "critical",
   "dependencies": [],
-  "extends": [
-    "domain-plan",
-    "domain-step",
-    "storage-sqlite",
-    "api-plan-crud"
-  ],
+  "extends": ["domain-plan", "domain-step", "storage-sqlite", "api-plan-crud"],
   "design_reference": ".context/planner-schema-enrichment.md",
   "summary": {
-    "goal": "Extend the schema with plan-level 'understanding' (agent observations), plan-level 'context' (formalized decisions), and step-level 'specification' (architecture/design/testing/security details) to support the Intake -> Planner -> Orchestrator pipeline",
-    "context": "Current schema only has summary + steps. We need richer structure to capture ideation insights, formalized decisions, and formal specs. The information flow is: understanding (observations) -> context (decisions) -> specification (implementation).",
+    "goal": "Extend the schema with plan-level 'understanding' (agent observations) and step-level 'specification' (architecture/design/testing/security details) to support the Intake -> Planner -> Orchestrator pipeline",
+    "context": "Current schema only has summary + steps. We need richer structure to capture ideation insights and formal specs. HYBRID MODEL: Understanding is plan-level (context for the whole plan), Specification is step-level (each step has its own arch/design/test/security spec).",
     "model": {
       "understanding": "Plan-level - what agents observed during ideation (observations, keywords, questions, concerns per role)",
-      "context": "Plan-level - formalized decisions per role that inform step-level specs (designer: library/theme/patterns, architect: tech_stack/api_style/boundaries, tester: framework/strategy, security: auth/compliance)",
       "specification": "Step-level - each step can have its own architecture decisions, design elements, test cases, security requirements"
     },
-    "information_flow": {
-      "description": "Three-stage refinement from loose to precise",
-      "stages": [
-        {
-          "stage": "understanding",
-          "type": "exploratory",
-          "scope": "plan-level",
-          "content": "Loose observations, questions, concerns from agent ideation"
-        },
-        {
-          "stage": "context",
-          "type": "decisions",
-          "scope": "plan-level",
-          "content": "Formalized choices that emerged from understanding"
-        },
-        {
-          "stage": "specification",
-          "type": "implementation",
-          "scope": "step-level",
-          "content": "Concrete implementation details per step"
-        }
-      ]
-    },
     "in_scope": [
-      "Zod schemas for Understanding (plan-level) - agent observations",
-      "Zod schemas for Context (plan-level) - role-keyed decisions",
-      "Zod schemas for Specification (step-level) - implementation details",
-      "Database migration adding JSONB columns for all three",
-      "API endpoints for reading/updating understanding, context, and step specifications",
+      "Zod schemas for Understanding (plan-level) and Specification (step-level)",
+      "Database migration adding JSONB columns",
+      "API endpoints for reading/updating understanding and step specifications",
       "Understanding tab in PlanEditorPage showing agent observations",
-      "Context tab in PlanEditorPage showing formalized decisions per role",
       "Tabbed specification editor in StepEditor (Details | Architecture | Design | Testing | Security)"
     ],
     "out_of_scope": [
       "Ideation conversation UI (future Intake package)",
       "Automatic agent population of understanding (manual for now)",
-      "Automatic derivation of context from understanding",
       "Step generation from specification (future enhancement)",
       "Per-domain approval workflow for specifications"
     ],
     "acceptance_criteria": [
-      {
-        "id": "ac1",
-        "description": "PlanVersion schema includes optional 'understanding' field (record of role -> AgentObservations)"
-      },
-      {
-        "id": "ac2",
-        "description": "PlanVersion schema includes optional 'context' field (record of role -> RoleContext)"
-      },
-      {
-        "id": "ac3",
-        "description": "Step schema includes optional 'specification' field with architecture, design, testing, security sub-schemas"
-      },
-      {
-        "id": "ac4",
-        "description": "Database stores understanding and context at plan_versions level, specification in steps JSONB"
-      },
-      {
-        "id": "ac5",
-        "description": "GET /plans/:id/versions/:version returns understanding, context, and steps with specification"
-      },
-      {
-        "id": "ac6",
-        "description": "PATCH /plans/:id/versions/:version/understanding/:role updates agent observations"
-      },
-      {
-        "id": "ac7",
-        "description": "PATCH /plans/:id/versions/:version/context/:role updates formalized decisions"
-      },
-      {
-        "id": "ac8",
-        "description": "PATCH /plans/:id/versions/:version/steps/:stepId/specification/:domain updates step spec"
-      },
-      {
-        "id": "ac9",
-        "description": "PlanEditorPage has Understanding tab and Context tab (Plan | Understanding | Context)"
-      },
-      {
-        "id": "ac10",
-        "description": "StepEditor shows tabbed spec editor when expanded (Details | Architecture | Design | Testing | Security)"
-      },
-      {
-        "id": "ac11",
-        "description": "Understanding tab displays observations, keywords, questions, concerns per role"
-      },
-      {
-        "id": "ac12",
-        "description": "Context tab displays formalized decisions per role with structured fields"
-      },
-      {
-        "id": "ac13",
-        "description": "Step spec tabs allow inline editing of each domain's structured fields"
-      },
-      {
-        "id": "ac14",
-        "description": "Existing plans without understanding/context/specification continue to work (backward compatible)"
-      },
-      {
-        "id": "ac15",
-        "description": "MCP tools can read and write understanding, context, and step specifications"
-      }
+      { "id": "ac1", "description": "PlanVersion schema includes optional 'understanding' field (record of role -> AgentObservations)" },
+      { "id": "ac2", "description": "Step schema includes optional 'specification' field with architecture, design, testing, security sub-schemas" },
+      { "id": "ac3", "description": "Database stores understanding at plan_versions level, specification in steps JSONB" },
+      { "id": "ac4", "description": "GET /plans/:id/versions/:version returns understanding and steps with specification" },
+      { "id": "ac5", "description": "PATCH /plans/:id/versions/:version/understanding/:role updates agent observations" },
+      { "id": "ac6", "description": "PATCH /plans/:id/versions/:version/steps/:stepId/specification/:domain updates step spec" },
+      { "id": "ac7", "description": "PlanEditorPage has Understanding tab (Plan | Understanding | Decisions)" },
+      { "id": "ac8", "description": "StepEditor shows tabbed spec editor when expanded (Details | Architecture | Design | Testing | Security)" },
+      { "id": "ac9", "description": "Understanding tab displays observations, keywords, questions, concerns per role" },
+      { "id": "ac10", "description": "Step spec tabs allow inline editing of each domain's structured fields" },
+      { "id": "ac11", "description": "Existing plans without understanding/specification continue to work (backward compatible)" },
+      { "id": "ac12", "description": "MCP tools can read and write understanding and step specifications" }
     ]
   },
   "sub_features": [
     "schema-understanding",
-    "schema-context",
     "schema-specification",
     "schema-db-migration",
     "schema-api-endpoints",
     "schema-ui-understanding",
-    "schema-ui-context",
     "schema-ui-specification",
     "schema-mcp-tools"
   ],
-  "plan_tests": {
-    "coverage": "integration",
-    "priority": "high",
-    "cases": [
-      {
-        "type": "happy",
-        "scope": "api",
-        "description": "Create plan -> PATCH understanding for 'architect' role -> GET returns understanding.architect"
-      },
-      {
-        "type": "happy",
-        "scope": "api",
-        "description": "Create plan -> PATCH context for 'designer' role -> GET returns context.designer"
-      },
-      {
-        "type": "happy",
-        "scope": "api",
-        "description": "Create plan with steps -> PATCH specification/architecture on step -> GET returns step.specification.architecture"
-      },
-      {
-        "type": "edge",
-        "scope": "api",
-        "description": "PATCH understanding merges arrays (new observations appended, not replaced)"
-      },
-      {
-        "type": "edge",
-        "scope": "api",
-        "description": "PATCH context merges fields (new fields added, existing preserved)"
-      },
-      {
-        "type": "edge",
-        "scope": "storage",
-        "description": "Existing plans without understanding/context load correctly with empty objects"
-      },
-      {
-        "type": "error",
-        "scope": "api",
-        "description": "PATCH understanding/context on approved plan returns 400"
-      },
-      {
-        "type": "happy",
-        "scope": "ui",
-        "description": "Understanding tab shows AgentObservationCard per role with correct confidence badge color"
-      },
-      {
-        "type": "happy",
-        "scope": "ui",
-        "description": "Context tab shows RoleContextCard per role with structured fields"
-      },
-      {
-        "type": "happy",
-        "scope": "ui",
-        "description": "Expanded step shows 5 tabs; Architecture tab displays decisions list"
-      },
-      {
-        "type": "edge",
-        "scope": "ui",
-        "description": "Empty understanding/context shows appropriate empty state messages"
-      }
-    ],
-    "data_requirements": [
-      "Draft plan with 2+ steps",
-      "Plan with existing understanding (architect role with observations)",
-      "Plan with existing context (designer role with library decision)",
-      "Approved plan (for rejection test)"
-    ]
-  },
   "plan_implementation": {
-    "scopes": [
-      "planner-core",
-      "planner-ui"
-    ],
+    "scopes": ["planner-core", "planner-ui"],
     "steps": []
-  },
-  "context": {
-    "tester": {
-      "strategy": "Integration tests at API and UI boundaries. Unit tests covered in individual feature implementation steps.",
-      "migrated_from": "plan_tests"
-    }
   }
 }

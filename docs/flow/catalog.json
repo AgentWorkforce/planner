@@ -92,9 +92,8 @@
         "usage": ["ui-question-queue"]
       },
       "step-spec-tabs": {
-        "description": "Tabbed interface inside expanded step for spec domains (freeform - any domain allowed)",
-        "tabs": ["Details", "+ dynamic domain tabs from specification keys"],
-        "suggested_domains": ["Architecture", "Model", "Design", "Testing", "Security"],
+        "description": "Tabbed interface inside expanded step for spec domains",
+        "tabs": ["Details", "Architecture", "Design", "Testing", "Security"],
         "tab_list": "flex gap-1 bg-transparent border-b border-border-subtle px-4",
         "tab_trigger": "px-3 py-2 text-sm text-text-muted hover:text-text-secondary data-[state=active]:text-text-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-cyan",
         "tab_content": "p-4",
@@ -113,33 +112,26 @@
         },
         "keyword_chip": "px-2 py-0.5 bg-accent-cyan/10 text-accent-cyan text-xs rounded",
         "usage": ["schema-ui-understanding"]
-      },
-      "role-context-card": {
-        "description": "Card showing formalized role decisions (context) - freeform key-value pairs",
-        "card": "bg-bg-card border border-border-subtle rounded-lg overflow-hidden",
-        "header": "flex items-center justify-between px-4 py-3 bg-bg-tertiary border-b border-border-subtle",
-        "body": "p-4 space-y-3",
-        "field_row": "flex items-start gap-2",
-        "field_label": "text-text-muted text-xs uppercase tracking-wide min-w-[100px]",
-        "field_value": "text-text-primary text-sm flex-1",
-        "tag_list": "flex flex-wrap gap-1",
-        "tag": "px-2 py-0.5 bg-accent-cyan/10 text-accent-cyan text-xs rounded",
-        "usage": ["schema-context", "schema-ui-context"]
-      },
-      "key-value-editor": {
-        "description": "Reusable freeform key-value editor for context and specification domains",
-        "row": "flex items-start gap-2 py-2 border-b border-border-subtle last:border-0",
-        "key_input": "text-text-muted text-xs uppercase tracking-wide w-32 bg-transparent border-0 focus:ring-0",
-        "value_input": "text-text-primary text-sm flex-1 bg-transparent border-0 focus:ring-0",
-        "add_button": "text-accent-cyan text-sm hover:underline",
-        "delete_button": "text-text-muted hover:text-error",
-        "usage": ["schema-ui-context", "schema-ui-specification"]
       }
     },
     "icons": "Inline SVG, stroke-based, strokeWidth=2, currentColor, sizes: 14/16/20/24px"
   },
 
   "components": [
+    {
+      "id": "ideation-core",
+      "name": "Ideation Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod", "Relay"],
+      "path": "packages/ideation/",
+      "description": "Backend service for brainstorming facilitation, session management, and nugget crystallization. Transforms raw intent into refined understanding ready for planning."
+    },
+    {
+      "id": "ideation-ui",
+      "name": "Ideation UI",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui"],
+      "path": "packages/ideation-ui/",
+      "description": "Frontend application for human-initiated brainstorming sessions with Interviewer agent and real-time specialist observations."
+    },
     {
       "id": "planner-core",
       "name": "Planner Core API",
@@ -157,6 +149,20 @@
   ],
 
   "features": [
+    { "id": "ideation-package", "title": "Ideation Package", "type": "epic", "status": "draft", "priority": "critical", "component": "ideation-core", "design_reference": "docs/flow/features/ideation-package.json" },
+    { "id": "ideation-domain", "title": "Ideation Domain Model", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-package" },
+    { "id": "ideation-storage", "title": "Ideation Storage Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-domain"], "parent": "ideation-package" },
+    { "id": "ideation-api", "title": "Ideation REST API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-storage"], "parent": "ideation-package" },
+    { "id": "ideation-lead", "title": "Interviewer Persistent Agent", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-api"], "parent": "ideation-package" },
+    { "id": "ideation-specialists", "title": "Guardian Specialist Agents", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-lead"], "parent": "ideation-package" },
+    { "id": "ideation-planner-handoff", "title": "Planner Handoff Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-lead", "ideation-specialists"], "parent": "ideation-package" },
+
+    { "id": "ideation-ui", "title": "Ideation UI Package", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-ui", "dependencies": ["ideation-api"], "design_reference": "docs/flow/features/ideation-ui.json" },
+    { "id": "ideation-ui-layout", "title": "Ideation Layout & Navigation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-list", "title": "Session List & Management", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-chat", "title": "Chat Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-specialists-panel", "title": "Specialists Panel", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
     { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
     { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved" },
@@ -262,15 +268,13 @@
 
     { "id": "ui-direct-messaging", "title": "Direct Messaging Agents", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["ui-relay-messaging", "ui-status-bar", "ui-agent-avatars"] },
 
-    { "id": "schema-enrichment", "title": "PlanVersion Schema Enrichment", "type": "epic", "status": "in_progress", "priority": "critical", "dependencies": [], "extends": ["domain-plan", "storage-sqlite", "api-plan-crud"], "design_reference": ".context/planner-schema-enrichment.md", "audit_note": "Freeform approach adopted: schemas use Record<string, Record<string, unknown>>. Intelligence lives in agent prompts, not Zod validation." },
+    { "id": "schema-enrichment", "title": "PlanVersion Schema Enrichment", "type": "epic", "status": "draft", "priority": "critical", "dependencies": [], "extends": ["domain-plan", "storage-sqlite", "api-plan-crud"], "design_reference": ".context/planner-schema-enrichment.md" },
     { "id": "schema-understanding", "title": "Understanding Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
-    { "id": "schema-context", "title": "Context Schema & Domain Model", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["schema-understanding"], "audit_note": "Complete: Freeform Context schema (z.record), SUGGESTED_ROLES documented, context_json column in DB, API endpoints with delete support (empty object removes role), MCP tools (get_plan_context, update_plan_context), SSE events (context_updated). All 13 acceptance criteria verified." },
-    { "id": "schema-specification", "title": "Specification Schema & Domain Model", "type": "feature", "status": "in_progress", "priority": "high", "dependencies": [], "audit_note": "CHANGE REQUEST: Was typed (ArchitectureSpec etc), needs freeform z.record approach like Context" },
-    { "id": "schema-db-migration", "title": "Database Migration for Understanding, Context & Specification", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["schema-understanding", "schema-specification"] },
-    { "id": "schema-api-endpoints", "title": "API Endpoints for Understanding, Context & Specification", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["schema-db-migration"] },
-    { "id": "schema-ui-understanding", "title": "Understanding Section UI", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
-    { "id": "schema-ui-context", "title": "Context Section UI", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["schema-api-endpoints"], "audit_note": "Complete: ContextTab with tabbed role selection, RoleContextCard, KeyValueEditor for freeform fields, AddRolePopover with suggested roles and custom input, delete role via empty object. 36 UI tests passing." },
-    { "id": "schema-ui-specification", "title": "Specification Section UI", "type": "feature", "status": "in_progress", "priority": "medium", "dependencies": ["schema-api-endpoints"], "audit_note": "CHANGE REQUEST: Was hardcoded tabs, needs dynamic tabs + KeyValueEditor like ContextTab" },
-    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding, Context & Specification", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["schema-api-endpoints"] }
+    { "id": "schema-specification", "title": "Specification Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-db-migration", "title": "Database Migration for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-understanding", "schema-specification"] },
+    { "id": "schema-api-endpoints", "title": "API Endpoints for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-db-migration"] },
+    { "id": "schema-ui-understanding", "title": "Understanding Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-ui-specification", "title": "Specification Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding & Specification", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] }
   ]
 }

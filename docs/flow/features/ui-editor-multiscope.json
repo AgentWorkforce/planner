@@ -4,79 +4,34 @@
   "type": "feature",
   "status": "approved",
   "priority": "high",
-  "dependencies": [
-    "ui-editor-steps"
-  ],
+  "dependencies": ["ui-editor-steps"],
   "audit_note": "Swimlane view fully implemented (SwimlaneView, ViewModeToggle integrated). Dependency visualization complete with gutter-based lines. DependencyIndicator now always shows circles on both sides (empty placeholders visible as subtle dots - UX improvement over spec). Missing: list-view scope grouping (uem001-002), zoom levels (uem004), add-step per-scope (uem005-006). 8/11 acceptance criteria met.",
+
   "summary": {
     "goal": "Visualize plans with multiple scopes showing steps grouped by scope with cross-scope dependencies",
     "context": "Real work crosses boundaries. Steps group by scope (repo/team/domain). Cross-scope dependencies are AI-inferred and visually connected. Users see the whole system, not isolated tasks.",
     "acceptance_criteria": [
-      {
-        "id": "ac1",
-        "description": "Steps grouped into scope sections"
-      },
-      {
-        "id": "ac2",
-        "description": "Scope sections are collapsible"
-      },
-      {
-        "id": "ac3",
-        "description": "Dependencies indicated by edge badges (numbered dots) on step cards"
-      },
-      {
-        "id": "ac4",
-        "description": "Left indicator shows incoming dependencies (what step depends on)"
-      },
-      {
-        "id": "ac5",
-        "description": "Right indicator shows outgoing dependencies (what blocks on this step)"
-      },
-      {
-        "id": "ac6",
-        "description": "Dependency lines appear only on hover (not always visible)"
-      },
-      {
-        "id": "ac7",
-        "description": "Lines drawn in gutters (left/right margins), never crossing over card content"
-      },
-      {
-        "id": "ac8",
-        "description": "Cross-scope dependencies shown with distinct color (orange/warning)"
-      },
-      {
-        "id": "ac9",
-        "description": "Swimlane view option showing scopes as horizontal lanes"
-      },
-      {
-        "id": "ac10",
-        "description": "Scope summary statistics (step count, completion %, blocked count)"
-      },
-      {
-        "id": "ac11",
-        "description": "Progress indicators per scope (N/M complete)"
-      },
-      {
-        "id": "ac12",
-        "description": "Click indicator scrolls to and highlights connected step"
-      },
-      {
-        "id": "ac13",
-        "description": "Zoom levels: Overview (collapsed), Expanded (1-level), Full Detail"
-      },
-      {
-        "id": "ac14",
-        "description": "Add step button within each scope section"
-      }
+      { "id": "ac1", "description": "Steps grouped into scope sections" },
+      { "id": "ac2", "description": "Scope sections are collapsible" },
+      { "id": "ac3", "description": "Dependencies indicated by edge badges (numbered dots) on step cards" },
+      { "id": "ac4", "description": "Left indicator shows incoming dependencies (what step depends on)" },
+      { "id": "ac5", "description": "Right indicator shows outgoing dependencies (what blocks on this step)" },
+      { "id": "ac6", "description": "Dependency lines appear only on hover (not always visible)" },
+      { "id": "ac7", "description": "Lines drawn in gutters (left/right margins), never crossing over card content" },
+      { "id": "ac8", "description": "Cross-scope dependencies shown with distinct color (orange/warning)" },
+      { "id": "ac9", "description": "Swimlane view option showing scopes as horizontal lanes" },
+      { "id": "ac10", "description": "Scope summary statistics (step count, completion %, blocked count)" },
+      { "id": "ac11", "description": "Progress indicators per scope (N/M complete)" },
+      { "id": "ac12", "description": "Click indicator scrolls to and highlights connected step" },
+      { "id": "ac13", "description": "Zoom levels: Overview (collapsed), Expanded (1-level), Full Detail" },
+      { "id": "ac14", "description": "Add step button within each scope section" }
     ]
   },
+
   "references": [
-    {
-      "type": "spec",
-      "title": "Multi-Scope Plans - UX",
-      "path": "docs/planner-scale.md"
-    }
+    { "type": "spec", "title": "Multi-Scope Plans - UX", "path": "docs/planner-scale.md" }
   ],
+
   "design_spec": {
     "views": [
       {
@@ -197,26 +152,10 @@
             "component": "ScopeSectionHeader",
             "layout": "display: flex; align-items: center; gap: var(--spacing-md)",
             "children": [
-              {
-                "element": "expand-icon",
-                "content": "[v] or [>]",
-                "style": "cursor: pointer"
-              },
-              {
-                "element": "scope-name",
-                "content": "Scope title",
-                "style": "font-weight: 600"
-              },
-              {
-                "element": "ScopeSummaryStats",
-                "content": "Progress + counts",
-                "style": "margin-left: auto"
-              },
-              {
-                "element": "add-step-btn",
-                "content": "+ Add Step",
-                "style": "btn btn-secondary btn-sm"
-              }
+              { "element": "expand-icon", "content": "[v] or [>]", "style": "cursor: pointer" },
+              { "element": "scope-name", "content": "Scope title", "style": "font-weight: 600" },
+              { "element": "ScopeSummaryStats", "content": "Progress + counts", "style": "margin-left: auto" },
+              { "element": "add-step-btn", "content": "+ Add Step", "style": "btn btn-secondary btn-sm" }
             ],
             "styling": {
               "padding": "var(--spacing-md) var(--spacing-lg)",
@@ -258,30 +197,10 @@
           {
             "component": "StatBadge",
             "variants": [
-              {
-                "type": "completed",
-                "icon": "checkmark",
-                "bg": "#dcfce7",
-                "color": "#166534"
-              },
-              {
-                "type": "in_progress",
-                "icon": "spinner",
-                "bg": "#dbeafe",
-                "color": "#1e40af"
-              },
-              {
-                "type": "blocked",
-                "icon": "pause",
-                "bg": "#fef3c7",
-                "color": "#92400e"
-              },
-              {
-                "type": "critical_path",
-                "label": "Critical",
-                "bg": "#fee2e2",
-                "color": "#991b1b"
-              }
+              { "type": "completed", "icon": "checkmark", "bg": "#dcfce7", "color": "#166534" },
+              { "type": "in_progress", "icon": "spinner", "bg": "#dbeafe", "color": "#1e40af" },
+              { "type": "blocked", "icon": "pause", "bg": "#fef3c7", "color": "#92400e" },
+              { "type": "critical_path", "label": "Critical", "bg": "#fee2e2", "color": "#991b1b" }
             ],
             "styling": {
               "font-size": "0.75rem",
@@ -404,12 +323,7 @@
         },
         "technical": {
           "gutter_width": "40px each side",
-          "update_triggers": [
-            "scroll",
-            "resize",
-            "expand/collapse",
-            "step add/remove"
-          ],
+          "update_triggers": ["scroll", "resize", "expand/collapse", "step add/remove"],
           "debounce": "16ms (one frame)",
           "z_index": "Indicators: 15 (above cards), Lines: 5 (below cards)"
         }
@@ -419,47 +333,27 @@
       {
         "name": "SwimlaneContainer",
         "description": "Horizontally scrollable container with sticky lane labels",
-        "props": [
-          "children",
-          "onScroll"
-        ]
+        "props": ["children", "onScroll"]
       },
       {
         "name": "SwimlaneLane",
         "description": "Single horizontal lane for a scope",
-        "props": [
-          "scope",
-          "steps",
-          "onStepClick",
-          "isHighlighted"
-        ]
+        "props": ["scope", "steps", "onStepClick", "isHighlighted"]
       },
       {
         "name": "SwimlaneStepCard",
         "description": "Compact step card (180px) showing title and status",
-        "props": [
-          "step",
-          "onClick",
-          "isHighlighted",
-          "isSelected"
-        ]
+        "props": ["step", "onClick", "isHighlighted", "isSelected"]
       },
       {
         "name": "ScopeSummaryStats",
         "description": "Progress bar and stat badges for a scope",
-        "props": [
-          "steps",
-          "compact"
-        ]
+        "props": ["steps", "compact"]
       },
       {
         "name": "DependencyLinesOverlay",
         "description": "SVG container that tracks step positions and renders lines",
-        "props": [
-          "steps",
-          "hoveredStepId",
-          "viewMode"
-        ]
+        "props": ["steps", "hoveredStepId", "viewMode"]
       },
       {
         "name": "useDependencyPositions",
@@ -471,12 +365,39 @@
         "description": "Hook that orders steps by dependency depth for swimlane X-position",
         "returns": "Map<stepId, column_index>"
       }
+    ],
+    "css_classes_needed": [
+      ".swimlane-container",
+      ".swimlane-lane",
+      ".swimlane-lane-label",
+      ".swimlane-steps-area",
+      ".swimlane-step-card",
+      ".swimlane-step-card--selected",
+      ".swimlane-step-card--highlighted",
+      ".scope-section",
+      ".scope-section--collapsed",
+      ".scope-section-header",
+      ".scope-section-body",
+      ".scope-summary-stats",
+      ".scope-summary-stats--compact",
+      ".stat-badge",
+      ".stat-badge--completed",
+      ".stat-badge--in-progress",
+      ".stat-badge--blocked",
+      ".stat-badge--critical",
+      ".dependency-lines-overlay",
+      ".dependency-line",
+      ".dependency-line--intra",
+      ".dependency-line--cross",
+      ".dependency-line--highlighted",
+      ".dependency-line--critical",
+      ".view-mode-toggle",
+      ".zoom-level-selector"
     ]
   },
+
   "plan_implementation": {
-    "scopes": [
-      "planner-ui"
-    ],
+    "scopes": ["planner-ui"],
     "steps": [
       {
         "step_id": "uem001",
@@ -487,82 +408,24 @@
         "owner_role": "frontend:Coder",
         "status": "pending",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Section header shows scope name"
-          },
-          {
-            "id": "ac2",
-            "description": "Collapse/expand toggle works"
-          },
-          {
-            "id": "ac3",
-            "description": "Steps rendered inside section"
-          },
-          {
-            "id": "ac4",
-            "description": "Progress indicator (N/M)"
-          }
-        ],
-        "specification": {
-          "testing": {
-            "focus": "Enhanced visualization (uem008-uem011) per design_spec v002/v004/v005"
-          },
-          "design": {
-            "css_classes_needed": [
-              ".swimlane-container",
-              ".swimlane-lane",
-              ".swimlane-lane-label",
-              ".swimlane-steps-area",
-              ".swimlane-step-card",
-              ".swimlane-step-card--selected",
-              ".swimlane-step-card--highlighted",
-              ".scope-section",
-              ".scope-section--collapsed",
-              ".scope-section-header",
-              ".scope-section-body",
-              ".scope-summary-stats",
-              ".scope-summary-stats--compact",
-              ".stat-badge",
-              ".stat-badge--completed",
-              ".stat-badge--in-progress",
-              ".stat-badge--blocked",
-              ".stat-badge--critical",
-              ".dependency-lines-overlay",
-              ".dependency-line",
-              ".dependency-line--intra",
-              ".dependency-line--cross",
-              ".dependency-line--highlighted",
-              ".dependency-line--critical",
-              ".view-mode-toggle",
-              ".zoom-level-selector"
-            ]
-          }
-        }
+          { "id": "ac1", "description": "Section header shows scope name" },
+          { "id": "ac2", "description": "Collapse/expand toggle works" },
+          { "id": "ac3", "description": "Steps rendered inside section" },
+          { "id": "ac4", "description": "Progress indicator (N/M)" }
+        ]
       },
       {
         "step_id": "uem002",
         "title": "Group steps by scope in plan view",
         "scope": "planner-ui",
         "description": "Organize plan view to display steps grouped into ScopeSections.",
-        "dependencies": [
-          "uem001"
-        ],
+        "dependencies": ["uem001"],
         "owner_role": "frontend:Coder",
         "status": "pending",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Steps grouped by scope property"
-          },
-          {
-            "id": "ac2",
-            "description": "Each scope in its own section"
-          },
-          {
-            "id": "ac3",
-            "description": "Unscoped steps in 'General' section"
-          }
+          { "id": "ac1", "description": "Steps grouped by scope property" },
+          { "id": "ac2", "description": "Each scope in its own section" },
+          { "id": "ac3", "description": "Unscoped steps in 'General' section" }
         ]
       },
       {
@@ -570,28 +433,14 @@
         "title": "Implement dependency connector lines",
         "scope": "planner-ui",
         "description": "Draw SVG lines connecting dependent steps, including cross-scope connections.",
-        "dependencies": [
-          "uem002"
-        ],
+        "dependencies": ["uem002"],
         "owner_role": "frontend:Coder",
         "status": "done",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Lines drawn between dependent steps"
-          },
-          {
-            "id": "ac2",
-            "description": "Lines update on scroll/resize"
-          },
-          {
-            "id": "ac3",
-            "description": "Cross-scope lines visible"
-          },
-          {
-            "id": "ac4",
-            "description": "Arrow indicates direction"
-          }
+          { "id": "ac1", "description": "Lines drawn between dependent steps" },
+          { "id": "ac2", "description": "Lines update on scroll/resize" },
+          { "id": "ac3", "description": "Cross-scope lines visible" },
+          { "id": "ac4", "description": "Arrow indicates direction" }
         ],
         "audit": {
           "evidence": "DependencyLinesOverlay.tsx exists (298 lines) with full SVG implementation including intra/cross-scope lines, arrowheads, and useDependencyPositions hook for position tracking"
@@ -602,28 +451,14 @@
         "title": "Implement zoom levels",
         "scope": "planner-ui",
         "description": "View toggle: Overview (scopes collapsed), Expanded (scopes open, steps collapsed), Full (everything expanded).",
-        "dependencies": [
-          "uem002"
-        ],
+        "dependencies": ["uem002"],
         "owner_role": "frontend:Coder",
         "status": "pending",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Zoom control in toolbar"
-          },
-          {
-            "id": "ac2",
-            "description": "Overview collapses all"
-          },
-          {
-            "id": "ac3",
-            "description": "Expanded shows steps, not details"
-          },
-          {
-            "id": "ac4",
-            "description": "Full shows everything"
-          }
+          { "id": "ac1", "description": "Zoom control in toolbar" },
+          { "id": "ac2", "description": "Overview collapses all" },
+          { "id": "ac3", "description": "Expanded shows steps, not details" },
+          { "id": "ac4", "description": "Full shows everything" }
         ]
       },
       {
@@ -631,24 +466,13 @@
         "title": "Add step button per scope",
         "scope": "planner-ui",
         "description": "Add button in each scope section to create new step in that scope.",
-        "dependencies": [
-          "uem001"
-        ],
+        "dependencies": ["uem001"],
         "owner_role": "frontend:Coder",
         "status": "pending",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Add button in scope section footer"
-          },
-          {
-            "id": "ac2",
-            "description": "Click creates step with scope preset"
-          },
-          {
-            "id": "ac3",
-            "description": "New step appears in section"
-          }
+          { "id": "ac1", "description": "Add button in scope section footer" },
+          { "id": "ac2", "description": "Click creates step with scope preset" },
+          { "id": "ac3", "description": "New step appears in section" }
         ]
       },
       {
@@ -656,24 +480,13 @@
         "title": "Add new scope functionality",
         "scope": "planner-ui",
         "description": "Allow adding new scopes to a plan. New scope section appears.",
-        "dependencies": [
-          "uem002"
-        ],
+        "dependencies": ["uem002"],
         "owner_role": "frontend:Coder",
         "status": "pending",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Add Scope button available"
-          },
-          {
-            "id": "ac2",
-            "description": "Input for new scope name"
-          },
-          {
-            "id": "ac3",
-            "description": "New section created and visible"
-          }
+          { "id": "ac1", "description": "Add Scope button available" },
+          { "id": "ac2", "description": "Input for new scope name" },
+          { "id": "ac3", "description": "New section created and visible" }
         ]
       },
       {
@@ -681,27 +494,13 @@
         "title": "Add tests for multi-scope view",
         "scope": "planner-ui",
         "description": "Tests for scope grouping, connectors, zoom levels.",
-        "dependencies": [
-          "uem003",
-          "uem004",
-          "uem005",
-          "uem006"
-        ],
+        "dependencies": ["uem003", "uem004", "uem005", "uem006"],
         "owner_role": "frontend:Coder",
         "status": "pending",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Scope grouping tests pass"
-          },
-          {
-            "id": "ac2",
-            "description": "Zoom level tests pass"
-          },
-          {
-            "id": "ac3",
-            "description": "Add step/scope tests pass"
-          }
+          { "id": "ac1", "description": "Scope grouping tests pass" },
+          { "id": "ac2", "description": "Zoom level tests pass" },
+          { "id": "ac3", "description": "Add step/scope tests pass" }
         ]
       },
       {
@@ -709,41 +508,17 @@
         "title": "Implement swimlane layout view",
         "scope": "planner-ui",
         "description": "Implement v002 swimlane layout: SwimlaneContainer (horizontal scroll, min-height 400px), SwimlaneLane (flex row, min-height 120px, border-bottom), SwimlaneLaneLabel (160px fixed width, sticky left, z-index 5), SwimlaneStepsArea (flex row, gap spacing-lg), SwimlaneStepCard (180px width, 80px min-height). ViewModeToggle in toolbar (segmented buttons: List/Swimlane). useTopologicalSort hook for step X-positioning by dependency depth.",
-        "dependencies": [
-          "uem002",
-          "uem003"
-        ],
+        "dependencies": ["uem002", "uem003"],
         "owner_role": "frontend:Coder",
         "status": "done",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "SwimlaneLane renders per scope with 120px min-height, border-bottom 1px solid var(--color-border)"
-          },
-          {
-            "id": "ac2",
-            "description": "SwimlaneLaneLabel is 160px wide, sticky left with z-index 5, background var(--color-background)"
-          },
-          {
-            "id": "ac3",
-            "description": "SwimlaneStepCard is 180px width, 80px min-height, shows truncated title (2 lines) + status badge"
-          },
-          {
-            "id": "ac4",
-            "description": "useTopologicalSort returns Map<stepId, column_index> for left-to-right positioning"
-          },
-          {
-            "id": "ac5",
-            "description": "ViewModeToggle in plan header toolbar switches between list/swimlane modes"
-          },
-          {
-            "id": "ac6",
-            "description": "Click card opens step detail panel (slide-in from right)"
-          },
-          {
-            "id": "ac7",
-            "description": "Hover card highlights connected dependency lines"
-          }
+          { "id": "ac1", "description": "SwimlaneLane renders per scope with 120px min-height, border-bottom 1px solid var(--color-border)" },
+          { "id": "ac2", "description": "SwimlaneLaneLabel is 160px wide, sticky left with z-index 5, background var(--color-background)" },
+          { "id": "ac3", "description": "SwimlaneStepCard is 180px width, 80px min-height, shows truncated title (2 lines) + status badge" },
+          { "id": "ac4", "description": "useTopologicalSort returns Map<stepId, column_index> for left-to-right positioning" },
+          { "id": "ac5", "description": "ViewModeToggle in plan header toolbar switches between list/swimlane modes" },
+          { "id": "ac6", "description": "Click card opens step detail panel (slide-in from right)" },
+          { "id": "ac7", "description": "Hover card highlights connected dependency lines" }
         ],
         "audit": {
           "evidence": "SwimlaneView.tsx (271 lines) implements full swimlane layout with all components. ViewModeToggle.tsx (92 lines) exists. useTopologicalSort.ts (79 lines) exists. Tests in SwimlaneView.test.tsx (240 lines).",
@@ -755,44 +530,18 @@
         "title": "Create ScopeSummaryStats component",
         "scope": "planner-ui",
         "description": "Implement v004 ScopeSummaryStats: ProgressBar (80px list / 100% swimlane, 6px height, 3px radius, var(--color-border) bg, var(--color-success) fill). StatBadge variants: completed (#dcfce7 bg, #166534 text, checkmark), in_progress (#dbeafe bg, #1e40af text, spinner), blocked (#fef3c7 bg, #92400e text, pause), critical (#fee2e2 bg, #991b1b text). Badges are 0.75rem font, 2px 6px padding, only shown when count > 0. Two layouts: list view (full: bar + percent + all badges inline) and swimlane (compact: bar + fraction below scope name).",
-        "dependencies": [
-          "uem001"
-        ],
+        "dependencies": ["uem001"],
         "owner_role": "frontend:Coder",
         "status": "done",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "ProgressBar renders 80px width (list) or 100% (swimlane), 6px height, 3px border-radius"
-          },
-          {
-            "id": "ac2",
-            "description": "StatBadge completed variant: bg #dcfce7, color #166534, checkmark icon"
-          },
-          {
-            "id": "ac3",
-            "description": "StatBadge in_progress variant: bg #dbeafe, color #1e40af, spinner icon"
-          },
-          {
-            "id": "ac4",
-            "description": "StatBadge blocked variant: bg #fef3c7, color #92400e, pause icon"
-          },
-          {
-            "id": "ac5",
-            "description": "StatBadge critical variant: bg #fee2e2, color #991b1b, 'Critical' label"
-          },
-          {
-            "id": "ac6",
-            "description": "Badges only render when count > 0"
-          },
-          {
-            "id": "ac7",
-            "description": "compact prop switches to swimlane layout (bar + '3/5 complete' text)"
-          },
-          {
-            "id": "ac8",
-            "description": "Stats update reactively as step statuses change"
-          }
+          { "id": "ac1", "description": "ProgressBar renders 80px width (list) or 100% (swimlane), 6px height, 3px border-radius" },
+          { "id": "ac2", "description": "StatBadge completed variant: bg #dcfce7, color #166534, checkmark icon" },
+          { "id": "ac3", "description": "StatBadge in_progress variant: bg #dbeafe, color #1e40af, spinner icon" },
+          { "id": "ac4", "description": "StatBadge blocked variant: bg #fef3c7, color #92400e, pause icon" },
+          { "id": "ac5", "description": "StatBadge critical variant: bg #fee2e2, color #991b1b, 'Critical' label" },
+          { "id": "ac6", "description": "Badges only render when count > 0" },
+          { "id": "ac7", "description": "compact prop switches to swimlane layout (bar + '3/5 complete' text)" },
+          { "id": "ac8", "description": "Stats update reactively as step statuses change" }
         ],
         "audit": {
           "evidence": "ScopeSummaryStats.tsx (165 lines) fully implements ProgressBar and StatBadge with correct colors, sizing, and compact mode"
@@ -803,48 +552,19 @@
         "title": "Enhance dependency line rendering",
         "scope": "planner-ui",
         "description": "Implement v005 dependency line visualization. Intra-scope: stroke var(--color-border) #e2e8f0, 2px width, solid, 0.6 opacity. Cross-scope: stroke var(--color-primary) #2563eb, 2px width, dasharray '6 4', 0.7 opacity. Highlighted: stroke #2563eb, 3px width, opacity 1.0, drop-shadow filter. Critical path: stroke var(--color-error) #ef4444, 2px, solid, 0.8 opacity. Path algorithms - list view: intra=vertical (source.bottom-center to target.top-center), cross=bezier (source.right-center, control1 +60px/0, control2 +60px/+dy, target.left-center). Swimlane: intra=horizontal, cross=bezier (source.bottom-center, control1 0/+40px, control2 dx/+40px, target.top-center). SVG arrowhead marker 8x8. useDependencyPositions hook returns Map<stepId, DOMRect>. Update on scroll/resize/expand with 16ms debounce.",
-        "dependencies": [
-          "uem003"
-        ],
+        "dependencies": ["uem003"],
         "owner_role": "frontend:Coder",
         "status": "done",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "Intra-scope lines: solid, stroke #e2e8f0, 2px width, 0.6 opacity"
-          },
-          {
-            "id": "ac2",
-            "description": "Cross-scope lines: dashed (6 4), stroke #2563eb, 2px width, 0.7 opacity"
-          },
-          {
-            "id": "ac3",
-            "description": "List view paths: vertical for intra, bezier curve (+60px control points) for cross-scope"
-          },
-          {
-            "id": "ac4",
-            "description": "Swimlane paths: horizontal for intra, bezier curve (+40px control points) for cross-scope"
-          },
-          {
-            "id": "ac5",
-            "description": "Highlighted state: 3px width, opacity 1.0, drop-shadow(0 0 3px var(--color-primary))"
-          },
-          {
-            "id": "ac6",
-            "description": "Critical path lines: stroke #ef4444, solid, 0.8 opacity"
-          },
-          {
-            "id": "ac7",
-            "description": "SVG arrowhead marker 8x8, points to dependent step"
-          },
-          {
-            "id": "ac8",
-            "description": "useDependencyPositions hook tracks DOM positions, updates with 16ms debounce"
-          },
-          {
-            "id": "ac9",
-            "description": "Hover on line shows tooltip: 'Step B depends on Step A'"
-          }
+          { "id": "ac1", "description": "Intra-scope lines: solid, stroke #e2e8f0, 2px width, 0.6 opacity" },
+          { "id": "ac2", "description": "Cross-scope lines: dashed (6 4), stroke #2563eb, 2px width, 0.7 opacity" },
+          { "id": "ac3", "description": "List view paths: vertical for intra, bezier curve (+60px control points) for cross-scope" },
+          { "id": "ac4", "description": "Swimlane paths: horizontal for intra, bezier curve (+40px control points) for cross-scope" },
+          { "id": "ac5", "description": "Highlighted state: 3px width, opacity 1.0, drop-shadow(0 0 3px var(--color-primary))" },
+          { "id": "ac6", "description": "Critical path lines: stroke #ef4444, solid, 0.8 opacity" },
+          { "id": "ac7", "description": "SVG arrowhead marker 8x8, points to dependent step" },
+          { "id": "ac8", "description": "useDependencyPositions hook tracks DOM positions, updates with 16ms debounce" },
+          { "id": "ac9", "description": "Hover on line shows tooltip: 'Step B depends on Step A'" }
         ],
         "audit": {
           "evidence": "DependencyLinesOverlay.tsx implements all line types with exact colors and path algorithms. useDependencyPositions.ts (93 lines) has 16ms debounce. Arrowhead markers 8x8 defined in SVG defs. Title elements provide tooltips."
@@ -855,50 +575,19 @@
         "title": "Add tests for enhanced visualization",
         "scope": "planner-ui",
         "description": "Tests covering v002/v004/v005 design spec implementations. Swimlane: verify lane dimensions (120px min-height), label width (160px), card size (180x80), sticky behavior. Stats: verify badge color mapping (completed=#dcfce7, in_progress=#dbeafe, blocked=#fef3c7, critical=#fee2e2), progress bar dimensions, compact mode rendering. Lines: verify stroke colors (#e2e8f0 intra, #2563eb cross), dasharray presence, hover highlight application, arrowhead rendering.",
-        "dependencies": [
-          "uem008",
-          "uem009",
-          "uem010"
-        ],
+        "dependencies": ["uem008", "uem009", "uem010"],
         "owner_role": "frontend:Coder",
         "status": "done",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "SwimlaneLane renders with min-height 120px, border-bottom style"
-          },
-          {
-            "id": "ac2",
-            "description": "SwimlaneLaneLabel renders 160px width with sticky positioning"
-          },
-          {
-            "id": "ac3",
-            "description": "SwimlaneStepCard renders 180px width, 80px min-height"
-          },
-          {
-            "id": "ac4",
-            "description": "useTopologicalSort returns correct column indices for dependency ordering"
-          },
-          {
-            "id": "ac5",
-            "description": "StatBadge renders correct colors per variant"
-          },
-          {
-            "id": "ac6",
-            "description": "StatBadge hides when count is 0"
-          },
-          {
-            "id": "ac7",
-            "description": "Intra-scope lines have solid stroke, cross-scope have dasharray '6 4'"
-          },
-          {
-            "id": "ac8",
-            "description": "Hover on step applies highlighted class to connected lines"
-          },
-          {
-            "id": "ac9",
-            "description": "Empty scope (0 steps) renders without errors"
-          }
+          { "id": "ac1", "description": "SwimlaneLane renders with min-height 120px, border-bottom style" },
+          { "id": "ac2", "description": "SwimlaneLaneLabel renders 160px width with sticky positioning" },
+          { "id": "ac3", "description": "SwimlaneStepCard renders 180px width, 80px min-height" },
+          { "id": "ac4", "description": "useTopologicalSort returns correct column indices for dependency ordering" },
+          { "id": "ac5", "description": "StatBadge renders correct colors per variant" },
+          { "id": "ac6", "description": "StatBadge hides when count is 0" },
+          { "id": "ac7", "description": "Intra-scope lines have solid stroke, cross-scope have dasharray '6 4'" },
+          { "id": "ac8", "description": "Hover on step applies highlighted class to connected lines" },
+          { "id": "ac9", "description": "Empty scope (0 steps) renders without errors" }
         ],
         "audit": {
           "evidence": "SwimlaneView.test.tsx (240 lines) covers lane rendering, step card rendering, interactions, step ordering, empty states, scope summary stats, and status colors. ScopeSummaryStats.test.tsx and DependencyLinesOverlay.test.tsx also exist."
@@ -909,57 +598,21 @@
         "title": "Redesign dependency visualization with edge indicators and gutter lines",
         "scope": "planner-ui",
         "description": "Replace always-visible center/diagonal dependency lines with gutter-based approach per updated v005 spec. Create DependencyIndicator component (numbered dots on card edges). Modify DependencyLinesOverlay to render lines only on hover, in 40px left/right gutters. Left gutter shows incoming dependencies (blue), right gutter shows outgoing (green). Cross-scope uses orange. Lines use quadratic bezier curves within gutters, never crossing card content. Click indicator scrolls to connected step.",
-        "dependencies": [
-          "uem003",
-          "uem010"
-        ],
+        "dependencies": ["uem003", "uem010"],
         "owner_role": "frontend:Coder",
         "status": "done",
         "acceptance_criteria": [
-          {
-            "id": "ac1",
-            "description": "DependencyIndicator component renders 20px circular badges on card edges"
-          },
-          {
-            "id": "ac2",
-            "description": "Left indicator (blue #2563eb) shows incoming dependency count, hidden when 0"
-          },
-          {
-            "id": "ac3",
-            "description": "Right indicator (green #22c55e) shows outgoing dependency count, hidden when 0"
-          },
-          {
-            "id": "ac4",
-            "description": "Cross-scope indicators use orange (#f59e0b) background"
-          },
-          {
-            "id": "ac5",
-            "description": "Lines only render when step or indicator is hovered"
-          },
-          {
-            "id": "ac6",
-            "description": "Left gutter (40px) contains incoming dependency curves"
-          },
-          {
-            "id": "ac7",
-            "description": "Right gutter (40px) contains outgoing dependency curves"
-          },
-          {
-            "id": "ac8",
-            "description": "Lines never cross over step card content area"
-          },
-          {
-            "id": "ac9",
-            "description": "Click indicator scrolls to and highlights first connected step"
-          },
-          {
-            "id": "ac10",
-            "description": "Tooltip on indicator hover shows connected step names"
-          },
-          {
-            "id": "ac11",
-            "description": "Old center/diagonal lines removed"
-          }
+          { "id": "ac1", "description": "DependencyIndicator component renders 20px circular badges on card edges" },
+          { "id": "ac2", "description": "Left indicator (blue #2563eb) shows incoming dependency count, hidden when 0" },
+          { "id": "ac3", "description": "Right indicator (green #22c55e) shows outgoing dependency count, hidden when 0" },
+          { "id": "ac4", "description": "Cross-scope indicators use orange (#f59e0b) background" },
+          { "id": "ac5", "description": "Lines only render when step or indicator is hovered" },
+          { "id": "ac6", "description": "Left gutter (40px) contains incoming dependency curves" },
+          { "id": "ac7", "description": "Right gutter (40px) contains outgoing dependency curves" },
+          { "id": "ac8", "description": "Lines never cross over step card content area" },
+          { "id": "ac9", "description": "Click indicator scrolls to and highlights first connected step" },
+          { "id": "ac10", "description": "Tooltip on indicator hover shows connected step names" },
+          { "id": "ac11", "description": "Old center/diagonal lines removed" }
         ],
         "audit": {
           "evidence": "DependencyIndicator.tsx (127 lines) renders 20px circular badges with direction-specific colors (blue incoming, green outgoing, orange cross-scope). DependencyLinesOverlay.tsx rewritten (300 lines) with gutter-based path algorithm using quadratic bezier curves in 40px left/right gutters. Lines only render on hover. Integrated into StepEditor and SwimlaneStepCard. PlanEditorPage updated with handleScrollToStep for click-to-scroll."
@@ -967,213 +620,140 @@
       }
     ]
   },
+
   "audit": {
     "last_run": "2026-01-29",
     "result": "partial",
     "summary": "uem012 completed: Dependency visualization redesigned with edge indicators and gutter-based lines. DependencyIndicator component shows numbered dots on card edges. Lines only visible on hover, drawn in 40px left/right gutters using quadratic bezier curves.",
-    "done_steps": [
-      "uem003",
-      "uem008",
-      "uem009",
-      "uem010",
-      "uem011",
-      "uem012"
-    ],
-    "pending_steps": [
-      "uem001",
-      "uem002",
-      "uem004",
-      "uem005",
-      "uem006",
-      "uem007"
-    ],
-    "criteria_met": [
-      "ac3",
-      "ac4",
-      "ac5",
-      "ac6",
-      "ac7",
-      "ac8",
-      "ac9",
-      "ac10",
-      "ac11",
-      "ac12"
-    ],
-    "criteria_pending": [
-      "ac1",
-      "ac2",
-      "ac13",
-      "ac14"
-    ],
+    "done_steps": ["uem003", "uem008", "uem009", "uem010", "uem011", "uem012"],
+    "pending_steps": ["uem001", "uem002", "uem004", "uem005", "uem006", "uem007"],
+    "criteria_met": ["ac3", "ac4", "ac5", "ac6", "ac7", "ac8", "ac9", "ac10", "ac11", "ac12"],
+    "criteria_pending": ["ac1", "ac2", "ac13", "ac14"],
     "change_request": {
       "date": "2026-01-29",
       "description": "Redesign dependency lines: edge indicators + gutter-based lines + hover-only visibility",
-      "affected_steps": [
-        "uem003",
-        "uem010"
-      ],
+      "affected_steps": ["uem003", "uem010"],
       "new_step": "uem012",
       "status": "completed"
     }
   },
+
   "plan_tests": {
     "coverage": "integration",
     "priority": "high",
+    "focus": "Enhanced visualization (uem008-uem011) per design_spec v002/v004/v005",
     "cases": [
       {
         "id": "t1",
         "type": "happy",
         "component": "SwimlaneLane",
         "description": "Renders with min-height 120px, border-bottom 1px solid var(--color-border)",
-        "covers": [
-          "uem008.ac1",
-          "uem011.ac1"
-        ]
+        "covers": ["uem008.ac1", "uem011.ac1"]
       },
       {
         "id": "t2",
         "type": "happy",
         "component": "SwimlaneLaneLabel",
         "description": "Renders 160px width with sticky left positioning and z-index 5",
-        "covers": [
-          "uem008.ac2",
-          "uem011.ac2"
-        ]
+        "covers": ["uem008.ac2", "uem011.ac2"]
       },
       {
         "id": "t3",
         "type": "happy",
         "component": "SwimlaneStepCard",
         "description": "Renders 180px width, 80px min-height with truncated title and status badge",
-        "covers": [
-          "uem008.ac3",
-          "uem011.ac3"
-        ]
+        "covers": ["uem008.ac3", "uem011.ac3"]
       },
       {
         "id": "t4",
         "type": "happy",
         "component": "useTopologicalSort",
         "description": "Returns Map<stepId, column_index> with correct dependency ordering",
-        "covers": [
-          "uem008.ac4",
-          "uem011.ac4"
-        ]
+        "covers": ["uem008.ac4", "uem011.ac4"]
       },
       {
         "id": "t5",
         "type": "happy",
         "component": "ViewModeToggle",
         "description": "Switches between list and swimlane modes in toolbar",
-        "covers": [
-          "uem008.ac5"
-        ]
+        "covers": ["uem008.ac5"]
       },
       {
         "id": "t6",
         "type": "happy",
         "component": "ScopeSummaryStats",
         "description": "ProgressBar renders 80px (list) or 100% (swimlane) width, 6px height",
-        "covers": [
-          "uem009.ac1"
-        ]
+        "covers": ["uem009.ac1"]
       },
       {
         "id": "t7",
         "type": "happy",
         "component": "StatBadge",
         "description": "Completed variant: bg #dcfce7, color #166534, checkmark icon",
-        "covers": [
-          "uem009.ac2",
-          "uem011.ac5"
-        ]
+        "covers": ["uem009.ac2", "uem011.ac5"]
       },
       {
         "id": "t8",
         "type": "happy",
         "component": "StatBadge",
         "description": "In_progress variant: bg #dbeafe, color #1e40af, spinner icon",
-        "covers": [
-          "uem009.ac3",
-          "uem011.ac5"
-        ]
+        "covers": ["uem009.ac3", "uem011.ac5"]
       },
       {
         "id": "t9",
         "type": "happy",
         "component": "StatBadge",
         "description": "Blocked variant: bg #fef3c7, color #92400e, pause icon",
-        "covers": [
-          "uem009.ac4",
-          "uem011.ac5"
-        ]
+        "covers": ["uem009.ac4", "uem011.ac5"]
       },
       {
         "id": "t10",
         "type": "edge",
         "component": "StatBadge",
         "description": "Badges hidden when count is 0",
-        "covers": [
-          "uem009.ac6",
-          "uem011.ac6"
-        ]
+        "covers": ["uem009.ac6", "uem011.ac6"]
       },
       {
         "id": "t11",
         "type": "happy",
         "component": "ScopeSummaryStats",
         "description": "Compact mode shows progress bar + '3/5 complete' text",
-        "covers": [
-          "uem009.ac7"
-        ]
+        "covers": ["uem009.ac7"]
       },
       {
         "id": "t12",
         "type": "happy",
         "component": "DependencyLinesOverlay",
         "description": "Intra-scope lines: solid stroke #e2e8f0, 2px width, 0.6 opacity",
-        "covers": [
-          "uem010.ac1",
-          "uem011.ac7"
-        ]
+        "covers": ["uem010.ac1", "uem011.ac7"]
       },
       {
         "id": "t13",
         "type": "happy",
         "component": "DependencyLinesOverlay",
         "description": "Cross-scope lines: dashed (6 4) stroke #2563eb, 2px width, 0.7 opacity",
-        "covers": [
-          "uem010.ac2",
-          "uem011.ac7"
-        ]
+        "covers": ["uem010.ac2", "uem011.ac7"]
       },
       {
         "id": "t14",
         "type": "happy",
         "component": "DependencyLinesOverlay",
         "description": "Highlighted state applies 3px width, opacity 1.0, drop-shadow",
-        "covers": [
-          "uem010.ac5",
-          "uem011.ac8"
-        ]
+        "covers": ["uem010.ac5", "uem011.ac8"]
       },
       {
         "id": "t15",
         "type": "happy",
         "component": "DependencyLinesOverlay",
         "description": "SVG arrowhead marker 8x8 points to dependent step",
-        "covers": [
-          "uem010.ac7"
-        ]
+        "covers": ["uem010.ac7"]
       },
       {
         "id": "t16",
         "type": "edge",
         "component": "ScopeSummaryStats",
         "description": "Handles empty scope (0 steps) without errors",
-        "covers": [
-          "uem011.ac9"
-        ]
+        "covers": ["uem011.ac9"]
       }
     ],
     "data_requirements": [
@@ -1182,12 +762,7 @@
       "Cross-scope and intra-scope dependencies",
       "One scope with zero steps for edge case",
       "At least one scope on critical path"
-    ]
-  },
-  "context": {
-    "tester": {
-      "notes": "Focus on design spec compliance (exact dimensions, colors, behaviors). Skip testing SVG bezier curve math (framework behavior). Skip line bundling visual tests (hard to assert meaningfully).",
-      "migrated_from": "plan_tests"
-    }
+    ],
+    "notes": "Focus on design spec compliance (exact dimensions, colors, behaviors). Skip testing SVG bezier curve math (framework behavior). Skip line bundling visual tests (hard to assert meaningfully)."
   }
 }

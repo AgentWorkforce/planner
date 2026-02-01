@@ -4,115 +4,64 @@
   "type": "feature",
   "status": "completed",
   "priority": "high",
-  "dependencies": [
-    "ui-status-bar"
-  ],
+  "dependencies": ["ui-status-bar"],
+
   "summary": {
     "goal": "Visual indicators for each planning agent showing their current state, with interaction affordances for viewing activity and answering questions.",
     "acceptance_criteria": [
-      {
-        "id": "ac1",
-        "description": "AgentAvatar component renders icon/emoji for agent role"
-      },
-      {
-        "id": "ac2",
-        "description": "Avatar shows 'working' state with green pulsing dot"
-      },
-      {
-        "id": "ac3",
-        "description": "Avatar shows 'needs input' state with red ring indicator"
-      },
-      {
-        "id": "ac4",
-        "description": "Avatar shows 'idle' state with dimmed opacity"
-      },
-      {
-        "id": "ac5",
-        "description": "Avatar shows 'error' state with warning icon"
-      },
-      {
-        "id": "ac6",
-        "description": "Hover shows tooltip with current status/activity"
-      },
-      {
-        "id": "ac7",
-        "description": "Click on working agent opens ActivityPopover"
-      },
-      {
-        "id": "ac8",
-        "description": "Click on needs-input agent opens ChatBubble"
-      },
-      {
-        "id": "ac9",
-        "description": "ActivityPopover shows current thought snippet and 'View Full Trajectory' link"
-      }
+      { "id": "ac1", "description": "AgentAvatar component renders icon/emoji for agent role" },
+      { "id": "ac2", "description": "Avatar shows 'working' state with green pulsing dot" },
+      { "id": "ac3", "description": "Avatar shows 'needs input' state with red ring indicator" },
+      { "id": "ac4", "description": "Avatar shows 'idle' state with dimmed opacity" },
+      { "id": "ac5", "description": "Avatar shows 'error' state with warning icon" },
+      { "id": "ac6", "description": "Hover shows tooltip with current status/activity" },
+      { "id": "ac7", "description": "Click on working agent opens ActivityPopover" },
+      { "id": "ac8", "description": "Click on needs-input agent opens ChatBubble" },
+      { "id": "ac9", "description": "ActivityPopover shows current thought snippet and 'View Full Trajectory' link" }
     ]
   },
+
   "plan_implementation": {
-    "scopes": [
-      "planner-ui"
-    ],
+    "scopes": ["planner-ui"],
     "steps": [
       {
         "step_id": "aa-1",
         "title": "Create AgentAvatar component",
         "scope": "planner-ui",
         "description": "Component with role prop (maps to emoji), state prop (normal/working/needs_input/idle/error), size prop (sm/md/lg)",
-        "acceptance": [
-          "Renders correct emoji for each role",
-          "Shows state indicator (green dot, red ring, dimmed, warning)",
-          "Three sizes work correctly"
-        ],
-        "specification": {
-          "design": {
-            "custom_components": []
-          }
-        }
+        "acceptance": ["Renders correct emoji for each role", "Shows state indicator (green dot, red ring, dimmed, warning)", "Three sizes work correctly"]
       },
       {
         "step_id": "aa-2",
         "title": "Add state indicator animations",
         "scope": "planner-ui",
         "description": "Green pulsing dot for working, red ring for needs_input (with escalation animation at 2min+), dimmed for idle",
-        "acceptance": [
-          "Working state has animate-pulse on green dot",
-          "Needs input has ring that thickens over time",
-          "Idle is 50% opacity"
-        ]
+        "acceptance": ["Working state has animate-pulse on green dot", "Needs input has ring that thickens over time", "Idle is 50% opacity"]
       },
       {
         "step_id": "aa-3",
         "title": "Create AgentActivityPopover component",
         "scope": "planner-ui",
         "description": "Popover that shows on click when agent is working. Shows role, current activity, step title, thought preview, 'View Trajectory' link",
-        "acceptance": [
-          "Popover appears above avatar on click",
-          "Shows agent's current activity",
-          "View Trajectory link works"
-        ]
+        "acceptance": ["Popover appears above avatar on click", "Shows agent's current activity", "View Trajectory link works"]
       },
       {
         "step_id": "aa-4",
         "title": "Add tooltip on hover",
         "scope": "planner-ui",
         "description": "Simple tooltip showing role label and brief status on hover",
-        "acceptance": [
-          "Tooltip appears on hover after 300ms delay",
-          "Shows role name and status text"
-        ]
+        "acceptance": ["Tooltip appears on hover after 300ms delay", "Shows role name and status text"]
       },
       {
         "step_id": "aa-5",
         "title": "Define agent roles configuration",
         "scope": "planner-ui",
         "description": "Create AGENT_ROLES constant with id, icon (emoji), label for each role type",
-        "acceptance": [
-          "Architect, UI Designer, Data Modeler, Coder, Tester, Security defined",
-          "Easy to add new roles"
-        ]
+        "acceptance": ["Architect, UI Designer, Data Modeler, Coder, Tester, Security defined", "Easy to add new roles"]
       }
     ]
   },
+
   "design_spec": {
     "views": [
       {
@@ -130,21 +79,13 @@
             "component": "div",
             "use": "avatar-container",
             "class": "relative rounded-full bg-bg-tertiary flex items-center justify-center cursor-pointer hover:bg-bg-elevated transition-colors",
-            "size_classes": {
-              "sm": "w-5 h-5",
-              "md": "w-8 h-8",
-              "lg": "w-10 h-10"
-            }
+            "size_classes": { "sm": "w-5 h-5", "md": "w-8 h-8", "lg": "w-10 h-10" }
           },
           {
             "component": "span",
             "use": "role-icon",
             "class": "text-center select-none",
-            "size_classes": {
-              "sm": "text-xs",
-              "md": "text-base",
-              "lg": "text-lg"
-            },
+            "size_classes": { "sm": "text-xs", "md": "text-base", "lg": "text-lg" },
             "content": "emoji based on role"
           },
           {
@@ -172,87 +113,31 @@
         "name": "Activity Popover (on click when working)",
         "layout": "Tooltip or Popover, positioned above avatar",
         "elements": [
-          {
-            "component": "div",
-            "use": "header",
-            "class": "flex items-center gap-2 pb-2 border-b border-border-subtle"
-          },
-          {
-            "component": "span",
-            "use": "role-icon",
-            "class": "text-lg"
-          },
-          {
-            "component": "span",
-            "use": "role-label",
-            "class": "text-sm font-medium text-text-primary"
-          },
-          {
-            "component": "div",
-            "use": "status-line",
-            "class": "text-xs text-text-muted mt-2",
-            "content": "Status: {currentActivity}"
-          },
-          {
-            "component": "div",
-            "use": "working-on",
-            "class": "text-xs text-text-secondary mt-1",
-            "content": "Working on: {stepTitle}"
-          },
-          {
-            "component": "div",
-            "use": "thought-preview",
-            "class": "text-xs text-text-muted mt-2 italic line-clamp-2",
-            "content": "\"{currentThought}...\""
-          },
-          {
-            "component": "Button",
-            "use": "view-trajectory",
-            "props": "variant=ghost size=sm",
-            "class": "mt-2 w-full",
-            "content": "View Full Trajectory →"
-          }
+          { "component": "div", "use": "header", "class": "flex items-center gap-2 pb-2 border-b border-border-subtle" },
+          { "component": "span", "use": "role-icon", "class": "text-lg" },
+          { "component": "span", "use": "role-label", "class": "text-sm font-medium text-text-primary" },
+          { "component": "div", "use": "status-line", "class": "text-xs text-text-muted mt-2", "content": "Status: {currentActivity}" },
+          { "component": "div", "use": "working-on", "class": "text-xs text-text-secondary mt-1", "content": "Working on: {stepTitle}" },
+          { "component": "div", "use": "thought-preview", "class": "text-xs text-text-muted mt-2 italic line-clamp-2", "content": "\"{currentThought}...\"" },
+          { "component": "Button", "use": "view-trajectory", "props": "variant=ghost size=sm", "class": "mt-2 w-full", "content": "View Full Trajectory →" }
         ],
         "width": "w-64",
         "background": "bg-bg-tertiary border border-border-subtle rounded-lg shadow-modal p-3"
       }
     ],
     "agent_roles": [
-      {
-        "id": "architect",
-        "icon": "🏗️",
-        "label": "Architect"
-      },
-      {
-        "id": "ui-designer",
-        "icon": "🎨",
-        "label": "UI/UX Designer"
-      },
-      {
-        "id": "data-modeler",
-        "icon": "💾",
-        "label": "Data Modeler"
-      },
-      {
-        "id": "coder",
-        "icon": "💻",
-        "label": "Coder"
-      },
-      {
-        "id": "tester",
-        "icon": "🧪",
-        "label": "Tester"
-      },
-      {
-        "id": "security",
-        "icon": "🔒",
-        "label": "Security"
-      }
+      { "id": "architect", "icon": "🏗️", "label": "Architect" },
+      { "id": "ui-designer", "icon": "🎨", "label": "UI/UX Designer" },
+      { "id": "data-modeler", "icon": "💾", "label": "Data Modeler" },
+      { "id": "coder", "icon": "💻", "label": "Coder" },
+      { "id": "tester", "icon": "🧪", "label": "Tester" },
+      { "id": "security", "icon": "🔒", "label": "Security" }
     ],
     "interactions": {
       "hover": "Show Tooltip with role label and brief status",
       "click_working": "Open ActivityPopover",
       "click_needs_input": "Open ChatBubble (handled by parent)"
-    }
+    },
+    "custom_needed": []
   }
 }

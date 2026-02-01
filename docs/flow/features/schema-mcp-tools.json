@@ -1,18 +1,14 @@
 {
   "feature_id": "schema-mcp-tools",
-  "title": "MCP Tools for Understanding, Context & Specification",
+  "title": "MCP Tools for Understanding & Specification",
   "type": "feature",
-  "status": "complete",
+  "status": "draft",
   "priority": "medium",
   "dependencies": ["schema-api-endpoints"],
   "parent_epic": "schema-enrichment",
-  "extends_for_context": {
-    "note": "Context MCP tools are part of schema-context feature (c009)",
-    "see": "schema-context.json"
-  },
   "summary": {
     "goal": "Extend MCP tools so agents can read and write understanding and specification sections programmatically",
-    "context": "Agents need MCP tools to contribute observations (understanding) and refine specs (specification) during planning sessions. This enables organic, agent-driven planning. Context tools will be added as part of schema-context feature.",
+    "context": "Agents need MCP tools to contribute observations (understanding) and refine specs (specification) during planning sessions. This enables organic, agent-driven planning.",
     "acceptance_criteria": [
       { "id": "ac1", "description": "get_plan tool response includes understanding and specification when present" },
       { "id": "ac2", "description": "update_understanding tool adds/updates observations for a specific role" },

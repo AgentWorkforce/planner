@@ -2,7 +2,7 @@
   "feature_id": "schema-ui-understanding",
   "title": "Understanding Section UI",
   "type": "feature",
-  "status": "complete",
+  "status": "draft",
   "priority": "medium",
   "dependencies": ["schema-api-endpoints"],
   "parent_epic": "schema-enrichment",
