@@ -1,0 +1,163 @@
+{
+  "feature_id": "ideation-ui-specialists-panel",
+  "title": "Specialists Panel (Right Sidebar)",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-ui-layout"],
+  "parent": "ideation-ui",
+  "summary": {
+    "goal": "Display real-time specialist observations in a minimal, scannable format. Specialists are dynamic (not fixed 5) and observations are freeform. Panel adapts to whatever specialists the Interviewer has spawned.",
+    "design_spec": {
+      "layout": "Vertical stack of specialist cards in right sidebar",
+      "card_structure": {
+        "header": "Icon (by role_hint or generic) + Specialist name + Confidence indicator",
+        "body": "Extract keywords/tags from freeform observations if present",
+        "alerts": "Extract concerns/questions from freeform observations if present"
+      },
+      "confidence_indicators": {
+        "note": "Confidence is freeform - look for 'confidence' key in observations",
+        "exploring": "3 empty dots (muted, accent-purple)",
+        "forming": "2 filled dots (partial, warning)",
+        "confident": "3 filled dots (full, success)",
+        "fallback": "Show 'thinking...' if no confidence reported yet"
+      },
+      "icon_mapping": {
+        "note": "Use role_hint to select icon, fallback to generic brain icon",
+        "known_hints": ["architecture", "data", "design", "testing", "security"],
+        "fallback": "generic brain/lightbulb icon"
+      }
+    },
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Panel shows cards for all active_specialists (dynamic count)" },
+      { "id": "ac2", "description": "Specialist name displayed (from understanding keys)" },
+      { "id": "ac3", "description": "Confidence extracted from observations.confidence if present" },
+      { "id": "ac4", "description": "Keywords extracted from observations.keywords if present (max 5 visible)" },
+      { "id": "ac5", "description": "Concerns/questions extracted from observations if present" },
+      { "id": "ac6", "description": "Panel updates in real-time as specialists contribute" },
+      { "id": "ac7", "description": "Empty state when no specialists spawned yet" },
+      { "id": "ac8", "description": "Panel is collapsible on smaller screens" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-ui"],
+    "steps": [
+      {
+        "step_id": "pnl001",
+        "title": "Create ConfidenceDots component",
+        "scope": "ideation-ui",
+        "description": "3-dot indicator for confidence level",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ConfidenceDots({ level }) renders 3 dots" },
+          { "id": "ac2", "description": "exploring: all dots empty/muted (text-accent-purple/30)" },
+          { "id": "ac3", "description": "forming: 2 dots filled (text-warning)" },
+          { "id": "ac4", "description": "confident: all 3 dots filled (text-success)" },
+          { "id": "ac5", "description": "Each dot is 6px circle with appropriate fill" }
+        ]
+      },
+      {
+        "step_id": "pnl002",
+        "title": "Create specialist icon mapping",
+        "scope": "ideation-ui",
+        "description": "Icon selection based on role_hint or specialist name",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getSpecialistIcon(name, roleHint?) returns appropriate icon component" },
+          { "id": "ac2", "description": "Known hints map: 'architecture'->building, 'data'->grid, 'design'->palette, 'test'->flask, 'security'->shield" },
+          { "id": "ac3", "description": "Name matching: 'Architect'->building, 'Designer'->palette, etc. (case-insensitive contains)" },
+          { "id": "ac4", "description": "Fallback: generic brain/lightbulb icon for unknown specialists" },
+          { "id": "ac5", "description": "All icons: currentColor, size prop (default 16px)" }
+        ]
+      },
+      {
+        "step_id": "pnl003",
+        "title": "Create KeywordTag component",
+        "scope": "ideation-ui",
+        "description": "Compact tag for keywords",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "KeywordTag({ keyword }) renders pill-shaped tag" },
+          { "id": "ac2", "description": "Styling: bg-accent-cyan/10 text-accent-cyan text-xs px-2 py-0.5 rounded-full" },
+          { "id": "ac3", "description": "Truncates if keyword > 15 chars" }
+        ]
+      },
+      {
+        "step_id": "pnl004",
+        "title": "Create AlertCount component",
+        "scope": "ideation-ui",
+        "description": "Count badge for concerns/questions",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AlertCount({ type, count }) renders icon + count" },
+          { "id": "ac2", "description": "type='concern': warning icon, text-warning" },
+          { "id": "ac3", "description": "type='question': help-circle icon, text-accent-purple" },
+          { "id": "ac4", "description": "Hidden when count=0" }
+        ]
+      },
+      {
+        "step_id": "pnl005",
+        "title": "Create SpecialistCard component",
+        "scope": "ideation-ui",
+        "description": "Card showing single specialist's freeform observations",
+        "dependencies": ["pnl001", "pnl002", "pnl003", "pnl004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistCard({ name, roleHint, observations }) renders card" },
+          { "id": "ac2", "description": "Header: icon (from mapping) + name + ConfidenceDots (from observations.confidence)" },
+          { "id": "ac3", "description": "Body: KeywordTags from observations.keywords if present (max 5)" },
+          { "id": "ac4", "description": "Footer: AlertCount from observations.concerns and observations.questions if present" },
+          { "id": "ac5", "description": "Empty state if observations is empty object: 'Thinking...'" },
+          { "id": "ac6", "description": "Card styling: bg-bg-card border-border-subtle rounded-lg p-3" }
+        ]
+      },
+      {
+        "step_id": "pnl006",
+        "title": "Create SpecialistsPanel component",
+        "scope": "ideation-ui",
+        "description": "Panel containing dynamic specialist cards",
+        "dependencies": ["pnl005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistsPanel({ understanding, activeSpecialists }) renders panel" },
+          { "id": "ac2", "description": "Header: 'Specialists' title with count badge" },
+          { "id": "ac3", "description": "Body: SpecialistCard for each key in understanding (dynamic count)" },
+          { "id": "ac4", "description": "Footer: total concerns/questions badge (aggregated from all)" },
+          { "id": "ac5", "description": "Empty state when no specialists: 'Specialists will appear as needed'" }
+        ]
+      },
+      {
+        "step_id": "pnl007",
+        "title": "Create useUnderstanding hook",
+        "scope": "ideation-ui",
+        "description": "Hook to get freeform understanding from session with real-time updates",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useUnderstanding(sessionId) returns { understanding, activeSpecialists }" },
+          { "id": "ac2", "description": "Integrates with useSessionEvents for real-time updates" },
+          { "id": "ac3", "description": "Returns Record<string, Record<string, unknown>> for understanding" },
+          { "id": "ac4", "description": "Returns ActiveSpecialist[] for specialist metadata" }
+        ]
+      },
+      {
+        "step_id": "pnl008",
+        "title": "Integrate panel into IdeationLayout",
+        "scope": "ideation-ui",
+        "description": "Wire up SpecialistsPanel as right sidebar",
+        "dependencies": ["pnl006", "pnl007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistsPanel rendered in IdeationLayout right slot" },
+          { "id": "ac2", "description": "Receives understanding from useUnderstanding hook" },
+          { "id": "ac3", "description": "Only shown when viewing a session (not on empty state)" },
+          { "id": "ac4", "description": "Respects collapse state from layout" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "feature_id": "ideation-storage",
+  "title": "Ideation Storage Layer",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["ideation-domain"],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Implement SQLite persistence for Sessions, following the same patterns as planner-core storage.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Sessions table stores: id, status, initiative_id, source (JSONB), transcript (JSONB), understanding (JSONB), active_specialists (JSONB), planner_sends (JSONB), timestamps" },
+      { "id": "ac2", "description": "IdeationStorage interface defines CRUD operations for sessions" },
+      { "id": "ac3", "description": "SQLiteIdeationStorage implements the interface using better-sqlite3" },
+      { "id": "ac4", "description": "Database initialization creates tables if not exists" },
+      { "id": "ac5", "description": "Transcript can be appended without replacing entire session" },
+      { "id": "ac6", "description": "Understanding can be updated per-specialist (freeform key) without overwriting others" },
+      { "id": "ac7", "description": "active_specialists can be appended/updated for lazy spawning tracking" },
+      { "id": "ac8", "description": "planner_sends can be appended with full payload snapshot" },
+      { "id": "ac9", "description": "Sessions can be queried by status and initiative_id" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core"],
+    "steps": [
+      {
+        "step_id": "sto001",
+        "title": "Define IdeationStorage interface",
+        "scope": "ideation-core",
+        "description": "Create TypeScript interface for storage operations",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createSession(source, initiative_id?) -> Session" },
+          { "id": "ac2", "description": "getSession(id) -> Session | null" },
+          { "id": "ac3", "description": "listSessions(filter?: { status?, initiative_id? }) -> Session[]" },
+          { "id": "ac4", "description": "updateSessionStatus(id, status) -> Session" },
+          { "id": "ac5", "description": "appendTranscript(id, message: TranscriptMessage) -> Session" },
+          { "id": "ac6", "description": "updateUnderstanding(id, specialistName: string, observations: Record<string, unknown>) -> Session" },
+          { "id": "ac7", "description": "addActiveSpecialist(id, specialist: ActiveSpecialist) -> Session" },
+          { "id": "ac8", "description": "removeActiveSpecialist(id, specialistName: string) -> Session" },
+          { "id": "ac9", "description": "appendPlannerSend(id, send: PlannerSend) -> Session" }
+        ]
+      },
+      {
+        "step_id": "sto002",
+        "title": "Create SQLite schema and initialization",
+        "scope": "ideation-core",
+        "description": "Define CREATE TABLE statements and init function",
+        "dependencies": ["sto001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sessions table: id TEXT PK, status TEXT, initiative_id TEXT, source TEXT (JSON), transcript TEXT (JSON), understanding TEXT (JSON), active_specialists TEXT (JSON), planner_sends TEXT (JSON), created_at TEXT, updated_at TEXT" },
+          { "id": "ac2", "description": "Index on status, initiative_id for filtering" },
+          { "id": "ac3", "description": "initDatabase(db) function creates tables if not exist" }
+        ]
+      },
+      {
+        "step_id": "sto003",
+        "title": "Implement session CRUD operations",
+        "scope": "ideation-core",
+        "description": "Implement createSession, getSession, listSessions, updateSessionStatus",
+        "dependencies": ["sto002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createSession generates UUID, initializes empty transcript/understanding/active_specialists, sets status='active'" },
+          { "id": "ac2", "description": "getSession returns null if not found" },
+          { "id": "ac3", "description": "listSessions accepts optional status and initiative_id filters, returns sorted by updated_at DESC" },
+          { "id": "ac4", "description": "updateSessionStatus updates status and updated_at timestamp" }
+        ]
+      },
+      {
+        "step_id": "sto004",
+        "title": "Implement transcript append operation",
+        "scope": "ideation-core",
+        "description": "Implement appendTranscript that appends without full replacement",
+        "dependencies": ["sto003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Uses SQLite JSON functions to append to transcript array" },
+          { "id": "ac2", "description": "Updates updated_at timestamp" },
+          { "id": "ac3", "description": "Returns updated Session" }
+        ]
+      },
+      {
+        "step_id": "sto005",
+        "title": "Implement understanding update operation",
+        "scope": "ideation-core",
+        "description": "Implement updateUnderstanding that merges per-specialist observations (freeform)",
+        "dependencies": ["sto003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Uses SQLite JSON functions to set specific specialist key in understanding object" },
+          { "id": "ac2", "description": "Key is specialistName (any string), value is freeform Record<string, unknown>" },
+          { "id": "ac3", "description": "Does not overwrite other specialists' observations" },
+          { "id": "ac4", "description": "Updates updated_at timestamp" },
+          { "id": "ac5", "description": "Returns updated Session" }
+        ]
+      },
+      {
+        "step_id": "sto005b",
+        "title": "Implement active specialists operations",
+        "scope": "ideation-core",
+        "description": "Implement addActiveSpecialist and removeActiveSpecialist for lazy spawning tracking",
+        "dependencies": ["sto003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "addActiveSpecialist appends to active_specialists array" },
+          { "id": "ac2", "description": "removeActiveSpecialist filters out specialist by name" },
+          { "id": "ac3", "description": "Both update updated_at timestamp" },
+          { "id": "ac4", "description": "Returns updated Session" }
+        ]
+      },
+      {
+        "step_id": "sto006",
+        "title": "Implement planner send append operation",
+        "scope": "ideation-core",
+        "description": "Implement appendPlannerSend to record exact payload sent to planner",
+        "dependencies": ["sto003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "appendPlannerSend(id, send: PlannerSend) appends to planner_sends array" },
+          { "id": "ac2", "description": "Uses SQLite JSON functions to append to array" },
+          { "id": "ac3", "description": "Updates updated_at timestamp" },
+          { "id": "ac4", "description": "Returns updated Session" }
+        ]
+      },
+      {
+        "step_id": "sto007",
+        "title": "Write storage tests",
+        "scope": "ideation-core",
+        "description": "Unit tests for all storage operations",
+        "dependencies": ["sto005b", "sto006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test session CRUD lifecycle" },
+          { "id": "ac2", "description": "Test transcript append preserves existing messages" },
+          { "id": "ac3", "description": "Test understanding update merges per-specialist (freeform key)" },
+          { "id": "ac4", "description": "Test listSessions with status and initiative_id filters" },
+          { "id": "ac5", "description": "Test planner send append preserves history and captures full payload" },
+          { "id": "ac6", "description": "Test active_specialists add/remove operations" }
+        ]
+      },
+      {
+        "step_id": "sto008",
+        "title": "Export storage module",
+        "scope": "ideation-core",
+        "description": "Create storage/index.ts barrel export",
+        "dependencies": ["sto007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports IdeationStorage interface and SQLiteIdeationStorage class" }
+        ]
+      }
+    ]
+  }
+}

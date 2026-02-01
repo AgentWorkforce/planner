@@ -1,0 +1,142 @@
+{
+  "feature_id": "ideation-ui-layout",
+  "title": "Ideation Layout & Navigation",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "ideation-ui",
+  "summary": {
+    "goal": "Establish the 3-column layout structure for the ideation interface with navigation sidebar, main content area, and specialists panel.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Left sidebar contains navigation (sessions list, new session button)" },
+      { "id": "ac2", "description": "Center area is the main content (chat or session details)" },
+      { "id": "ac3", "description": "Right sidebar shows specialists panel (collapsible)" },
+      { "id": "ac4", "description": "Layout uses Mission Control design system" },
+      { "id": "ac5", "description": "Responsive breakpoints handled (hide right sidebar on smaller screens)" }
+    ],
+    "decisions": [
+      { "decision": "Copy components from planner-ui and adapt (not shared package yet)", "rationale": "Simpler MVP, extract to shared-ui later when both UIs are stable" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-ui"],
+    "steps": [
+      {
+        "step_id": "lay001",
+        "title": "Initialize ideation-ui package",
+        "scope": "ideation-ui",
+        "description": "Create package structure matching planner-ui pattern",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/ideation-ui/ with package.json, tsconfig.json, vite.config.ts" },
+          { "id": "ac2", "description": "Dependencies: react, react-dom, react-router-dom, tailwindcss, @radix-ui/*, clsx, tailwind-merge" },
+          { "id": "ac3", "description": "Copy vite.config.ts from planner-ui (proxy settings, aliases)" },
+          { "id": "ac4", "description": "src/main.tsx with BrowserRouter setup" }
+        ]
+      },
+      {
+        "step_id": "lay002",
+        "title": "Copy design system files from planner-ui",
+        "scope": "ideation-ui",
+        "description": "Copy globals.css, tailwind.config.cjs, and utility functions",
+        "dependencies": ["lay001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Copy globals.css with all CSS variables (colors, shadows, etc.)" },
+          { "id": "ac2", "description": "Copy tailwind.config.cjs with theme extensions" },
+          { "id": "ac3", "description": "Copy src/lib/utils.ts (cn function for class merging)" },
+          { "id": "ac4", "description": "Add ideation-specific variables: --specialists-panel-width" }
+        ]
+      },
+      {
+        "step_id": "lay003",
+        "title": "Copy common UI components from planner-ui",
+        "scope": "ideation-ui",
+        "description": "Copy and adapt reusable components",
+        "dependencies": ["lay002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Copy components/ui/button.tsx" },
+          { "id": "ac2", "description": "Copy components/ui/dialog.tsx (for modals)" },
+          { "id": "ac3", "description": "Copy components/ui/textarea.tsx" },
+          { "id": "ac4", "description": "Copy components/ui/badge.tsx" },
+          { "id": "ac5", "description": "Copy components/LoadingSpinner.tsx" },
+          { "id": "ac6", "description": "Copy components/icons/ directory (all SVG icon components)" }
+        ],
+        "notes": "These are candidates for shared-ui extraction later"
+      },
+      {
+        "step_id": "lay004",
+        "title": "Create IdeationLayout component",
+        "scope": "ideation-ui",
+        "description": "3-column layout shell with slots for sidebar, main, and panel",
+        "dependencies": ["lay003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "IdeationLayout accepts: sidebar, children (main), panel props" },
+          { "id": "ac2", "description": "Left sidebar: fixed width (var(--sidebar-width)), full height, bg-bg-secondary" },
+          { "id": "ac3", "description": "Main area: flex-1, overflow-y-auto" },
+          { "id": "ac4", "description": "Right panel: fixed width (var(--specialists-panel-width)), collapsible" }
+        ]
+      },
+      {
+        "step_id": "lay005",
+        "title": "Implement responsive panel collapse",
+        "scope": "ideation-ui",
+        "description": "Hide right panel on smaller screens, add toggle button",
+        "dependencies": ["lay004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useMediaQuery hook or Tailwind breakpoints hide panel < 1024px" },
+          { "id": "ac2", "description": "Toggle button in header to show/hide panel manually" },
+          { "id": "ac3", "description": "Panel state persisted to localStorage" }
+        ]
+      },
+      {
+        "step_id": "lay006",
+        "title": "Create sidebar navigation structure",
+        "scope": "ideation-ui",
+        "description": "Sidebar with header, sessions list slot, and footer",
+        "dependencies": ["lay004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header: 'Ideation' title + New Session button" },
+          { "id": "ac2", "description": "Body: scrollable area for SessionList component" },
+          { "id": "ac3", "description": "Footer: optional settings/help links" }
+        ]
+      },
+      {
+        "step_id": "lay007",
+        "title": "Set up React Router routes",
+        "scope": "ideation-ui",
+        "description": "Define routes for session views",
+        "dependencies": ["lay004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "/ - sessions list (default, shows empty state or list)" },
+          { "id": "ac2", "description": "/session/:id - session chat view" },
+          { "id": "ac3", "description": "All routes wrapped in IdeationLayout" }
+        ]
+      },
+      {
+        "step_id": "lay008",
+        "title": "Create API client hook",
+        "scope": "ideation-ui",
+        "description": "useIdeationApi hook for fetching/mutating data",
+        "dependencies": ["lay001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "API_BASE_URL from environment variable" },
+          { "id": "ac2", "description": "Methods: getSessions, getSession, createSession, sendMessage, sendToPlanner, abandon" },
+          { "id": "ac3", "description": "Returns { data, loading, error } pattern" }
+        ],
+        "cross_scope_contract": {
+          "consumes": "ideation-api endpoints",
+          "base_url": "/api/ideation"
+        }
+      }
+    ]
+  }
+}

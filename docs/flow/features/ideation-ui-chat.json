@@ -1,0 +1,197 @@
+{
+  "feature_id": "ideation-ui-chat",
+  "title": "Chat Interface",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["ideation-ui-layout"],
+  "parent": "ideation-ui",
+  "summary": {
+    "goal": "Provide conversational interface for brainstorming with the Interviewer agent, displaying transcript and handling real-time message updates.",
+    "reuse_from_planner_ui": [
+      "MessagingSidebar/ChatBubble pattern -> adapt for ChatBubble",
+      "MessagingSidebar/ChatInput pattern -> adapt for ChatInput",
+      "usePlanEvents hook pattern -> adapt for useSessionEvents (SSE)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Messages displayed in chat bubble format (user right, Interviewer left)" },
+      { "id": "ac2", "description": "Chat is pure user <-> Interviewer (no specialist messages in transcript)" },
+      { "id": "ac3", "description": "Text input at bottom with send button" },
+      { "id": "ac4", "description": "Messages appear in real-time via SSE" },
+      { "id": "ac5", "description": "Auto-scroll to newest message" },
+      { "id": "ac6", "description": "Loading indicator while waiting for Interviewer response" },
+      { "id": "ac7", "description": "Session header shows confidence bar and 'Send to Planner' action" }
+    ],
+    "decisions": [
+      { "decision": "Specialists don't appear in chat", "rationale": "Interviewer facilitates - surfaces specialist insights when appropriate. Specialists show in sidebar panel." }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-ui"],
+    "steps": [
+      {
+        "step_id": "cht001",
+        "title": "Create useSession hook",
+        "scope": "ideation-ui",
+        "description": "Hook to fetch single session with transcript",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useSession(sessionId) returns { session, loading, error, refetch }" },
+          { "id": "ac2", "description": "Calls GET /api/ideation/sessions/:id" },
+          { "id": "ac3", "description": "Session includes transcript[] and understanding" }
+        ]
+      },
+      {
+        "step_id": "cht002",
+        "title": "Create useSessionEvents hook",
+        "scope": "ideation-ui",
+        "description": "Hook for SSE subscription to session updates",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useSessionEvents(sessionId, handlers) subscribes to SSE" },
+          { "id": "ac2", "description": "Connects to GET /api/ideation/sessions/:id/events" },
+          { "id": "ac3", "description": "Handlers: onTranscript, onUnderstanding, onStatus, onConfidence" },
+          { "id": "ac4", "description": "Auto-reconnect on connection loss" },
+          { "id": "ac5", "description": "Cleanup on unmount" }
+        ],
+        "cross_scope_contract": {
+          "consumes": "ideation-api SSE endpoint",
+          "event_types": ["transcript_updated", "understanding_updated", "status_changed", "confidence_changed"]
+        }
+      },
+      {
+        "step_id": "cht003",
+        "title": "Create ChatBubble component",
+        "scope": "ideation-ui",
+        "description": "Individual message bubble with role-based styling (user or assistant only)",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ChatBubble({ message }) renders bubble with content" },
+          { "id": "ac2", "description": "user role: right-aligned, bg-accent-cyan/20" },
+          { "id": "ac3", "description": "assistant role: left-aligned, bg-bg-tertiary, Interviewer avatar" },
+          { "id": "ac4", "description": "Timestamp shown subtly below bubble" }
+        ]
+      },
+      {
+        "step_id": "cht004",
+        "title": "Create ChatMessageList component",
+        "scope": "ideation-ui",
+        "description": "Scrollable list of chat bubbles",
+        "dependencies": ["cht003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ChatMessageList({ messages }) renders ChatBubble for each" },
+          { "id": "ac2", "description": "Auto-scroll to bottom when new messages arrive" },
+          { "id": "ac3", "description": "useRef for scroll container, scrollIntoView on update" },
+          { "id": "ac4", "description": "Loading skeleton when initial load" }
+        ]
+      },
+      {
+        "step_id": "cht005",
+        "title": "Create ChatInput component",
+        "scope": "ideation-ui",
+        "description": "Text input with send button at bottom of chat",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Textarea that grows up to 4 lines" },
+          { "id": "ac2", "description": "Send button (arrow icon) enabled when text present" },
+          { "id": "ac3", "description": "Enter to send, Shift+Enter for newline" },
+          { "id": "ac4", "description": "onSend(content) callback prop" },
+          { "id": "ac5", "description": "Disabled state when sending (loading)" }
+        ]
+      },
+      {
+        "step_id": "cht006",
+        "title": "Create useSendMessage hook",
+        "scope": "ideation-ui",
+        "description": "Hook to send message and track pending state",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useSendMessage(sessionId) returns { send, sending }" },
+          { "id": "ac2", "description": "send(content) calls POST /api/ideation/sessions/:id/messages" },
+          { "id": "ac3", "description": "Optimistically adds user message to local state" },
+          { "id": "ac4", "description": "sending boolean for loading indicator" }
+        ]
+      },
+      {
+        "step_id": "cht007",
+        "title": "Create ConfidenceBar component",
+        "scope": "ideation-ui",
+        "description": "Visual bar showing aggregate confidence from all specialists",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ConfidenceBar({ score }) renders segmented bar (5 segments)" },
+          { "id": "ac2", "description": "0-20: 1 segment filled (red)" },
+          { "id": "ac3", "description": "21-40: 2 segments (red-orange)" },
+          { "id": "ac4", "description": "41-60: 3 segments (orange)" },
+          { "id": "ac5", "description": "61-80: 4 segments (yellow-green)" },
+          { "id": "ac6", "description": "81-100: 5 segments (green)" },
+          { "id": "ac7", "description": "Tooltip shows breakdown by specialist" }
+        ]
+      },
+      {
+        "step_id": "cht008",
+        "title": "Create useConfidence hook",
+        "scope": "ideation-ui",
+        "description": "Hook to fetch and subscribe to confidence updates",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useConfidence(sessionId) returns { score, breakdown, loading }" },
+          { "id": "ac2", "description": "Fetches GET /api/ideation/sessions/:id/confidence" },
+          { "id": "ac3", "description": "Updates via SSE confidence_changed events" }
+        ]
+      },
+      {
+        "step_id": "cht009",
+        "title": "Create ChatHeader component",
+        "scope": "ideation-ui",
+        "description": "Header showing session info, confidence bar, and send-to-planner action",
+        "dependencies": ["cht007", "cht008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows session title (truncated initial_intent)" },
+          { "id": "ac2", "description": "Shows ConfidenceBar with current aggregate score" },
+          { "id": "ac3", "description": "'Send to Planner' button with color matching confidence (red/orange/green)" },
+          { "id": "ac4", "description": "Button always enabled (advisory confidence, not blocking)" },
+          { "id": "ac5", "description": "If session.planner_sends.length > 0, show 'Update Plan' instead of 'Send to Planner'" }
+        ]
+      },
+      {
+        "step_id": "cht010",
+        "title": "Create TypingIndicator component",
+        "scope": "ideation-ui",
+        "description": "Animated indicator when Interviewer is responding",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Three animated dots in a bubble" },
+          { "id": "ac2", "description": "Shown after user sends message until response arrives" },
+          { "id": "ac3", "description": "Left-aligned like assistant messages" }
+        ]
+      },
+      {
+        "step_id": "cht011",
+        "title": "Create SessionChatView page",
+        "scope": "ideation-ui",
+        "description": "Main chat view composing all components",
+        "dependencies": ["cht001", "cht002", "cht004", "cht005", "cht006", "cht009", "cht010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Route: /session/:id" },
+          { "id": "ac2", "description": "Uses useSession for initial data" },
+          { "id": "ac3", "description": "Uses useSessionEvents to update transcript in real-time" },
+          { "id": "ac4", "description": "Renders ChatHeader, ChatMessageList, ChatInput" },
+          { "id": "ac5", "description": "Shows TypingIndicator when waiting for response" },
+          { "id": "ac6", "description": "404 state if session not found" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "feature_id": "ideation-ui-session-list",
+  "title": "Session List & Management",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-ui-layout"],
+  "parent": "ideation-ui",
+  "summary": {
+    "goal": "Display list of ideation sessions in the left sidebar with status indicators and actions.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Sessions listed with title (from initial_intent) and status badge" },
+      { "id": "ac2", "description": "Status badges: active (cyan), abandoned (muted)" },
+      { "id": "ac3", "description": "Sessions with planner_sends.length > 0 show 'Sent to Planner' indicator (linked plan icon, count if > 1)" },
+      { "id": "ac4", "description": "'New Session' button creates session with initial intent prompt" },
+      { "id": "ac5", "description": "Clicking session navigates to chat view" },
+      { "id": "ac6", "description": "Sessions sorted by updated_at (most recent first)" },
+      { "id": "ac7", "description": "Empty state shown when no sessions exist" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-ui"],
+    "steps": [
+      {
+        "step_id": "ses001",
+        "title": "Create useSessions hook",
+        "scope": "ideation-ui",
+        "description": "Hook to fetch and manage sessions list",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useSessions() returns { sessions: Session[], loading, error, refetch }" },
+          { "id": "ac2", "description": "Calls GET /api/ideation/sessions on mount" },
+          { "id": "ac3", "description": "Sessions sorted by updated_at DESC" }
+        ]
+      },
+      {
+        "step_id": "ses002",
+        "title": "Create SessionStatusBadge component",
+        "scope": "ideation-ui",
+        "description": "Badge component for session status",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionStatusBadge({ status, sendCount }) renders colored badge" },
+          { "id": "ac2", "description": "active: bg-accent-cyan/20 text-accent-cyan" },
+          { "id": "ac3", "description": "abandoned: bg-bg-tertiary text-text-muted" },
+          { "id": "ac4", "description": "If sendCount > 0: shows linked plan icon with count badge if > 1" }
+        ]
+      },
+      {
+        "step_id": "ses003",
+        "title": "Create SessionItem component",
+        "scope": "ideation-ui",
+        "description": "Individual session row in the list",
+        "dependencies": ["ses002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionItem({ session, isActive }) renders title, badge, timestamp" },
+          { "id": "ac2", "description": "Title truncated from initial_intent (first 50 chars)" },
+          { "id": "ac3", "description": "Hover state: bg-bg-tertiary" },
+          { "id": "ac4", "description": "Active state: border-l-2 border-accent-cyan" },
+          { "id": "ac5", "description": "onClick navigates to /session/:id" }
+        ]
+      },
+      {
+        "step_id": "ses004",
+        "title": "Create SessionList component",
+        "scope": "ideation-ui",
+        "description": "List container with loading/empty states",
+        "dependencies": ["ses001", "ses003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionList renders SessionItem for each session" },
+          { "id": "ac2", "description": "Loading state: skeleton items" },
+          { "id": "ac3", "description": "Empty state: illustration + 'Start your first brainstorm' message" },
+          { "id": "ac4", "description": "Error state: error message with retry button" }
+        ]
+      },
+      {
+        "step_id": "ses005",
+        "title": "Create NewSessionModal component",
+        "scope": "ideation-ui",
+        "description": "Modal to create new session with initial intent",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Modal with textarea for initial intent" },
+          { "id": "ac2", "description": "Placeholder: 'What would you like to build or explore?'" },
+          { "id": "ac3", "description": "Submit calls POST /api/ideation/sessions" },
+          { "id": "ac4", "description": "On success: navigates to /session/:newId, closes modal" },
+          { "id": "ac5", "description": "Loading state on submit button" }
+        ]
+      },
+      {
+        "step_id": "ses006",
+        "title": "Create NewSessionButton component",
+        "scope": "ideation-ui",
+        "description": "Button in sidebar header to open new session modal",
+        "dependencies": ["ses005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Button with + icon and 'New Session' text" },
+          { "id": "ac2", "description": "Opens NewSessionModal on click" },
+          { "id": "ac3", "description": "Uses primary button style (bg-accent-cyan)" }
+        ]
+      },
+      {
+        "step_id": "ses007",
+        "title": "Integrate SessionList into sidebar",
+        "scope": "ideation-ui",
+        "description": "Wire up SessionList and NewSessionButton in IdeationLayout sidebar",
+        "dependencies": ["ses004", "ses006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sidebar renders NewSessionButton in header" },
+          { "id": "ac2", "description": "Sidebar renders SessionList in body" },
+          { "id": "ac3", "description": "Current session highlighted based on route params" }
+        ]
+      }
+    ]
+  }
+}
