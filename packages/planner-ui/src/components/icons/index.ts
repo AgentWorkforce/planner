@@ -16,6 +16,7 @@ export { PlayIcon } from './PlayIcon';
 export { ChannelIcon } from './ChannelIcon';
 export { SendIcon } from './SendIcon';
 export { UsersIcon } from './UsersIcon';
+export { UserIcon } from './UserIcon';
 export { EnvelopeIcon } from './EnvelopeIcon';
 export { SearchIcon } from './SearchIcon';
 export { BrainIcon } from './BrainIcon';

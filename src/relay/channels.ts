@@ -14,8 +14,10 @@ import { getClient, isConnected, onStateChange, type ClientState } from './clien
 export interface ChannelInfo {
   id: string;
   name: string;
-  type: 'global' | 'plan';
+  type: 'global' | 'plan' | 'dm';
   planId?: string;
+  agentId?: string; // For DM channels - target agent ID
+  agentName?: string; // For DM channels - display name
   description?: string;
 }
 
@@ -28,11 +30,67 @@ const createdChannels = new Set<string>();
 /** Track plan channels */
 const planChannels = new Map<string, string>(); // planId -> channelId
 
+/** Track DM channels */
+const dmChannels = new Map<string, ChannelInfo>(); // channelId -> ChannelInfo
+
 /**
  * Get channel ID for a plan.
  */
 export function getPlanChannelId(planId: string): string {
   return `#plan-${planId.slice(0, 8)}`;
+}
+
+/**
+ * Get channel ID for a DM between user and agent.
+ */
+export function getDmChannelId(userSessionId: string, agentId: string): string {
+  return `#dm-${userSessionId}-${agentId}`;
+}
+
+/**
+ * Create a DM channel between user and agent.
+ * Called when user initiates DM with an agent.
+ */
+export function createDmChannel(
+  userSessionId: string,
+  agentId: string,
+  agentName: string
+): ChannelInfo | null {
+  const client = getClient();
+  if (!client || !isConnected()) {
+    console.log(`[channels] Skipping DM channel creation: relay not connected`);
+    return null;
+  }
+
+  const channelId = getDmChannelId(userSessionId, agentId);
+
+  // Check if already created
+  if (dmChannels.has(channelId)) {
+    console.log(`[channels] DM channel ${channelId} already exists`);
+    return dmChannels.get(channelId)!;
+  }
+
+  // Join the channel (creates it if it doesn't exist)
+  const displayName = 'Planner Core';
+  const joined = client.joinChannel(channelId, displayName);
+
+  if (joined) {
+    const channelInfo: ChannelInfo = {
+      id: channelId,
+      name: `DM with ${agentName}`,
+      type: 'dm',
+      agentId,
+      agentName,
+    };
+
+    createdChannels.add(channelId);
+    dmChannels.set(channelId, channelInfo);
+    console.log(`[channels] Created DM channel ${channelId} for ${agentName}`);
+    return channelInfo;
+  }
+
+  console.warn(`[channels] Failed to create DM channel ${channelId}`);
+  return null;
 }
 
 /**
@@ -120,9 +178,16 @@ export function removePlanChannel(planId: string): boolean {
 
 /**
  * Get all channels accessible to a user.
- * Returns #planner plus all plan channels the user has access to.
+ * Returns #planner plus plan channels and DM channels.
+ *
+ * @param planIds - If provided, include channels for these plan IDs.
+ *                  If not provided, only returns active plan channels (in planChannels map).
+ * @param userSessionId - If provided, include DM channels for this user.
  */
-export function getChannelsForUser(planIds?: string[]): ChannelInfo[] {
+export function getChannelsForUser(
+  planIds?: string[],
+  userSessionId?: string
+): ChannelInfo[] {
   const channels: ChannelInfo[] = [];
 
   // Always include #planner
@@ -135,6 +200,7 @@ export function getChannelsForUser(planIds?: string[]): ChannelInfo[] {
 
   // Include plan channels
   if (planIds) {
+    // Return channels for specific plan IDs
     for (const planId of planIds) {
       const channelId = planChannels.get(planId) || getPlanChannelId(planId);
       channels.push({
@@ -145,7 +211,7 @@ export function getChannelsForUser(planIds?: string[]): ChannelInfo[] {
       });
     }
   } else {
-    // Return all known plan channels
+    // Return only active plan channels (ones we've actually joined)
     for (const [planId, channelId] of planChannels) {
       channels.push({
         id: channelId,
@@ -153,6 +219,15 @@ export function getChannelsForUser(planIds?: string[]): ChannelInfo[] {
         type: 'plan',
         planId,
       });
+    }
+  }
+
+  // Include DM channels for this user
+  if (userSessionId) {
+    for (const [channelId, channelInfo] of dmChannels) {
+      if (channelId.includes(userSessionId)) {
+        channels.push(channelInfo);
+      }
     }
   }
 
