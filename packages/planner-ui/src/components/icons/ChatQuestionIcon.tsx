@@ -1,18 +1,12 @@
 import type { IconProps } from './types';
-
-const sizes = {
-  sm: 14,
-  md: 16,
-  lg: 20,
-  xl: 24,
-};
+import { iconSizes } from './types';
 
 /**
  * Chat bubble icon with a question mark inside.
  * Used to indicate pending questions from agents.
  */
 export function ChatQuestionIcon({ size = 'md', className = '' }: IconProps) {
-  const pixelSize = sizes[size];
+  const pixelSize = iconSizes[size];
 
   return (
     <svg

@@ -23,6 +23,13 @@ export { BrainIcon } from './BrainIcon';
 export { DecisionsIcon } from './DecisionsIcon';
 export { ChatQuestionIcon } from './ChatQuestionIcon';
 
+// Role icons (for Understanding UI and Context UI)
+export { ArchitectIcon } from './ArchitectIcon';
+export { DesignerIcon } from './DesignerIcon';
+export { TesterIcon } from './TesterIcon';
+export { SecurityIcon } from './SecurityIcon';
+export { DatabaseIcon } from './DatabaseIcon';
+
 // Navigation icons (lucide-react)
 export { DashboardIcon } from './DashboardIcon';
 export { PlansIcon } from './PlansIcon';

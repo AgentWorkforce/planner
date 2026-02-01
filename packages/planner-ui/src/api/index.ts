@@ -1,4 +1,10 @@
-export { ApiError } from './client';
+export { ApiError, updateUnderstanding, updateStepSpecification, updateContext } from './client';
+export type {
+  UpdateUnderstandingInput,
+  UpdateUnderstandingResponse,
+  UpdateStepSpecificationResponse,
+  UpdateContextResponse,
+} from './client';
 export {
   listPlans,
   getPlan,
