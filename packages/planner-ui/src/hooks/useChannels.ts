@@ -42,7 +42,17 @@ export function useChannels(
     setError(null);
 
     try {
-      const url = planId ? `/channels?planId=${planId}` : '/channels';
+      // Get userId for DM channel fetching (same source as createDmChannel)
+      const userId = sessionStorage.getItem('relay_anonymous_user_id') || '';
+
+      // Build query params
+      // Use activeOnly=true to get #planner, active plan channels, and DMs only
+      const params = new URLSearchParams();
+      params.append('activeOnly', 'true');
+      if (planId) params.append('planId', planId);
+      if (userId) params.append('userId', userId);
+
+      const url = `/channels?${params.toString()}`;
       const response = await get<ChannelsResponse>(url);
       setChannels(response.channels);
     } catch (err) {

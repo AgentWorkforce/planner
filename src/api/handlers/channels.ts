@@ -9,7 +9,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import type { PlanStorage } from '../../storage/interface.js';
-import { getChannelsForUser, type ChannelInfo, PLANNER_CHANNEL, getPlanChannelId } from '../../relay/channels.js';
+import { getChannelsForUser, type ChannelInfo, PLANNER_CHANNEL, getPlanChannelId, createDmChannel } from '../../relay/channels.js';
 import { getRelayMode, isRelayAvailable } from '../../relay/service.js';
 import { getClient } from '../../relay/client.js';
 
@@ -21,8 +21,10 @@ interface ChannelParams {
 interface ChannelResponse {
   id: string;
   name: string;
-  type: 'global' | 'plan';
+  type: 'global' | 'plan' | 'dm';
   planId?: string;
+  agentId?: string; // For DM channels - target agent ID
+  agentName?: string; // For DM channels - display name
   description?: string;
   unreadCount?: number;
   lastMessage?: {
@@ -57,10 +59,17 @@ export function createChannelHandlers(storage: PlanStorage) {
     /**
      * GET /api/channels
      * List available channels for the current user.
+     * Query params:
+     *  - userId: Optional. If provided, includes DM channels for this user.
+     *  - activeOnly: Optional. If true, only return #planner, active plan channels, and DMs.
+     *  - planId: Optional. If provided, always include this plan's channel (even with activeOnly).
      */
     list: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const mode = getRelayMode();
+        const userId = req.query.userId as string | undefined;
+        const activeOnly = req.query.activeOnly === 'true';
+        const specificPlanId = req.query.planId as string | undefined;
 
         // In mock/demo mode, return demo channel
         if (mode !== 'connected') {
@@ -77,22 +86,68 @@ export function createChannelHandlers(storage: PlanStorage) {
           return;
         }
 
-        // Get all plans the user might have access to
+        // Build a plan lookup map for titles
         const plans = storage.listPlans();
-        const planIds = plans.map((p) => p.plan_id);
+        const planLookup = new Map<string, { title: string; goal?: string }>();
+        for (const plan of plans) {
+          // Try to get plan's latest version for goal/title
+          try {
+            const latestVersion = storage.getLatestVersion(plan.plan_id);
+            const goal = latestVersion?.summary?.goal;
+            planLookup.set(plan.plan_id, {
+              title: goal?.slice(0, 40) || `Plan ${plan.plan_id.slice(0, 8)}`,
+              goal,
+            });
+          } catch {
+            planLookup.set(plan.plan_id, { title: `Plan ${plan.plan_id.slice(0, 8)}` });
+          }
+        }
 
-        // Get channels for user
-        const channelInfos = getChannelsForUser(planIds);
+        // Get channels for user (including DM channels if userId is provided)
+        // Only pass plan IDs for active channels, not all plans
+        const planIds = activeOnly ? undefined : plans.map((p) => p.plan_id);
+        const channelInfos = getChannelsForUser(planIds, userId);
 
-        // Transform to response format
-        const channels: ChannelResponse[] = channelInfos.map((ch) => ({
-          id: ch.id,
-          name: ch.name,
-          type: ch.type,
-          planId: ch.planId,
-          description: ch.description,
-          unreadCount: 0, // TODO: Track unread counts
-        }));
+        // If a specific planId is requested, ensure its channel is included
+        if (specificPlanId) {
+          const planChannelId = getPlanChannelId(specificPlanId);
+          const alreadyIncluded = channelInfos.some(ch => ch.planId === specificPlanId);
+          if (!alreadyIncluded) {
+            channelInfos.push({
+              id: planChannelId,
+              name: planChannelId.slice(1), // Remove # prefix
+              type: 'plan',
+              planId: specificPlanId,
+            });
+          }
+        }
+
+        // Transform to response format with plan titles
+        const channels: ChannelResponse[] = channelInfos.map((ch) => {
+          let displayName = ch.name;
+
+          // For plan channels, use the plan goal/title instead of hash
+          if (ch.type === 'plan' && ch.planId) {
+            const planInfo = planLookup.get(ch.planId);
+            displayName = planInfo?.title || ch.name;
+          }
+
+          // For DM channels, use agent name
+          if (ch.type === 'dm' && ch.agentName) {
+            displayName = ch.agentName;
+          }
+
+          return {
+            id: ch.id,
+            name: displayName,
+            type: ch.type,
+            planId: ch.planId,
+            agentId: ch.agentId,
+            agentName: ch.agentName,
+            description: ch.description,
+            unreadCount: 0, // TODO: Track unread counts
+          };
+        });
 
         res.json({ channels, mode });
       } catch (err) {
@@ -248,6 +303,68 @@ export function createChannelHandlers(storage: PlanStorage) {
           console.error(`[channels] Failed to query presence for ${channelId}:`, error);
           res.json({ members: [], onlineCount: 0, mode, error: 'Failed to fetch presence' });
         }
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    /**
+     * POST /api/channels/dm
+     * Create or return existing DM channel.
+     * Body: { agentId: string, agentName: string }
+     * Query/Header: userId
+     */
+    createDm: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { agentId, agentName } = req.body;
+        const userId = (req.query.userId as string) || req.get('X-User-Id');
+
+        // Validate required fields
+        if (!agentId || !agentName) {
+          res.status(400).json({ error: 'agentId and agentName required' });
+          return;
+        }
+
+        if (!userId) {
+          res.status(400).json({ error: 'userId required (query param or X-User-Id header)' });
+          return;
+        }
+
+        const mode = getRelayMode();
+
+        // In mock mode, return mock DM channel
+        if (mode !== 'connected') {
+          const mockChannel: ChannelResponse = {
+            id: `#dm-${userId}-${agentId}`,
+            name: agentName,
+            type: 'dm',
+            agentId,
+            agentName,
+            unreadCount: 0,
+          };
+          res.json({ channel: mockChannel, mode });
+          return;
+        }
+
+        // Create or get existing DM channel
+        const channelInfo = createDmChannel(userId, agentId, agentName);
+
+        if (!channelInfo) {
+          res.status(503).json({ error: 'Failed to create DM channel (relay not available)' });
+          return;
+        }
+
+        // Transform to response format
+        const channel: ChannelResponse = {
+          id: channelInfo.id,
+          name: channelInfo.agentName || channelInfo.name,
+          type: 'dm',
+          agentId: channelInfo.agentId,
+          agentName: channelInfo.agentName,
+          unreadCount: 0,
+        };
+
+        res.json({ channel, mode });
       } catch (err) {
         next(err);
       }

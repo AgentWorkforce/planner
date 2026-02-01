@@ -1,3 +1,5 @@
+import type { Channel } from '@/types';
+
 const API_BASE = '/api';
 
 export class ApiError extends Error {
@@ -58,3 +60,36 @@ export const apiClient = {
   put,
   delete: del,
 };
+
+/**
+ * Get or create a stable anonymous user ID for this session.
+ * Persists to sessionStorage so it survives page refreshes within the same tab.
+ */
+function getOrCreateUserId(): string {
+  const SESSION_USER_ID_KEY = 'relay_anonymous_user_id';
+  const stored = sessionStorage.getItem(SESSION_USER_ID_KEY);
+  if (stored) {
+    return stored;
+  }
+  const newId = `anon-${crypto.randomUUID().slice(0, 8)}`;
+  sessionStorage.setItem(SESSION_USER_ID_KEY, newId);
+  return newId;
+}
+
+/**
+ * Create or return existing DM channel with an agent.
+ *
+ * @param agentId - The agent's unique identifier
+ * @param agentName - The agent's display name
+ * @returns Promise resolving to the Channel object
+ */
+export async function createDmChannel(agentId: string, agentName: string): Promise<Channel> {
+  const userId = getOrCreateUserId();
+  const response = await fetch(`${API_BASE}/channels/dm?userId=${encodeURIComponent(userId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agentId, agentName }),
+  });
+  const data = await handleResponse<{ channel: Channel }>(response);
+  return data.channel;
+}

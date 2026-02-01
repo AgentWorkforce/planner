@@ -95,3 +95,8 @@ export {
   initPlannerLead,
   notifyNewPlan,
 } from './planner-lead.js';
+
+// Q&A message types
+export {
+  type QAMessagePayload,
+} from './qa-message.js';

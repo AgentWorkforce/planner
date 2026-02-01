@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from './ui/sidebar';
 import { AppSidebar } from './sidebar/AppSidebar';
 import { CommandPalette } from './CommandPalette';
@@ -7,10 +7,14 @@ import { StatusBar } from './StatusBar';
 import { TriagePanel } from './TriagePanel';
 import { ChatBubble } from './ChatBubble';
 import { QuestionNotificationContent } from './QuestionNotificationContent';
-import { useCommandPalette, useRecentPlans, useAgentOrchestration, useQuestionQueue, useQuestionNotifications } from '@/hooks';
+import { MessagingSidebar } from './MessagingSidebar';
+import { useCommandPalette, useRecentPlans, useAgentOrchestration, useQuestionQueue, useQuestionNotifications, useDmChannel } from '@/hooks';
 import { listPlans, getPlan } from '@/api';
 import type { PlanSummary, PlanWithVersion, Question } from '@/types';
 import type { Agent } from '@/hooks/useAgentOrchestration';
+
+/** Storage key for messaging sidebar collapsed state */
+const MESSAGING_SIDEBAR_COLLAPSED_KEY = 'planner-messaging-sidebar-collapsed';
 
 /**
  * Layout - Main application layout component
@@ -21,6 +25,7 @@ import type { Agent } from '@/hooks/useAgentOrchestration';
  * - SidebarInset: Main content area with router outlet
  * - CommandPalette: Global command palette (Cmd+K)
  * - StatusBar: Fixed bottom bar showing agent activity and session stats
+ * - MessagingSidebar: Right sidebar for channel-based messaging
  *
  * Features:
  * - Full-height layout with responsive sidebar
@@ -28,14 +33,23 @@ import type { Agent } from '@/hooks/useAgentOrchestration';
  * - Recent plans tracking
  * - Agent orchestration status bar
  * - React Router outlet for page content
+ * - Messaging sidebar with persistent state
  */
 export function Layout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isOpen, close } = useCommandPalette();
   const { recentPlanIds, addRecent } = useRecentPlans();
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [currentPlan, setCurrentPlan] = useState<PlanWithVersion | null>(null);
+
+  // Messaging sidebar collapsed state (persisted)
+  const [messagingSidebarCollapsed, setMessagingSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem(MESSAGING_SIDEBAR_COLLAPSED_KEY);
+    return stored === 'true';
+  });
+
+  // Requested channel ID for MessagingSidebar (set when clicking agent avatar)
+  const [requestedChannelId, setRequestedChannelId] = useState<string | null>(null);
 
   // Extract planId from URL
   const planIdMatch = location.pathname.match(/^\/plans\/([^/]+)/);
@@ -56,6 +70,9 @@ export function Layout() {
     answer,
     dismiss,
   } = useQuestionQueue(currentPlanId, { pollInterval: 30000 });
+
+  // DM channel management
+  const { openDm } = useDmChannel();
 
   // Question notification bubble state
   const handleNotificationClick = useCallback((notification: { question: Question; agentId: string }) => {
@@ -165,8 +182,14 @@ export function Layout() {
     setTriagePanelOpen(false);
   }, []);
 
+  // Handle messaging sidebar collapse change with persistence
+  const handleMessagingSidebarCollapseChange = useCallback((collapsed: boolean) => {
+    setMessagingSidebarCollapsed(collapsed);
+    localStorage.setItem(MESSAGING_SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  }, []);
+
   // Handle agent avatar click
-  const handleAgentClick = useCallback((agent: Agent) => {
+  const handleAgentClick = useCallback(async (agent: Agent) => {
     // If agent needs input, find and show their pending question
     if (agent.state === 'needs_input') {
       const agentQuestion = questions.find(q => q.agent_id === agent.id);
@@ -175,13 +198,17 @@ export function Layout() {
         return;
       }
     }
-    // Otherwise navigate to the plan channel for this agent
-    // Channel IDs use format: #plan-{first 8 chars of UUID}
-    if (currentPlanId) {
-      const channelId = `#plan-${currentPlanId.slice(0, 8)}`;
-      navigate(`/channels/${encodeURIComponent(channelId)}`);
+
+    // Open DM with agent - just expand sidebar and select channel, don't navigate
+    try {
+      const channelId = await openDm(agent.id, agent.displayName || agent.id);
+      // Expand messaging sidebar and select the DM channel
+      setMessagingSidebarCollapsed(false);
+      setRequestedChannelId(channelId);
+    } catch (error) {
+      console.error('Failed to open DM with agent:', error);
     }
-  }, [questions, currentPlanId, navigate]);
+  }, [questions, openDm]);
 
   // Fetch plans for command palette
   useEffect(() => {
@@ -303,6 +330,15 @@ export function Layout() {
           />
         )}
       />
+
+      {/* MessagingSidebar - shown when expanded or on channel pages (but NOT on plan pages which have their own) */}
+      {(!messagingSidebarCollapsed || location.pathname.startsWith('/channels/')) && !currentPlanId && (
+        <MessagingSidebar
+          isCollapsed={messagingSidebarCollapsed}
+          onCollapseChange={handleMessagingSidebarCollapseChange}
+          requestedChannelId={requestedChannelId}
+        />
+      )}
     </SidebarProvider>
   );
 }

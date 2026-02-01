@@ -106,6 +106,7 @@ export function createRouter(storage: PlanStorage): Router {
 
   // Channel routes (relay messaging)
   router.get('/channels', channelHandlers.list);
+  router.post('/channels/dm', channelHandlers.createDm);
   router.get('/channels/:id/messages', channelHandlers.messages);
   router.get('/channels/:id/presence', channelHandlers.presence);
 

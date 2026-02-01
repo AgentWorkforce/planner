@@ -12,6 +12,8 @@
 
 import { useRef, useEffect, useMemo } from 'react';
 import type { RelayMessage } from '@/types';
+import { QAMessageCard } from '../QAMessageCard';
+import { isQAMessage } from '@/types/relay';
 
 interface ChannelMessageListProps {
   messages: RelayMessage[];
@@ -70,14 +72,26 @@ export function ChannelMessageList({ messages, currentUserId }: ChannelMessageLi
           <DateDivider date={date} />
 
           {/* Messages for this date */}
-          {dateMessages.map((message, index) => (
-            <MessageItem
-              key={message.id}
-              message={message}
-              isOwn={message.from === currentUserId}
-              showAvatar={shouldShowAvatar(dateMessages, index)}
-            />
-          ))}
+          {dateMessages.map((message, index) => {
+            // Check if this is a Q&A message
+            if (message.data && isQAMessage(message.data)) {
+              return (
+                <div key={message.id} className="w-full flex justify-center">
+                  <QAMessageCard {...message.data} timestamp={message.timestamp} />
+                </div>
+              );
+            }
+
+            // Regular chat message
+            return (
+              <MessageItem
+                key={message.id}
+                message={message}
+                isOwn={message.from === currentUserId}
+                showAvatar={shouldShowAvatar(dateMessages, index)}
+              />
+            );
+          })}
         </div>
       ))}
 

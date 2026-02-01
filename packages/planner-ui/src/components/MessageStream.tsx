@@ -7,6 +7,8 @@
 
 import { useRef, useEffect } from 'react';
 import type { RelayMessage } from '@/types';
+import { QAMessageCard } from './QAMessageCard';
+import { isQAMessage } from '@/types/relay';
 
 interface MessageStreamProps {
   messages: RelayMessage[];
@@ -61,6 +63,16 @@ export function MessageStream({
           <DateSeparator label={dateLabel} />
           <div className="space-y-3 mt-3">
             {dateMessages.map((message, index) => {
+              // Check if this is a Q&A message
+              if (message.data && isQAMessage(message.data)) {
+                return (
+                  <div key={message.id} className="w-full flex justify-center">
+                    <QAMessageCard {...message.data} timestamp={message.timestamp} />
+                  </div>
+                );
+              }
+
+              // Regular chat message
               const prevMessage = index > 0 ? dateMessages[index - 1] : null;
               const showAvatar = !prevMessage || prevMessage.from !== message.from;
               const isOwn = message.from === currentUserId;

@@ -72,8 +72,18 @@ function shouldHandleMessage(from: string, body: string, channelId?: string): bo
     return false;
   }
 
+  // Don't respond to system messages (joins, etc.)
+  if (from === '__system__') {
+    return false;
+  }
+
   // Check if this is a channel we care about
-  const isRelevantChannel = channelId === PLANNER_CHANNEL || channelId?.startsWith('#plan-');
+  // Respond in: #planner, #plan-*, and #dm-* channels
+  const isRelevantChannel =
+    channelId === PLANNER_CHANNEL ||
+    channelId?.startsWith('#plan-') ||
+    channelId?.startsWith('#dm-');
+
   if (!isRelevantChannel) {
     return false;
   }
