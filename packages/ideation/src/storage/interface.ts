@@ -1,18 +1,17 @@
 /**
  * Ideation Storage Interface
  *
- * Defines the contract for persisting Sessions and Nuggets.
- * Implementations can use SQLite, PostgreSQL, or other backends.
+ * Defines the contract for persisting Sessions.
+ * No Nugget entity - understanding is live state sent to planner as snapshot.
  */
 
 import type {
   Session,
   SessionStatus,
-  Nugget,
   TranscriptMessage,
-  AgentObservations,
-  CreateSessionRequest,
-  CrystallizeRequest,
+  ActiveSpecialist,
+  PlannerSend,
+  SessionSource,
 } from '../domain/index.js';
 
 export interface IdeationStorage {
@@ -23,7 +22,7 @@ export interface IdeationStorage {
   /**
    * Create a new ideation session.
    */
-  createSession(request: CreateSessionRequest): Promise<Session>;
+  createSession(source: SessionSource, initiative_id?: string): Promise<Session>;
 
   /**
    * Get a session by ID.
@@ -33,10 +32,9 @@ export interface IdeationStorage {
   /**
    * List sessions with optional filtering.
    */
-  listSessions(options?: {
+  listSessions(filter?: {
     status?: SessionStatus;
-    limit?: number;
-    offset?: number;
+    initiative_id?: string;
   }): Promise<Session[]>;
 
   /**
@@ -46,54 +44,35 @@ export interface IdeationStorage {
 
   /**
    * Append a message to the session transcript.
+   * Uses efficient JSON append, not full replacement.
    */
-  appendMessage(sessionId: string, message: Omit<TranscriptMessage, 'timestamp'>): Promise<Session>;
+  appendTranscript(sessionId: string, message: TranscriptMessage): Promise<Session>;
 
   /**
-   * Update observations for a specific agent role.
-   * Merges with existing observations, doesn't replace other roles.
+   * Update observations for a specific specialist.
+   * Merges freeform observations without overwriting other specialists.
    */
-  updateObservations(
+  updateUnderstanding(
     sessionId: string,
-    role: string,
-    observations: AgentObservations
+    specialistName: string,
+    observations: Record<string, unknown>
   ): Promise<Session>;
 
   /**
-   * Delete a session (and its nugget if exists).
+   * Add an active specialist to the session.
    */
-  deleteSession(id: string): Promise<void>;
-
-  // ==========================================================================
-  // Nugget Operations
-  // ==========================================================================
+  addActiveSpecialist(sessionId: string, specialist: ActiveSpecialist): Promise<Session>;
 
   /**
-   * Crystallize a session into a nugget.
-   * Creates the nugget and updates session status to 'crystallized'.
+   * Remove an active specialist by name.
    */
-  crystallizeSession(sessionId: string, request: CrystallizeRequest): Promise<Nugget>;
+  removeActiveSpecialist(sessionId: string, specialistName: string): Promise<Session>;
 
   /**
-   * Get a nugget by ID.
+   * Append a planner send record to the session.
+   * Full payload snapshot for audit trail.
    */
-  getNugget(id: string): Promise<Nugget | null>;
-
-  /**
-   * Get nugget by session ID.
-   */
-  getNuggetBySession(sessionId: string): Promise<Nugget | null>;
-
-  /**
-   * Mark nugget as promoted (linked to a plan).
-   * Updates session status to 'promoted' and stores plan_id on nugget.
-   */
-  promoteNugget(nuggetId: string, planId: string): Promise<Nugget>;
-
-  /**
-   * List all nuggets.
-   */
-  listNuggets(options?: { limit?: number; offset?: number }): Promise<Nugget[]>;
+  appendPlannerSend(sessionId: string, send: PlannerSend): Promise<Session>;
 
   // ==========================================================================
   // Lifecycle
