@@ -1,0 +1,111 @@
+{
+  "feature_id": "schema-mcp-tools",
+  "title": "MCP Tools for Understanding & Specification",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["schema-api-endpoints"],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Extend MCP tools so agents can read and write understanding and specification sections programmatically",
+    "context": "Agents need MCP tools to contribute observations (understanding) and refine specs (specification) during planning sessions. This enables organic, agent-driven planning.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "get_plan tool response includes understanding and specification when present" },
+      { "id": "ac2", "description": "update_understanding tool adds/updates observations for a specific role" },
+      { "id": "ac3", "description": "update_step_specification tool adds/updates a specific domain spec for a step" },
+      { "id": "ac4", "description": "Tools validate against Zod schemas, return clear errors on invalid input" },
+      { "id": "ac5", "description": "Tools work with plan_id + version, fail gracefully if plan not found" },
+      { "id": "ac6", "description": "PlannerLead can use tools to populate understanding from conversation analysis" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "m001",
+        "title": "Update get_plan tool response",
+        "scope": "planner-core",
+        "description": "Ensure get_plan MCP tool returns understanding and step specifications",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "get_plan response includes version.understanding" },
+          { "id": "ac2", "description": "get_plan response includes version.steps[].specification" },
+          { "id": "ac3", "description": "Response shape documented in tool description" }
+        ]
+      },
+      {
+        "step_id": "m002",
+        "title": "Add update_understanding MCP tool",
+        "scope": "planner-core",
+        "description": "Create MCP tool for updating understanding observations",
+        "dependencies": ["m001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool name: update_understanding" },
+          { "id": "ac2", "description": "Input schema: { plan_id: string, role: string, observations?: string[], keywords?: string[], questions?: string[], concerns?: string[], references?: string[], confidence?: 'exploring'|'forming'|'confident' }" },
+          { "id": "ac3", "description": "Calls PATCH /plans/:id/understanding/:role internally" },
+          { "id": "ac4", "description": "Returns success with updated observations or error message" },
+          { "id": "ac5", "description": "Tool description explains usage and when to use" }
+        ]
+      },
+      {
+        "step_id": "m003",
+        "title": "Add update_step_specification MCP tool",
+        "scope": "planner-core",
+        "description": "Create MCP tool for updating step specifications",
+        "dependencies": ["m001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool name: update_step_specification" },
+          { "id": "ac2", "description": "Input schema: { plan_id: string, step_id: string, domain: 'architecture'|'design'|'testing'|'security', specification: object }" },
+          { "id": "ac3", "description": "Specification object varies by domain (validated against appropriate schema)" },
+          { "id": "ac4", "description": "Calls PATCH /plans/:id/steps/:stepId/specification/:domain internally" },
+          { "id": "ac5", "description": "Returns success with updated spec or error message" },
+          { "id": "ac6", "description": "Tool description includes examples for each domain" }
+        ]
+      },
+      {
+        "step_id": "m004",
+        "title": "Register tools in MCP server",
+        "scope": "planner-core",
+        "description": "Register new tools in the MCP server handler",
+        "dependencies": ["m002", "m003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "update_understanding registered in tools list" },
+          { "id": "ac2", "description": "update_step_specification registered in tools list" },
+          { "id": "ac3", "description": "Tools appear in MCP server tool listing" }
+        ]
+      },
+      {
+        "step_id": "m005",
+        "title": "Add MCP tool tests",
+        "scope": "planner-core",
+        "description": "Add tests for new MCP tools",
+        "dependencies": ["m004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: update_understanding adds observations for new role" },
+          { "id": "ac2", "description": "Test: update_understanding returns error for invalid input" },
+          { "id": "ac3", "description": "Test: update_step_specification adds spec to step" },
+          { "id": "ac4", "description": "Test: update_step_specification returns error for unknown step_id" },
+          { "id": "ac5", "description": "Test: get_plan includes understanding and specifications" }
+        ]
+      },
+      {
+        "step_id": "m006",
+        "title": "Document tools for PlannerLead",
+        "scope": "planner-core",
+        "description": "Update PlannerLead system prompt to include new tools usage",
+        "dependencies": ["m004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlannerLead system prompt mentions update_understanding tool" },
+          { "id": "ac2", "description": "PlannerLead system prompt includes guidance on when to use each tool" },
+          { "id": "ac3", "description": "Examples of extracting observations from conversation included" }
+        ]
+      }
+    ]
+  }
+}

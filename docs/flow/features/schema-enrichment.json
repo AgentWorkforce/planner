@@ -1,0 +1,58 @@
+{
+  "feature_id": "schema-enrichment",
+  "title": "PlanVersion Schema Enrichment",
+  "type": "epic",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": [],
+  "extends": ["domain-plan", "domain-step", "storage-sqlite", "api-plan-crud"],
+  "design_reference": ".context/planner-schema-enrichment.md",
+  "summary": {
+    "goal": "Extend the schema with plan-level 'understanding' (agent observations) and step-level 'specification' (architecture/design/testing/security details) to support the Intake -> Planner -> Orchestrator pipeline",
+    "context": "Current schema only has summary + steps. We need richer structure to capture ideation insights and formal specs. HYBRID MODEL: Understanding is plan-level (context for the whole plan), Specification is step-level (each step has its own arch/design/test/security spec).",
+    "model": {
+      "understanding": "Plan-level - what agents observed during ideation (observations, keywords, questions, concerns per role)",
+      "specification": "Step-level - each step can have its own architecture decisions, design elements, test cases, security requirements"
+    },
+    "in_scope": [
+      "Zod schemas for Understanding (plan-level) and Specification (step-level)",
+      "Database migration adding JSONB columns",
+      "API endpoints for reading/updating understanding and step specifications",
+      "Understanding tab in PlanEditorPage showing agent observations",
+      "Tabbed specification editor in StepEditor (Details | Architecture | Design | Testing | Security)"
+    ],
+    "out_of_scope": [
+      "Ideation conversation UI (future Intake package)",
+      "Automatic agent population of understanding (manual for now)",
+      "Step generation from specification (future enhancement)",
+      "Per-domain approval workflow for specifications"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "PlanVersion schema includes optional 'understanding' field (record of role -> AgentObservations)" },
+      { "id": "ac2", "description": "Step schema includes optional 'specification' field with architecture, design, testing, security sub-schemas" },
+      { "id": "ac3", "description": "Database stores understanding at plan_versions level, specification in steps JSONB" },
+      { "id": "ac4", "description": "GET /plans/:id/versions/:version returns understanding and steps with specification" },
+      { "id": "ac5", "description": "PATCH /plans/:id/versions/:version/understanding/:role updates agent observations" },
+      { "id": "ac6", "description": "PATCH /plans/:id/versions/:version/steps/:stepId/specification/:domain updates step spec" },
+      { "id": "ac7", "description": "PlanEditorPage has Understanding tab (Plan | Understanding | Decisions)" },
+      { "id": "ac8", "description": "StepEditor shows tabbed spec editor when expanded (Details | Architecture | Design | Testing | Security)" },
+      { "id": "ac9", "description": "Understanding tab displays observations, keywords, questions, concerns per role" },
+      { "id": "ac10", "description": "Step spec tabs allow inline editing of each domain's structured fields" },
+      { "id": "ac11", "description": "Existing plans without understanding/specification continue to work (backward compatible)" },
+      { "id": "ac12", "description": "MCP tools can read and write understanding and step specifications" }
+    ]
+  },
+  "sub_features": [
+    "schema-understanding",
+    "schema-specification",
+    "schema-db-migration",
+    "schema-api-endpoints",
+    "schema-ui-understanding",
+    "schema-ui-specification",
+    "schema-mcp-tools"
+  ],
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": []
+  }
+}

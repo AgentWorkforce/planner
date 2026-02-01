@@ -1,0 +1,79 @@
+{
+  "feature_id": "schema-understanding",
+  "title": "Understanding Schema & Domain Model",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": [],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Define Zod schemas for the Understanding section - free-form agent observations captured during ideation",
+    "context": "Understanding captures what specialist agents notice as they watch conversations. It's exploratory, keyword-based, and preserves the 'why' behind planning decisions. Each role (architect, designer, tester, security) has their own observations.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "AgentObservationsSchema defined with: observations[], keywords[], questions[], concerns[], references[], confidence, updated_at, updated_by" },
+      { "id": "ac2", "description": "UnderstandingSchema is Record<string, AgentObservations> allowing any role key" },
+      { "id": "ac3", "description": "Confidence enum: 'exploring' | 'forming' | 'confident'" },
+      { "id": "ac4", "description": "All fields are optional for incremental population" },
+      { "id": "ac5", "description": "Schema exported from src/domain/understanding.ts" },
+      { "id": "ac6", "description": "TypeScript types exported for frontend use" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "u001",
+        "title": "Create understanding.ts domain file",
+        "scope": "planner-core",
+        "description": "Create src/domain/understanding.ts with Zod schemas for AgentObservations and Understanding",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ConfidenceSchema = z.enum(['exploring', 'forming', 'confident'])" },
+          { "id": "ac2", "description": "AgentObservationsSchema with optional fields: observations: z.array(z.string()), keywords: z.array(z.string()), questions: z.array(z.string()), concerns: z.array(z.string()), references: z.array(z.string()), confidence: ConfidenceSchema, updated_at: z.string().datetime(), updated_by: z.string()" },
+          { "id": "ac3", "description": "UnderstandingSchema = z.record(z.string(), AgentObservationsSchema)" },
+          { "id": "ac4", "description": "Types exported: Confidence, AgentObservations, Understanding" }
+        ]
+      },
+      {
+        "step_id": "u002",
+        "title": "Add understanding to PlanVersion schema",
+        "scope": "planner-core",
+        "description": "Update src/domain/plan.ts to include optional understanding field in PlanVersionSchema",
+        "dependencies": ["u001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersionSchema includes: understanding: UnderstandingSchema.optional()" },
+          { "id": "ac2", "description": "PlanVersion type includes understanding?: Understanding" },
+          { "id": "ac3", "description": "createPlanVersion() does not set understanding (remains undefined)" }
+        ]
+      },
+      {
+        "step_id": "u003",
+        "title": "Export types for frontend",
+        "scope": "planner-core",
+        "description": "Ensure Understanding types are exported via src/domain/index.ts for frontend consumption",
+        "dependencies": ["u001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/domain/index.ts exports: UnderstandingSchema, AgentObservationsSchema, ConfidenceSchema" },
+          { "id": "ac2", "description": "src/domain/index.ts exports types: Understanding, AgentObservations, Confidence" }
+        ]
+      },
+      {
+        "step_id": "u004",
+        "title": "Add understanding.test.ts",
+        "scope": "planner-core",
+        "description": "Create unit tests for understanding schemas",
+        "dependencies": ["u001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: AgentObservationsSchema validates with all fields" },
+          { "id": "ac2", "description": "Test: AgentObservationsSchema validates with no fields (all optional)" },
+          { "id": "ac3", "description": "Test: AgentObservationsSchema rejects invalid confidence value" },
+          { "id": "ac4", "description": "Test: UnderstandingSchema accepts any string role key" }
+        ]
+      }
+    ]
+  }
+}
