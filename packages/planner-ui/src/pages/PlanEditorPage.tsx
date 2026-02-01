@@ -4,7 +4,6 @@ import { getPlan, updatePlan, ApiError, getComments, createComment, resolveComme
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
 import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
 import { StepEditor } from '@/components/StepEditor';
-import { EditableText } from '@/components/EditableText';
 import { EditableTextarea } from '@/components/EditableTextarea';
 import { CommentThread } from '@/components/CommentThread';
 import { WorkflowActions } from '@/components/WorkflowActions';
@@ -15,7 +14,7 @@ import { MessagingSidebar } from '@/components/MessagingSidebar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { DocumentIcon, DecisionsIcon, PlusIcon, ChevronLeftIcon } from '@/components/icons';
+import { DocumentIcon, DecisionsIcon, BrainIcon, SettingsIcon, PlusIcon, ChevronLeftIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { usePlanEvents } from '@/hooks';
 import { useUserTrajectory } from '@/hooks/useUserTrajectory';
@@ -24,6 +23,8 @@ import { DecisionList } from '@/components/trajectory/DecisionList';
 import { DecisionEmptyState } from '@/components/trajectory/DecisionEmptyState';
 import { DecisionDetailSheet } from '@/components/trajectory/DecisionDetailSheet';
 import { PreferencesSummary } from '@/components/trajectory/PreferencesSummary';
+import { UnderstandingTab } from '@/components/UnderstandingTab';
+import { ContextTab } from '@/components/ContextTab';
 
 /** Panel type for comments */
 type ActivePanel = 'comments' | null;
@@ -76,7 +77,13 @@ export function PlanEditorPage() {
   const stepsContainerRef = useRef<HTMLDivElement>(null);
 
   // Active tab detection based on URL
-  const activeTab = location.pathname.endsWith('/decisions') ? 'decisions' : 'plan';
+  const activeTab = location.pathname.endsWith('/decisions')
+    ? 'decisions'
+    : location.pathname.endsWith('/understanding')
+      ? 'understanding'
+      : location.pathname.endsWith('/context')
+        ? 'context'
+        : 'plan';
 
   // Decision-related state (for decisions tab)
   const [agentFilter, setAgentFilter] = useState<string>('all');
@@ -142,9 +149,12 @@ export function PlanEditorPage() {
     if (!planId) return;
     try {
       const result = await getPlan(planId);
-      // Only update if fetched version is newer than local
+      // Update if fetched version is newer OR same version but updated more recently
+      // (understanding/context updates don't create new versions, only update timestamp)
       setVersion((prev) => {
-        if (!prev || result.version.version > prev.version) {
+        if (!prev) return result.version;
+        if (result.version.version > prev.version) return result.version;
+        if (result.version.version === prev.version && result.version.updated_at > prev.updated_at) {
           return result.version;
         }
         return prev;
@@ -471,6 +481,10 @@ export function PlanEditorPage() {
               onValueChange={(value) => {
                 if (value === 'plan') {
                   navigate(`/plans/${planId}`);
+                } else if (value === 'understanding') {
+                  navigate(`/plans/${planId}/understanding`);
+                } else if (value === 'context') {
+                  navigate(`/plans/${planId}/context`);
                 } else if (value === 'decisions') {
                   navigate(`/plans/${planId}/decisions`);
                 }
@@ -480,6 +494,14 @@ export function PlanEditorPage() {
               <ToggleGroupItem value="plan" aria-label="Plan view" className="h-7">
                 <DocumentIcon size="sm" />
                 Plan
+              </ToggleGroupItem>
+              <ToggleGroupItem value="understanding" aria-label="Understanding view" className="h-7">
+                <BrainIcon size="sm" />
+                Understanding
+              </ToggleGroupItem>
+              <ToggleGroupItem value="context" aria-label="Context view" className="h-7">
+                <SettingsIcon size="sm" />
+                Context
               </ToggleGroupItem>
               <ToggleGroupItem value="decisions" aria-label="Decisions view" className="h-7">
                 <DecisionsIcon size="sm" />
@@ -538,8 +560,8 @@ export function PlanEditorPage() {
         </div>
       </div>
 
-      {/* Content - conditionally render Plan or Decisions based on active tab */}
-      {activeTab === 'plan' ? (
+      {/* Content - conditionally render Plan, Understanding, or Decisions based on active tab */}
+      {activeTab === 'plan' && (
         <div className="px-6 py-6 space-y-6 overflow-hidden">
           {/* Steps header */}
           <div className="flex items-center justify-between">
@@ -622,6 +644,7 @@ export function PlanEditorPage() {
                         <StepEditor
                           step={step}
                           allSteps={version.steps}
+                          planId={planId!}
                           onUpdate={handleStepUpdate}
                           onDelete={handleStepDelete}
                           disabled={!isEditable}
@@ -669,8 +692,34 @@ export function PlanEditorPage() {
             <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
           </div>
         </div>
-      ) : (
-        /* Decisions tab content */
+      )}
+
+      {/* Understanding tab content */}
+      {activeTab === 'understanding' && (
+        <div className="px-6 py-6 space-y-6 overflow-auto">
+          <UnderstandingTab
+            understanding={version.understanding}
+            isEditable={version.status === 'draft'}
+          />
+        </div>
+      )}
+
+      {/* Context tab content */}
+      {activeTab === 'context' && (
+        <div className="px-6 py-6 space-y-6 overflow-auto">
+          <ContextTab
+            planId={planId!}
+            context={version.context}
+            isEditable={version.status === 'draft'}
+            onContextUpdate={(updatedContext) => {
+              setVersion((prev) => (prev ? { ...prev, context: updatedContext } : prev));
+            }}
+          />
+        </div>
+      )}
+
+      {/* Decisions tab content */}
+      {activeTab === 'decisions' && (
         <div className="px-6 py-6 space-y-6 overflow-hidden">
           {/* Header with title and agent filter */}
           <DecisionLogHeader

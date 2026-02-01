@@ -18,6 +18,8 @@ export function App() {
           <Route path="plans/my" element={<PlansListPage />} />
           <Route path="plans/new" element={<NewPlanPage />} />
           <Route path="plans/:planId" element={<PlanEditorPage />} />
+          <Route path="plans/:planId/understanding" element={<PlanEditorPage />} />
+          <Route path="plans/:planId/context" element={<PlanEditorPage />} />
           <Route path="plans/:planId/decisions" element={<PlanEditorPage />} />
           <Route path="initiatives" element={<InitiativesListPage />} />
           <Route path="initiatives/:id" element={<InitiativeDetailPage />} />

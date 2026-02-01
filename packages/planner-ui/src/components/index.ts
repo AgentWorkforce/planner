@@ -37,3 +37,14 @@ export { ChannelHeader } from './ChannelHeader';
 export { MessageStream } from './MessageStream';
 export { MessageInput } from './MessageInput';
 export { MessagingSidebar } from './MessagingSidebar';
+
+// Understanding components
+export { ConfidenceBadge } from './ConfidenceBadge';
+export { AgentObservationCard } from './AgentObservationCard';
+export { UnderstandingTab } from './UnderstandingTab';
+
+// Context components
+export { KeyValueEditor } from './context/KeyValueEditor';
+export { AddRolePopover } from './context/AddRolePopover';
+export { RoleContextCard } from './context/RoleContextCard';
+export { ContextTab } from './ContextTab';
