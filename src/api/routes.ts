@@ -50,6 +50,11 @@ export function createRouter(storage: PlanStorage): Router {
   router.get('/plans/:id/versions/:version', planHandlers.getVersion);
   router.post('/plans/:id/versions', planHandlers.createVersion);
 
+  // Understanding, context, and specification routes
+  router.patch('/plans/:id/understanding/:role', planHandlers.updateUnderstanding);
+  router.patch('/plans/:id/context/:role', planHandlers.updateContext);
+  router.patch('/plans/:id/steps/:stepId/specification/:domain', planHandlers.updateStepSpecification);
+
   // Session routes
   router.get('/plans/:id/session', sessionHandlers.getSession);
   router.post('/plans/:id/session', sessionHandlers.createSession);

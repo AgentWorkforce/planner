@@ -84,6 +84,25 @@ export interface PlanStorage {
     version: number,
     status: PlanStatus
   ): PlanVersion | null;
+  updateVersionUnderstanding(
+    planId: string,
+    version: number,
+    role: string,
+    observations: Record<string, unknown>
+  ): PlanVersion | null;
+  updateVersionContext(
+    planId: string,
+    version: number,
+    role: string,
+    fields: Record<string, unknown>
+  ): PlanVersion | null;
+  updateStepSpecification(
+    planId: string,
+    version: number,
+    stepId: string,
+    domain: string,
+    spec: Record<string, unknown>
+  ): PlanVersion | null;
 
   // Workflow operations
   submitVersion(planId: string, version: number): PlanVersion | null;

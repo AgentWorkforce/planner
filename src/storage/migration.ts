@@ -25,6 +25,12 @@ export function runMigrations(db: Database.Database): void {
 
   // 4. Add metadata_json column to versions if missing
   migrateVersionsMetadata(db);
+
+  // 5. Add understanding_json column to versions if missing
+  migrateVersionsUnderstanding(db);
+
+  // 6. Add context_json column to versions if missing
+  migrateVersionsContext(db);
 }
 
 /**
@@ -107,4 +113,50 @@ function migrateVersionsMetadata(db: Database.Database): void {
   if (!hasMetadata) {
     db.exec(`ALTER TABLE versions ADD COLUMN metadata_json TEXT`);
   }
+}
+
+/**
+ * Adds understanding_json column to versions table if missing.
+ * Understanding stores plan-level agent observations keyed by role.
+ * Migrates existing records to have empty understanding ({}).
+ */
+function migrateVersionsUnderstanding(db: Database.Database): void {
+  // Check if understanding_json column exists
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(versions)`)
+    .all();
+  const hasUnderstanding = columns.some((c) => c.name === 'understanding_json');
+
+  if (!hasUnderstanding) {
+    db.exec(`ALTER TABLE versions ADD COLUMN understanding_json TEXT`);
+  }
+
+  // Migrate existing records with NULL understanding to empty object
+  const result = db
+    .prepare(`UPDATE versions SET understanding_json = '{}' WHERE understanding_json IS NULL`)
+    .run();
+
+  if (result.changes > 0) {
+    console.log(`Migrated ${result.changes} existing plan versions with empty understanding`);
+  }
+}
+
+/**
+ * Adds context_json column to versions table if missing.
+ * Context stores plan-level formalized decisions keyed by role.
+ * Unlike understanding (observations), context captures crystallized decisions.
+ */
+function migrateVersionsContext(db: Database.Database): void {
+  // Check if context_json column exists
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(versions)`)
+    .all();
+  const hasContext = columns.some((c) => c.name === 'context_json');
+
+  if (!hasContext) {
+    db.exec(`ALTER TABLE versions ADD COLUMN context_json TEXT`);
+  }
+
+  // Note: Unlike understanding, we don't migrate NULL to empty object.
+  // Context starts undefined until a role explicitly adds decisions.
 }

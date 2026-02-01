@@ -15,7 +15,10 @@ export type PlanChangeType =
   | 'step_edited'
   | 'step_removed'
   | 'criteria_added'
-  | 'criteria_edited';
+  | 'criteria_edited'
+  | 'understanding_updated'
+  | 'context_updated'
+  | 'specification_updated';
 
 /**
  * Data emitted with plan change events.
@@ -25,6 +28,8 @@ export interface PlanChangeEvent {
   version: number;
   changeType: PlanChangeType;
   stepId?: string;
+  role?: string;
+  domain?: string;
   timestamp: string;
 }
 
@@ -43,24 +48,39 @@ const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
 /**
+ * Options for emitting a plan change event.
+ */
+export interface EmitPlanChangeOptions {
+  stepId?: string;
+  role?: string;
+  domain?: string;
+}
+
+/**
  * Emit a plan change event to all listeners for the given planId.
  *
  * @param planId - The plan that changed
  * @param version - The new version number after the change
  * @param changeType - Type of change that occurred
- * @param stepId - Optional step ID involved in the change
+ * @param options - Optional additional data (stepId, role, domain)
  */
 export function emitPlanChange(
   planId: string,
   version: number,
   changeType: PlanChangeType,
-  stepId?: string
+  options?: EmitPlanChangeOptions | string
 ): void {
+  // Support both old signature (stepId as string) and new options object
+  const opts: EmitPlanChangeOptions =
+    typeof options === 'string' ? { stepId: options } : options ?? {};
+
   const event: PlanChangeEvent = {
     planId,
     version,
     changeType,
-    stepId,
+    stepId: opts.stepId,
+    role: opts.role,
+    domain: opts.domain,
     timestamp: new Date().toISOString(),
   };
 

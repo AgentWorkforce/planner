@@ -12,6 +12,9 @@ import {
   UpdatePlanRequestSchema,
   ListPlansQuerySchema,
   CreateVersionRequestSchema,
+  UpdateUnderstandingRequestSchema,
+  UpdateContextRequestSchema,
+  UpdateStepSpecificationRequestSchema,
 } from '../schemas.js';
 import { isRelayAvailable } from '../../relay/service.js';
 import { createSpawner, type SpawnResult } from '../../relay/spawner.js';
@@ -19,6 +22,7 @@ import { createMockSpawner } from '../../relay/mock-spawner.js';
 import { createPlanChannel, joinChannel, getPlanChannelId } from '../../relay/channels.js';
 import { notifyNewPlan } from '../../relay/planner-lead.js';
 import { randomUUID } from 'crypto';
+import { emitPlanChange } from '../../events/plan-events.js';
 
 /** Default session expiration time (1 hour) */
 const SESSION_EXPIRATION_MS = 60 * 60 * 1000;
@@ -65,6 +69,19 @@ interface IdParams {
 
 interface VersionParams extends IdParams {
   version: string;
+}
+
+interface UnderstandingParams extends IdParams {
+  role: string;
+}
+
+interface ContextParams extends IdParams {
+  role: string;
+}
+
+interface StepSpecificationParams extends IdParams {
+  stepId: string;
+  domain: string;
 }
 
 // Get MCP server URL for agent connection
@@ -477,6 +494,180 @@ export function createPlanHandlers(storage: PlanStorage) {
         storage.createVersion(newVersion);
 
         res.status(201).json({ version: newVersion });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    /**
+     * PATCH /plans/:id/understanding/:role
+     * Update understanding observations for a specific role.
+     * Only allowed on draft versions.
+     */
+    updateUnderstanding: (
+      req: Request<UnderstandingParams>,
+      res: Response,
+      next: NextFunction
+    ) => {
+      try {
+        const { id, role } = req.params;
+        const body = UpdateUnderstandingRequestSchema.parse(req.body);
+
+        const plan = storage.getPlan(id);
+        if (!plan) {
+          throw notFound('Plan');
+        }
+
+        const latestVersion = storage.getLatestVersion(id);
+        if (!latestVersion) {
+          throw notFound('Version');
+        }
+
+        // Only allow updates on draft versions
+        if (latestVersion.status !== PlanStatus.Draft) {
+          throw badRequest('Can only update understanding on draft versions');
+        }
+
+        const updated = storage.updateVersionUnderstanding(
+          id,
+          latestVersion.version,
+          role,
+          body as Record<string, unknown>
+        );
+
+        if (!updated) {
+          throw notFound('Version');
+        }
+
+        // Emit SSE event for understanding update
+        emitPlanChange(id, updated.version, 'understanding_updated', { role });
+
+        res.json({
+          role,
+          observations: updated.understanding?.[role] ?? {},
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    /**
+     * PATCH /plans/:id/context/:role
+     * Update context for a specific role.
+     * Only allowed on draft versions.
+     */
+    updateContext: (
+      req: Request<ContextParams>,
+      res: Response,
+      next: NextFunction
+    ) => {
+      try {
+        const { id, role } = req.params;
+        const body = UpdateContextRequestSchema.parse(req.body);
+
+        const plan = storage.getPlan(id);
+        if (!plan) {
+          throw notFound('Plan');
+        }
+
+        const latestVersion = storage.getLatestVersion(id);
+        if (!latestVersion) {
+          throw notFound('Version');
+        }
+
+        // Only allow updates on draft versions
+        if (latestVersion.status !== PlanStatus.Draft) {
+          throw badRequest('Can only update context on draft versions');
+        }
+
+        const updated = storage.updateVersionContext(
+          id,
+          latestVersion.version,
+          role,
+          body as Record<string, unknown>
+        );
+
+        if (!updated) {
+          throw notFound('Version');
+        }
+
+        // Emit SSE event for context update
+        emitPlanChange(id, updated.version, 'context_updated', { role });
+
+        res.json({
+          role,
+          context: updated.context?.[role] ?? {},
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    /**
+     * PATCH /plans/:id/steps/:stepId/specification/:domain
+     * Update specification for a specific step and domain.
+     * Only allowed on draft versions.
+     */
+    updateStepSpecification: (
+      req: Request<StepSpecificationParams>,
+      res: Response,
+      next: NextFunction
+    ) => {
+      try {
+        const { id, stepId, domain } = req.params;
+
+        // Domain is freeform - any string is allowed (e.g., architecture, design, custom_domain)
+        if (!domain || typeof domain !== 'string') {
+          throw badRequest('Domain parameter is required');
+        }
+
+        // Validate request body - freeform key-value pairs
+        const body = UpdateStepSpecificationRequestSchema.parse(req.body);
+
+        const plan = storage.getPlan(id);
+        if (!plan) {
+          throw notFound('Plan');
+        }
+
+        const latestVersion = storage.getLatestVersion(id);
+        if (!latestVersion) {
+          throw notFound('Version');
+        }
+
+        // Only allow updates on draft versions
+        if (latestVersion.status !== PlanStatus.Draft) {
+          throw badRequest('Can only update specification on draft versions');
+        }
+
+        // Check if step exists
+        const step = latestVersion.steps.find((s) => s.step_id === stepId);
+        if (!step) {
+          throw notFound('Step');
+        }
+
+        const updated = storage.updateStepSpecification(
+          id,
+          latestVersion.version,
+          stepId,
+          domain,
+          body
+        );
+
+        if (!updated) {
+          throw notFound('Version');
+        }
+
+        // Emit SSE event for specification update
+        emitPlanChange(id, updated.version, 'specification_updated', { stepId, domain });
+
+        const updatedStep = updated.steps.find((s) => s.step_id === stepId);
+        const updatedDomainSpec = (updatedStep?.specification as Record<string, unknown>)?.[domain];
+
+        res.json({
+          step_id: stepId,
+          domain,
+          specification: updatedDomainSpec ?? {},
+        });
       } catch (err) {
         next(err);
       }

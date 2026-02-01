@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url';
 import type { Plan, PlanVersion } from '../domain/plan.js';
 import type { Step } from '../domain/step.js';
 import type { Summary } from '../domain/summary.js';
+import type { Understanding } from '../domain/understanding.js';
+import type { Context } from '../domain/context.js';
 import type { PlanStatus } from '../domain/status.js';
 import type { ApprovalInfo } from '../domain/workflow.js';
 import type {
@@ -72,6 +74,8 @@ interface VersionRow {
   version: number;
   status: string;
   summary_json: string;
+  understanding_json: string | null;
+  context_json: string | null;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -191,6 +195,8 @@ interface PlanWithAttentionRow {
   version: number;
   status: string;
   summary_json: string;
+  understanding_json: string | null;
+  context_json: string | null;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -567,6 +573,8 @@ export class SqliteStorage implements PlanStorage {
         v.version,
         v.status,
         v.summary_json,
+        v.understanding_json,
+        v.context_json,
         v.submitted_at,
         v.approval_info_json,
         v.change_request_id,
@@ -618,6 +626,8 @@ export class SqliteStorage implements PlanStorage {
             version: row.version,
             status: row.status,
             summary_json: row.summary_json,
+            understanding_json: row.understanding_json,
+            context_json: row.context_json,
             submitted_at: row.submitted_at,
             approval_info_json: row.approval_info_json,
             change_request_id: row.change_request_id,
@@ -641,14 +651,16 @@ export class SqliteStorage implements PlanStorage {
     const transaction = this.db.transaction(() => {
       // Insert version
       const versionStmt = this.db.prepare(`
-        INSERT INTO versions (plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at)
-        VALUES (@plan_id, @version, @status, @summary_json, @submitted_at, @approval_info_json, @change_request_id, @metadata_json, @created_at, @updated_at)
+        INSERT INTO versions (plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at)
+        VALUES (@plan_id, @version, @status, @summary_json, @understanding_json, @context_json, @submitted_at, @approval_info_json, @change_request_id, @metadata_json, @created_at, @updated_at)
       `);
       versionStmt.run({
         plan_id: version.plan_id,
         version: version.version,
         status: version.status,
         summary_json: JSON.stringify(version.summary),
+        understanding_json: JSON.stringify(version.understanding ?? {}),
+        context_json: version.context ? JSON.stringify(version.context) : null,
         submitted_at: version.submitted_at ?? null,
         approval_info_json: version.approval_info
           ? JSON.stringify(version.approval_info)
@@ -687,7 +699,7 @@ export class SqliteStorage implements PlanStorage {
 
   getVersion(planId: string, version: number): PlanVersion | null {
     const versionStmt = this.db.prepare<[string, number], VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE plan_id = ? AND version = ?
     `);
@@ -700,7 +712,7 @@ export class SqliteStorage implements PlanStorage {
 
   getLatestVersion(planId: string): PlanVersion | null {
     const versionStmt = this.db.prepare<string, VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE plan_id = ?
       ORDER BY version DESC
@@ -715,7 +727,7 @@ export class SqliteStorage implements PlanStorage {
 
   listVersions(planId: string): PlanVersion[] {
     const versionStmt = this.db.prepare<string, VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE plan_id = ?
       ORDER BY version ASC
@@ -749,6 +761,181 @@ export class SqliteStorage implements PlanStorage {
     updatePlanStmt.run(now, planId);
 
     return this.getVersion(planId, version);
+  }
+
+  updateVersionUnderstanding(
+    planId: string,
+    version: number,
+    role: string,
+    observations: Record<string, unknown>
+  ): PlanVersion | null {
+    const existingVersion = this.getVersion(planId, version);
+    if (!existingVersion) return null;
+
+    // Merge observations with existing understanding for this role
+    const currentUnderstanding = existingVersion.understanding ?? {};
+    const currentRoleObs = (currentUnderstanding[role] ?? {}) as Record<string, unknown>;
+    const mergedObs = this.deepMerge(currentRoleObs, observations);
+
+    // Add updated_at timestamp
+    (mergedObs as Record<string, unknown>).updated_at = new Date().toISOString();
+
+    const newUnderstanding = {
+      ...currentUnderstanding,
+      [role]: mergedObs,
+    };
+
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      UPDATE versions
+      SET understanding_json = ?, updated_at = ?
+      WHERE plan_id = ? AND version = ?
+    `);
+    const result = stmt.run(JSON.stringify(newUnderstanding), now, planId, version);
+    if (result.changes === 0) return null;
+
+    // Also update plan's updated_at
+    const updatePlanStmt = this.db.prepare(`
+      UPDATE plans SET updated_at = ? WHERE plan_id = ?
+    `);
+    updatePlanStmt.run(now, planId);
+
+    return this.getVersion(planId, version);
+  }
+
+  updateVersionContext(
+    planId: string,
+    version: number,
+    role: string,
+    fields: Record<string, unknown>
+  ): PlanVersion | null {
+    const existingVersion = this.getVersion(planId, version);
+    if (!existingVersion) return null;
+
+    const currentContext = existingVersion.context ?? {};
+
+    // If fields is empty, remove the role entirely (delete operation)
+    // Otherwise, merge fields with existing context for this role
+    let newContext: Record<string, Record<string, unknown>>;
+
+    if (Object.keys(fields).length === 0) {
+      // Delete: remove the role from context
+      newContext = { ...currentContext };
+      delete newContext[role];
+    } else {
+      // Update: merge fields with existing
+      const currentRoleCtx = (currentContext[role] ?? {}) as Record<string, unknown>;
+      const mergedCtx = this.deepMerge(currentRoleCtx, fields);
+      newContext = {
+        ...currentContext,
+        [role]: mergedCtx,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      UPDATE versions
+      SET context_json = ?, updated_at = ?
+      WHERE plan_id = ? AND version = ?
+    `);
+    const result = stmt.run(JSON.stringify(newContext), now, planId, version);
+    if (result.changes === 0) return null;
+
+    // Also update plan's updated_at
+    const updatePlanStmt = this.db.prepare(`
+      UPDATE plans SET updated_at = ? WHERE plan_id = ?
+    `);
+    updatePlanStmt.run(now, planId);
+
+    return this.getVersion(planId, version);
+  }
+
+  updateStepSpecification(
+    planId: string,
+    version: number,
+    stepId: string,
+    domain: string,
+    spec: Record<string, unknown>
+  ): PlanVersion | null {
+    const existingVersion = this.getVersion(planId, version);
+    if (!existingVersion) return null;
+
+    // Find the step
+    const stepIndex = existingVersion.steps.findIndex((s) => s.step_id === stepId);
+    if (stepIndex === -1) return null;
+
+    const step = existingVersion.steps[stepIndex]!;
+
+    // Merge specification with existing spec for this domain
+    const currentSpec = step.specification ?? {};
+    const currentDomainSpec = ((currentSpec as Record<string, unknown>)[domain] ?? {}) as Record<string, unknown>;
+    const mergedSpec = this.deepMerge(currentDomainSpec, spec);
+
+    const newSpecification = {
+      ...currentSpec,
+      [domain]: mergedSpec,
+    };
+
+    const updatedStep = {
+      ...step,
+      specification: newSpecification,
+    };
+
+    const now = new Date().toISOString();
+
+    // Update the step JSON in the database
+    const stmt = this.db.prepare(`
+      UPDATE steps
+      SET step_json = ?
+      WHERE plan_id = ? AND version = ? AND step_id = ?
+    `);
+    const result = stmt.run(JSON.stringify(updatedStep), planId, version, stepId);
+    if (result.changes === 0) return null;
+
+    // Also update version's and plan's updated_at
+    const updateVersionStmt = this.db.prepare(`
+      UPDATE versions SET updated_at = ? WHERE plan_id = ? AND version = ?
+    `);
+    updateVersionStmt.run(now, planId, version);
+
+    const updatePlanStmt = this.db.prepare(`
+      UPDATE plans SET updated_at = ? WHERE plan_id = ?
+    `);
+    updatePlanStmt.run(now, planId);
+
+    return this.getVersion(planId, version);
+  }
+
+  /**
+   * Deep merge two objects, concatenating arrays.
+   */
+  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+    const result = { ...target };
+    for (const key of Object.keys(source)) {
+      const sourceVal = source[key];
+      const targetVal = result[key];
+      if (Array.isArray(sourceVal) && Array.isArray(targetVal)) {
+        // Concatenate arrays and remove duplicates for simple values
+        result[key] = Array.from(new Set([...targetVal, ...sourceVal]));
+      } else if (
+        typeof sourceVal === 'object' &&
+        sourceVal !== null &&
+        !Array.isArray(sourceVal) &&
+        typeof targetVal === 'object' &&
+        targetVal !== null &&
+        !Array.isArray(targetVal)
+      ) {
+        // Recursively merge objects
+        result[key] = this.deepMerge(
+          targetVal as Record<string, unknown>,
+          sourceVal as Record<string, unknown>
+        );
+      } else {
+        // Overwrite with source value
+        result[key] = sourceVal;
+      }
+    }
+    return result;
   }
 
   // ============================================
@@ -903,7 +1090,7 @@ export class SqliteStorage implements PlanStorage {
 
   getVersionByChangeRequest(changeRequestId: string): PlanVersion | null {
     const versionStmt = this.db.prepare<string, VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE change_request_id = ?
     `);
@@ -975,6 +1162,20 @@ export class SqliteStorage implements PlanStorage {
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
+    if (row.understanding_json) {
+      try {
+        version.understanding = JSON.parse(row.understanding_json) as Understanding;
+      } catch {
+        version.understanding = {};
+      }
+    }
+    if (row.context_json) {
+      try {
+        version.context = JSON.parse(row.context_json) as Context;
+      } catch {
+        version.context = {};
+      }
+    }
     if (row.submitted_at) {
       version.submitted_at = row.submitted_at;
     }

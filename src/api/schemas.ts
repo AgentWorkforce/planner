@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { StepSchema } from '../domain/step.js';
 import { PlanStatusSchema } from '../domain/status.js';
+import { AgentObservationsSchema } from '../domain/understanding.js';
+import { RoleContextSchema } from '../domain/context.js';
+import { DomainSpecSchema } from '../domain/specification.js';
 
 /**
  * Request schema for creating a new plan.
@@ -85,3 +88,28 @@ export const CreateVersionRequestSchema = z.object({
 });
 
 export type CreateVersionRequest = z.infer<typeof CreateVersionRequestSchema>;
+
+/**
+ * Request schema for updating understanding observations for a role.
+ * All fields are optional for incremental updates.
+ */
+export const UpdateUnderstandingRequestSchema = AgentObservationsSchema.partial();
+
+export type UpdateUnderstandingRequest = z.infer<typeof UpdateUnderstandingRequestSchema>;
+
+/**
+ * Request schema for updating context for a role.
+ * Context is freeform - any key-value pairs allowed.
+ */
+export const UpdateContextRequestSchema = RoleContextSchema;
+
+export type UpdateContextRequest = z.infer<typeof UpdateContextRequestSchema>;
+
+/**
+ * Request schema for updating step specifications per domain.
+ * Specification is freeform - any domain key, any fields within each domain.
+ * Pass empty object {} to delete a domain.
+ */
+export const UpdateStepSpecificationRequestSchema = DomainSpecSchema;
+
+export type UpdateStepSpecificationRequest = z.infer<typeof UpdateStepSpecificationRequestSchema>;

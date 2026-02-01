@@ -393,4 +393,197 @@ describe('SqliteStorage', () => {
       expect(retrieved?.steps[0]!.title).toBe('Step with émojis 🎉 and ü∫ñîç∂é');
     });
   });
+
+  describe('Understanding persistence', () => {
+    let plan: ReturnType<typeof createPlan>;
+
+    beforeEach(() => {
+      plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+    });
+
+    it('should create and retrieve version with understanding', () => {
+      const version = createPlanVersion(plan.plan_id, 'Goal');
+      version.understanding = {
+        architect: {
+          observations: ['Found a pattern', 'Noticed complexity'],
+          keywords: ['auth', 'security'],
+          confidence: 'forming',
+          updated_at: '2026-01-31T12:00:00.000Z',
+          updated_by: 'architect-agent',
+        },
+        designer: {
+          observations: ['Clean UI needed'],
+          confidence: 'exploring',
+        },
+      };
+      storage.createVersion(version);
+
+      const retrieved = storage.getVersion(plan.plan_id, 1);
+      expect(retrieved?.understanding).toBeDefined();
+      expect(retrieved?.understanding?.architect?.observations).toEqual([
+        'Found a pattern',
+        'Noticed complexity',
+      ]);
+      expect(retrieved?.understanding?.architect?.confidence).toBe('forming');
+      expect(retrieved?.understanding?.designer?.confidence).toBe('exploring');
+    });
+
+    it('should default understanding to empty object when not provided', () => {
+      const version = createPlanVersion(plan.plan_id, 'Goal');
+      // Do not set understanding
+      storage.createVersion(version);
+
+      const retrieved = storage.getVersion(plan.plan_id, 1);
+      // Should have understanding as empty object or undefined
+      expect(retrieved?.understanding ?? {}).toEqual({});
+    });
+
+    it('should preserve understanding across getLatestVersion', () => {
+      const version = createPlanVersion(plan.plan_id, 'Goal');
+      version.understanding = {
+        tester: { questions: ['How to test edge cases?'] },
+      };
+      storage.createVersion(version);
+
+      const latest = storage.getLatestVersion(plan.plan_id);
+      expect(latest?.understanding?.tester?.questions).toEqual([
+        'How to test edge cases?',
+      ]);
+    });
+
+    it('should preserve understanding in listVersions', () => {
+      const v1 = createPlanVersion(plan.plan_id, 'Goal v1');
+      v1.understanding = { role1: { observations: ['v1 obs'] } };
+
+      const v2 = { ...createPlanVersion(plan.plan_id, 'Goal v2'), version: 2 };
+      v2.understanding = { role2: { observations: ['v2 obs'] } };
+
+      storage.createVersion(v1);
+      storage.createVersion(v2);
+
+      const versions = storage.listVersions(plan.plan_id);
+      expect(versions).toHaveLength(2);
+      expect(versions[0]?.understanding?.role1?.observations).toEqual(['v1 obs']);
+      expect(versions[1]?.understanding?.role2?.observations).toEqual(['v2 obs']);
+    });
+  });
+
+  describe('Step specification persistence', () => {
+    let plan: ReturnType<typeof createPlan>;
+
+    beforeEach(() => {
+      plan = createPlan(testOrgId);
+      storage.createPlan(plan);
+    });
+
+    it('should create and retrieve step with specification', () => {
+      const version = createPlanVersion(plan.plan_id, 'Goal');
+      version.steps = [
+        createStep('Step with spec', {
+          specification: {
+            architecture: {
+              decisions: [
+                {
+                  decision_id: 'd001',
+                  decision: 'Use PostgreSQL',
+                  rationale: 'Better for relational data',
+                },
+              ],
+            },
+            testing: {
+              test_cases: [
+                {
+                  case_id: 't001',
+                  type: 'happy',
+                  priority: 'critical',
+                  description: 'User can login',
+                },
+              ],
+            },
+          },
+        }),
+      ];
+      storage.createVersion(version);
+
+      const retrieved = storage.getVersion(plan.plan_id, 1);
+      expect(retrieved?.steps[0]?.specification).toBeDefined();
+      expect(
+        retrieved?.steps[0]?.specification?.architecture?.decisions?.[0]?.decision_id
+      ).toBe('d001');
+      expect(
+        retrieved?.steps[0]?.specification?.testing?.test_cases?.[0]?.type
+      ).toBe('happy');
+    });
+
+    it('should preserve steps without specification', () => {
+      const version = createPlanVersion(plan.plan_id, 'Goal');
+      version.steps = [
+        createStep('Step without spec'),
+        createStep('Step with spec', {
+          specification: {
+            design: {
+              components: [{ component_id: 'c1', name: 'Button' }],
+            },
+          },
+        }),
+      ];
+      storage.createVersion(version);
+
+      const retrieved = storage.getVersion(plan.plan_id, 1);
+      expect(retrieved?.steps[0]?.specification).toBeUndefined();
+      expect(retrieved?.steps[1]?.specification?.design?.components?.[0]?.name).toBe(
+        'Button'
+      );
+    });
+
+    it('should handle all specification domains', () => {
+      const version = createPlanVersion(plan.plan_id, 'Goal');
+      version.steps = [
+        createStep('Full spec step', {
+          specification: {
+            architecture: {
+              decisions: [{ decision_id: 'd1', decision: 'Use REST', rationale: 'Simple' }],
+              api_contracts: [{ endpoint: '/api/test', method: 'GET' }],
+              boundaries: [{ component_id: 'b1', name: 'API Layer' }],
+            },
+            design: {
+              components: [{ component_id: 'c1', name: 'Card' }],
+              views: [{ view_id: 'v1', name: 'Dashboard', route: '/dashboard' }],
+              interactions: [{ trigger: 'click', action: 'navigate' }],
+            },
+            testing: {
+              test_cases: [
+                { case_id: 't1', type: 'edge', priority: 'high', description: 'Empty state' },
+              ],
+              coverage_notes: '80% target',
+            },
+            security: {
+              requirements: [
+                {
+                  requirement_id: 'r1',
+                  category: 'authentication',
+                  description: 'Require auth',
+                  priority: 'critical',
+                },
+              ],
+              threats: [{ threat: 'SQL injection', likelihood: 'low', impact: 'high' }],
+            },
+          },
+        }),
+      ];
+      storage.createVersion(version);
+
+      const retrieved = storage.getVersion(plan.plan_id, 1);
+      const spec = retrieved?.steps[0]?.specification;
+      expect(spec?.architecture?.decisions).toHaveLength(1);
+      expect(spec?.architecture?.api_contracts).toHaveLength(1);
+      expect(spec?.design?.components).toHaveLength(1);
+      expect(spec?.design?.views).toHaveLength(1);
+      expect(spec?.testing?.test_cases).toHaveLength(1);
+      expect(spec?.testing?.coverage_notes).toBe('80% target');
+      expect(spec?.security?.requirements).toHaveLength(1);
+      expect(spec?.security?.threats).toHaveLength(1);
+    });
+  });
 });

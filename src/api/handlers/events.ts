@@ -53,6 +53,8 @@ export function createEventsHandler(storage: PlanStorage) {
           version: event.version,
           changeType: event.changeType,
           stepId: event.stepId,
+          role: event.role,
+          domain: event.domain,
           timestamp: event.timestamp,
         });
         res.write(`event: plan_change\ndata: ${data}\n\n`);
