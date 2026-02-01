@@ -65,6 +65,50 @@ interface FlowAcceptanceCriterion {
   type?: string;
 }
 
+// Flow design_spec types
+interface FlowViewElement {
+  component: string;
+  use?: string;
+  props?: string;
+}
+
+interface FlowView {
+  view_id: string;
+  name: string;
+  layout?: string;
+  elements?: FlowViewElement[];
+  states?: Record<string, string>;
+}
+
+interface FlowDesignSpec {
+  location?: string;
+  pattern?: string;
+  views?: FlowView[];
+  custom_needed?: string[];
+}
+
+// Flow plan_tests types
+interface FlowTestCase {
+  type: 'happy' | 'edge' | 'error';
+  scope?: string;
+  description: string;
+}
+
+interface FlowTestGroup {
+  group: string;
+  rationale?: string;
+  tests: FlowTestCase[];
+}
+
+interface FlowPlanTests {
+  coverage?: string;
+  priority?: string;
+  strategy?: string;
+  notes?: string;
+  cases?: (FlowTestCase | FlowTestGroup)[];
+  data_requirements?: string[];
+}
+
 interface FlowStep {
   step_id: string;
   title: string;
@@ -73,6 +117,7 @@ interface FlowStep {
   dependencies: string[];
   owner_role?: string;
   acceptance_criteria?: FlowAcceptanceCriterion[];
+  specification?: Record<string, unknown>; // Step-level specification (design, testing, etc.)
 }
 
 interface SubFeatureRef {
@@ -80,6 +125,24 @@ interface SubFeatureRef {
   title: string;
   ref: string;
 }
+
+// Flow understanding types (agent observations during ideation)
+interface FlowAgentObservations {
+  observations?: string[];
+  keywords?: string[];
+  questions?: string[];
+  concerns?: string[];
+  references?: string[];
+  confidence?: 'exploring' | 'forming' | 'confident';
+  migrated_from?: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+type FlowUnderstanding = Record<string, FlowAgentObservations>;
+
+// Flow context types (agent decisions at plan level)
+type FlowContext = Record<string, Record<string, unknown>>;
 
 interface FlowFeature {
   feature_id: string;
@@ -93,6 +156,10 @@ interface FlowFeature {
     context?: string;
     acceptance_criteria?: FlowAcceptanceCriterion[];
   };
+  design_spec?: FlowDesignSpec;
+  plan_tests?: FlowPlanTests;
+  understanding?: FlowUnderstanding;
+  context?: FlowContext;
   sub_features?: SubFeatureRef[];
   plan_implementation?: {
     scopes: string[];
@@ -123,6 +190,209 @@ function mapStatus(flowStatus: string): 'draft' | 'approved' | 'published' {
   if (flowStatus === 'published') return 'published';
   if (flowStatus === 'approved') return 'approved';
   return 'draft';
+}
+
+/**
+ * Map flow design_spec to Specification.design format
+ */
+function mapDesignSpec(flow: FlowDesignSpec): {
+  components?: Array<{ component_id: string; name: string; description?: string }>;
+  views?: Array<{
+    view_id: string;
+    name: string;
+    description?: string;
+    components?: string[];
+    states?: Array<{ state: string; description?: string }>;
+  }>;
+} {
+  const spec: ReturnType<typeof mapDesignSpec> = {};
+  const componentSet = new Set<string>();
+  const components: Array<{ component_id: string; name: string; description?: string }> = [];
+
+  if (flow.views) {
+    spec.views = flow.views.map((v) => {
+      const viewComponents: string[] = [];
+
+      if (v.elements) {
+        for (const el of v.elements) {
+          if (el.component) {
+            componentSet.add(el.component);
+            viewComponents.push(el.component);
+          }
+        }
+      }
+
+      const states: Array<{ state: string; description?: string }> = [];
+      if (v.states) {
+        for (const [state, description] of Object.entries(v.states)) {
+          states.push({ state, description });
+        }
+      }
+
+      return {
+        view_id: v.view_id,
+        name: v.name,
+        description: v.layout,
+        components: viewComponents.length > 0 ? viewComponents : undefined,
+        states: states.length > 0 ? states : undefined,
+      };
+    });
+  }
+
+  // Build component specs from collected components
+  for (const compName of componentSet) {
+    if (compName) {
+      components.push({
+        component_id: compName.toLowerCase().replace(/\s+/g, '-'),
+        name: compName,
+      });
+    }
+  }
+
+  // Add custom_needed as components with descriptions
+  if (flow.custom_needed) {
+    for (const custom of flow.custom_needed) {
+      if (typeof custom !== 'string') continue; // Skip non-string entries
+      const match = custom.match(/^([^-]+)\s*-\s*(.+)$/);
+      if (match) {
+        components.push({
+          component_id: match[1].trim().toLowerCase().replace(/\s+/g, '-'),
+          name: match[1].trim(),
+          description: match[2].trim(),
+        });
+      } else {
+        components.push({
+          component_id: custom.toLowerCase().replace(/\s+/g, '-'),
+          name: custom,
+        });
+      }
+    }
+  }
+
+  if (components.length > 0) {
+    spec.components = components;
+  }
+
+  // If only location/pattern, add as a view with description
+  if (!flow.views && (flow.location || flow.pattern)) {
+    spec.views = [
+      {
+        view_id: 'v001',
+        name: 'Main View',
+        description: [flow.location, flow.pattern ? `Pattern: ${flow.pattern}` : null]
+          .filter(Boolean)
+          .join('. '),
+      },
+    ];
+  }
+
+  return spec;
+}
+
+/**
+ * Map flow plan_tests to Specification.testing format
+ */
+function mapPlanTests(
+  flow: FlowPlanTests,
+  featureId: string
+): {
+  test_cases?: Array<{
+    case_id: string;
+    type: 'happy' | 'edge' | 'error' | 'security' | 'performance';
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    description: string;
+  }>;
+  coverage_notes?: string;
+} {
+  const spec: ReturnType<typeof mapPlanTests> = {};
+  const testCases: Array<{
+    case_id: string;
+    type: 'happy' | 'edge' | 'error' | 'security' | 'performance';
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    description: string;
+  }> = [];
+
+  if (flow.cases) {
+    let idx = 0;
+    for (const c of flow.cases) {
+      // Check if it's a grouped test structure
+      if ('group' in c && 'tests' in c) {
+        const group = c as FlowTestGroup;
+        for (const test of group.tests) {
+          idx++;
+          testCases.push({
+            case_id: `${featureId}-tc${String(idx).padStart(3, '0')}`,
+            type: test.type as 'happy' | 'edge' | 'error',
+            priority: (flow.priority as 'critical' | 'high' | 'medium' | 'low') || 'high',
+            description: test.description,
+          });
+        }
+      } else if ('type' in c && 'description' in c) {
+        // Flat test case
+        idx++;
+        const test = c as FlowTestCase;
+        testCases.push({
+          case_id: `${featureId}-tc${String(idx).padStart(3, '0')}`,
+          type: test.type as 'happy' | 'edge' | 'error',
+          priority: (flow.priority as 'critical' | 'high' | 'medium' | 'low') || 'high',
+          description: test.description,
+        });
+      }
+    }
+  }
+
+  if (testCases.length > 0) {
+    spec.test_cases = testCases;
+  }
+
+  // Build coverage notes from various fields
+  const notes: string[] = [];
+  if (flow.coverage) {
+    notes.push(`Coverage: ${flow.coverage}`);
+  }
+  if (flow.strategy) {
+    notes.push(`Strategy: ${flow.strategy}`);
+  }
+  if (flow.notes) {
+    notes.push(`Notes: ${flow.notes}`);
+  }
+  if (flow.data_requirements && flow.data_requirements.length > 0) {
+    notes.push(`Data requirements:\n- ${flow.data_requirements.join('\n- ')}`);
+  }
+
+  if (notes.length > 0) {
+    spec.coverage_notes = notes.join('\n\n');
+  }
+
+  return spec;
+}
+
+/**
+ * Build step specification from feature-level design_spec and plan_tests
+ */
+function buildStepSpecification(
+  feature: FlowFeature
+): { design?: ReturnType<typeof mapDesignSpec>; testing?: ReturnType<typeof mapPlanTests> } | undefined {
+  const spec: { design?: ReturnType<typeof mapDesignSpec>; testing?: ReturnType<typeof mapPlanTests> } = {};
+  let hasContent = false;
+
+  if (feature.design_spec) {
+    const design = mapDesignSpec(feature.design_spec);
+    if (design.views || design.components) {
+      spec.design = design;
+      hasContent = true;
+    }
+  }
+
+  if (feature.plan_tests) {
+    const testing = mapPlanTests(feature.plan_tests, feature.feature_id);
+    if (testing.test_cases || testing.coverage_notes) {
+      spec.testing = testing;
+      hasContent = true;
+    }
+  }
+
+  return hasContent ? spec : undefined;
 }
 
 async function migrate() {
@@ -270,8 +540,8 @@ async function migrate() {
   `);
 
   const insertVersion = db.prepare(`
-    INSERT OR REPLACE INTO versions (plan_id, version, status, summary_json, submitted_at, approval_info_json, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO versions (plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertStep = db.prepare(`
@@ -296,6 +566,8 @@ async function migrate() {
   let importedCount = 0;
   let stepsCount = 0;
   let epicsWithSubPlans = 0;
+  let withUnderstanding = 0;
+  let withContext = 0;
 
   // Second pass: import features
   const transaction = db.transaction(() => {
@@ -321,17 +593,30 @@ async function migrate() {
             })
           : null;
 
+      // Build understanding and context from flow feature
+      const understandingJson = feature.understanding
+        ? JSON.stringify(feature.understanding)
+        : null;
+      const contextJson = feature.context
+        ? JSON.stringify(feature.context)
+        : null;
+
       // Create version
       insertVersion.run(
         planId,
         1, // version
         status,
         JSON.stringify(summary),
+        understandingJson,
+        contextJson,
         status !== 'draft' ? now : null, // submitted_at
         approvalInfo,
         now,
         now
       );
+
+      // Build specification from feature-level design_spec and plan_tests
+      const featureSpecification = buildStepSpecification(feature);
 
       // Determine what steps to create
       let stepsToInsert: Array<{
@@ -343,6 +628,7 @@ async function migrate() {
         owner_role?: string;
         acceptance_criteria?: FlowAcceptanceCriterion[];
         sub_plan_id?: string;
+        specification?: ReturnType<typeof buildStepSpecification>;
       }> = [];
 
       // If this is an epic with sub_features, create steps from sub_features
@@ -368,7 +654,23 @@ async function migrate() {
       } else {
         // Regular feature: use plan_implementation.steps
         const flowSteps = feature.plan_implementation?.steps || [];
-        for (const flowStep of flowSteps) {
+        for (let i = 0; i < flowSteps.length; i++) {
+          const flowStep = flowSteps[i];
+
+          // Build step specification:
+          // - First step: merge feature-level spec with step-level spec
+          // - Other steps: use step-level spec only
+          let stepSpec: Record<string, unknown> | undefined;
+          if (i === 0 && featureSpecification) {
+            // First step gets feature-level spec, merged with any step-level spec
+            stepSpec = flowStep.specification
+              ? { ...featureSpecification, ...flowStep.specification }
+              : featureSpecification;
+          } else if (flowStep.specification) {
+            // Other steps use their own specification if present
+            stepSpec = flowStep.specification;
+          }
+
           stepsToInsert.push({
             step_id: flowStep.step_id,
             title: flowStep.title,
@@ -377,6 +679,7 @@ async function migrate() {
             dependencies: flowStep.dependencies || [],
             owner_role: flowStep.owner_role,
             acceptance_criteria: flowStep.acceptance_criteria,
+            specification: stepSpec,
           });
         }
       }
@@ -395,8 +698,21 @@ async function migrate() {
           ? `${stepsToInsert.length} sub-plans`
           : `${stepsToInsert.length} steps`;
 
+      // Track understanding and context
+      if (feature.understanding && Object.keys(feature.understanding).length > 0) {
+        withUnderstanding++;
+      }
+      if (feature.context && Object.keys(feature.context).length > 0) {
+        withContext++;
+      }
+
+      const enrichmentInfo: string[] = [];
+      if (feature.understanding) enrichmentInfo.push('U');
+      if (feature.context) enrichmentInfo.push('C');
+      const enrichmentStr = enrichmentInfo.length > 0 ? ` {${enrichmentInfo.join(',')}}` : '';
+
       console.log(
-        `  Imported: ${feature.feature_id} (${feature.type}) -> ${planId.slice(0, 8)}... [${stepInfo}]`
+        `  Imported: ${feature.feature_id} (${feature.type}) -> ${planId.slice(0, 8)}... [${stepInfo}]${enrichmentStr}`
       );
       importedCount++;
     }
@@ -409,6 +725,8 @@ async function migrate() {
   console.log(`  Plans imported/updated: ${importedCount}`);
   console.log(`  Steps imported: ${stepsCount}`);
   console.log(`  Epics with sub-plans: ${epicsWithSubPlans}`);
+  console.log(`  With understanding: ${withUnderstanding}`);
+  console.log(`  With context: ${withContext}`);
   console.log(`  Database: ${dbPath}`);
   console.log(`\n  All plans are attached to the "Planner v1" initiative.`);
   console.log(`  Note: Uses deterministic UUIDs - safe to re-run for updates.`);
