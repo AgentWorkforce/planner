@@ -4,7 +4,8 @@ import type { QuestionBlockingLevel } from '../../domain/question.js';
 import { createQuestion as createQuestionEntity } from '../../domain/question.js';
 import { emitQuestionEvent } from '../../events/question-events.js';
 import { emitAgentStatusUpdate } from '../../relay/agent-status.js';
-import { sendMessage } from '../../relay/client.js';
+import { sendMessage, sendChannelMessage } from '../../relay/client.js';
+import type { QAMessagePayload } from '../../relay/index.js';
 import { notFound, badRequest } from '../middleware.js';
 
 interface PlanParams {
@@ -184,6 +185,22 @@ export function createQuestionHandlers(storage: PlanStorage) {
           agentId: question.agent_id,
           question: updated,
         });
+
+        // Send Q&A to plan channel for agent visibility
+        const planChannel = `#plan-${question.plan_id}`;
+        const qaBody = `Q: ${question.text}\nA: ${answer}`;
+        const qaPayload: QAMessagePayload = {
+          type: 'qa',
+          questionId,
+          questionText: question.text,
+          answerText: answer,
+          agentName: question.agent_id,
+          agentRole: question.agent_role,
+          blockingLevel: question.blocking_level,
+          answeredAt: updated.answered_at || new Date().toISOString(),
+        };
+
+        sendChannelMessage(planChannel, qaBody, qaPayload as unknown as Record<string, unknown>);
 
         res.json({ question: updated });
       } catch (err) {

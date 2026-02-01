@@ -1,0 +1,135 @@
+{
+  "feature_id": "qa-channel-broadcast",
+  "title": "Q&A Channel Broadcast",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ui-question-queue", "ui-relay-messaging"],
+
+  "summary": {
+    "goal": "When a user answers an MCP question, broadcast the Q&A to the plan channel with distinctive styling so all participants see the decision made.",
+    "in_scope": [
+      "Post Q&A to #plan-{id} channel when question is answered",
+      "Include: question text, answer text, agent name, timestamp",
+      "Special card styling distinct from normal chat messages",
+      "Display in MessagingSidebar and ChannelPage/ChannelView"
+    ],
+    "out_of_scope": [
+      "Editing answers after posting",
+      "Threading replies to Q&A messages",
+      "Analytics on Q&A patterns",
+      "Posting to #planner channel"
+    ],
+    "approach": "Use existing message `data` field with type='qa' payload. Frontend detects data.type and renders QAMessageCard component instead of standard message bubble.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Answering a question via TriagePanel/ChatBubble sends a message to #plan-{id} channel" },
+      { "id": "ac2", "description": "Q&A message contains question text, answer text, agent name (who asked), and timestamp" },
+      { "id": "ac3", "description": "Q&A messages render with distinct card styling (different background, icon, layout) vs normal chat" },
+      { "id": "ac4", "description": "Q&A messages appear in MessagingSidebar message stream when viewing that plan" },
+      { "id": "ac5", "description": "Q&A messages appear in /channels/:id view for the plan channel" },
+      { "id": "ac6", "description": "Q&A card shows blocking level badge (hard_block, soft_block, preference, fyi)" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": [
+      {
+        "step_id": "qa-001",
+        "title": "Define QA message payload type",
+        "scope": "planner-core",
+        "description": "Create TypeScript interface for Q&A channel message payload in src/relay/. This defines the shape of `data` field when `data.type === 'qa'`.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "QAMessagePayload interface exists with fields: { type: 'qa', questionId: string, questionText: string, answerText: string, agentName: string, agentRole: string, blockingLevel: QuestionBlockingLevel, answeredAt: string }" },
+          { "id": "ac2", "description": "Type is exported from src/relay/index.ts" }
+        ]
+      },
+      {
+        "step_id": "qa-002",
+        "title": "Send Q&A channel message on answer",
+        "scope": "planner-core",
+        "description": "In src/api/handlers/questions.ts, after answerQuestion() succeeds, call sendChannelMessage() to broadcast Q&A to #plan-{planId} channel. Use the relay client's channel messaging with data.type='qa' payload.",
+        "dependencies": ["qa-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After answerQuestion() in handlers/questions.ts, sendChannelMessage() is called with channel=#plan-{planId}" },
+          { "id": "ac2", "description": "Message body is human-readable summary: 'Q: {question}\\nA: {answer}'" },
+          { "id": "ac3", "description": "Message data field contains full QAMessagePayload with all required fields" },
+          { "id": "ac4", "description": "Channel ID uses plan's full UUID (not prefix), matching #plan-{plan_id} format" }
+        ]
+      },
+      {
+        "step_id": "qa-003",
+        "title": "Define QA message payload type (frontend)",
+        "scope": "planner-ui",
+        "description": "Add QAMessagePayload type to packages/planner-ui/src/types/relay.ts matching the backend definition.",
+        "dependencies": ["qa-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "QAMessagePayload interface in types/relay.ts matches backend definition" },
+          { "id": "ac2", "description": "Type guard isQAMessage(data: unknown): data is QAMessagePayload exists" }
+        ]
+      },
+      {
+        "step_id": "qa-004",
+        "title": "Create QAMessageCard component",
+        "scope": "planner-ui",
+        "description": "Create packages/planner-ui/src/components/QAMessageCard.tsx component that renders Q&A messages with distinct styling. Should match Mission Control design system with accent colors for blocking level badges.",
+        "dependencies": ["qa-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "QAMessageCard component accepts QAMessagePayload + timestamp props" },
+          { "id": "ac2", "description": "Card uses bg-bg-card with border-l-4 accent border (cyan for answered)" },
+          { "id": "ac3", "description": "Shows question icon and 'QUESTION ANSWERED' header label" },
+          { "id": "ac4", "description": "Displays agent name and role who asked the question" },
+          { "id": "ac5", "description": "Shows blocking level badge using existing question-type-badges pattern (hard_block=error, soft_block/preference=warning, fyi=cyan)" },
+          { "id": "ac6", "description": "Question text in text-secondary, answer text in text-primary with emphasis" },
+          { "id": "ac7", "description": "Timestamp displayed in relative or absolute format" }
+        ]
+      },
+      {
+        "step_id": "qa-005",
+        "title": "Integrate QAMessageCard into MessageStream",
+        "scope": "planner-ui",
+        "description": "Modify MessageStream.tsx to detect Q&A messages via data.type === 'qa' and render QAMessageCard instead of MessageBubble. Q&A messages should span full width (not left/right aligned).",
+        "dependencies": ["qa-004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "MessageStream checks message.data?.type === 'qa' before rendering" },
+          { "id": "ac2", "description": "Q&A messages render QAMessageCard component with full data payload" },
+          { "id": "ac3", "description": "Q&A messages span full width (not aligned left/right like chat)" },
+          { "id": "ac4", "description": "Normal messages continue to render as MessageBubble unchanged" },
+          { "id": "ac5", "description": "Q&A messages respect date grouping and appear in chronological order" }
+        ]
+      },
+      {
+        "step_id": "qa-006",
+        "title": "Write unit tests for QAMessageCard",
+        "scope": "planner-ui",
+        "description": "Create test file packages/planner-ui/src/components/QAMessageCard.test.tsx with tests for rendering different blocking levels and edge cases.",
+        "dependencies": ["qa-004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests render QAMessageCard with each blocking level (hard_block, soft_block, preference, fyi)" },
+          { "id": "ac2", "description": "Tests verify all required fields are displayed (question, answer, agent, badge)" },
+          { "id": "ac3", "description": "Tests verify badge colors match design system pattern" }
+        ]
+      },
+      {
+        "step_id": "qa-007",
+        "title": "Integration test: answer question broadcasts to channel",
+        "scope": "planner-core",
+        "description": "Add integration test in src/api/handlers/questions.test.ts that verifies answering a question sends a channel message with correct Q&A payload.",
+        "dependencies": ["qa-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test creates a question, answers it via POST /questions/:id/answer" },
+          { "id": "ac2", "description": "Test verifies sendChannelMessage was called with #plan-{planId}" },
+          { "id": "ac3", "description": "Test verifies message data contains correct QAMessagePayload fields" }
+        ]
+      }
+    ]
+  }
+}
