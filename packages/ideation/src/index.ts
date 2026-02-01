@@ -1,8 +1,8 @@
 /**
  * Ideation Core Package
  *
- * The "nugget extraction" phase in the gold mining architecture.
- * Transforms raw intent into crystallized understanding ready for planning.
+ * Brainstorming facilitation for the Planner system.
+ * The Interviewer guides users through ideation with invisible specialist support.
  *
  * @packageDocumentation
  */
@@ -12,3 +12,6 @@ export * from './domain/index.js';
 
 // Storage Layer
 export * from './storage/index.js';
+
+// API Layer
+export * from './api/index.js';
