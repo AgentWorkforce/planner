@@ -161,19 +161,20 @@ describe('BoardColumn', () => {
   });
 
   describe('layout and dimensions', () => {
-    it('applies min-width of 240px', () => {
+    it('uses flex-1 min-w-0 for equal width Kanban columns', () => {
       const plans = [createMockPlan()];
       const { container } = renderWithRouter(<BoardColumn title="Drafting" plans={plans} />);
 
-      const column = container.querySelector('.min-w-\\[240px\\]');
+      // Implementation uses flex-1 min-w-0 for Kanban-style equal width columns
+      const column = container.querySelector('.flex-1.min-w-0');
       expect(column).toBeInTheDocument();
     });
 
-    it('prevents shrinking with flex-shrink-0', () => {
+    it('allows columns to share space equally with flex-1', () => {
       const plans = [createMockPlan()];
       const { container } = renderWithRouter(<BoardColumn title="Drafting" plans={plans} />);
 
-      const column = container.querySelector('.flex-shrink-0');
+      const column = container.querySelector('.flex-1');
       expect(column).toBeInTheDocument();
     });
 
