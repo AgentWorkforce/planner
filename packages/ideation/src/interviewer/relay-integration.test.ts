@@ -20,7 +20,7 @@ vi.mock('../relay/index.js', () => ({
   }),
   sendChannelMessage: vi.fn(() => true),
   isConnected: vi.fn(() => mockRelayConnected),
-  getConnectionState: vi.fn(() => (mockRelayConnected ? 'READY' : 'DISCONNECTED') as ClientState),
+  getConnectionState: vi.fn(() => (mockRelayConnected ? 'connected' : 'disconnected') as ClientState),
   onStateChange: vi.fn((callback) => {
     mockStateChangeCallback = callback;
     return () => {
@@ -163,7 +163,7 @@ describe('Interviewer Relay Integration', () => {
 
       // Simulate relay connection
       mockRelayConnected = true;
-      mockStateChangeCallback?.('READY');
+      mockStateChangeCallback?.('connected');
 
       expect(relayModule.sendChannelMessage).toHaveBeenCalledWith(
         '#ideation',
@@ -179,7 +179,7 @@ describe('Interviewer Relay Integration', () => {
 
       // Simulate relay disconnection
       mockRelayConnected = false;
-      mockStateChangeCallback?.('DISCONNECTED');
+      mockStateChangeCallback?.('disconnected');
 
       expect(relayModule.sendChannelMessage).not.toHaveBeenCalled();
     });

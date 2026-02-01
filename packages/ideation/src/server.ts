@@ -1,0 +1,47 @@
+/**
+ * Ideation Server - Standalone development server
+ *
+ * Run with: npm run dev (or npm start)
+ */
+
+import express from 'express';
+import cors from 'cors';
+import { createIdeationRouter } from './api/index.js';
+import { SQLiteIdeationStorage } from './storage/index.js';
+
+const PORT = process.env.IDEATION_PORT || 3001;
+const DB_PATH = process.env.IDEATION_DB_PATH || './ideation.db';
+
+async function main() {
+  // Initialize storage
+  const storage = new SQLiteIdeationStorage(DB_PATH);
+  await storage.initialize();
+
+  // Create Express app
+  const app = express();
+
+  // Middleware
+  app.use(cors());
+  app.use(express.json());
+
+  // Mount ideation API
+  const ideationRouter = createIdeationRouter(storage);
+  app.use('/api/ideation', ideationRouter);
+
+  // Health check
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', service: 'ideation' });
+  });
+
+  // Start server
+  app.listen(PORT, () => {
+    console.log(`[Ideation Server] Running on http://localhost:${PORT}`);
+    console.log(`[Ideation Server] API: http://localhost:${PORT}/api/ideation`);
+    console.log(`[Ideation Server] Database: ${DB_PATH}`);
+  });
+}
+
+main().catch((err) => {
+  console.error('[Ideation Server] Failed to start:', err);
+  process.exit(1);
+});

@@ -83,7 +83,7 @@ class InterviewerService {
     // Subscribe to relay state changes
     this.unsubscribeStateChange = relayOnStateChange((state: ClientState) => {
       const wasConnected = this.state.relayConnected;
-      this.state.relayConnected = state === 'READY';
+      this.state.relayConnected = state === 'connected';
 
       if (!wasConnected && this.state.relayConnected) {
         console.log('[Interviewer] Relay connected');

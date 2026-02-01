@@ -7,6 +7,56 @@
  * @packageDocumentation
  */
 
+import type { Router } from 'express';
+import { SQLiteIdeationStorage } from './storage/index.js';
+import { createIdeationRouter } from './api/index.js';
+
+// =============================================================================
+// Plugin Interface (for mounting in planner backend)
+// =============================================================================
+
+export interface IdeationServiceConfig {
+  /** Path to SQLite database file */
+  dbPath?: string;
+}
+
+export interface IdeationService {
+  /** Express router to mount at /api/ideation */
+  router: Router;
+  /** Initialize storage (creates tables) */
+  initialize: () => Promise<void>;
+  /** Shutdown service (closes DB connection) */
+  shutdown: () => Promise<void>;
+}
+
+/**
+ * Create ideation service for mounting in another Express app.
+ *
+ * @example
+ * ```typescript
+ * import { createIdeationService } from 'ideation-core';
+ *
+ * const ideation = createIdeationService({ dbPath: './ideation.db' });
+ * await ideation.initialize();
+ * app.use('/api/ideation', ideation.router);
+ * ```
+ */
+export function createIdeationService(config: IdeationServiceConfig = {}): IdeationService {
+  const dbPath = config.dbPath || './ideation.db';
+  const storage = new SQLiteIdeationStorage(dbPath);
+  const router = createIdeationRouter(storage);
+
+  return {
+    router,
+    initialize: () => storage.initialize(),
+    shutdown: () => storage.close(),
+  };
+}
+
+// =============================================================================
+// Module Exports (for advanced usage)
+// =============================================================================
+
 // Domain Model
 export * from './domain/index.js';
 

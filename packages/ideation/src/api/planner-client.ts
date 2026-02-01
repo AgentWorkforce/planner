@@ -47,6 +47,50 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
         version: data.version.version,
       };
     },
+
+    async createVersion(params) {
+      const response = await fetch(`${baseUrl}/api/plans/${params.plan_id}/versions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          goal: params.goal,
+          context: params.context,
+          understanding: params.understanding,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Planner API error: ${response.status} ${error}`);
+      }
+
+      const data = await response.json() as {
+        version: number;
+      };
+      return {
+        plan_id: params.plan_id,
+        version: data.version,
+      };
+    },
+
+    async updatePlan(params) {
+      const response = await fetch(`${baseUrl}/api/plans/${params.plan_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          understanding: params.understanding,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Planner API error: ${response.status} ${error}`);
+      }
+    },
   };
 }
 
@@ -54,13 +98,28 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
 // Mock Planner Client (for testing)
 // =============================================================================
 
+let mockVersionCounter = 1;
+
 export function createMockPlannerClient(): PlannerClient {
   return {
     async createPlan(_params) {
+      mockVersionCounter = 1;
       return {
         plan_id: `plan-${Date.now()}`,
-        version: 1,
+        version: mockVersionCounter,
       };
+    },
+
+    async createVersion(params) {
+      mockVersionCounter++;
+      return {
+        plan_id: params.plan_id,
+        version: mockVersionCounter,
+      };
+    },
+
+    async updatePlan(_params) {
+      // Mock - no-op
     },
   };
 }

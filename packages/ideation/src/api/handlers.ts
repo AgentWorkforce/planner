@@ -233,7 +233,7 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       if (plannerClient) {
         if (isSubsequentSend) {
           // Get the plan_id from the first send
-          const firstSend = existingSession.planner_sends[0];
+          const firstSend = existingSession.planner_sends[0]!;
           const planId = firstSend.result?.plan_id;
 
           if (!planId) {
@@ -276,7 +276,7 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       } else {
         // Mock result when no planner client configured
         if (isSubsequentSend) {
-          const firstSend = existingSession.planner_sends[0];
+          const firstSend = existingSession.planner_sends[0]!;
           result = {
             plan_id: firstSend.result?.plan_id ?? `plan-${Date.now()}`,
             plan_version: (firstSend.result?.plan_version ?? 0) + 1,

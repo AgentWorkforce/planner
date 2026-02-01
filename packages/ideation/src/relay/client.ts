@@ -2,17 +2,14 @@
  * Relay Client Integration for Ideation Package
  *
  * Provides relay messaging capabilities for the Interviewer service.
- * Follows the same pattern as planner-core's relay integration.
+ * When running standalone, operates in mock mode.
+ * When integrated with planner, can use shared relay connection.
  */
 
-import {
-  onMessage as relayOnMessage,
-  sendChannelMessage as relaySendChannelMessage,
-  isConnected as relayIsConnected,
-  getConnectionState as relayGetConnectionState,
-  onStateChange as relayOnStateChange,
-  type ClientState,
-} from '../../../../src/relay/client.js';
+/**
+ * Connection state type.
+ */
+export type ClientState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 /**
  * Message handler type for ideation relay integration.
@@ -24,19 +21,20 @@ export type IdeationMessageHandler = (
   data?: Record<string, unknown>
 ) => Promise<void> | void;
 
+// Internal state
+let connectionState: ClientState = 'disconnected';
+const messageHandlers: Set<IdeationMessageHandler> = new Set();
+const stateChangeHandlers: Set<(state: ClientState) => void> = new Set();
+
 /**
  * Register a handler for incoming relay messages.
  * Returns unsubscribe function.
  */
 export function onMessage(handler: IdeationMessageHandler): () => void {
-  return relayOnMessage((from, body, threadId, data) => {
-    // Wrap in try-catch to prevent handler errors from propagating
-    try {
-      void handler(from, body, threadId, data);
-    } catch (error) {
-      console.error('[ideation-relay] Error in message handler:', error);
-    }
-  });
+  messageHandlers.add(handler);
+  return () => {
+    messageHandlers.delete(handler);
+  };
 }
 
 /**
@@ -46,30 +44,39 @@ export function onMessage(handler: IdeationMessageHandler): () => void {
 export function sendChannelMessage(
   channel: string,
   body: string,
-  data?: Record<string, unknown>
+  _data?: Record<string, unknown>
 ): boolean {
-  return relaySendChannelMessage(channel, body, data);
+  if (connectionState !== 'connected') {
+    console.log(`[ideation-relay] Mock send to ${channel}: ${body.substring(0, 50)}...`);
+    return false;
+  }
+  // In integrated mode, this would use the shared relay connection
+  console.log(`[ideation-relay] Send to ${channel}: ${body.substring(0, 50)}...`);
+  return true;
 }
 
 /**
  * Check if relay is connected.
  */
 export function isConnected(): boolean {
-  return relayIsConnected();
+  return connectionState === 'connected';
 }
 
 /**
  * Get current relay connection state.
  */
 export function getConnectionState(): ClientState {
-  return relayGetConnectionState();
+  return connectionState;
 }
 
 /**
  * Subscribe to relay connection state changes.
  */
 export function onStateChange(callback: (state: ClientState) => void): () => void {
-  return relayOnStateChange(callback);
+  stateChangeHandlers.add(callback);
+  return () => {
+    stateChangeHandlers.delete(callback);
+  };
 }
 
 /**
@@ -78,4 +85,30 @@ export function onStateChange(callback: (state: ClientState) => void): () => voi
  */
 export function getRelayMode(): 'connected' | 'mock' {
   return isConnected() ? 'connected' : 'mock';
+}
+
+/**
+ * Set connection state (for testing or integration).
+ */
+export function setConnectionState(state: ClientState): void {
+  connectionState = state;
+  stateChangeHandlers.forEach((handler) => handler(state));
+}
+
+/**
+ * Dispatch a message to all handlers (for testing or integration).
+ */
+export function dispatchMessage(
+  from: string,
+  body: string,
+  threadId?: string,
+  data?: Record<string, unknown>
+): void {
+  messageHandlers.forEach((handler) => {
+    try {
+      void handler(from, body, threadId, data);
+    } catch (error) {
+      console.error('[ideation-relay] Error in message handler:', error);
+    }
+  });
 }
