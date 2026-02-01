@@ -35,6 +35,18 @@ export interface PlannerClient {
     understanding?: Record<string, Record<string, unknown>>;
     initiative_id?: string;
   }): Promise<{ plan_id: string; version: number }>;
+
+  createVersion(params: {
+    plan_id: string;
+    goal: string;
+    context?: string;
+    understanding?: Record<string, Record<string, unknown>>;
+  }): Promise<{ plan_id: string; version: number }>;
+
+  updatePlan(params: {
+    plan_id: string;
+    understanding?: Record<string, Record<string, unknown>>;
+  }): Promise<void>;
 }
 
 export interface HandlerConfig {
@@ -156,14 +168,21 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
   async function updateUnderstanding(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id ?? '');
+      const specialist = String(req.params.specialist ?? '');
+
+      if (!specialist) {
+        res.status(400).json({ error: 'Specialist name is required in URL' });
+        return;
+      }
+
       const parsed = UpdateUnderstandingRequestSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
         return;
       }
 
-      const { specialist_name, observations } = parsed.data;
-      const session = await storage.updateUnderstanding(id, specialist_name, observations);
+      const { observations } = parsed.data;
+      const session = await storage.updateUnderstanding(id, specialist, observations);
 
       ideationEvents.emitSessionEvent('session:understanding', session);
       res.json(session);
@@ -208,24 +227,66 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       // Call planner API if client available, otherwise mock
       let result: { plan_id: string; plan_version: number };
 
+      // Check if this is a subsequent send
+      const isSubsequentSend = existingSession.planner_sends.length > 0;
+
       if (plannerClient) {
-        const plannerResult = await plannerClient.createPlan({
-          goal: payload.goal,
-          context: payload.context,
-          source: payload.source,
-          understanding: payload.understanding,
-          initiative_id: payload.initiative_id,
-        });
-        result = {
-          plan_id: plannerResult.plan_id,
-          plan_version: plannerResult.version,
-        };
+        if (isSubsequentSend) {
+          // Get the plan_id from the first send
+          const firstSend = existingSession.planner_sends[0];
+          const planId = firstSend.result?.plan_id;
+
+          if (!planId) {
+            res.status(500).json({ error: 'Cannot create version: previous send has no plan_id' });
+            return;
+          }
+
+          // Create new version on existing plan and update understanding
+          const plannerResult = await plannerClient.createVersion({
+            plan_id: planId,
+            goal: payload.goal,
+            context: payload.context,
+            understanding: payload.understanding,
+          });
+
+          // Update plan-level understanding
+          await plannerClient.updatePlan({
+            plan_id: planId,
+            understanding: payload.understanding,
+          });
+
+          result = {
+            plan_id: plannerResult.plan_id,
+            plan_version: plannerResult.version,
+          };
+        } else {
+          // First send - create new plan
+          const plannerResult = await plannerClient.createPlan({
+            goal: payload.goal,
+            context: payload.context,
+            source: payload.source,
+            understanding: payload.understanding,
+            initiative_id: payload.initiative_id,
+          });
+          result = {
+            plan_id: plannerResult.plan_id,
+            plan_version: plannerResult.version,
+          };
+        }
       } else {
         // Mock result when no planner client configured
-        result = {
-          plan_id: `plan-${Date.now()}`,
-          plan_version: 1,
-        };
+        if (isSubsequentSend) {
+          const firstSend = existingSession.planner_sends[0];
+          result = {
+            plan_id: firstSend.result?.plan_id ?? `plan-${Date.now()}`,
+            plan_version: (firstSend.result?.plan_version ?? 0) + 1,
+          };
+        } else {
+          result = {
+            plan_id: `plan-${Date.now()}`,
+            plan_version: 1,
+          };
+        }
       }
 
       const send = createPlannerSend(payload, result);

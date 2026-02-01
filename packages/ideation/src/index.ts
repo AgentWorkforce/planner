@@ -21,3 +21,6 @@ export * from './interviewer/index.js';
 
 // Specialists (Dynamic Agents)
 export * from './specialists/index.js';
+
+// Relay Integration
+export * from './relay/index.js';

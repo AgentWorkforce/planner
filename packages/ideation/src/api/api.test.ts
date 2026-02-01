@@ -189,16 +189,15 @@ describe('Ideation API', () => {
   // Understanding
   // ==========================================================================
 
-  describe('PUT /sessions/:id/understanding', () => {
+  describe('PUT /sessions/:id/understanding/:specialist', () => {
     it('updates specialist observations', async () => {
       const session = await request(app)
         .post('/api/ideation/sessions')
         .send({ initial_intent: 'Test' });
 
       const res = await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Architect`)
         .send({
-          specialist_name: 'Architect',
           observations: { patterns: ['microservices'], confidence: 'exploring' },
         });
 
@@ -215,16 +214,14 @@ describe('Ideation API', () => {
         .send({ initial_intent: 'Test' });
 
       await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Architect`)
         .send({
-          specialist_name: 'Architect',
           observations: { note: 'arch' },
         });
 
       const res = await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Designer`)
         .send({
-          specialist_name: 'Designer',
           observations: { note: 'design' },
         });
 
@@ -258,16 +255,14 @@ describe('Ideation API', () => {
         .send({ initial_intent: 'Test' });
 
       await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Architect`)
         .send({
-          specialist_name: 'Architect',
           observations: { confidence: 'confident' }, // 90
         });
 
       await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Designer`)
         .send({
-          specialist_name: 'Designer',
           observations: { confidence: 'exploring' }, // 25
         });
 
@@ -293,9 +288,8 @@ describe('Ideation API', () => {
         .send({ initial_intent: 'Build an API' });
 
       await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Architect`)
         .send({
-          specialist_name: 'Architect',
           observations: { patterns: ['REST'] },
         });
 
@@ -351,6 +345,8 @@ describe('Planner Handoff Integration', () => {
   let storage: SQLiteIdeationStorage;
   let mockPlannerClient: PlannerClient;
   let createPlanSpy: ReturnType<typeof vi.fn>;
+  let createVersionSpy: ReturnType<typeof vi.fn>;
+  let updatePlanSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     storage = new SQLiteIdeationStorage(':memory:');
@@ -362,8 +358,17 @@ describe('Planner Handoff Integration', () => {
       version: 1,
     });
 
+    createVersionSpy = vi.fn().mockResolvedValue({
+      plan_id: 'plan-from-planner-123',
+      version: 2,
+    });
+
+    updatePlanSpy = vi.fn().mockResolvedValue(undefined);
+
     mockPlannerClient = {
       createPlan: createPlanSpy,
+      createVersion: createVersionSpy,
+      updatePlan: updatePlanSpy,
     };
 
     app = express();
@@ -382,7 +387,7 @@ describe('Planner Handoff Integration', () => {
     router.get('/sessions/:id', handlers.getSession);
     router.post('/sessions/:id/abandon', handlers.abandonSession);
     router.post('/sessions/:id/messages', handlers.addMessage);
-    router.put('/sessions/:id/understanding', handlers.updateUnderstanding);
+    router.put('/sessions/:id/understanding/:specialist', handlers.updateUnderstanding);
     router.post('/sessions/:id/send-to-planner', handlers.sendToPlanner);
     router.get('/sessions/:id/confidence', handlers.getConfidence);
     router.get('/events', handlers.subscribeToEvents);
@@ -404,19 +409,21 @@ describe('Planner Handoff Integration', () => {
         .send({ initial_intent: 'Build a REST API' });
 
       // Add understanding
-      await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+      const arch = await request(app)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Architect`)
         .send({
-          specialist_name: 'Architect',
           observations: { patterns: ['REST', 'microservices'], confidence: 'confident' },
         });
 
-      await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+      expect(arch.status).toBe(200);
+
+      const sec = await request(app)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding/Security`)
         .send({
-          specialist_name: 'Security',
           observations: { concerns: ['authentication'], confidence: 'exploring' },
         });
+
+      expect(sec.status).toBe(200);
 
       // Send to planner
       const res = await request(app)
@@ -492,26 +499,36 @@ describe('Planner Handoff Integration', () => {
       expect(updated.body.planner_sends[0].result.plan_version).toBe(1);
     });
 
-    it('allows multiple sends to planner from same session', async () => {
+    it('creates new version on subsequent sends to same plan', async () => {
       const session = await request(app)
         .post('/api/ideation/sessions')
         .send({ initial_intent: 'Test' });
 
-      // First send
-      await request(app)
+      // First send - creates plan
+      const firstRes = await request(app)
         .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
         .send({});
 
-      // Update planner mock for second call
-      createPlanSpy.mockResolvedValueOnce({
-        plan_id: 'plan-second-456',
-        version: 1,
-      });
+      expect(firstRes.status).toBe(200);
+      expect(firstRes.body.plan_id).toBe('plan-from-planner-123');
+      expect(firstRes.body.plan_version).toBe(1);
+      expect(createPlanSpy).toHaveBeenCalledTimes(1);
 
-      // Second send with refined goal
-      await request(app)
+      // Second send - should create version 2 on same plan
+      const secondRes = await request(app)
         .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
         .send({ goal: 'Refined after first plan' });
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.plan_id).toBe('plan-from-planner-123'); // Same plan
+      expect(secondRes.body.plan_version).toBe(2); // New version
+      expect(createVersionSpy).toHaveBeenCalledTimes(1);
+      expect(updatePlanSpy).toHaveBeenCalledTimes(1);
+
+      // Verify createVersion was called with correct params
+      const versionCallArgs = createVersionSpy.mock.calls[0][0];
+      expect(versionCallArgs.plan_id).toBe('plan-from-planner-123');
+      expect(versionCallArgs.goal).toBe('Refined after first plan');
 
       // Check both sends recorded
       const updated = await request(app)
@@ -519,7 +536,9 @@ describe('Planner Handoff Integration', () => {
 
       expect(updated.body.planner_sends).toHaveLength(2);
       expect(updated.body.planner_sends[0].result.plan_id).toBe('plan-from-planner-123');
-      expect(updated.body.planner_sends[1].result.plan_id).toBe('plan-second-456');
+      expect(updated.body.planner_sends[0].result.plan_version).toBe(1);
+      expect(updated.body.planner_sends[1].result.plan_id).toBe('plan-from-planner-123');
+      expect(updated.body.planner_sends[1].result.plan_version).toBe(2);
     });
 
     it('handles planner client errors gracefully', async () => {

@@ -58,10 +58,9 @@ export type AddMessageRequest = z.infer<typeof AddMessageRequestSchema>;
 
 /**
  * Request to update specialist observations.
+ * Note: specialist name comes from URL param, not body.
  */
 export const UpdateUnderstandingRequestSchema = z.object({
-  /** The specialist name (e.g., 'Architect', 'Designer') */
-  specialist_name: z.string().min(1, 'Specialist name is required'),
   /** Freeform observations object */
   observations: z.record(z.string(), z.unknown()),
 });

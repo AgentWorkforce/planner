@@ -20,6 +20,14 @@ import { INTERVIEWER_TOOLS, type ToolResult } from './tools.js';
 import { executeTool, getMockToolResult, type ToolExecutorDeps } from './tool-executor.js';
 import { conversationHistory } from './history.js';
 import { specialistQueue, formatPendingInsights } from './specialist-queue.js';
+import {
+  onMessage as relayOnMessage,
+  sendChannelMessage,
+  isConnected as relayIsConnected,
+  onStateChange as relayOnStateChange,
+  getRelayMode,
+  type ClientState,
+} from '../relay/index.js';
 
 // =============================================================================
 // Types
@@ -27,7 +35,6 @@ import { specialistQueue, formatPendingInsights } from './specialist-queue.js';
 
 export interface InterviewerDeps {
   storage: IdeationStorage;
-  sendMessage?: (channelId: string, content: string) => Promise<void>;
   spawnAgent?: (sessionId: string, name: string, focus: string, context?: string) => Promise<string>;
   plannerClient?: import('../api/handlers.js').PlannerClient;
 }
@@ -36,6 +43,7 @@ export interface InterviewerState {
   isActive: boolean;
   anthropic: Anthropic | null;
   mockMode: boolean;
+  relayConnected: boolean;
 }
 
 // =============================================================================
@@ -47,8 +55,11 @@ class InterviewerService {
     isActive: false,
     anthropic: null,
     mockMode: true,
+    relayConnected: false,
   };
   private deps: InterviewerDeps | null = null;
+  private unsubscribeMessage: (() => void) | null = null;
+  private unsubscribeStateChange: (() => void) | null = null;
 
   /**
    * Initialize the Interviewer service.
@@ -66,15 +77,48 @@ class InterviewerService {
       this.state.mockMode = true;
     }
 
+    // Register relay message handler
+    this.unsubscribeMessage = relayOnMessage(this.handleRelayMessage.bind(this));
+
+    // Subscribe to relay state changes
+    this.unsubscribeStateChange = relayOnStateChange((state: ClientState) => {
+      const wasConnected = this.state.relayConnected;
+      this.state.relayConnected = state === 'READY';
+
+      if (!wasConnected && this.state.relayConnected) {
+        console.log('[Interviewer] Relay connected');
+        this.announceStartup();
+      }
+    });
+
+    // Check initial relay state
+    this.state.relayConnected = relayIsConnected();
+
     this.state.isActive = true;
-    console.log(`[Interviewer] Initialized (mock=${this.state.mockMode})`);
+    console.log(`[Interviewer] Initialized (mock=${this.state.mockMode}, relay=${getRelayMode()})`);
+
+    // Announce if relay is already connected
+    if (this.state.relayConnected) {
+      this.announceStartup();
+    }
   }
 
   /**
    * Stop the Interviewer service.
    */
   stop(): void {
+    // Unsubscribe from relay events
+    if (this.unsubscribeMessage) {
+      this.unsubscribeMessage();
+      this.unsubscribeMessage = null;
+    }
+    if (this.unsubscribeStateChange) {
+      this.unsubscribeStateChange();
+      this.unsubscribeStateChange = null;
+    }
+
     this.state.isActive = false;
+    this.state.relayConnected = false;
     conversationHistory.clearAll();
     specialistQueue.clearAll();
     console.log('[Interviewer] Stopped');
@@ -105,6 +149,58 @@ class InterviewerService {
     if (fromAgent === INTERVIEWER_CONFIG.agentId) return false;
 
     return true;
+  }
+
+  /**
+   * Handle incoming relay messages.
+   * Routes messages from relay channels to handleMessage.
+   */
+  private async handleRelayMessage(
+    from: string,
+    body: string,
+    threadId?: string,
+    data?: Record<string, unknown>
+  ): Promise<void> {
+    // Extract channel from data
+    const channelId = (data?.channel as string) || threadId;
+
+    if (!channelId || !this.shouldHandleMessage(channelId, from)) {
+      return;
+    }
+
+    console.log(`[Interviewer] Received message from ${from} in ${channelId}`);
+
+    try {
+      const response = await this.handleMessage(channelId, body, from);
+
+      if (response && this.state.relayConnected) {
+        // Send response via relay
+        const sent = sendChannelMessage(channelId, response);
+        if (!sent) {
+          console.warn(`[Interviewer] Failed to send response to ${channelId}`);
+        }
+      }
+    } catch (error) {
+      console.error('[Interviewer] Error handling relay message:', error);
+    }
+  }
+
+  /**
+   * Send startup announcement to #ideation channel.
+   */
+  private announceStartup(): void {
+    if (!this.state.relayConnected) {
+      return;
+    }
+
+    const announcement = this.state.mockMode
+      ? 'Interviewer online (mock mode). Set ANTHROPIC_API_KEY for AI-powered brainstorming.'
+      : 'Interviewer online. Ready to facilitate your brainstorming sessions!';
+
+    const sent = sendChannelMessage(IDEATION_CHANNEL, announcement);
+    if (sent) {
+      console.log('[Interviewer] Startup announcement sent');
+    }
   }
 
   /**
@@ -327,13 +423,20 @@ class InterviewerService {
    * Send a welcome message when a new session starts.
    */
   async notifyNewSession(sessionId: string, initialIntent: string): Promise<void> {
-    if (!this.deps?.sendMessage) return;
+    if (!this.state.relayConnected) {
+      console.log('[Interviewer] Cannot send welcome: relay not connected');
+      return;
+    }
 
     const channelId = sessionChannelId(sessionId);
     const welcome = getWelcomeMessage(initialIntent);
 
-    await this.deps.sendMessage(channelId, welcome);
-    conversationHistory.addMessage(channelId, 'assistant', welcome);
+    const sent = sendChannelMessage(channelId, welcome);
+    if (sent) {
+      conversationHistory.addMessage(channelId, 'assistant', welcome);
+    } else {
+      console.warn(`[Interviewer] Failed to send welcome message to ${channelId}`);
+    }
   }
 }
 

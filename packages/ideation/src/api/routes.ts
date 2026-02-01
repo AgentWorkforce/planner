@@ -53,10 +53,10 @@ export function createIdeationRouter(storage: IdeationStorage): Router {
   // ===========================================================================
 
   /**
-   * PUT /sessions/:id/understanding - Update specialist observations
-   * Body: { specialist_name: string, observations: Record<string, unknown> }
+   * PUT /sessions/:id/understanding/:specialist - Update specialist observations
+   * Body: { observations: Record<string, unknown> }
    */
-  router.put('/sessions/:id/understanding', handlers.updateUnderstanding);
+  router.put('/sessions/:id/understanding/:specialist', handlers.updateUnderstanding);
 
   // ===========================================================================
   // Planner Routes
