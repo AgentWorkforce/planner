@@ -1,45 +1,64 @@
 /**
- * Ideation Domain Model
+ * Ideation Domain - Index
  *
- * Exports all domain types and schemas for the Ideation package.
+ * Exports all schemas and inferred types for the ideation package.
  */
 
+// Types and enums
 export {
-  // Agent Observations
-  ConfidenceLevelSchema,
-  type ConfidenceLevel,
-  AgentObservationsSchema,
-  type AgentObservations,
+  SessionStatus,
+  SessionStatusSchema,
+  TranscriptRole,
+  TranscriptRoleSchema,
+} from './types.js';
+
+// Understanding (freeform)
+export {
   UnderstandingSchema,
   type Understanding,
+  createEmptyUnderstanding,
+} from './understanding.js';
 
-  // Transcript
+// Transcript
+export {
   TranscriptMessageSchema,
   type TranscriptMessage,
+  createTranscriptMessage,
+} from './transcript.js';
 
-  // Session
-  SessionStatusSchema,
-  type SessionStatus,
+// PlannerSend
+export {
+  PlannerSendSourceSchema,
+  PlannerSendPayloadSchema,
+  PlannerSendResultSchema,
+  PlannerSendSchema,
+  type PlannerSendSource,
+  type PlannerSendPayload,
+  type PlannerSendResult,
+  type PlannerSend,
+  createPlannerSend,
+} from './planner-send.js';
+
+// ActiveSpecialist
+export {
+  ActiveSpecialistSchema,
+  type ActiveSpecialist,
+  createActiveSpecialist,
+} from './active-specialist.js';
+
+// Session
+export {
   SessionSourceSchema,
-  type SessionSource,
   SessionSchema,
+  type SessionSource,
   type Session,
+  createSession,
+} from './session.js';
 
-  // Nugget
-  InitialSpecificationSchema,
-  type InitialSpecification,
-  NuggetSchema,
-  type Nugget,
-
-  // API Request/Response
-  CreateSessionRequestSchema,
-  type CreateSessionRequest,
-  AddMessageRequestSchema,
-  type AddMessageRequest,
-  UpdateObservationsRequestSchema,
-  type UpdateObservationsRequest,
-  CrystallizeRequestSchema,
-  type CrystallizeRequest,
-  ListSessionsQuerySchema,
-  type ListSessionsQuery,
-} from './schemas.js';
+// Confidence
+export {
+  computeAggregateConfidence,
+  getConfidenceLevel,
+  type ConfidenceBreakdown,
+  type AggregateConfidenceResult,
+} from './confidence.js';
