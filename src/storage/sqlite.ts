@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { Plan, PlanVersion } from '../domain/plan.js';
+import type { Plan, PlanVersion, PlanSource, Understanding } from '../domain/plan.js';
 import type { Step } from '../domain/step.js';
 import type { Summary } from '../domain/summary.js';
 import type { PlanStatus } from '../domain/status.js';
@@ -57,6 +57,7 @@ interface PlanRow {
   org_id: string;
   initiative_id: string | null;
   owner_user_id: string | null;
+  source_json: string;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +67,7 @@ interface VersionRow {
   version: number;
   status: string;
   summary_json: string;
+  understanding_json: string;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -180,11 +182,13 @@ interface PlanWithAttentionRow {
   org_id: string;
   initiative_id: string | null;
   owner_user_id: string | null;
+  source_json: string;
   plan_created_at: string;
   plan_updated_at: string;
   version: number;
   status: string;
   summary_json: string;
+  understanding_json: string;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -398,14 +402,15 @@ export class SqliteStorage implements PlanStorage {
 
   createPlan(plan: Plan): Plan {
     const stmt = this.db.prepare(`
-      INSERT INTO plans (plan_id, org_id, initiative_id, owner_user_id, created_at, updated_at)
-      VALUES (@plan_id, @org_id, @initiative_id, @owner_user_id, @created_at, @updated_at)
+      INSERT INTO plans (plan_id, org_id, initiative_id, owner_user_id, source_json, created_at, updated_at)
+      VALUES (@plan_id, @org_id, @initiative_id, @owner_user_id, @source_json, @created_at, @updated_at)
     `);
     stmt.run({
       plan_id: plan.plan_id,
       org_id: plan.org_id,
       initiative_id: plan.initiative_id ?? null,
       owner_user_id: plan.owner_user_id ?? null,
+      source_json: JSON.stringify(plan.source ?? { type: 'manual' }),
       created_at: plan.created_at,
       updated_at: plan.updated_at,
     });
@@ -414,7 +419,7 @@ export class SqliteStorage implements PlanStorage {
 
   getPlan(planId: string): Plan | null {
     const stmt = this.db.prepare<string, PlanRow>(`
-      SELECT plan_id, org_id, initiative_id, owner_user_id, created_at, updated_at
+      SELECT plan_id, org_id, initiative_id, owner_user_id, source_json, created_at, updated_at
       FROM plans
       WHERE plan_id = ?
     `);
@@ -481,7 +486,7 @@ export class SqliteStorage implements PlanStorage {
     if (filter?.status) {
       // Need to join with versions to filter by status
       sql = `
-        SELECT DISTINCT p.plan_id, p.org_id, p.initiative_id, p.owner_user_id, p.created_at, p.updated_at
+        SELECT DISTINCT p.plan_id, p.org_id, p.initiative_id, p.owner_user_id, p.source_json, p.created_at, p.updated_at
         FROM plans p
         INNER JOIN versions v ON p.plan_id = v.plan_id
         ${whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''}
@@ -489,7 +494,7 @@ export class SqliteStorage implements PlanStorage {
       `;
     } else {
       sql = `
-        SELECT plan_id, org_id, initiative_id, owner_user_id, created_at, updated_at
+        SELECT plan_id, org_id, initiative_id, owner_user_id, source_json, created_at, updated_at
         FROM plans p
         ${whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''}
         ORDER BY updated_at DESC
@@ -529,11 +534,13 @@ export class SqliteStorage implements PlanStorage {
         p.org_id,
         p.initiative_id,
         p.owner_user_id,
+        p.source_json,
         p.created_at as plan_created_at,
         p.updated_at as plan_updated_at,
         v.version,
         v.status,
         v.summary_json,
+        v.understanding_json,
         v.submitted_at,
         v.approval_info_json,
         v.change_request_id,
@@ -576,6 +583,7 @@ export class SqliteStorage implements PlanStorage {
           org_id: row.org_id,
           initiative_id: row.initiative_id ?? undefined,
           owner_user_id: row.owner_user_id ?? undefined,
+          source: JSON.parse(row.source_json) as PlanSource,
           created_at: row.plan_created_at,
           updated_at: row.plan_updated_at,
         },
@@ -585,6 +593,7 @@ export class SqliteStorage implements PlanStorage {
             version: row.version,
             status: row.status,
             summary_json: row.summary_json,
+            understanding_json: row.understanding_json,
             submitted_at: row.submitted_at,
             approval_info_json: row.approval_info_json,
             change_request_id: row.change_request_id,
@@ -608,14 +617,15 @@ export class SqliteStorage implements PlanStorage {
     const transaction = this.db.transaction(() => {
       // Insert version
       const versionStmt = this.db.prepare(`
-        INSERT INTO versions (plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at)
-        VALUES (@plan_id, @version, @status, @summary_json, @submitted_at, @approval_info_json, @change_request_id, @metadata_json, @created_at, @updated_at)
+        INSERT INTO versions (plan_id, version, status, summary_json, understanding_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at)
+        VALUES (@plan_id, @version, @status, @summary_json, @understanding_json, @submitted_at, @approval_info_json, @change_request_id, @metadata_json, @created_at, @updated_at)
       `);
       versionStmt.run({
         plan_id: version.plan_id,
         version: version.version,
         status: version.status,
         summary_json: JSON.stringify(version.summary),
+        understanding_json: JSON.stringify(version.understanding ?? {}),
         submitted_at: version.submitted_at ?? null,
         approval_info_json: version.approval_info
           ? JSON.stringify(version.approval_info)
@@ -654,7 +664,7 @@ export class SqliteStorage implements PlanStorage {
 
   getVersion(planId: string, version: number): PlanVersion | null {
     const versionStmt = this.db.prepare<[string, number], VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE plan_id = ? AND version = ?
     `);
@@ -667,7 +677,7 @@ export class SqliteStorage implements PlanStorage {
 
   getLatestVersion(planId: string): PlanVersion | null {
     const versionStmt = this.db.prepare<string, VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE plan_id = ?
       ORDER BY version DESC
@@ -682,7 +692,7 @@ export class SqliteStorage implements PlanStorage {
 
   listVersions(planId: string): PlanVersion[] {
     const versionStmt = this.db.prepare<string, VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE plan_id = ?
       ORDER BY version ASC
@@ -870,7 +880,7 @@ export class SqliteStorage implements PlanStorage {
 
   getVersionByChangeRequest(changeRequestId: string): PlanVersion | null {
     const versionStmt = this.db.prepare<string, VersionRow>(`
-      SELECT plan_id, version, status, summary_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+      SELECT plan_id, version, status, summary_json, understanding_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
       FROM versions
       WHERE change_request_id = ?
     `);
@@ -927,18 +937,21 @@ export class SqliteStorage implements PlanStorage {
       org_id: row.org_id,
       initiative_id: row.initiative_id ?? undefined,
       owner_user_id: row.owner_user_id ?? undefined,
+      source: JSON.parse(row.source_json) as PlanSource,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
   }
 
   private rowToVersion(row: VersionRow, steps: Step[]): PlanVersion {
+    const understanding = JSON.parse(row.understanding_json) as Understanding;
     const version: PlanVersion = {
       plan_id: row.plan_id,
       version: row.version,
       status: row.status as PlanStatus,
       summary: JSON.parse(row.summary_json) as Summary,
       steps,
+      understanding: Object.keys(understanding).length > 0 ? understanding : undefined,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };

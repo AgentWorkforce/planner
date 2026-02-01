@@ -24,10 +24,32 @@ import {
 import { ideationEvents } from './events.js';
 
 // =============================================================================
+// Planner Client Interface
+// =============================================================================
+
+export interface PlannerClient {
+  createPlan(params: {
+    goal: string;
+    context?: string;
+    source?: { type: 'ideation'; session_id: string };
+    understanding?: Record<string, Record<string, unknown>>;
+    initiative_id?: string;
+  }): Promise<{ plan_id: string; version: number }>;
+}
+
+export interface HandlerConfig {
+  storage: IdeationStorage;
+  plannerClient?: PlannerClient;
+}
+
+// =============================================================================
 // Handler Factory
 // =============================================================================
 
-export function createHandlers(storage: IdeationStorage) {
+export function createHandlers(config: IdeationStorage | HandlerConfig) {
+  // Support both old (storage only) and new (config object) signatures
+  const storage: IdeationStorage = 'storage' in config ? config.storage : config;
+  const plannerClient: PlannerClient | undefined = 'storage' in config ? config.plannerClient : undefined;
   // ===========================================================================
   // Session CRUD (#112)
   // ===========================================================================
@@ -156,7 +178,7 @@ export function createHandlers(storage: IdeationStorage) {
   }
 
   // ===========================================================================
-  // Send to Planner (#114) - Placeholder until planner-handoff
+  // Send to Planner (#114)
   // ===========================================================================
 
   async function sendToPlanner(req: Request, res: Response): Promise<void> {
@@ -183,12 +205,28 @@ export function createHandlers(storage: IdeationStorage) {
         initiative_id: parsed.data.initiative_id ?? existingSession.initiative_id,
       };
 
-      // TODO: Actually call planner API (implemented in ideation-planner-handoff)
-      // For now, return a mock result
-      const result = {
-        plan_id: `plan-${Date.now()}`,
-        plan_version: 1,
-      };
+      // Call planner API if client available, otherwise mock
+      let result: { plan_id: string; plan_version: number };
+
+      if (plannerClient) {
+        const plannerResult = await plannerClient.createPlan({
+          goal: payload.goal,
+          context: payload.context,
+          source: payload.source,
+          understanding: payload.understanding,
+          initiative_id: payload.initiative_id,
+        });
+        result = {
+          plan_id: plannerResult.plan_id,
+          plan_version: plannerResult.version,
+        };
+      } else {
+        // Mock result when no planner client configured
+        result = {
+          plan_id: `plan-${Date.now()}`,
+          plan_version: 1,
+        };
+      }
 
       const send = createPlannerSend(payload, result);
       const session = await storage.appendPlannerSend(existingSession.id, send);

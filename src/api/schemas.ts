@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { StepSchema } from '../domain/step.js';
 import { PlanStatusSchema } from '../domain/status.js';
+import { PlanSourceSchema, UnderstandingSchema } from '../domain/plan.js';
 
 /**
  * Request schema for creating a new plan.
@@ -12,6 +13,10 @@ export const CreatePlanRequestSchema = z.object({
   ai_assist: z.boolean().optional().default(false),
   /** Associate plan with an initiative */
   initiative_id: z.string().uuid().optional(),
+  /** Plan source (manual, ideation, or intake) */
+  source: PlanSourceSchema.optional(),
+  /** Understanding from ideation session */
+  understanding: UnderstandingSchema.optional(),
 });
 
 export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;

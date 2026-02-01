@@ -5,6 +5,7 @@
  */
 
 import type { IdeationStorage } from '../storage/index.js';
+import type { PlannerClient } from '../api/handlers.js';
 import { createTranscriptMessage, createPlannerSend, createActiveSpecialist } from '../domain/index.js';
 import type {
   ToolResult,
@@ -23,6 +24,7 @@ import type {
 export interface ToolExecutorDeps {
   storage: IdeationStorage;
   spawnAgent?: (sessionId: string, name: string, focus: string, context?: string) => Promise<string>;
+  plannerClient?: PlannerClient;
 }
 
 export async function executeTool(
@@ -30,7 +32,7 @@ export async function executeTool(
   input: unknown,
   deps: ToolExecutorDeps
 ): Promise<ToolResult> {
-  const { storage, spawnAgent } = deps;
+  const { storage, spawnAgent, plannerClient } = deps;
 
   try {
     switch (name) {
@@ -81,11 +83,28 @@ export async function executeTool(
           initiative_id: session.initiative_id,
         };
 
-        // TODO: Actually call planner API (implemented in ideation-planner-handoff)
-        const result = {
-          plan_id: `plan-${Date.now()}`,
-          plan_version: 1,
-        };
+        // Call planner API if client available, otherwise mock
+        let result: { plan_id: string; plan_version: number };
+
+        if (plannerClient) {
+          const plannerResult = await plannerClient.createPlan({
+            goal: payload.goal,
+            context: payload.context,
+            source: payload.source,
+            understanding: payload.understanding,
+            initiative_id: payload.initiative_id,
+          });
+          result = {
+            plan_id: plannerResult.plan_id,
+            plan_version: plannerResult.version,
+          };
+        } else {
+          // Mock result when no planner client configured
+          result = {
+            plan_id: `plan-${Date.now()}`,
+            plan_version: 1,
+          };
+        }
 
         const send = createPlannerSend(payload, result);
         await storage.appendPlannerSend(session_id, send);

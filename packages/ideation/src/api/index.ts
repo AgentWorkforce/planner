@@ -5,7 +5,8 @@
  */
 
 export { createIdeationRouter } from './routes.js';
-export { createHandlers } from './handlers.js';
+export { createHandlers, type PlannerClient, type HandlerConfig } from './handlers.js';
+export { createHttpPlannerClient, createMockPlannerClient, type HttpPlannerClientConfig } from './planner-client.js';
 export { ideationEvents, type SessionEvent, type SessionEventType } from './events.js';
 export {
   CreateSessionRequestSchema,

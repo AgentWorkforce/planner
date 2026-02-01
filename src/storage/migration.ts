@@ -25,6 +25,12 @@ export function runMigrations(db: Database.Database): void {
 
   // 4. Add metadata_json column to versions if missing
   migrateVersionsMetadata(db);
+
+  // 5. Add source_json column to plans if missing
+  migratePlansSource(db);
+
+  // 6. Add understanding_json column to versions if missing
+  migrateVersionsUnderstanding(db);
 }
 
 /**
@@ -106,5 +112,39 @@ function migrateVersionsMetadata(db: Database.Database): void {
 
   if (!hasMetadata) {
     db.exec(`ALTER TABLE versions ADD COLUMN metadata_json TEXT`);
+  }
+}
+
+/**
+ * Adds source_json column to plans table if missing.
+ * Tracks plan origin: manual, ideation, or intake.
+ */
+function migratePlansSource(db: Database.Database): void {
+  // Check if source_json column exists
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(plans)`)
+    .all();
+  const hasSource = columns.some((c) => c.name === 'source_json');
+
+  if (!hasSource) {
+    // Add column with default value for existing plans
+    db.exec(`ALTER TABLE plans ADD COLUMN source_json TEXT NOT NULL DEFAULT '{"type":"manual"}'`);
+  }
+}
+
+/**
+ * Adds understanding_json column to versions table if missing.
+ * Stores freeform specialist observations from ideation.
+ */
+function migrateVersionsUnderstanding(db: Database.Database): void {
+  // Check if understanding_json column exists
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(versions)`)
+    .all();
+  const hasUnderstanding = columns.some((c) => c.name === 'understanding_json');
+
+  if (!hasUnderstanding) {
+    // Add column with default value for existing versions
+    db.exec(`ALTER TABLE versions ADD COLUMN understanding_json TEXT NOT NULL DEFAULT '{}'`);
   }
 }

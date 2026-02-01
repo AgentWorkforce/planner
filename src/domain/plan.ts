@@ -5,6 +5,20 @@ import { StepSchema } from './step.js';
 import { ApprovalInfoSchema } from './workflow.js';
 
 /**
+ * PlanSource tracks where a plan originated from.
+ * - manual: Created directly via UI/API
+ * - ideation: Created from an ideation session
+ * - intake: Created from an intake signal
+ */
+export const PlanSourceSchema = z.object({
+  type: z.enum(['manual', 'ideation', 'intake']),
+  session_id: z.string().uuid().optional(),
+  signal_id: z.string().uuid().optional(),
+});
+
+export type PlanSource = z.infer<typeof PlanSourceSchema>;
+
+/**
  * Plan is a container for versions. It tracks the plan_id and timestamps.
  */
 export const PlanSchema = z.object({
@@ -12,11 +26,20 @@ export const PlanSchema = z.object({
   org_id: z.string().uuid(),
   initiative_id: z.string().uuid().optional(),
   owner_user_id: z.string().optional(),
+  source: PlanSourceSchema.optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
 
 export type Plan = z.infer<typeof PlanSchema>;
+
+/**
+ * Understanding schema - freeform specialist observations from ideation.
+ * Each key is a specialist name, value is their freeform observations.
+ */
+export const UnderstandingSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
+
+export type Understanding = z.infer<typeof UnderstandingSchema>;
 
 /**
  * PlanVersion is a snapshot of a plan at a point in time.
@@ -28,6 +51,7 @@ export const PlanVersionSchema = z.object({
   status: PlanStatusSchema,
   summary: SummarySchema,
   steps: z.array(StepSchema),
+  understanding: UnderstandingSchema.optional(),
   submitted_at: z.string().datetime().optional(),
   approval_info: ApprovalInfoSchema.optional(),
   change_request_id: z.string().uuid().optional(),
@@ -41,12 +65,17 @@ export type PlanVersion = z.infer<typeof PlanVersionSchema>;
 /**
  * Creates a new Plan with generated UUID and timestamps
  */
-export function createPlan(org_id: string, owner_user_id?: string): Plan {
+export function createPlan(
+  org_id: string,
+  owner_user_id?: string,
+  source?: PlanSource
+): Plan {
   const now = new Date().toISOString();
   const plan: Plan = {
     plan_id: crypto.randomUUID(),
     org_id,
     owner_user_id,
+    source: source ?? { type: 'manual' },
     created_at: now,
     updated_at: now,
   };
@@ -59,7 +88,8 @@ export function createPlan(org_id: string, owner_user_id?: string): Plan {
 export function createPlanVersion(
   plan_id: string,
   goal: string,
-  context?: string
+  context?: string,
+  understanding?: Understanding
 ): PlanVersion {
   const now = new Date().toISOString();
   const summary: Summary = { goal };
@@ -73,6 +103,7 @@ export function createPlanVersion(
     status: PlanStatus.Draft,
     summary,
     steps: [],
+    understanding,
     created_at: now,
     updated_at: now,
   };

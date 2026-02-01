@@ -4,10 +4,11 @@
  * Integration tests for API endpoints.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { createIdeationRouter } from './routes.js';
+import { createHandlers, type PlannerClient } from './handlers.js';
 import { SQLiteIdeationStorage } from '../storage/sqlite.js';
 
 describe('Ideation API', () => {
@@ -337,6 +338,219 @@ describe('Ideation API', () => {
         .get(`/api/ideation/sessions/${session.body.id}`);
 
       expect(updated.body.planner_sends[0].payload.goal).toBe('Refined goal');
+    });
+  });
+});
+
+// =============================================================================
+// Planner Handoff Integration Tests
+// =============================================================================
+
+describe('Planner Handoff Integration', () => {
+  let app: express.Express;
+  let storage: SQLiteIdeationStorage;
+  let mockPlannerClient: PlannerClient;
+  let createPlanSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    storage = new SQLiteIdeationStorage(':memory:');
+    await storage.initialize();
+
+    // Create mock planner client
+    createPlanSpy = vi.fn().mockResolvedValue({
+      plan_id: 'plan-from-planner-123',
+      version: 1,
+    });
+
+    mockPlannerClient = {
+      createPlan: createPlanSpy,
+    };
+
+    app = express();
+    app.use(express.json());
+
+    // Create router with planner client
+    const handlers = createHandlers({
+      storage,
+      plannerClient: mockPlannerClient,
+    });
+
+    // Register routes manually with handlers
+    const router = express.Router();
+    router.post('/sessions', handlers.createSession);
+    router.get('/sessions', handlers.listSessions);
+    router.get('/sessions/:id', handlers.getSession);
+    router.post('/sessions/:id/abandon', handlers.abandonSession);
+    router.post('/sessions/:id/messages', handlers.addMessage);
+    router.put('/sessions/:id/understanding', handlers.updateUnderstanding);
+    router.post('/sessions/:id/send-to-planner', handlers.sendToPlanner);
+    router.get('/sessions/:id/confidence', handlers.getConfidence);
+    router.get('/events', handlers.subscribeToEvents);
+    router.get('/sessions/:id/events', handlers.subscribeToEvents);
+
+    app.use('/api/ideation', router);
+  });
+
+  afterEach(async () => {
+    await storage.close();
+    vi.clearAllMocks();
+  });
+
+  describe('Planner Client Integration', () => {
+    it('calls planner client with source and understanding', async () => {
+      // Create session
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Build a REST API' });
+
+      // Add understanding
+      await request(app)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .send({
+          specialist_name: 'Architect',
+          observations: { patterns: ['REST', 'microservices'], confidence: 'confident' },
+        });
+
+      await request(app)
+        .put(`/api/ideation/sessions/${session.body.id}/understanding`)
+        .send({
+          specialist_name: 'Security',
+          observations: { concerns: ['authentication'], confidence: 'exploring' },
+        });
+
+      // Send to planner
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({ context: 'Additional context here' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.plan_id).toBe('plan-from-planner-123');
+      expect(res.body.plan_version).toBe(1);
+
+      // Verify planner client was called correctly
+      expect(createPlanSpy).toHaveBeenCalledTimes(1);
+      const callArgs = createPlanSpy.mock.calls[0][0];
+
+      expect(callArgs.goal).toBe('Build a REST API');
+      expect(callArgs.context).toBe('Additional context here');
+      expect(callArgs.source).toEqual({
+        type: 'ideation',
+        session_id: session.body.id,
+      });
+      expect(callArgs.understanding).toEqual({
+        Architect: { patterns: ['REST', 'microservices'], confidence: 'confident' },
+        Security: { concerns: ['authentication'], confidence: 'exploring' },
+      });
+    });
+
+    it('passes initiative_id to planner', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({
+          initial_intent: 'Test',
+          initiative_id: 'init-abc-123',
+        });
+
+      await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({});
+
+      expect(createPlanSpy).toHaveBeenCalledTimes(1);
+      const callArgs = createPlanSpy.mock.calls[0][0];
+      expect(callArgs.initiative_id).toBe('init-abc-123');
+    });
+
+    it('uses goal override when provided', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Original goal' });
+
+      await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({ goal: 'Refined goal after discussion' });
+
+      expect(createPlanSpy).toHaveBeenCalledTimes(1);
+      const callArgs = createPlanSpy.mock.calls[0][0];
+      expect(callArgs.goal).toBe('Refined goal after discussion');
+    });
+
+    it('records plan_id from planner response', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({});
+
+      // Get updated session
+      const updated = await request(app)
+        .get(`/api/ideation/sessions/${session.body.id}`);
+
+      expect(updated.body.planner_sends).toHaveLength(1);
+      expect(updated.body.planner_sends[0].result.plan_id).toBe('plan-from-planner-123');
+      expect(updated.body.planner_sends[0].result.plan_version).toBe(1);
+    });
+
+    it('allows multiple sends to planner from same session', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      // First send
+      await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({});
+
+      // Update planner mock for second call
+      createPlanSpy.mockResolvedValueOnce({
+        plan_id: 'plan-second-456',
+        version: 1,
+      });
+
+      // Second send with refined goal
+      await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({ goal: 'Refined after first plan' });
+
+      // Check both sends recorded
+      const updated = await request(app)
+        .get(`/api/ideation/sessions/${session.body.id}`);
+
+      expect(updated.body.planner_sends).toHaveLength(2);
+      expect(updated.body.planner_sends[0].result.plan_id).toBe('plan-from-planner-123');
+      expect(updated.body.planner_sends[1].result.plan_id).toBe('plan-second-456');
+    });
+
+    it('handles planner client errors gracefully', async () => {
+      createPlanSpy.mockRejectedValueOnce(new Error('Planner API error'));
+
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({});
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe('Failed to send to planner');
+    });
+
+    it('session status remains active after sending to planner', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
+        .send({});
+
+      const updated = await request(app)
+        .get(`/api/ideation/sessions/${session.body.id}`);
+
+      // Session should remain active for continued ideation
+      expect(updated.body.status).toBe('active');
     });
   });
 });

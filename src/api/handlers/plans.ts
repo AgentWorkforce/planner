@@ -95,15 +95,15 @@ export function createPlanHandlers(storage: PlanStorage) {
         // Get default org for MVP single-org mode
         const orgId = getDefaultOrgId(storage);
 
-        // Create plan with org and optional initiative association
-        const plan = createPlan(orgId);
+        // Create plan with org, optional initiative, and optional source
+        const plan = createPlan(orgId, undefined, body.source);
         if (body.initiative_id) {
           plan.initiative_id = body.initiative_id;
         }
         storage.createPlan(plan);
 
-        // Create initial draft version
-        const version = createPlanVersion(plan.plan_id, body.goal, body.context);
+        // Create initial draft version with optional understanding
+        const version = createPlanVersion(plan.plan_id, body.goal, body.context, body.understanding);
         storage.createVersion(version);
 
         // Create plan channel for relay communication

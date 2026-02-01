@@ -29,6 +29,7 @@ export interface InterviewerDeps {
   storage: IdeationStorage;
   sendMessage?: (channelId: string, content: string) => Promise<void>;
   spawnAgent?: (sessionId: string, name: string, focus: string, context?: string) => Promise<string>;
+  plannerClient?: import('../api/handlers.js').PlannerClient;
 }
 
 export interface InterviewerState {
@@ -316,6 +317,7 @@ class InterviewerService {
     const toolDeps: ToolExecutorDeps = {
       storage: this.deps.storage,
       spawnAgent: this.deps.spawnAgent,
+      plannerClient: this.deps.plannerClient,
     };
 
     return executeTool(name, input, toolDeps);
