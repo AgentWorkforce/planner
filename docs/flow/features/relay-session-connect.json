@@ -4,20 +4,43 @@
   "type": "feature",
   "status": "approved",
   "priority": "high",
-  "dependencies": ["relay-session-management", "relay-ai-chat"],
+  "dependencies": [
+    "relay-session-management",
+    "relay-ai-chat"
+  ],
   "audit_note": "All 8 implementation tasks completed - spawner updated (rsc001), POST /plans/:id/session endpoint (rsc002), API client (rsc003), useAIConnectionStatus hook (rsc004), AIConnectionBadge (rsc005), tests (rsc007-008). Note: rsc006 (ChatPanel integration) superseded by MessagingSidebar architecture - badge integrated into PlanEditorPage header instead.",
-
   "summary": {
     "goal": "Allow users to spawn/connect an AI planning agent for any existing plan, not just at plan creation time",
     "context": "Currently, AI agents are only spawned when creating a new plan with ai_assist=true. If a user opens an existing plan (session expired or never had one), they're stuck in 'Demo Mode' with mock responses. Users need a way to start a real AI session on any plan they're editing.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "POST /plans/:id/session endpoint spawns a planning agent for an existing plan" },
-      { "id": "ac2", "description": "UI shows 'Connect AI' button when viewing a draft plan without an active session" },
-      { "id": "ac3", "description": "Clicking 'Connect AI' spawns agent and transitions from Demo Mode to Connected" },
-      { "id": "ac4", "description": "If plan already has active session, endpoint returns existing session info (409)" },
-      { "id": "ac5", "description": "Spawned agent has full plan context (goal, step count, instructed to read current state)" },
-      { "id": "ac6", "description": "Connection status indicator updates in real-time after connecting" },
-      { "id": "ac7", "description": "Only draft plans can have AI sessions (approved/published plans stay in demo mode)" }
+      {
+        "id": "ac1",
+        "description": "POST /plans/:id/session endpoint spawns a planning agent for an existing plan"
+      },
+      {
+        "id": "ac2",
+        "description": "UI shows 'Connect AI' button when viewing a draft plan without an active session"
+      },
+      {
+        "id": "ac3",
+        "description": "Clicking 'Connect AI' spawns agent and transitions from Demo Mode to Connected"
+      },
+      {
+        "id": "ac4",
+        "description": "If plan already has active session, endpoint returns existing session info (409)"
+      },
+      {
+        "id": "ac5",
+        "description": "Spawned agent has full plan context (goal, step count, instructed to read current state)"
+      },
+      {
+        "id": "ac6",
+        "description": "Connection status indicator updates in real-time after connecting"
+      },
+      {
+        "id": "ac7",
+        "description": "Only draft plans can have AI sessions (approved/published plans stay in demo mode)"
+      }
     ],
     "out_of_scope": [
       "Auto-spawn on first chat message (could be added later)",
@@ -25,9 +48,11 @@
       "Session transfer between users"
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-core", "planner-ui"],
+    "scopes": [
+      "planner-core",
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "rsc001",
@@ -37,28 +62,698 @@
         "dependencies": [],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "SpawnContext accepts optional existingStepCount?: number field" },
-          { "id": "ac2", "description": "Initial task prompt includes 'This plan already has N steps' when existingStepCount > 0" },
-          { "id": "ac3", "description": "Agent instructed to first read_plan to understand current state" },
-          { "id": "ac4", "description": "Agent instructed to continue from current state, not start fresh" }
-        ]
+          {
+            "id": "ac1",
+            "description": "SpawnContext accepts optional existingStepCount?: number field"
+          },
+          {
+            "id": "ac2",
+            "description": "Initial task prompt includes 'This plan already has N steps' when existingStepCount > 0"
+          },
+          {
+            "id": "ac3",
+            "description": "Agent instructed to first read_plan to understand current state"
+          },
+          {
+            "id": "ac4",
+            "description": "Agent instructed to continue from current state, not start fresh"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "mock_patterns": [
+              {
+                "description": "Mock relay availability for 503 testing",
+                "code": "vi.mock('../relay/service.js', () => ({ isRelayAvailable: vi.fn().mockReturnValue(false) }))"
+              },
+              {
+                "description": "Mock spawner for success/failure testing",
+                "code": "vi.mock('../relay/spawner.js', () => ({ spawnPlanningAgent: vi.fn().mockResolvedValue({ agentId: 'agent-123', sessionToken: 'token-abc' }) }))"
+              },
+              {
+                "description": "Mock createSession API for hook tests",
+                "code": "vi.mock('@/api/chat', () => ({ createSession: vi.fn().mockResolvedValue({ session_id: 's-1', status: 'active', agent_id: 'a-1', started_at: '2026-01-29T00:00:00Z' }) }))"
+              },
+              {
+                "description": "Mock useAIConnectionStatus for component tests",
+                "code": "vi.mock('@/hooks/useAIConnectionStatus', () => ({ useAIConnectionStatus: vi.fn().mockReturnValue({ status: 'demo', isConnected: false, connect: vi.fn(), isConnecting: false, connectError: null }) }))"
+              }
+            ],
+            "test_file_structure": [
+              {
+                "file": "src/relay/spawner.test.ts",
+                "add_cases": "Add new describe block for 'existing plan context'"
+              },
+              {
+                "file": "src/api/sessions.test.ts",
+                "create": true,
+                "description": "New file for POST /plans/:id/session endpoint tests"
+              },
+              {
+                "file": "packages/planner-ui/src/api/chat.test.ts",
+                "add_cases": "Add tests for createSession function"
+              },
+              {
+                "file": "packages/planner-ui/src/hooks/useAIConnectionStatus.test.ts",
+                "add_cases": "Add tests for connect() function"
+              },
+              {
+                "file": "packages/planner-ui/src/components/AIConnectionBadge.test.tsx",
+                "create": true,
+                "description": "New file for AIConnectionBadge component"
+              },
+              {
+                "file": "packages/planner-ui/src/components/ChatPanel.test.tsx",
+                "add_cases": "Add tests for badge integration and useMock behavior"
+              }
+            ],
+            "test_suites": [
+              {
+                "suite_id": "backend-spawner",
+                "name": "Spawner Updates for Existing Plans (rsc001)",
+                "scope": "planner-core",
+                "file": "src/relay/spawner.test.ts",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "buildInitialTask() includes existingStepCount in prompt when > 0",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Prompt says 'This plan already has N steps' when existingStepCount=5",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Prompt includes instruction to use read_plan tool first",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Prompt includes instruction to continue from current state",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "existingStepCount=0 uses standard new plan prompt (no special wording)",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "existingStepCount undefined uses standard new plan prompt",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "existingStepCount=1 uses singular 'step' not 'steps'",
+                    "step": "rsc001"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "SpawnContext type includes optional existingStepCount field",
+                    "step": "rsc001"
+                  }
+                ]
+              },
+              {
+                "suite_id": "backend-session-endpoint",
+                "name": "POST /plans/:id/session Endpoint (rsc002)",
+                "scope": "planner-core",
+                "file": "src/api/sessions.test.ts",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "Returns 200 with { session_id, status: 'active', agent_id, started_at } on success",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Creates session record in storage via storage.createSession()",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Spawns agent via spawnPlanningAgent() with correct planId and goal",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Passes existingStepCount=steps.length to spawnPlanningAgent",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Session status is 'active' in response and storage",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "started_at is a valid ISO timestamp",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "agent_id matches spawned agent identifier",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Plan with 0 steps spawns with existingStepCount=0",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Plan with 10 steps spawns with existingStepCount=10",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Goal extracted from latest version summary",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Uses latest version for step count and goal",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 404 for non-existent plan_id",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 404 body includes error message 'Plan not found'",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 409 when plan already has active session",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "409 response body includes existing session_id, agent_id, started_at",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 400 when latest version status is 'approved'",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 400 when latest version status is 'published'",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "400 response body includes error 'Only draft plans can have AI sessions'",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 503 when relay is not available (isRelayAvailable() returns false)",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "503 response body includes error 'AI service unavailable'",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 500 when spawnPlanningAgent throws",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Does not create session record if spawn fails",
+                    "step": "rsc002"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Returns 500 when storage.createSession throws",
+                    "step": "rsc002"
+                  }
+                ]
+              },
+              {
+                "suite_id": "frontend-api-client",
+                "name": "Session API Client (rsc003)",
+                "scope": "planner-ui",
+                "file": "packages/planner-ui/src/api/chat.test.ts",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "createSession(planId) calls POST /api/plans/:id/session",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Returns { session_id, status, agent_id, started_at } on 200 response",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Correctly parses session_id from response",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Correctly parses agent_id from response",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Correctly parses started_at as ISO string",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "On 409, returns { alreadyConnected: true, session: {...} }",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "409 response extracts existing session info from body",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "alreadyConnected=true indicates success (not an error)",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Throws Error with message 'Only draft plans can have AI sessions' on 400",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Throws Error with message 'AI service unavailable' on 503",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Throws Error with message 'Plan not found' on 404",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Throws generic Error for other status codes (500, etc.)",
+                    "step": "rsc003"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Network error throws with descriptive message",
+                    "step": "rsc003"
+                  }
+                ]
+              },
+              {
+                "suite_id": "frontend-hook-connect",
+                "name": "useAIConnectionStatus Hook connect() (rsc004)",
+                "scope": "planner-ui",
+                "file": "packages/planner-ui/src/hooks/useAIConnectionStatus.test.ts",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "Hook returns connect function",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Hook returns isConnecting: false initially",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Hook returns connectError: null initially",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "connect() calls createSession with planId",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "isConnecting becomes true during API call",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "isConnecting becomes false after API resolves",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "On success, calls refresh() to update status",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "After refresh(), status changes from 'demo' to 'connected'",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "connectError remains null on success",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "On alreadyConnected response, calls refresh() (treats as success)",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "alreadyConnected does not set connectError",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Multiple rapid connect() calls only trigger one API call",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "connect() while already connected is no-op",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "connect() while isConnecting=true is no-op",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "error",
+                    "description": "On createSession error, sets connectError state",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "error",
+                    "description": "connectError contains error message from thrown Error",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "error",
+                    "description": "connect() does not throw (catches errors)",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "error",
+                    "description": "isConnecting becomes false after error",
+                    "step": "rsc004"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Calling connect() again clears previous connectError",
+                    "step": "rsc004"
+                  }
+                ]
+              },
+              {
+                "suite_id": "frontend-badge-component",
+                "name": "AIConnectionBadge Component (rsc005)",
+                "scope": "planner-ui",
+                "file": "packages/planner-ui/src/components/AIConnectionBadge.test.tsx",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "Shows 'AI Connected' text when status='connected'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Connected badge has green styling (success variant)",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Shows 'Demo Mode' text when status='demo'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Demo badge has amber/warning styling",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Shows 'Connect AI' button when status='demo'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Clicking 'Connect AI' button calls connect()",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Shows spinner (Loader2) when status='loading'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Shows spinner when isConnecting=true",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Button disabled while isConnecting=true",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Hides 'Connect AI' button when planStatus='approved'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Hides 'Connect AI' button when planStatus='published'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Shows 'Demo Mode' only (no button) for non-draft plans",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Tooltip on disabled state explains 'Only draft plans support AI'",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Badge is compact when rendered in header",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Shows error message when connectError is set",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Error message styled as destructive/red",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Error can be dismissed (optional close button)",
+                    "step": "rsc005"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Error clears on next connect() attempt",
+                    "step": "rsc005"
+                  }
+                ]
+              },
+              {
+                "suite_id": "frontend-chat-integration",
+                "name": "ChatPanel Integration (rsc006)",
+                "scope": "planner-ui",
+                "file": "packages/planner-ui/src/components/ChatPanel.test.tsx",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "AIConnectionBadge rendered in ChatPanel header",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "ChatPanel receives isConnected from useAIConnectionStatus",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "ChatPanel receives planStatus prop",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "useAIChat called with useMock=true when not connected",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "useAIChat called with useMock=false when connected",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "After connect(), useMock changes from true to false",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Chat input always enabled (works in both modes)",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Send button always enabled (mock fallback works)",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "In demo mode, messages get mock responses",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "In connected mode, messages route to real agent",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Status transition (demo -> connected) during conversation preserved",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Message history preserved across connect",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Badge position consistent with chat header layout",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "error",
+                    "description": "If connection fails, chat continues in demo mode",
+                    "step": "rsc006"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Connection error shown via badge, not chat disruption",
+                    "step": "rsc006"
+                  }
+                ]
+              },
+              {
+                "suite_id": "integration-e2e",
+                "name": "End-to-End Integration",
+                "scope": "integration",
+                "file": "src/api/sessions.test.ts",
+                "cases": [
+                  {
+                    "type": "happy",
+                    "description": "Full flow: open plan -> click Connect AI -> badge updates -> chat uses real agent"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Spawned agent can read existing plan steps via read_plan tool"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Agent prompt includes correct step count from existing plan"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Session persists across page refresh (verified via GET /plans/:id/session)"
+                  },
+                  {
+                    "type": "happy",
+                    "description": "Chat messages after connect route to spawned agent"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Opening same plan in new tab sees existing session (409 -> alreadyConnected)"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Closing browser doesn't immediately terminate session"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Session timeout (from relay-session-management) eventually terminates"
+                  },
+                  {
+                    "type": "edge",
+                    "description": "Plan approval terminates session (badge returns to demo)"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Relay going down mid-session shows degraded state"
+                  },
+                  {
+                    "type": "error",
+                    "description": "Agent crash handled gracefully (session marked error)"
+                  }
+                ]
+              }
+            ]
+          }
+        }
       },
       {
         "step_id": "rsc002",
         "title": "Add POST /plans/:id/session endpoint",
         "description": "Create endpoint to spawn a planning agent for an existing plan. Reuses existing spawnPlanningAgent and session creation logic. Only allows session creation for draft plans.",
         "scope": "planner-core",
-        "dependencies": ["rsc001"],
+        "dependencies": [
+          "rsc001"
+        ],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "POST /plans/:id/session returns { session_id, status: 'active', agent_id, started_at } on success" },
-          { "id": "ac2", "description": "Route added to routes.ts: router.post('/plans/:id/session', sessionHandlers.createSession)" },
-          { "id": "ac3", "description": "Returns 404 if plan doesn't exist" },
-          { "id": "ac4", "description": "Returns 409 if plan already has active session, response body includes existing session info" },
-          { "id": "ac5", "description": "Returns 400 if latest version is approved/published (only draft plans can have AI sessions)" },
-          { "id": "ac6", "description": "Returns 503 if relay is not available" },
-          { "id": "ac7", "description": "Creates session record via storage.createSession()" },
-          { "id": "ac8", "description": "Agent spawned with spawnPlanningAgent({ planId, goal, existingStepCount: steps.length })" }
+          {
+            "id": "ac1",
+            "description": "POST /plans/:id/session returns { session_id, status: 'active', agent_id, started_at } on success"
+          },
+          {
+            "id": "ac2",
+            "description": "Route added to routes.ts: router.post('/plans/:id/session', sessionHandlers.createSession)"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns 404 if plan doesn't exist"
+          },
+          {
+            "id": "ac4",
+            "description": "Returns 409 if plan already has active session, response body includes existing session info"
+          },
+          {
+            "id": "ac5",
+            "description": "Returns 400 if latest version is approved/published (only draft plans can have AI sessions)"
+          },
+          {
+            "id": "ac6",
+            "description": "Returns 503 if relay is not available"
+          },
+          {
+            "id": "ac7",
+            "description": "Creates session record via storage.createSession()"
+          },
+          {
+            "id": "ac8",
+            "description": "Agent spawned with spawnPlanningAgent({ planId, goal, existingStepCount: steps.length })"
+          }
         ]
       },
       {
@@ -66,14 +761,31 @@
         "title": "Add session API client function",
         "description": "Create createSession(planId) function in packages/planner-ui/src/api/chat.ts that calls POST /plans/:id/session.",
         "scope": "planner-ui",
-        "dependencies": ["rsc002"],
+        "dependencies": [
+          "rsc002"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "createSession(planId) exported from @/api/chat" },
-          { "id": "ac2", "description": "Returns { session_id, status, agent_id, started_at } on success" },
-          { "id": "ac3", "description": "On 409, returns { alreadyConnected: true, session: SessionStatus } extracted from response" },
-          { "id": "ac4", "description": "Throws with message 'Only draft plans can have AI sessions' on 400" },
-          { "id": "ac5", "description": "Throws with message 'AI service unavailable' on 503" }
+          {
+            "id": "ac1",
+            "description": "createSession(planId) exported from @/api/chat"
+          },
+          {
+            "id": "ac2",
+            "description": "Returns { session_id, status, agent_id, started_at } on success"
+          },
+          {
+            "id": "ac3",
+            "description": "On 409, returns { alreadyConnected: true, session: SessionStatus } extracted from response"
+          },
+          {
+            "id": "ac4",
+            "description": "Throws with message 'Only draft plans can have AI sessions' on 400"
+          },
+          {
+            "id": "ac5",
+            "description": "Throws with message 'AI service unavailable' on 503"
+          }
         ]
       },
       {
@@ -81,15 +793,35 @@
         "title": "Add connect method to useAIConnectionStatus hook",
         "description": "Extend the hook to provide a connect() function that calls createSession and updates status.",
         "scope": "planner-ui",
-        "dependencies": ["rsc003"],
+        "dependencies": [
+          "rsc003"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Hook returns { ...existing, connect: () => Promise<void>, isConnecting: boolean, connectError: string | null }" },
-          { "id": "ac2", "description": "connect() calls createSession(planId)" },
-          { "id": "ac3", "description": "isConnecting is true while API call in progress" },
-          { "id": "ac4", "description": "On success, triggers refresh() to update status to 'connected'" },
-          { "id": "ac5", "description": "On alreadyConnected response, triggers refresh() (treats as success)" },
-          { "id": "ac6", "description": "On error, sets connectError state (doesn't throw)" }
+          {
+            "id": "ac1",
+            "description": "Hook returns { ...existing, connect: () => Promise<void>, isConnecting: boolean, connectError: string | null }"
+          },
+          {
+            "id": "ac2",
+            "description": "connect() calls createSession(planId)"
+          },
+          {
+            "id": "ac3",
+            "description": "isConnecting is true while API call in progress"
+          },
+          {
+            "id": "ac4",
+            "description": "On success, triggers refresh() to update status to 'connected'"
+          },
+          {
+            "id": "ac5",
+            "description": "On alreadyConnected response, triggers refresh() (treats as success)"
+          },
+          {
+            "id": "ac6",
+            "description": "On error, sets connectError state (doesn't throw)"
+          }
         ]
       },
       {
@@ -97,15 +829,35 @@
         "title": "Create AIConnectionBadge component",
         "description": "Create a reusable badge component that shows connection status and provides Connect AI button when disconnected.",
         "scope": "planner-ui",
-        "dependencies": ["rsc004"],
+        "dependencies": [
+          "rsc004"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Shows 'AI Connected' (green badge) when status='connected'" },
-          { "id": "ac2", "description": "Shows 'Demo Mode' text + 'Connect AI' button (amber) when status='demo'" },
-          { "id": "ac3", "description": "Shows spinner when status='loading' or isConnecting=true" },
-          { "id": "ac4", "description": "Clicking 'Connect AI' calls connect()" },
-          { "id": "ac5", "description": "Shows error message when connectError is set" },
-          { "id": "ac6", "description": "Hides 'Connect AI' button for non-draft plans (shows 'Demo Mode' only)" }
+          {
+            "id": "ac1",
+            "description": "Shows 'AI Connected' (green badge) when status='connected'"
+          },
+          {
+            "id": "ac2",
+            "description": "Shows 'Demo Mode' text + 'Connect AI' button (amber) when status='demo'"
+          },
+          {
+            "id": "ac3",
+            "description": "Shows spinner when status='loading' or isConnecting=true"
+          },
+          {
+            "id": "ac4",
+            "description": "Clicking 'Connect AI' calls connect()"
+          },
+          {
+            "id": "ac5",
+            "description": "Shows error message when connectError is set"
+          },
+          {
+            "id": "ac6",
+            "description": "Hides 'Connect AI' button for non-draft plans (shows 'Demo Mode' only)"
+          }
         ]
       },
       {
@@ -113,14 +865,31 @@
         "title": "Integrate AIConnectionBadge into ChatPanel",
         "description": "Add the connection badge to the ChatPanel header. Wire useAIChat to use real agent when connected.",
         "scope": "planner-ui",
-        "dependencies": ["rsc005"],
+        "dependencies": [
+          "rsc005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "AIConnectionBadge shown in ChatPanel header" },
-          { "id": "ac2", "description": "ChatPanel receives connection status and plan status via props or context" },
-          { "id": "ac3", "description": "useAIChat useMock option set to !isConnected (false when connected)" },
-          { "id": "ac4", "description": "Chat input enabled regardless of connection status (mock fallback works)" },
-          { "id": "ac5", "description": "After successful connect, next chat message uses real agent" }
+          {
+            "id": "ac1",
+            "description": "AIConnectionBadge shown in ChatPanel header"
+          },
+          {
+            "id": "ac2",
+            "description": "ChatPanel receives connection status and plan status via props or context"
+          },
+          {
+            "id": "ac3",
+            "description": "useAIChat useMock option set to !isConnected (false when connected)"
+          },
+          {
+            "id": "ac4",
+            "description": "Chat input enabled regardless of connection status (mock fallback works)"
+          },
+          {
+            "id": "ac5",
+            "description": "After successful connect, next chat message uses real agent"
+          }
         ]
       },
       {
@@ -128,15 +897,35 @@
         "title": "Add tests for session creation endpoint",
         "description": "Add unit and integration tests for POST /plans/:id/session endpoint.",
         "scope": "planner-core",
-        "dependencies": ["rsc002"],
+        "dependencies": [
+          "rsc002"
+        ],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Test: returns 404 for non-existent plan" },
-          { "id": "ac2", "description": "Test: returns 409 when session already exists, body includes session_id/agent_id" },
-          { "id": "ac3", "description": "Test: returns 400 for approved plan" },
-          { "id": "ac4", "description": "Test: returns 503 when relay unavailable" },
-          { "id": "ac5", "description": "Test: creates session and spawns agent on success" },
-          { "id": "ac6", "description": "Test: spawned agent receives existingStepCount in context" }
+          {
+            "id": "ac1",
+            "description": "Test: returns 404 for non-existent plan"
+          },
+          {
+            "id": "ac2",
+            "description": "Test: returns 409 when session already exists, body includes session_id/agent_id"
+          },
+          {
+            "id": "ac3",
+            "description": "Test: returns 400 for approved plan"
+          },
+          {
+            "id": "ac4",
+            "description": "Test: returns 503 when relay unavailable"
+          },
+          {
+            "id": "ac5",
+            "description": "Test: creates session and spawns agent on success"
+          },
+          {
+            "id": "ac6",
+            "description": "Test: spawned agent receives existingStepCount in context"
+          }
         ]
       },
       {
@@ -144,207 +933,100 @@
         "title": "Add tests for UI components",
         "description": "Add unit tests for AIConnectionBadge component and useAIConnectionStatus hook connect functionality.",
         "scope": "planner-ui",
-        "dependencies": ["rsc006"],
+        "dependencies": [
+          "rsc006"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Test: AIConnectionBadge renders correct state for each status" },
-          { "id": "ac2", "description": "Test: Connect button calls connect()" },
-          { "id": "ac3", "description": "Test: Error state displays error message" },
-          { "id": "ac4", "description": "Test: useAIConnectionStatus.connect() updates state correctly" },
-          { "id": "ac5", "description": "Test: ChatPanel passes useMock=!isConnected to useAIChat" }
+          {
+            "id": "ac1",
+            "description": "Test: AIConnectionBadge renders correct state for each status"
+          },
+          {
+            "id": "ac2",
+            "description": "Test: Connect button calls connect()"
+          },
+          {
+            "id": "ac3",
+            "description": "Test: Error state displays error message"
+          },
+          {
+            "id": "ac4",
+            "description": "Test: useAIConnectionStatus.connect() updates state correctly"
+          },
+          {
+            "id": "ac5",
+            "description": "Test: ChatPanel passes useMock=!isConnected to useAIChat"
+          }
         ]
       }
     ]
   },
-
   "plan_tests": {
     "coverage": "integration",
     "priority": "high",
-
-    "test_suites": [
+    "cases": [
       {
-        "suite_id": "backend-spawner",
-        "name": "Spawner Updates for Existing Plans (rsc001)",
-        "scope": "planner-core",
-        "file": "src/relay/spawner.test.ts",
-        "cases": [
-          { "type": "happy", "description": "buildInitialTask() includes existingStepCount in prompt when > 0", "step": "rsc001" },
-          { "type": "happy", "description": "Prompt says 'This plan already has N steps' when existingStepCount=5", "step": "rsc001" },
-          { "type": "happy", "description": "Prompt includes instruction to use read_plan tool first", "step": "rsc001" },
-          { "type": "happy", "description": "Prompt includes instruction to continue from current state", "step": "rsc001" },
-          { "type": "edge", "description": "existingStepCount=0 uses standard new plan prompt (no special wording)", "step": "rsc001" },
-          { "type": "edge", "description": "existingStepCount undefined uses standard new plan prompt", "step": "rsc001" },
-          { "type": "edge", "description": "existingStepCount=1 uses singular 'step' not 'steps'", "step": "rsc001" },
-          { "type": "edge", "description": "SpawnContext type includes optional existingStepCount field", "step": "rsc001" }
-        ]
+        "type": "happy",
+        "description": "POST /plans/:id/session spawns agent and returns session info"
       },
       {
-        "suite_id": "backend-session-endpoint",
-        "name": "POST /plans/:id/session Endpoint (rsc002)",
-        "scope": "planner-core",
-        "file": "src/api/sessions.test.ts",
-        "cases": [
-          { "type": "happy", "description": "Returns 200 with { session_id, status: 'active', agent_id, started_at } on success", "step": "rsc002" },
-          { "type": "happy", "description": "Creates session record in storage via storage.createSession()", "step": "rsc002" },
-          { "type": "happy", "description": "Spawns agent via spawnPlanningAgent() with correct planId and goal", "step": "rsc002" },
-          { "type": "happy", "description": "Passes existingStepCount=steps.length to spawnPlanningAgent", "step": "rsc002" },
-          { "type": "happy", "description": "Session status is 'active' in response and storage", "step": "rsc002" },
-          { "type": "happy", "description": "started_at is a valid ISO timestamp", "step": "rsc002" },
-          { "type": "happy", "description": "agent_id matches spawned agent identifier", "step": "rsc002" },
-          { "type": "edge", "description": "Plan with 0 steps spawns with existingStepCount=0", "step": "rsc002" },
-          { "type": "edge", "description": "Plan with 10 steps spawns with existingStepCount=10", "step": "rsc002" },
-          { "type": "edge", "description": "Goal extracted from latest version summary", "step": "rsc002" },
-          { "type": "edge", "description": "Uses latest version for step count and goal", "step": "rsc002" },
-          { "type": "error", "description": "Returns 404 for non-existent plan_id", "step": "rsc002" },
-          { "type": "error", "description": "Returns 404 body includes error message 'Plan not found'", "step": "rsc002" },
-          { "type": "error", "description": "Returns 409 when plan already has active session", "step": "rsc002" },
-          { "type": "error", "description": "409 response body includes existing session_id, agent_id, started_at", "step": "rsc002" },
-          { "type": "error", "description": "Returns 400 when latest version status is 'approved'", "step": "rsc002" },
-          { "type": "error", "description": "Returns 400 when latest version status is 'published'", "step": "rsc002" },
-          { "type": "error", "description": "400 response body includes error 'Only draft plans can have AI sessions'", "step": "rsc002" },
-          { "type": "error", "description": "Returns 503 when relay is not available (isRelayAvailable() returns false)", "step": "rsc002" },
-          { "type": "error", "description": "503 response body includes error 'AI service unavailable'", "step": "rsc002" },
-          { "type": "error", "description": "Returns 500 when spawnPlanningAgent throws", "step": "rsc002" },
-          { "type": "error", "description": "Does not create session record if spawn fails", "step": "rsc002" },
-          { "type": "error", "description": "Returns 500 when storage.createSession throws", "step": "rsc002" }
-        ]
+        "type": "happy",
+        "description": "UI shows 'Demo Mode' badge when no session exists"
       },
       {
-        "suite_id": "frontend-api-client",
-        "name": "Session API Client (rsc003)",
-        "scope": "planner-ui",
-        "file": "packages/planner-ui/src/api/chat.test.ts",
-        "cases": [
-          { "type": "happy", "description": "createSession(planId) calls POST /api/plans/:id/session", "step": "rsc003" },
-          { "type": "happy", "description": "Returns { session_id, status, agent_id, started_at } on 200 response", "step": "rsc003" },
-          { "type": "happy", "description": "Correctly parses session_id from response", "step": "rsc003" },
-          { "type": "happy", "description": "Correctly parses agent_id from response", "step": "rsc003" },
-          { "type": "happy", "description": "Correctly parses started_at as ISO string", "step": "rsc003" },
-          { "type": "edge", "description": "On 409, returns { alreadyConnected: true, session: {...} }", "step": "rsc003" },
-          { "type": "edge", "description": "409 response extracts existing session info from body", "step": "rsc003" },
-          { "type": "edge", "description": "alreadyConnected=true indicates success (not an error)", "step": "rsc003" },
-          { "type": "error", "description": "Throws Error with message 'Only draft plans can have AI sessions' on 400", "step": "rsc003" },
-          { "type": "error", "description": "Throws Error with message 'AI service unavailable' on 503", "step": "rsc003" },
-          { "type": "error", "description": "Throws Error with message 'Plan not found' on 404", "step": "rsc003" },
-          { "type": "error", "description": "Throws generic Error for other status codes (500, etc.)", "step": "rsc003" },
-          { "type": "error", "description": "Network error throws with descriptive message", "step": "rsc003" }
-        ]
+        "type": "happy",
+        "description": "Clicking 'Connect AI' transitions badge to 'AI Connected'"
       },
       {
-        "suite_id": "frontend-hook-connect",
-        "name": "useAIConnectionStatus Hook connect() (rsc004)",
-        "scope": "planner-ui",
-        "file": "packages/planner-ui/src/hooks/useAIConnectionStatus.test.ts",
-        "cases": [
-          { "type": "happy", "description": "Hook returns connect function", "step": "rsc004" },
-          { "type": "happy", "description": "Hook returns isConnecting: false initially", "step": "rsc004" },
-          { "type": "happy", "description": "Hook returns connectError: null initially", "step": "rsc004" },
-          { "type": "happy", "description": "connect() calls createSession with planId", "step": "rsc004" },
-          { "type": "happy", "description": "isConnecting becomes true during API call", "step": "rsc004" },
-          { "type": "happy", "description": "isConnecting becomes false after API resolves", "step": "rsc004" },
-          { "type": "happy", "description": "On success, calls refresh() to update status", "step": "rsc004" },
-          { "type": "happy", "description": "After refresh(), status changes from 'demo' to 'connected'", "step": "rsc004" },
-          { "type": "happy", "description": "connectError remains null on success", "step": "rsc004" },
-          { "type": "edge", "description": "On alreadyConnected response, calls refresh() (treats as success)", "step": "rsc004" },
-          { "type": "edge", "description": "alreadyConnected does not set connectError", "step": "rsc004" },
-          { "type": "edge", "description": "Multiple rapid connect() calls only trigger one API call", "step": "rsc004" },
-          { "type": "edge", "description": "connect() while already connected is no-op", "step": "rsc004" },
-          { "type": "edge", "description": "connect() while isConnecting=true is no-op", "step": "rsc004" },
-          { "type": "error", "description": "On createSession error, sets connectError state", "step": "rsc004" },
-          { "type": "error", "description": "connectError contains error message from thrown Error", "step": "rsc004" },
-          { "type": "error", "description": "connect() does not throw (catches errors)", "step": "rsc004" },
-          { "type": "error", "description": "isConnecting becomes false after error", "step": "rsc004" },
-          { "type": "error", "description": "Calling connect() again clears previous connectError", "step": "rsc004" }
-        ]
+        "type": "happy",
+        "description": "After connecting, chat messages go to real agent (useMock=false)"
       },
       {
-        "suite_id": "frontend-badge-component",
-        "name": "AIConnectionBadge Component (rsc005)",
-        "scope": "planner-ui",
-        "file": "packages/planner-ui/src/components/AIConnectionBadge.test.tsx",
-        "cases": [
-          { "type": "happy", "description": "Shows 'AI Connected' text when status='connected'", "step": "rsc005" },
-          { "type": "happy", "description": "Connected badge has green styling (success variant)", "step": "rsc005" },
-          { "type": "happy", "description": "Shows 'Demo Mode' text when status='demo'", "step": "rsc005" },
-          { "type": "happy", "description": "Demo badge has amber/warning styling", "step": "rsc005" },
-          { "type": "happy", "description": "Shows 'Connect AI' button when status='demo'", "step": "rsc005" },
-          { "type": "happy", "description": "Clicking 'Connect AI' button calls connect()", "step": "rsc005" },
-          { "type": "happy", "description": "Shows spinner (Loader2) when status='loading'", "step": "rsc005" },
-          { "type": "happy", "description": "Shows spinner when isConnecting=true", "step": "rsc005" },
-          { "type": "happy", "description": "Button disabled while isConnecting=true", "step": "rsc005" },
-          { "type": "edge", "description": "Hides 'Connect AI' button when planStatus='approved'", "step": "rsc005" },
-          { "type": "edge", "description": "Hides 'Connect AI' button when planStatus='published'", "step": "rsc005" },
-          { "type": "edge", "description": "Shows 'Demo Mode' only (no button) for non-draft plans", "step": "rsc005" },
-          { "type": "edge", "description": "Tooltip on disabled state explains 'Only draft plans support AI'", "step": "rsc005" },
-          { "type": "edge", "description": "Badge is compact when rendered in header", "step": "rsc005" },
-          { "type": "error", "description": "Shows error message when connectError is set", "step": "rsc005" },
-          { "type": "error", "description": "Error message styled as destructive/red", "step": "rsc005" },
-          { "type": "error", "description": "Error can be dismissed (optional close button)", "step": "rsc005" },
-          { "type": "error", "description": "Error clears on next connect() attempt", "step": "rsc005" }
-        ]
+        "type": "happy",
+        "description": "Spawned agent receives existingStepCount and can read existing plan steps"
       },
       {
-        "suite_id": "frontend-chat-integration",
-        "name": "ChatPanel Integration (rsc006)",
-        "scope": "planner-ui",
-        "file": "packages/planner-ui/src/components/ChatPanel.test.tsx",
-        "cases": [
-          { "type": "happy", "description": "AIConnectionBadge rendered in ChatPanel header", "step": "rsc006" },
-          { "type": "happy", "description": "ChatPanel receives isConnected from useAIConnectionStatus", "step": "rsc006" },
-          { "type": "happy", "description": "ChatPanel receives planStatus prop", "step": "rsc006" },
-          { "type": "happy", "description": "useAIChat called with useMock=true when not connected", "step": "rsc006" },
-          { "type": "happy", "description": "useAIChat called with useMock=false when connected", "step": "rsc006" },
-          { "type": "happy", "description": "After connect(), useMock changes from true to false", "step": "rsc006" },
-          { "type": "happy", "description": "Chat input always enabled (works in both modes)", "step": "rsc006" },
-          { "type": "happy", "description": "Send button always enabled (mock fallback works)", "step": "rsc006" },
-          { "type": "edge", "description": "In demo mode, messages get mock responses", "step": "rsc006" },
-          { "type": "edge", "description": "In connected mode, messages route to real agent", "step": "rsc006" },
-          { "type": "edge", "description": "Status transition (demo -> connected) during conversation preserved", "step": "rsc006" },
-          { "type": "edge", "description": "Message history preserved across connect", "step": "rsc006" },
-          { "type": "edge", "description": "Badge position consistent with chat header layout", "step": "rsc006" },
-          { "type": "error", "description": "If connection fails, chat continues in demo mode", "step": "rsc006" },
-          { "type": "error", "description": "Connection error shown via badge, not chat disruption", "step": "rsc006" }
-        ]
+        "type": "happy",
+        "description": "Agent prompt instructs to continue from current state"
       },
       {
-        "suite_id": "integration-e2e",
-        "name": "End-to-End Integration",
-        "scope": "integration",
-        "file": "src/api/sessions.test.ts",
-        "cases": [
-          { "type": "happy", "description": "Full flow: open plan -> click Connect AI -> badge updates -> chat uses real agent" },
-          { "type": "happy", "description": "Spawned agent can read existing plan steps via read_plan tool" },
-          { "type": "happy", "description": "Agent prompt includes correct step count from existing plan" },
-          { "type": "happy", "description": "Session persists across page refresh (verified via GET /plans/:id/session)" },
-          { "type": "happy", "description": "Chat messages after connect route to spawned agent" },
-          { "type": "edge", "description": "Opening same plan in new tab sees existing session (409 -> alreadyConnected)" },
-          { "type": "edge", "description": "Closing browser doesn't immediately terminate session" },
-          { "type": "edge", "description": "Session timeout (from relay-session-management) eventually terminates" },
-          { "type": "edge", "description": "Plan approval terminates session (badge returns to demo)" },
-          { "type": "error", "description": "Relay going down mid-session shows degraded state" },
-          { "type": "error", "description": "Agent crash handled gracefully (session marked error)" }
-        ]
+        "type": "edge",
+        "description": "POST /plans/:id/session returns 409 with existing session info"
+      },
+      {
+        "type": "edge",
+        "description": "UI handles 409 as success (already connected)"
+      },
+      {
+        "type": "edge",
+        "description": "Connection badge shows spinner during connect"
+      },
+      {
+        "type": "edge",
+        "description": "Chat still works in demo mode (mock fallback)"
+      },
+      {
+        "type": "edge",
+        "description": "Connect AI button hidden for approved/published plans"
+      },
+      {
+        "type": "error",
+        "description": "POST /plans/:id/session returns 404 for missing plan"
+      },
+      {
+        "type": "error",
+        "description": "POST /plans/:id/session returns 400 for approved plan"
+      },
+      {
+        "type": "error",
+        "description": "POST /plans/:id/session returns 503 when relay down"
+      },
+      {
+        "type": "error",
+        "description": "UI shows connectError when connection fails"
       }
     ],
-
-    "cases": [
-      { "type": "happy", "description": "POST /plans/:id/session spawns agent and returns session info" },
-      { "type": "happy", "description": "UI shows 'Demo Mode' badge when no session exists" },
-      { "type": "happy", "description": "Clicking 'Connect AI' transitions badge to 'AI Connected'" },
-      { "type": "happy", "description": "After connecting, chat messages go to real agent (useMock=false)" },
-      { "type": "happy", "description": "Spawned agent receives existingStepCount and can read existing plan steps" },
-      { "type": "happy", "description": "Agent prompt instructs to continue from current state" },
-      { "type": "edge", "description": "POST /plans/:id/session returns 409 with existing session info" },
-      { "type": "edge", "description": "UI handles 409 as success (already connected)" },
-      { "type": "edge", "description": "Connection badge shows spinner during connect" },
-      { "type": "edge", "description": "Chat still works in demo mode (mock fallback)" },
-      { "type": "edge", "description": "Connect AI button hidden for approved/published plans" },
-      { "type": "error", "description": "POST /plans/:id/session returns 404 for missing plan" },
-      { "type": "error", "description": "POST /plans/:id/session returns 400 for approved plan" },
-      { "type": "error", "description": "POST /plans/:id/session returns 503 when relay down" },
-      { "type": "error", "description": "UI shows connectError when connection fails" }
-    ],
-
     "data_requirements": [
       "Test plan without active session (draft status) - need plan_id with version in 'draft' status and no session in planning_sessions table",
       "Test plan with active session - need plan with existing session record (status='active') in planning_sessions table",
@@ -359,34 +1041,6 @@
       "render and fireEvent from @testing-library/react for component tests",
       "supertest for API integration tests (as per existing patterns)",
       "Test agents with known agent_ids for assertion matching"
-    ],
-
-    "mock_patterns": [
-      {
-        "description": "Mock relay availability for 503 testing",
-        "code": "vi.mock('../relay/service.js', () => ({ isRelayAvailable: vi.fn().mockReturnValue(false) }))"
-      },
-      {
-        "description": "Mock spawner for success/failure testing",
-        "code": "vi.mock('../relay/spawner.js', () => ({ spawnPlanningAgent: vi.fn().mockResolvedValue({ agentId: 'agent-123', sessionToken: 'token-abc' }) }))"
-      },
-      {
-        "description": "Mock createSession API for hook tests",
-        "code": "vi.mock('@/api/chat', () => ({ createSession: vi.fn().mockResolvedValue({ session_id: 's-1', status: 'active', agent_id: 'a-1', started_at: '2026-01-29T00:00:00Z' }) }))"
-      },
-      {
-        "description": "Mock useAIConnectionStatus for component tests",
-        "code": "vi.mock('@/hooks/useAIConnectionStatus', () => ({ useAIConnectionStatus: vi.fn().mockReturnValue({ status: 'demo', isConnected: false, connect: vi.fn(), isConnecting: false, connectError: null }) }))"
-      }
-    ],
-
-    "test_file_structure": [
-      { "file": "src/relay/spawner.test.ts", "add_cases": "Add new describe block for 'existing plan context'" },
-      { "file": "src/api/sessions.test.ts", "create": true, "description": "New file for POST /plans/:id/session endpoint tests" },
-      { "file": "packages/planner-ui/src/api/chat.test.ts", "add_cases": "Add tests for createSession function" },
-      { "file": "packages/planner-ui/src/hooks/useAIConnectionStatus.test.ts", "add_cases": "Add tests for connect() function" },
-      { "file": "packages/planner-ui/src/components/AIConnectionBadge.test.tsx", "create": true, "description": "New file for AIConnectionBadge component" },
-      { "file": "packages/planner-ui/src/components/ChatPanel.test.tsx", "add_cases": "Add tests for badge integration and useMock behavior" }
     ]
   }
 }

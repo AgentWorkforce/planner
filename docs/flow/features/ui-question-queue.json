@@ -4,25 +4,55 @@
   "type": "feature",
   "status": "completed",
   "priority": "high",
-  "dependencies": ["ui-status-bar"],
-
+  "dependencies": [
+    "ui-status-bar"
+  ],
   "summary": {
     "goal": "Intelligent queue management for agent questions, with self-assigned priority, deduplication, and trajectory awareness to reduce question fatigue.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "Questions queue in priority order (blocking > time-sensitive > preference > confirmation)" },
-      { "id": "ac2", "description": "Only one question displayed at a time via ChatBubble" },
-      { "id": "ac3", "description": "After answering, prompt shows 'Next: [Agent] has a question' with [Show Now] [Later]" },
-      { "id": "ac4", "description": "Questions from same agent about same topic are deduplicated" },
-      { "id": "ac5", "description": "Agent can check queue before adding (avoid duplicate questions)" },
-      { "id": "ac6", "description": "Agent can subscribe to existing question's answer" },
-      { "id": "ac7", "description": "Priority score computed from blocking level, steps blocked, agents waiting, cascade depth" },
-      { "id": "ac8", "description": "Triage mode available when > 5 questions pending" },
-      { "id": "ac9", "description": "Questions ignored > 5 min show progressive urgency (thicker ring, pulsing badge)" }
+      {
+        "id": "ac1",
+        "description": "Questions queue in priority order (blocking > time-sensitive > preference > confirmation)"
+      },
+      {
+        "id": "ac2",
+        "description": "Only one question displayed at a time via ChatBubble"
+      },
+      {
+        "id": "ac3",
+        "description": "After answering, prompt shows 'Next: [Agent] has a question' with [Show Now] [Later]"
+      },
+      {
+        "id": "ac4",
+        "description": "Questions from same agent about same topic are deduplicated"
+      },
+      {
+        "id": "ac5",
+        "description": "Agent can check queue before adding (avoid duplicate questions)"
+      },
+      {
+        "id": "ac6",
+        "description": "Agent can subscribe to existing question's answer"
+      },
+      {
+        "id": "ac7",
+        "description": "Priority score computed from blocking level, steps blocked, agents waiting, cascade depth"
+      },
+      {
+        "id": "ac8",
+        "description": "Triage mode available when > 5 questions pending"
+      },
+      {
+        "id": "ac9",
+        "description": "Questions ignored > 5 min show progressive urgency (thicker ring, pulsing badge)"
+      }
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui", "planner-core"],
+    "scopes": [
+      "planner-ui",
+      "planner-core"
+    ],
     "steps": [
       {
         "step_id": "step-1",
@@ -30,14 +60,21 @@
         "title": "Add questions table to SQLite schema",
         "description": "Create questions table with columns: id, agent_id, agent_role, text, context, options_json, blocking_level, steps_blocked, can_use_default, default_value, subscribers_json, merged_from_json, created_at, priority_score. Add index on priority_score DESC for efficient sorting. Follow existing schema pattern in src/storage/schema.ts.",
         "dependencies": [],
-        "owner_role": "backend:Coder"
+        "owner_role": "backend:Coder",
+        "specification": {
+          "design": {
+            "custom_components": []
+          }
+        }
       },
       {
         "step_id": "step-2",
         "scope": "planner-core",
         "title": "Add Question interface to PlanStorage",
         "description": "Define Question interface in src/storage/interface.ts matching the schema. Add methods: createQuestion(), getQuestions(planId), answerQuestion(id, answer), subscribeToQuestion(questionId, agentId), dismissQuestion(id). Use existing patterns from Comment/Improvement interfaces.",
-        "dependencies": ["step-1"],
+        "dependencies": [
+          "step-1"
+        ],
         "owner_role": "backend:Coder"
       },
       {
@@ -45,7 +82,9 @@
         "scope": "planner-core",
         "title": "Implement Question storage in SQLite adapter",
         "description": "Add Question methods to src/storage/sqlite.ts. Implement priority score computation server-side using the formula: (blocking_level * 100) + (steps_blocked * 10) + (subscribers.length * 15) + (time_waiting_mins * 2). Add deduplication logic when creating questions (match by agent_id + first 50 chars of text). Follow pattern from Comment/Improvement storage.",
-        "dependencies": ["step-2"],
+        "dependencies": [
+          "step-2"
+        ],
         "owner_role": "backend:Coder"
       },
       {
@@ -53,7 +92,9 @@
         "scope": "planner-core",
         "title": "Create questions API endpoints",
         "description": "Add src/api/handlers/questions.ts with handlers: createQuestion (POST /plans/:id/questions), listQuestions (GET /plans/:id/questions?sort=priority), answerQuestion (POST /questions/:id/answer), subscribeToQuestion (POST /questions/:id/subscribe), dismissQuestion (POST /questions/:id/dismiss). Register routes in src/api/routes.ts. Follow pattern from comments.ts and improvements.ts.",
-        "dependencies": ["step-3"],
+        "dependencies": [
+          "step-3"
+        ],
         "owner_role": "backend:Coder"
       },
       {
@@ -69,7 +110,9 @@
         "scope": "planner-ui",
         "title": "Add questions API client",
         "description": "Create packages/planner-ui/src/api/questions.ts with functions: listQuestions(), answerQuestion(), subscribeToQuestion(), dismissQuestion(). Use get/post from ./client.ts. Follow pattern from plans.ts and comments.ts.",
-        "dependencies": ["step-5"],
+        "dependencies": [
+          "step-5"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -77,7 +120,9 @@
         "scope": "planner-ui",
         "title": "Create useQuestionQueue hook",
         "description": "Add packages/planner-ui/src/hooks/useQuestionQueue.ts. Hook should: fetch questions sorted by priority, provide currentQuestion (top priority), provide answerQuestion/skipQuestion/dismissFyi methods, handle optimistic updates. Return {questions, currentQuestion, isLoading, answer, skip, dismissFyi}. Follow pattern from useChannelMessages.ts.",
-        "dependencies": ["step-6"],
+        "dependencies": [
+          "step-6"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -85,7 +130,9 @@
         "scope": "planner-ui",
         "title": "Create QuestionBadge component for status bar",
         "description": "Add packages/planner-ui/src/components/QuestionBadge.tsx. Shows question count with icon. States: none (muted), some (primary), urgent (pulsing red if count > 5 or oldest > 5min). Click behavior: 0=disabled, 1-5=open ChatBubble, >5=open triage panel. Integrate into status bar. Use existing Button and styling patterns.",
-        "dependencies": ["step-7"],
+        "dependencies": [
+          "step-7"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -93,7 +140,9 @@
         "scope": "planner-ui",
         "title": "Create TriagePanel component",
         "description": "Add packages/planner-ui/src/components/TriagePanel.tsx. Fixed panel with header, scrollable question list, footer actions. Each queue item shows: AgentAvatar, agent name, type badge (BLOCKS/PREF/FYI), question preview (line-clamp-1), wait time, subscriber count. Click item to select question. Footer: Dismiss FYI button, Answer Top button. Use Sheet/Dialog pattern from existing components.",
-        "dependencies": ["step-8"],
+        "dependencies": [
+          "step-8"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -101,7 +150,9 @@
         "scope": "planner-ui",
         "title": "Create QueueItem component",
         "description": "Add packages/planner-ui/src/components/QueueItem.tsx. Displays single question in triage list. Shows: agent avatar with urgency ring (0min=red, 2min=pulsing, 5min=badge pulses), meta row with agent name + type badge + subscriber count, question preview text, waiting time. Handle click to select. Use Badge component with variants for blocking types.",
-        "dependencies": ["step-9"],
+        "dependencies": [
+          "step-9"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -109,7 +160,9 @@
         "scope": "planner-ui",
         "title": "Integrate queue with ChatBubble for question display",
         "description": "Update ChatBubble component to accept Question prop. When question provided, display question text, options (if any), and answer input. On answer submit, call useQuestionQueue.answer(). Show next question prompt after answering with [Show Now] [Later] buttons. Later button defers to queue rotation.",
-        "dependencies": ["step-10"],
+        "dependencies": [
+          "step-10"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -117,7 +170,9 @@
         "scope": "planner-ui",
         "title": "Add question deduplication UI indicators",
         "description": "In QueueItem component, show 'merged' badge when question.merged_from.length > 0. Show '+N agents waiting' when subscribers.length > 0. Add tooltip showing which questions were merged. Use existing Badge and Tooltip components.",
-        "dependencies": ["step-11"],
+        "dependencies": [
+          "step-11"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -125,7 +180,9 @@
         "scope": "planner-core",
         "title": "Add SSE notifications for new questions",
         "description": "Extend src/api/handlers/events.ts to emit 'question_added' events when new questions are created. Include question data in event payload. Follow existing event emission pattern for plan updates.",
-        "dependencies": ["step-4"],
+        "dependencies": [
+          "step-4"
+        ],
         "owner_role": "backend:Coder"
       },
       {
@@ -133,7 +190,10 @@
         "scope": "planner-ui",
         "title": "Add real-time question updates via SSE",
         "description": "Update useQuestionQueue hook to subscribe to SSE 'question_added' events. When event received, add question to queue and re-sort by priority. Use existing SSE pattern from plan updates. Handle deduplication check before adding.",
-        "dependencies": ["step-13", "step-12"],
+        "dependencies": [
+          "step-13",
+          "step-12"
+        ],
         "owner_role": "frontend:Coder"
       },
       {
@@ -141,12 +201,13 @@
         "scope": "planner-ui",
         "title": "Add agent subscription workflow",
         "description": "Add 'Subscribe to answer' button in ChatBubble when agent detects similar existing question. Call subscribeToQuestion() API. Update subscriber count in real-time. When original question is answered, notify all subscribers via SSE (backend change). Frontend receives notification and updates question as answered.",
-        "dependencies": ["step-14"],
+        "dependencies": [
+          "step-14"
+        ],
         "owner_role": "frontend:Coder"
       }
     ]
   },
-
   "design_spec": {
     "views": [
       {
@@ -161,15 +222,33 @@
             "use": "question-trigger",
             "class": "flex items-center gap-1 text-sm hover:text-accent-cyan transition-colors",
             "elements": [
-              { "component": "span", "use": "icon", "content": "❓" },
-              { "component": "span", "use": "count", "class": "tabular-nums", "content": "{count}" }
+              {
+                "component": "span",
+                "use": "icon",
+                "content": "❓"
+              },
+              {
+                "component": "span",
+                "use": "count",
+                "class": "tabular-nums",
+                "content": "{count}"
+              }
             ]
           }
         ],
         "states": {
-          "none": { "class": "text-text-muted", "content": "❓ 0" },
-          "some": { "class": "text-text-primary", "content": "❓ {count}" },
-          "urgent": { "class": "text-error animate-pulse", "condition": "count > 5 or oldest > 5min" }
+          "none": {
+            "class": "text-text-muted",
+            "content": "❓ 0"
+          },
+          "some": {
+            "class": "text-text-primary",
+            "content": "❓ {count}"
+          },
+          "urgent": {
+            "class": "text-error animate-pulse",
+            "condition": "count > 5 or oldest > 5min"
+          }
         },
         "behavior": {
           "click_when_0": "No action (disabled state)",
@@ -187,8 +266,18 @@
             "section": "header",
             "layout": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border-subtle",
             "elements": [
-              { "component": "h3", "use": "title", "class": "text-sm font-medium text-text-primary", "content": "Questions ({count})" },
-              { "component": "button", "use": "close", "class": "p-1 hover:bg-bg-tertiary rounded text-text-muted", "icon": "X (14px)" }
+              {
+                "component": "h3",
+                "use": "title",
+                "class": "text-sm font-medium text-text-primary",
+                "content": "Questions ({count})"
+              },
+              {
+                "component": "button",
+                "use": "close",
+                "class": "p-1 hover:bg-bg-tertiary rounded text-text-muted",
+                "icon": "X (14px)"
+              }
             ]
           },
           {
@@ -201,7 +290,12 @@
                 "class": "flex items-start gap-2 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors",
                 "repeat": "for each question in queue",
                 "children": [
-                  { "component": "AgentAvatar", "use": "agent", "props": "size=sm", "class": "shrink-0 mt-0.5" },
+                  {
+                    "component": "AgentAvatar",
+                    "use": "agent",
+                    "props": "size=sm",
+                    "class": "shrink-0 mt-0.5"
+                  },
                   {
                     "component": "div",
                     "use": "question-info",
@@ -212,15 +306,38 @@
                         "use": "meta-row",
                         "class": "flex items-center gap-1.5",
                         "children": [
-                          { "component": "span", "use": "agent-name", "class": "text-xs font-medium text-text-primary truncate" },
-                          { "component": "Badge", "use": "type-badge", "variants": "blocking|preference|fyi" },
-                          { "component": "span", "use": "subscribers", "class": "text-[10px] text-text-muted", "content": "+{n}", "condition": "subscribers > 0" }
+                          {
+                            "component": "span",
+                            "use": "agent-name",
+                            "class": "text-xs font-medium text-text-primary truncate"
+                          },
+                          {
+                            "component": "Badge",
+                            "use": "type-badge",
+                            "variants": "blocking|preference|fyi"
+                          },
+                          {
+                            "component": "span",
+                            "use": "subscribers",
+                            "class": "text-[10px] text-text-muted",
+                            "content": "+{n}",
+                            "condition": "subscribers > 0"
+                          }
                         ]
                       },
-                      { "component": "p", "use": "question-preview", "class": "text-xs text-text-secondary line-clamp-1 mt-0.5" }
+                      {
+                        "component": "p",
+                        "use": "question-preview",
+                        "class": "text-xs text-text-secondary line-clamp-1 mt-0.5"
+                      }
                     ]
                   },
-                  { "component": "span", "use": "waiting-time", "class": "text-[10px] text-text-muted shrink-0", "content": "{time}" }
+                  {
+                    "component": "span",
+                    "use": "waiting-time",
+                    "class": "text-[10px] text-text-muted shrink-0",
+                    "content": "{time}"
+                  }
                 ]
               }
             ]
@@ -229,8 +346,19 @@
             "section": "footer",
             "layout": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-t border-border-subtle",
             "elements": [
-              { "component": "Button", "use": "dismiss-fyi", "props": "variant=ghost size=sm", "content": "Dismiss FYI", "condition": "fyi_count > 0" },
-              { "component": "Button", "use": "answer-top", "props": "variant=default size=sm", "content": "Answer Top →" }
+              {
+                "component": "Button",
+                "use": "dismiss-fyi",
+                "props": "variant=ghost size=sm",
+                "content": "Dismiss FYI",
+                "condition": "fyi_count > 0"
+              },
+              {
+                "component": "Button",
+                "use": "answer-top",
+                "props": "variant=default size=sm",
+                "content": "Answer Top →"
+              }
             ]
           }
         ]
@@ -240,23 +368,53 @@
         "name": "Queue Item (within triage list)",
         "purpose": "Single question row showing priority indicators",
         "elements": [
-          { "component": "AgentAvatar", "use": "asking-agent", "props": "size=sm" },
+          {
+            "component": "AgentAvatar",
+            "use": "asking-agent",
+            "props": "size=sm"
+          },
           {
             "component": "div",
             "use": "content",
             "class": "flex-1",
             "children": [
-              { "component": "span", "use": "agent-name", "class": "text-xs font-medium" },
-              { "component": "Badge", "use": "priority-type" },
-              { "component": "span", "use": "subscribers-indicator", "class": "text-[10px] text-accent-cyan", "content": "+{n} waiting", "note": "Shows when other agents subscribed to this answer" }
+              {
+                "component": "span",
+                "use": "agent-name",
+                "class": "text-xs font-medium"
+              },
+              {
+                "component": "Badge",
+                "use": "priority-type"
+              },
+              {
+                "component": "span",
+                "use": "subscribers-indicator",
+                "class": "text-[10px] text-accent-cyan",
+                "content": "+{n} waiting",
+                "note": "Shows when other agents subscribed to this answer"
+              }
             ]
           },
-          { "component": "span", "use": "wait-time", "class": "text-[10px] text-text-muted" }
+          {
+            "component": "span",
+            "use": "wait-time",
+            "class": "text-[10px] text-text-muted"
+          }
         ],
         "type_badges": {
-          "blocking": { "class": "bg-error/20 text-error text-[10px] px-1 rounded", "text": "BLOCKS" },
-          "preference": { "class": "bg-warning/20 text-warning text-[10px] px-1 rounded", "text": "PREF" },
-          "fyi": { "class": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1 rounded", "text": "FYI" }
+          "blocking": {
+            "class": "bg-error/20 text-error text-[10px] px-1 rounded",
+            "text": "BLOCKS"
+          },
+          "preference": {
+            "class": "bg-warning/20 text-warning text-[10px] px-1 rounded",
+            "text": "PREF"
+          },
+          "fyi": {
+            "class": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1 rounded",
+            "text": "FYI"
+          }
         }
       },
       {
@@ -265,8 +423,20 @@
         "purpose": "Shows when questions have been merged (ac4, ac5, ac6)",
         "layout": "Inline indicator within queue item",
         "elements": [
-          { "component": "span", "use": "merged-badge", "class": "text-[10px] text-accent-purple", "content": "merged", "condition": "question.merged_from.length > 0" },
-          { "component": "span", "use": "subscribers", "class": "text-[10px] text-accent-cyan", "content": "+{n} agents waiting", "condition": "question.subscribers.length > 0" }
+          {
+            "component": "span",
+            "use": "merged-badge",
+            "class": "text-[10px] text-accent-purple",
+            "content": "merged",
+            "condition": "question.merged_from.length > 0"
+          },
+          {
+            "component": "span",
+            "use": "subscribers",
+            "class": "text-[10px] text-accent-cyan",
+            "content": "+{n} agents waiting",
+            "condition": "question.subscribers.length > 0"
+          }
         ],
         "tooltip": "Shows original questions that were deduplicated into this one"
       }
@@ -298,7 +468,12 @@
     },
     "priority_formula": {
       "formula": "score = (blocking_level * 100) + (steps_blocked * 10) + (agents_waiting * 15) + (cascade_depth * 5) + (time_waiting_mins * 2) - (can_use_default ? 30 : 0)",
-      "blocking_weights": { "hard_block": 4, "soft_block": 3, "preference": 2, "fyi": 1 },
+      "blocking_weights": {
+        "hard_block": 4,
+        "soft_block": 3,
+        "preference": 2,
+        "fyi": 1
+      },
       "example": "hard_block(400) + 3 steps(30) + 2 agents waiting(30) = 460 score"
     },
     "deduplication": {
@@ -307,10 +482,22 @@
       "ui_effect": "Merged questions show '+N waiting' indicator"
     },
     "escalation_timeline": {
-      "0min": { "visual": "Red ring on avatar", "class": "ring-2 ring-error" },
-      "2min": { "visual": "Ring pulses", "class": "ring-2 ring-error animate-pulse" },
-      "5min": { "visual": "Badge pulses in status bar", "class": "text-error animate-pulse" },
-      "10min": { "visual": "Optional browser notification", "requires": "notification permission" }
+      "0min": {
+        "visual": "Red ring on avatar",
+        "class": "ring-2 ring-error"
+      },
+      "2min": {
+        "visual": "Ring pulses",
+        "class": "ring-2 ring-error animate-pulse"
+      },
+      "5min": {
+        "visual": "Badge pulses in status bar",
+        "class": "text-error animate-pulse"
+      },
+      "10min": {
+        "visual": "Optional browser notification",
+        "requires": "notification permission"
+      }
     },
     "interactions": {
       "click_badge_few": "Open ChatBubble for top question",
@@ -319,7 +506,6 @@
       "answer_question": "Remove from queue, notify subscribers, show NextQuestionPrompt",
       "skip_question": "Move to back of queue (priority_score -= 50)",
       "dismiss_fyi": "Remove all FYI-level questions from queue"
-    },
-    "custom_needed": []
+    }
   }
 }

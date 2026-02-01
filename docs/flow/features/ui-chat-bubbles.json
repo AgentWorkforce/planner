@@ -4,97 +4,180 @@
   "type": "feature",
   "status": "completed",
   "priority": "high",
-  "dependencies": ["ui-agent-avatars", "ui-question-queue"],
-
+  "dependencies": [
+    "ui-agent-avatars",
+    "ui-question-queue"
+  ],
   "summary": {
     "goal": "Flashcard-style question interface that pops up from agent avatars, presenting context, multiple choice options, and free text input for human decisions.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "ChatBubble component anchors to agent avatar in status bar" },
-      { "id": "ac2", "description": "Bubble shows agent name/role in header with minimize/close buttons" },
-      { "id": "ac3", "description": "Context section displays diagram/ASCII/explanation from agent" },
-      { "id": "ac4", "description": "Question text is clearly visible" },
-      { "id": "ac5", "description": "Multiple choice options rendered as radio buttons" },
-      { "id": "ac6", "description": "Free text input always available as alternative" },
-      { "id": "ac7", "description": "Optional 'Add reasoning' textarea for human explanation" },
-      { "id": "ac8", "description": "Blocking questions show 'blocks N steps' indicator" },
-      { "id": "ac9", "description": "Preference questions show 'will auto-proceed in X min' timer" },
-      { "id": "ac10", "description": "[Send] submits answer and closes bubble" },
-      { "id": "ac11", "description": "[Skip for now] moves question to back of queue" },
-      { "id": "ac12", "description": "[−] minimize returns to red-ring avatar state" },
-      { "id": "ac13", "description": "Only one bubble visible at a time (queue shows next after answer)" }
+      {
+        "id": "ac1",
+        "description": "ChatBubble component anchors to agent avatar in status bar"
+      },
+      {
+        "id": "ac2",
+        "description": "Bubble shows agent name/role in header with minimize/close buttons"
+      },
+      {
+        "id": "ac3",
+        "description": "Context section displays diagram/ASCII/explanation from agent"
+      },
+      {
+        "id": "ac4",
+        "description": "Question text is clearly visible"
+      },
+      {
+        "id": "ac5",
+        "description": "Multiple choice options rendered as radio buttons"
+      },
+      {
+        "id": "ac6",
+        "description": "Free text input always available as alternative"
+      },
+      {
+        "id": "ac7",
+        "description": "Optional 'Add reasoning' textarea for human explanation"
+      },
+      {
+        "id": "ac8",
+        "description": "Blocking questions show 'blocks N steps' indicator"
+      },
+      {
+        "id": "ac9",
+        "description": "Preference questions show 'will auto-proceed in X min' timer"
+      },
+      {
+        "id": "ac10",
+        "description": "[Send] submits answer and closes bubble"
+      },
+      {
+        "id": "ac11",
+        "description": "[Skip for now] moves question to back of queue"
+      },
+      {
+        "id": "ac12",
+        "description": "[−] minimize returns to red-ring avatar state"
+      },
+      {
+        "id": "ac13",
+        "description": "Only one bubble visible at a time (queue shows next after answer)"
+      }
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui"],
+    "scopes": [
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "cb-1",
         "title": "Create ChatBubble component shell",
         "scope": "planner-ui",
         "description": "Component with slide-up animation, anchored above avatar. Header with agent info, minimize/close buttons.",
-        "acceptance": ["Bubble renders above triggering avatar", "Slide-up animation on mount", "Header shows agent icon, name, type badge"]
+        "acceptance": [
+          "Bubble renders above triggering avatar",
+          "Slide-up animation on mount",
+          "Header shows agent icon, name, type badge"
+        ],
+        "specification": {
+          "design": {
+            "custom_components": []
+          }
+        }
       },
       {
         "step_id": "cb-2",
         "title": "Implement context section",
         "scope": "planner-ui",
         "description": "Scrollable section for agent-provided context (markdown/ASCII). Max height with overflow.",
-        "acceptance": ["Context renders with monospace font", "Scrollable if content exceeds max-height", "Hidden if no context provided"]
+        "acceptance": [
+          "Context renders with monospace font",
+          "Scrollable if content exceeds max-height",
+          "Hidden if no context provided"
+        ]
       },
       {
         "step_id": "cb-3",
         "title": "Implement blocking info banner",
         "scope": "planner-ui",
         "description": "Red-tinted banner for blocking questions showing 'blocks N steps'",
-        "acceptance": ["Banner shows for blocking questions only", "Shows correct count of blocked steps"]
+        "acceptance": [
+          "Banner shows for blocking questions only",
+          "Shows correct count of blocked steps"
+        ]
       },
       {
         "step_id": "cb-4",
         "title": "Implement options section",
         "scope": "planner-ui",
         "description": "Radio button list for multiple choice options, styled with hover states",
-        "acceptance": ["Radio buttons for each option", "Hover highlights option", "Selection tracked in state"]
+        "acceptance": [
+          "Radio buttons for each option",
+          "Hover highlights option",
+          "Selection tracked in state"
+        ]
       },
       {
         "step_id": "cb-5",
         "title": "Implement free text input",
         "scope": "planner-ui",
         "description": "Radio + text input for 'Other' option. Text input enables when radio selected.",
-        "acceptance": ["Other option with text input", "Text input focuses when Other selected", "Value tracked in state"]
+        "acceptance": [
+          "Other option with text input",
+          "Text input focuses when Other selected",
+          "Value tracked in state"
+        ]
       },
       {
         "step_id": "cb-6",
         "title": "Implement reasoning section",
         "scope": "planner-ui",
         "description": "Collapsible section with textarea for optional reasoning",
-        "acceptance": ["Collapsed by default via <details>", "Textarea for reasoning input", "Value tracked in state"]
+        "acceptance": [
+          "Collapsed by default via <details>",
+          "Textarea for reasoning input",
+          "Value tracked in state"
+        ]
       },
       {
         "step_id": "cb-7",
         "title": "Implement auto-proceed timer",
         "scope": "planner-ui",
         "description": "For preference questions with can_use_default, show countdown timer",
-        "acceptance": ["Timer shows for preference questions only", "Countdown in mm:ss format", "Auto-submits default when timer hits 0"]
+        "acceptance": [
+          "Timer shows for preference questions only",
+          "Countdown in mm:ss format",
+          "Auto-submits default when timer hits 0"
+        ]
       },
       {
         "step_id": "cb-8",
         "title": "Implement footer actions",
         "scope": "planner-ui",
         "description": "Skip and Send buttons. Skip moves to back of queue, Send submits answer.",
-        "dependencies": ["qq-2"],
-        "acceptance": ["Skip moves question to back of queue", "Send submits and closes bubble", "Buttons disabled during submission"]
+        "dependencies": [
+          "qq-2"
+        ],
+        "acceptance": [
+          "Skip moves question to back of queue",
+          "Send submits and closes bubble",
+          "Buttons disabled during submission"
+        ]
       },
       {
         "step_id": "cb-9",
         "title": "Create NextQuestionPrompt component",
         "scope": "planner-ui",
         "description": "Small prompt after answering showing confirmation and next question preview",
-        "acceptance": ["Shows '✓ Sent to {agent}'", "Shows next question preview if any", "Show Now / Later buttons work"]
+        "acceptance": [
+          "Shows '✓ Sent to {agent}'",
+          "Shows next question preview if any",
+          "Show Now / Later buttons work"
+        ]
       }
     ]
   },
-
   "design_spec": {
     "views": [
       {
@@ -107,20 +190,56 @@
             "section": "header",
             "layout": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border-subtle",
             "elements": [
-              { "component": "div", "use": "agent-info", "class": "flex items-center gap-2" },
-              { "component": "span", "use": "role-icon", "class": "text-base" },
-              { "component": "span", "use": "role-label", "class": "text-sm font-medium text-text-primary" },
-              { "component": "Badge", "use": "question-type", "class": "ml-2", "variants": "blocking|preference|fyi" },
-              { "component": "div", "use": "actions", "class": "flex items-center gap-1" },
-              { "component": "button", "use": "minimize", "class": "p-1 hover:bg-bg-tertiary rounded text-text-muted", "icon": "Minus (14px)" },
-              { "component": "button", "use": "close", "class": "p-1 hover:bg-bg-tertiary rounded text-text-muted", "icon": "X (14px)" }
+              {
+                "component": "div",
+                "use": "agent-info",
+                "class": "flex items-center gap-2"
+              },
+              {
+                "component": "span",
+                "use": "role-icon",
+                "class": "text-base"
+              },
+              {
+                "component": "span",
+                "use": "role-label",
+                "class": "text-sm font-medium text-text-primary"
+              },
+              {
+                "component": "Badge",
+                "use": "question-type",
+                "class": "ml-2",
+                "variants": "blocking|preference|fyi"
+              },
+              {
+                "component": "div",
+                "use": "actions",
+                "class": "flex items-center gap-1"
+              },
+              {
+                "component": "button",
+                "use": "minimize",
+                "class": "p-1 hover:bg-bg-tertiary rounded text-text-muted",
+                "icon": "Minus (14px)"
+              },
+              {
+                "component": "button",
+                "use": "close",
+                "class": "p-1 hover:bg-bg-tertiary rounded text-text-muted",
+                "icon": "X (14px)"
+              }
             ]
           },
           {
             "section": "context",
             "layout": "px-3 py-2 max-h-32 overflow-y-auto border-b border-border-subtle",
             "elements": [
-              { "component": "div", "use": "context-content", "class": "text-xs text-text-secondary font-mono whitespace-pre-wrap", "note": "Renders markdown/ASCII from agent" }
+              {
+                "component": "div",
+                "use": "context-content",
+                "class": "text-xs text-text-secondary font-mono whitespace-pre-wrap",
+                "note": "Renders markdown/ASCII from agent"
+              }
             ],
             "condition": "only if context_provided is not empty"
           },
@@ -128,7 +247,12 @@
             "section": "blocking-info",
             "layout": "px-3 py-2 bg-error/10 border-b border-error/20",
             "elements": [
-              { "component": "span", "use": "blocking-text", "class": "text-xs text-error", "content": "⚠️ This blocks {N} other steps" }
+              {
+                "component": "span",
+                "use": "blocking-text",
+                "class": "text-xs text-error",
+                "content": "⚠️ This blocks {N} other steps"
+              }
             ],
             "condition": "only for blocking questions"
           },
@@ -136,41 +260,91 @@
             "section": "question",
             "layout": "px-3 py-3",
             "elements": [
-              { "component": "p", "use": "question-text", "class": "text-sm text-text-primary font-medium" }
+              {
+                "component": "p",
+                "use": "question-text",
+                "class": "text-sm text-text-primary font-medium"
+              }
             ]
           },
           {
             "section": "options",
             "layout": "px-3 pb-2 space-y-2",
             "elements": [
-              { "component": "label", "use": "option-item", "class": "flex items-start gap-2 p-2 rounded-lg hover:bg-bg-secondary cursor-pointer transition-colors" },
-              { "component": "input", "use": "radio", "props": "type=radio", "class": "mt-0.5 accent-accent-cyan" },
-              { "component": "span", "use": "option-text", "class": "text-sm text-text-secondary" }
+              {
+                "component": "label",
+                "use": "option-item",
+                "class": "flex items-start gap-2 p-2 rounded-lg hover:bg-bg-secondary cursor-pointer transition-colors"
+              },
+              {
+                "component": "input",
+                "use": "radio",
+                "props": "type=radio",
+                "class": "mt-0.5 accent-accent-cyan"
+              },
+              {
+                "component": "span",
+                "use": "option-text",
+                "class": "text-sm text-text-secondary"
+              }
             ]
           },
           {
             "section": "freetext",
             "layout": "px-3 pb-2",
             "elements": [
-              { "component": "label", "use": "other-option", "class": "flex items-start gap-2 p-2 rounded-lg hover:bg-bg-secondary cursor-pointer" },
-              { "component": "input", "use": "radio-other", "props": "type=radio", "class": "mt-0.5 accent-accent-cyan" },
-              { "component": "input", "use": "freetext-input", "props": "type=text placeholder='Other...'", "class": "flex-1 bg-transparent border-b border-border-default text-sm text-text-primary focus:border-accent-cyan outline-none" }
+              {
+                "component": "label",
+                "use": "other-option",
+                "class": "flex items-start gap-2 p-2 rounded-lg hover:bg-bg-secondary cursor-pointer"
+              },
+              {
+                "component": "input",
+                "use": "radio-other",
+                "props": "type=radio",
+                "class": "mt-0.5 accent-accent-cyan"
+              },
+              {
+                "component": "input",
+                "use": "freetext-input",
+                "props": "type=text placeholder='Other...'",
+                "class": "flex-1 bg-transparent border-b border-border-default text-sm text-text-primary focus:border-accent-cyan outline-none"
+              }
             ]
           },
           {
             "section": "reasoning",
             "layout": "px-3 pb-2",
             "elements": [
-              { "component": "details", "use": "reasoning-toggle", "class": "text-xs text-text-muted" },
-              { "component": "summary", "use": "reasoning-label", "class": "cursor-pointer hover:text-text-secondary", "content": "📝 Add reasoning (optional)" },
-              { "component": "textarea", "use": "reasoning-input", "class": "mt-2 w-full h-16 bg-bg-secondary border border-border-default rounded-md p-2 text-xs text-text-primary resize-none focus:border-accent-cyan outline-none", "props": "placeholder='Why this choice?'" }
+              {
+                "component": "details",
+                "use": "reasoning-toggle",
+                "class": "text-xs text-text-muted"
+              },
+              {
+                "component": "summary",
+                "use": "reasoning-label",
+                "class": "cursor-pointer hover:text-text-secondary",
+                "content": "📝 Add reasoning (optional)"
+              },
+              {
+                "component": "textarea",
+                "use": "reasoning-input",
+                "class": "mt-2 w-full h-16 bg-bg-secondary border border-border-default rounded-md p-2 text-xs text-text-primary resize-none focus:border-accent-cyan outline-none",
+                "props": "placeholder='Why this choice?'"
+              }
             ]
           },
           {
             "section": "auto-proceed",
             "layout": "px-3 py-2 bg-warning/10 border-t border-warning/20",
             "elements": [
-              { "component": "span", "use": "timer-text", "class": "text-xs text-warning", "content": "⏱️ Will auto-proceed with default in {time}" }
+              {
+                "component": "span",
+                "use": "timer-text",
+                "class": "text-xs text-warning",
+                "content": "⏱️ Will auto-proceed with default in {time}"
+              }
             ],
             "condition": "only for preference questions with can_use_default"
           },
@@ -178,8 +352,18 @@
             "section": "footer",
             "layout": "flex items-center justify-end gap-2 px-3 py-2 bg-bg-secondary border-t border-border-subtle",
             "elements": [
-              { "component": "Button", "use": "skip", "props": "variant=ghost size=sm", "content": "Skip for now" },
-              { "component": "Button", "use": "send", "props": "variant=default size=sm", "content": "Send →" }
+              {
+                "component": "Button",
+                "use": "skip",
+                "props": "variant=ghost size=sm",
+                "content": "Skip for now"
+              },
+              {
+                "component": "Button",
+                "use": "send",
+                "props": "variant=default size=sm",
+                "content": "Send →"
+              }
             ]
           }
         ]
@@ -189,24 +373,56 @@
         "name": "Next Question Prompt (after answering)",
         "layout": "absolute bottom-14 w-64 bg-bg-tertiary border border-border-subtle rounded-lg shadow-modal p-3",
         "elements": [
-          { "component": "p", "use": "confirmation", "class": "text-sm text-accent-green mb-2", "content": "✓ Sent to {agent}" },
-          { "component": "p", "use": "next-info", "class": "text-xs text-text-secondary mb-3", "content": "Next: {nextAgent} has a question..." },
-          { "component": "div", "use": "actions", "class": "flex gap-2" },
-          { "component": "Button", "use": "show-now", "props": "variant=default size=sm flex-1", "content": "Show Now" },
-          { "component": "Button", "use": "later", "props": "variant=ghost size=sm flex-1", "content": "Later" }
+          {
+            "component": "p",
+            "use": "confirmation",
+            "class": "text-sm text-accent-green mb-2",
+            "content": "✓ Sent to {agent}"
+          },
+          {
+            "component": "p",
+            "use": "next-info",
+            "class": "text-xs text-text-secondary mb-3",
+            "content": "Next: {nextAgent} has a question..."
+          },
+          {
+            "component": "div",
+            "use": "actions",
+            "class": "flex gap-2"
+          },
+          {
+            "component": "Button",
+            "use": "show-now",
+            "props": "variant=default size=sm flex-1",
+            "content": "Show Now"
+          },
+          {
+            "component": "Button",
+            "use": "later",
+            "props": "variant=ghost size=sm flex-1",
+            "content": "Later"
+          }
         ],
         "auto_dismiss": "3 seconds if no interaction"
       }
     ],
     "question_type_badges": {
-      "blocking": { "class": "bg-error text-white text-[10px] px-1.5 py-0.5 rounded", "text": "BLOCKING" },
-      "preference": { "class": "bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded", "text": "PREFERENCE" },
-      "fyi": { "class": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1.5 py-0.5 rounded", "text": "FYI" }
+      "blocking": {
+        "class": "bg-error text-white text-[10px] px-1.5 py-0.5 rounded",
+        "text": "BLOCKING"
+      },
+      "preference": {
+        "class": "bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded",
+        "text": "PREFERENCE"
+      },
+      "fyi": {
+        "class": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1.5 py-0.5 rounded",
+        "text": "FYI"
+      }
     },
     "animation": {
       "enter": "animate-slide-up (translateY(100%) -> translateY(0), 200ms ease-out)",
       "exit": "animate-slide-down (translateY(0) -> translateY(100%), 150ms ease-in)"
-    },
-    "custom_needed": []
+    }
   }
 }

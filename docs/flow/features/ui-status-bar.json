@@ -5,76 +5,133 @@
   "status": "completed",
   "priority": "high",
   "dependencies": [],
-
   "summary": {
     "goal": "Permanent bottom status bar providing ambient awareness of agent activity, plan context, and session stats across all views.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "Status bar is fixed to bottom of viewport, always visible" },
-      { "id": "ac2", "description": "Context section shows current plan name, version, and status badge" },
-      { "id": "ac3", "description": "Agent avatars section renders slot for each active agent" },
-      { "id": "ac4", "description": "Stats section shows pending questions count and resolved decisions count" },
-      { "id": "ac5", "description": "Meta section shows session duration" },
-      { "id": "ac6", "description": "Status bar can be collapsed to minimal height" },
-      { "id": "ac7", "description": "Clicking pending questions count opens Messages view filtered to pending" }
+      {
+        "id": "ac1",
+        "description": "Status bar is fixed to bottom of viewport, always visible"
+      },
+      {
+        "id": "ac2",
+        "description": "Context section shows current plan name, version, and status badge"
+      },
+      {
+        "id": "ac3",
+        "description": "Agent avatars section renders slot for each active agent"
+      },
+      {
+        "id": "ac4",
+        "description": "Stats section shows pending questions count and resolved decisions count"
+      },
+      {
+        "id": "ac5",
+        "description": "Meta section shows session duration"
+      },
+      {
+        "id": "ac6",
+        "description": "Status bar can be collapsed to minimal height"
+      },
+      {
+        "id": "ac7",
+        "description": "Clicking pending questions count opens Messages view filtered to pending"
+      }
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui"],
+    "scopes": [
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "sb-1",
         "title": "Create StatusBar component shell",
         "scope": "planner-ui",
         "description": "Create StatusBar.tsx with fixed bottom positioning, 4-section layout (context, agents, stats, meta), expanded/collapsed states",
-        "acceptance": ["Component renders at bottom of viewport", "4 sections visible with correct flex layout", "Toggle between 48px and 24px height"]
+        "acceptance": [
+          "Component renders at bottom of viewport",
+          "4 sections visible with correct flex layout",
+          "Toggle between 48px and 24px height"
+        ],
+        "specification": {
+          "design": {
+            "custom_components": [
+              "AgentAvatar - 32x32 circle with emoji/icon, state indicator (dot/ring), tooltip on hover"
+            ]
+          }
+        }
       },
       {
         "step_id": "sb-2",
         "title": "Implement context section",
         "scope": "planner-ui",
         "description": "Plan icon, name (truncated), version badge, status badge. Handle 'no active plan' state.",
-        "acceptance": ["Shows current plan name and version", "Status badge shows draft/approved/published", "Shows 'No active plan' when none selected"]
+        "acceptance": [
+          "Shows current plan name and version",
+          "Status badge shows draft/approved/published",
+          "Shows 'No active plan' when none selected"
+        ]
       },
       {
         "step_id": "sb-3",
         "title": "Implement agents section",
         "scope": "planner-ui",
         "description": "Render AgentAvatar components for each active agent, centered layout",
-        "dependencies": ["aa-1"],
-        "acceptance": ["Avatars render for all active agents", "Avatars centered in section", "Empty state when no agents active"]
+        "dependencies": [
+          "aa-1"
+        ],
+        "acceptance": [
+          "Avatars render for all active agents",
+          "Avatars centered in section",
+          "Empty state when no agents active"
+        ]
       },
       {
         "step_id": "sb-4",
         "title": "Implement stats section",
         "scope": "planner-ui",
         "description": "Pending questions count (clickable), resolved decisions count",
-        "acceptance": ["❓ N shows pending count", "✓ N shows resolved count", "Clicking ❓ navigates to /messages?filter=pending"]
+        "acceptance": [
+          "❓ N shows pending count",
+          "✓ N shows resolved count",
+          "Clicking ❓ navigates to /messages?filter=pending"
+        ]
       },
       {
         "step_id": "sb-5",
         "title": "Implement meta section",
         "scope": "planner-ui",
         "description": "Session timer (mm:ss format), collapse/expand toggle button",
-        "acceptance": ["Timer updates every second", "Toggle collapses/expands bar", "Collapsed state shows only avatars + pending badge"]
+        "acceptance": [
+          "Timer updates every second",
+          "Toggle collapses/expands bar",
+          "Collapsed state shows only avatars + pending badge"
+        ]
       },
       {
         "step_id": "sb-6",
         "title": "Integrate StatusBar into Layout",
         "scope": "planner-ui",
         "description": "Add StatusBar to Layout.tsx, ensure proper z-index and spacing with main content",
-        "acceptance": ["StatusBar visible on all pages", "Main content has bottom padding to not overlap", "Works with existing left sidebar"]
+        "acceptance": [
+          "StatusBar visible on all pages",
+          "Main content has bottom padding to not overlap",
+          "Works with existing left sidebar"
+        ]
       },
       {
         "step_id": "sb-7",
         "title": "Create useAgentOrchestration hook",
         "scope": "planner-ui",
         "description": "Hook to manage agent orchestration state - active agents, questions, decisions. Connects to relay for real-time updates.",
-        "acceptance": ["Hook provides agents list with states", "Hook provides pending/resolved counts", "Updates in real-time from relay"]
+        "acceptance": [
+          "Hook provides agents list with states",
+          "Hook provides pending/resolved counts",
+          "Updates in real-time from relay"
+        ]
       }
     ]
   },
-
   "design_spec": {
     "views": [
       {
@@ -86,33 +143,76 @@
             "section": "context",
             "layout": "flex items-center gap-2 shrink-0",
             "elements": [
-              { "component": "span", "use": "plan-icon", "class": "text-text-muted" },
-              { "component": "span", "use": "plan-name", "class": "text-text-primary text-sm font-medium truncate max-w-[200px]" },
-              { "component": "Badge", "use": "version", "props": "variant=outline size=sm", "class": "text-text-muted" },
-              { "component": "Badge", "use": "status", "props": "variant depends on status (draft=default, approved=success)" }
+              {
+                "component": "span",
+                "use": "plan-icon",
+                "class": "text-text-muted"
+              },
+              {
+                "component": "span",
+                "use": "plan-name",
+                "class": "text-text-primary text-sm font-medium truncate max-w-[200px]"
+              },
+              {
+                "component": "Badge",
+                "use": "version",
+                "props": "variant=outline size=sm",
+                "class": "text-text-muted"
+              },
+              {
+                "component": "Badge",
+                "use": "status",
+                "props": "variant depends on status (draft=default, approved=success)"
+              }
             ]
           },
           {
             "section": "agents",
             "layout": "flex-1 flex items-center justify-center gap-2",
             "elements": [
-              { "component": "AgentAvatar", "use": "each active agent", "custom": true, "note": "32x32 with state indicator" }
+              {
+                "component": "AgentAvatar",
+                "use": "each active agent",
+                "custom": true,
+                "note": "32x32 with state indicator"
+              }
             ]
           },
           {
             "section": "stats",
             "layout": "flex items-center gap-4 shrink-0",
             "elements": [
-              { "component": "button", "use": "pending-questions", "class": "flex items-center gap-1 text-sm hover:text-accent-cyan cursor-pointer", "content": "❓ {count}", "action": "navigate to /messages?filter=pending" },
-              { "component": "span", "use": "resolved-count", "class": "flex items-center gap-1 text-sm text-text-muted", "content": "✓ {count}" }
+              {
+                "component": "button",
+                "use": "pending-questions",
+                "class": "flex items-center gap-1 text-sm hover:text-accent-cyan cursor-pointer",
+                "content": "❓ {count}",
+                "action": "navigate to /messages?filter=pending"
+              },
+              {
+                "component": "span",
+                "use": "resolved-count",
+                "class": "flex items-center gap-1 text-sm text-text-muted",
+                "content": "✓ {count}"
+              }
             ]
           },
           {
             "section": "meta",
             "layout": "flex items-center gap-2 shrink-0",
             "elements": [
-              { "component": "span", "use": "session-timer", "class": "text-sm text-text-muted font-mono", "content": "⏱️ {duration}" },
-              { "component": "button", "use": "collapse-toggle", "class": "p-1 hover:bg-bg-tertiary rounded", "icon": "ChevronDown (16px)" }
+              {
+                "component": "span",
+                "use": "session-timer",
+                "class": "text-sm text-text-muted font-mono",
+                "content": "⏱️ {duration}"
+              },
+              {
+                "component": "button",
+                "use": "collapse-toggle",
+                "class": "p-1 hover:bg-bg-tertiary rounded",
+                "icon": "ChevronDown (16px)"
+              }
             ]
           }
         ]
@@ -122,9 +222,24 @@
         "name": "Status Bar (Collapsed)",
         "layout": "fixed bottom-0 left-0 right-0 h-6 bg-bg-secondary border-t border-border-subtle z-50 flex items-center justify-center gap-2",
         "elements": [
-          { "component": "AgentAvatar", "use": "each active agent", "props": "size=sm (20x20)" },
-          { "component": "span", "use": "pending-badge", "class": "text-xs text-error", "content": "❓{count}", "condition": "count > 0" },
-          { "component": "button", "use": "expand-toggle", "class": "absolute right-2 p-0.5 hover:bg-bg-tertiary rounded", "icon": "ChevronUp (14px)" }
+          {
+            "component": "AgentAvatar",
+            "use": "each active agent",
+            "props": "size=sm (20x20)"
+          },
+          {
+            "component": "span",
+            "use": "pending-badge",
+            "class": "text-xs text-error",
+            "content": "❓{count}",
+            "condition": "count > 0"
+          },
+          {
+            "component": "button",
+            "use": "expand-toggle",
+            "class": "absolute right-2 p-0.5 hover:bg-bg-tertiary rounded",
+            "icon": "ChevronUp (14px)"
+          }
         ]
       }
     ],
@@ -138,9 +253,6 @@
         "effect": "❓ badge uses text-error color, pulses if count > 5"
       }
     },
-    "custom_needed": [
-      "AgentAvatar - 32x32 circle with emoji/icon, state indicator (dot/ring), tooltip on hover"
-    ],
     "responsive": {
       "mobile": "Hide context section, show only agents + stats in collapsed mode"
     }

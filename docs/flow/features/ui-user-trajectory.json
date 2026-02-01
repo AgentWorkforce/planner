@@ -4,19 +4,45 @@
   "type": "feature",
   "status": "in_progress",
   "priority": "medium",
-  "dependencies": ["ui-question-queue", "ui-chat-bubbles"],
-
+  "dependencies": [
+    "ui-question-queue",
+    "ui-chat-bubbles"
+  ],
   "summary": {
     "goal": "Capture user decisions as trajectory events using @agent-relay/trajectory library, enable agents to query past answers before asking, and build a preference model over time.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "User answers recorded via @agent-relay/trajectory recordDecision()" },
-      { "id": "ac2", "description": "Event includes question context, selected option, free text, reasoning" },
-      { "id": "ac3", "description": "Event links to agent trajectory via trajectoryId" },
-      { "id": "ac4", "description": "Agents query trajectory via listTrajectorySteps() for similar decisions" },
-      { "id": "ac5", "description": "If similar question found, agent uses existing answer (no re-ask)" },
-      { "id": "ac6", "description": "Decision Log view renders trajectory data with filtering" },
-      { "id": "ac7", "description": "Preference model derived from trajectory queries" },
-      { "id": "ac8", "description": "Agents can query preference model to order options intelligently" }
+      {
+        "id": "ac1",
+        "description": "User answers recorded via @agent-relay/trajectory recordDecision()"
+      },
+      {
+        "id": "ac2",
+        "description": "Event includes question context, selected option, free text, reasoning"
+      },
+      {
+        "id": "ac3",
+        "description": "Event links to agent trajectory via trajectoryId"
+      },
+      {
+        "id": "ac4",
+        "description": "Agents query trajectory via listTrajectorySteps() for similar decisions"
+      },
+      {
+        "id": "ac5",
+        "description": "If similar question found, agent uses existing answer (no re-ask)"
+      },
+      {
+        "id": "ac6",
+        "description": "Decision Log view renders trajectory data with filtering"
+      },
+      {
+        "id": "ac7",
+        "description": "Preference model derived from trajectory queries"
+      },
+      {
+        "id": "ac8",
+        "description": "Agents can query preference model to order options intelligently"
+      }
     ],
     "out_of_scope_v1": [
       "Cross-plan global trajectory (plan-scoped only)",
@@ -25,9 +51,11 @@
       "Custom trajectory storage tables (using @agent-relay/trajectory instead)"
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui", "planner-core"],
+    "scopes": [
+      "planner-ui",
+      "planner-core"
+    ],
     "steps": [
       {
         "step_id": "step-1-refactor",
@@ -35,11 +63,25 @@
         "title": "Remove custom trajectory_events table",
         "description": "Remove trajectory_events table from src/storage/schema.ts. Remove related methods from sqlite.ts (createTrajectoryEvent, listTrajectoryEvents, findSimilarQuestions). Clean up trajectory storage interface.",
         "acceptance_criteria": [
-          { "id": "ac1-1", "description": "trajectory_events table definition removed from schema.ts" },
-          { "id": "ac1-2", "description": "Storage methods removed from sqlite.ts" },
-          { "id": "ac1-3", "description": "Storage interface cleaned up" }
+          {
+            "id": "ac1-1",
+            "description": "trajectory_events table definition removed from schema.ts"
+          },
+          {
+            "id": "ac1-2",
+            "description": "Storage methods removed from sqlite.ts"
+          },
+          {
+            "id": "ac1-3",
+            "description": "Storage interface cleaned up"
+          }
         ],
-        "dependencies": []
+        "dependencies": [],
+        "specification": {
+          "design": {
+            "custom_components": []
+          }
+        }
       },
       {
         "step_id": "step-2-refactor",
@@ -47,12 +89,26 @@
         "title": "Refactor TrajectoryService to use @agent-relay/trajectory",
         "description": "Update src/trajectory/service.ts to import from @agent-relay/trajectory. Use recordDecision(), listTrajectorySteps(), getTrajectoryHistory(). Remove custom SQL storage. Maintain same public API for handlers.",
         "acceptance_criteria": [
-          { "id": "ac2-1", "description": "Imports @agent-relay/trajectory functions" },
-          { "id": "ac2-2", "description": "recordDecision() uses relay trajectory recordDecision()" },
-          { "id": "ac2-3", "description": "queryEvents() uses listTrajectorySteps() and filters" },
-          { "id": "ac2-4", "description": "Same public interface maintained for handlers" }
+          {
+            "id": "ac2-1",
+            "description": "Imports @agent-relay/trajectory functions"
+          },
+          {
+            "id": "ac2-2",
+            "description": "recordDecision() uses relay trajectory recordDecision()"
+          },
+          {
+            "id": "ac2-3",
+            "description": "queryEvents() uses listTrajectorySteps() and filters"
+          },
+          {
+            "id": "ac2-4",
+            "description": "Same public interface maintained for handlers"
+          }
         ],
-        "dependencies": ["step-1-refactor"]
+        "dependencies": [
+          "step-1-refactor"
+        ]
       },
       {
         "step_id": "step-3-refactor",
@@ -60,11 +116,22 @@
         "title": "Update API handlers to use refactored service",
         "description": "Update src/api/handlers/trajectories.ts to work with refactored TrajectoryService. Same HTTP endpoints, now backed by relay trajectory. Update response format if needed to match relay types.",
         "acceptance_criteria": [
-          { "id": "ac3-1", "description": "Handlers use refactored TrajectoryService" },
-          { "id": "ac3-2", "description": "HTTP interface unchanged (frontend compatible)" },
-          { "id": "ac3-3", "description": "Response types align with relay trajectory format" }
+          {
+            "id": "ac3-1",
+            "description": "Handlers use refactored TrajectoryService"
+          },
+          {
+            "id": "ac3-2",
+            "description": "HTTP interface unchanged (frontend compatible)"
+          },
+          {
+            "id": "ac3-3",
+            "description": "Response types align with relay trajectory format"
+          }
         ],
-        "dependencies": ["step-2-refactor"]
+        "dependencies": [
+          "step-2-refactor"
+        ]
       },
       {
         "step_id": "step-4-refactor",
@@ -72,11 +139,22 @@
         "title": "Update domain types to match relay trajectory",
         "description": "Update src/domain/trajectory.ts to align DecisionEvent with @agent-relay/trajectory DecisionOptions. Remove redundant types. Keep DerivedPreference for preference calculation.",
         "acceptance_criteria": [
-          { "id": "ac4-1", "description": "DecisionEvent aligns with relay DecisionOptions" },
-          { "id": "ac4-2", "description": "Redundant types removed" },
-          { "id": "ac4-3", "description": "DerivedPreference retained for UI" }
+          {
+            "id": "ac4-1",
+            "description": "DecisionEvent aligns with relay DecisionOptions"
+          },
+          {
+            "id": "ac4-2",
+            "description": "Redundant types removed"
+          },
+          {
+            "id": "ac4-3",
+            "description": "DerivedPreference retained for UI"
+          }
         ],
-        "dependencies": ["step-2-refactor"]
+        "dependencies": [
+          "step-2-refactor"
+        ]
       },
       {
         "step_id": "step-5-refactor",
@@ -84,10 +162,18 @@
         "title": "Update frontend types to match new backend",
         "description": "Update packages/planner-ui/src/types/trajectory.ts to match refactored backend types. Ensure DecisionEvent matches relay trajectory format.",
         "acceptance_criteria": [
-          { "id": "ac5-1", "description": "Frontend DecisionEvent matches backend" },
-          { "id": "ac5-2", "description": "API responses properly typed" }
+          {
+            "id": "ac5-1",
+            "description": "Frontend DecisionEvent matches backend"
+          },
+          {
+            "id": "ac5-2",
+            "description": "API responses properly typed"
+          }
         ],
-        "dependencies": ["step-4-refactor"]
+        "dependencies": [
+          "step-4-refactor"
+        ]
       },
       {
         "step_id": "step-6-verify",
@@ -95,19 +181,32 @@
         "title": "Test refactored trajectory integration",
         "description": "Test that decisions are recorded via relay trajectory. Verify listTrajectorySteps returns decisions. Test preference derivation still works. Verify API endpoints return correct data.",
         "acceptance_criteria": [
-          { "id": "ac6-1", "description": "Decisions recorded to relay trajectory storage" },
-          { "id": "ac6-2", "description": "API endpoints return decision data" },
-          { "id": "ac6-3", "description": "Preferences derived correctly" },
-          { "id": "ac6-4", "description": "Decision Log UI still works" }
+          {
+            "id": "ac6-1",
+            "description": "Decisions recorded to relay trajectory storage"
+          },
+          {
+            "id": "ac6-2",
+            "description": "API endpoints return decision data"
+          },
+          {
+            "id": "ac6-3",
+            "description": "Preferences derived correctly"
+          },
+          {
+            "id": "ac6-4",
+            "description": "Decision Log UI still works"
+          }
         ],
-        "dependencies": ["step-5-refactor"]
+        "dependencies": [
+          "step-5-refactor"
+        ]
       }
     ],
     "previous_steps_completed": [
       "step-5 through step-14: UI components (DecisionRow, DecisionList, DecisionLogHeader, DecisionEmptyState, DecisionDetailSheet, PreferencesSummary, DecisionLogPage, ChatBubble integration, navigation) - these remain unchanged"
     ]
   },
-
   "design_spec": {
     "views": [
       {
@@ -119,7 +218,11 @@
           "container": "flex flex-col h-full bg-bg-primary",
           "maxWidth": "max-w-4xl mx-auto"
         },
-        "components": ["DecisionLogHeader", "DecisionList", "DecisionEmptyState"]
+        "components": [
+          "DecisionLogHeader",
+          "DecisionList",
+          "DecisionEmptyState"
+        ]
       },
       {
         "view_id": "decision-detail",
@@ -159,10 +262,8 @@
       "POST /api/plans/:planId/trajectory/decision": "Record decision via relay trajectory",
       "GET /api/plans/:planId/trajectory/preferences": "Get derived preferences (computed from decisions)",
       "GET /api/plans/:planId/trajectory/similar?text=": "Find similar past questions from trajectory"
-    },
-    "custom_needed": []
+    }
   },
-
   "change_history": [
     {
       "date": "2026-01-30",

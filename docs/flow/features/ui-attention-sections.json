@@ -5,22 +5,43 @@
   "status": "in_progress",
   "change_note": "2026-01-31: Completed PlanCard navigation enhancements (ac8-ac12, steps i011-i016). Steps i011-i016 implemented: backend API, PlanSummary type, ProgressBar, AgentActivityDot, QuestionsBadge, PlanCard integration. Step i017 (tests) deferred due to pre-existing test file issues requiring separate cleanup.",
   "priority": "high",
-  "dependencies": ["ui-attention-signals"],
-
+  "dependencies": [
+    "ui-attention-signals"
+  ],
   "summary": {
     "goal": "Render attention-based sections on the plans list page with clear visual hierarchy and action affordances.",
     "context": "The plans page transforms from a flat list to a prioritized dashboard. 'Needs Attention' surfaces actionable items at top. 'Working On' shows active work. Visual design follows relay-dashboard patterns with mission control aesthetic.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "Needs Attention section appears at top when plans need action" },
-      { "id": "ac2", "description": "Each attention type shows distinct icon, label, and count" },
-      { "id": "ac3", "description": "Attention items show time context (e.g., 'submitted 2h ago', 'stale for 14 days')" },
-      { "id": "ac4", "description": "Working On section shows drafts updated recently and running executions" },
-      { "id": "ac5", "description": "Sections are collapsible with remembered state" },
-      { "id": "ac6", "description": "Empty Needs Attention shows celebratory message ('All caught up')" },
-      { "id": "ac7", "description": "Visual priority: glow/accent on urgent items (failed, change_request)" }
+      {
+        "id": "ac1",
+        "description": "Needs Attention section appears at top when plans need action"
+      },
+      {
+        "id": "ac2",
+        "description": "Each attention type shows distinct icon, label, and count"
+      },
+      {
+        "id": "ac3",
+        "description": "Attention items show time context (e.g., 'submitted 2h ago', 'stale for 14 days')"
+      },
+      {
+        "id": "ac4",
+        "description": "Working On section shows drafts updated recently and running executions"
+      },
+      {
+        "id": "ac5",
+        "description": "Sections are collapsible with remembered state"
+      },
+      {
+        "id": "ac6",
+        "description": "Empty Needs Attention shows celebratory message ('All caught up')"
+      },
+      {
+        "id": "ac7",
+        "description": "Visual priority: glow/accent on urgent items (failed, change_request)"
+      }
     ]
   },
-
   "design_spec": {
     "views": [
       {
@@ -28,9 +49,21 @@
         "name": "Needs Attention Section",
         "layout": "Full width section with grouped attention items by type",
         "elements": [
-          { "component": "SectionHeader", "use": "Section title with count badge", "props": "collapsible, glow accent when items present" },
-          { "component": "AttentionGroup", "use": "Group header (e.g., 'Awaiting Approval (3)')", "props": "icon, label, count" },
-          { "component": "AttentionItem", "use": "Plan card with attention context", "props": "plan summary + attention badge + time context" }
+          {
+            "component": "SectionHeader",
+            "use": "Section title with count badge",
+            "props": "collapsible, glow accent when items present"
+          },
+          {
+            "component": "AttentionGroup",
+            "use": "Group header (e.g., 'Awaiting Approval (3)')",
+            "props": "icon, label, count"
+          },
+          {
+            "component": "AttentionItem",
+            "use": "Plan card with attention context",
+            "props": "plan summary + attention badge + time context"
+          }
         ],
         "states": {
           "empty": "Centered 'All caught up' message with checkmark icon, muted green accent",
@@ -43,24 +76,28 @@
         "name": "Working On Section",
         "layout": "Full width section with active plans",
         "elements": [
-          { "component": "SectionHeader", "use": "Section title", "props": "collapsible" },
-          { "component": "ActivePlanCard", "use": "Draft or running plan", "props": "status indicator, last activity time" }
+          {
+            "component": "SectionHeader",
+            "use": "Section title",
+            "props": "collapsible"
+          },
+          {
+            "component": "ActivePlanCard",
+            "use": "Draft or running plan",
+            "props": "status indicator, last activity time"
+          }
         ],
         "states": {
           "empty": "Hidden entirely when no active work",
           "collapsed": "Section header only with count"
         }
       }
-    ],
-    "custom_needed": [
-      "AttentionGroup - collapsible group with icon, label, count",
-      "AttentionItem - plan card variant with attention badge and time context",
-      "AttentionBadge - icon + label for attention type with appropriate color"
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui"],
+    "scopes": [
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "i000",
@@ -70,24 +107,59 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PlanSummary has attention_types?: AttentionType[] field" },
-          { "id": "ac2", "description": "AttentionType enum is exported from @/types" },
-          { "id": "ac3", "description": "listPlans() returns plans with attention_types populated" }
+          {
+            "id": "ac1",
+            "description": "PlanSummary has attention_types?: AttentionType[] field"
+          },
+          {
+            "id": "ac2",
+            "description": "AttentionType enum is exported from @/types"
+          },
+          {
+            "id": "ac3",
+            "description": "listPlans() returns plans with attention_types populated"
+          }
         ],
-        "gate": { "type": "human_approval", "approver_role": "tech-lead" }
+        "gate": {
+          "type": "human_approval",
+          "approver_role": "tech-lead"
+        },
+        "specification": {
+          "design": {
+            "custom_components": [
+              "AttentionGroup - collapsible group with icon, label, count",
+              "AttentionItem - plan card variant with attention badge and time context",
+              "AttentionBadge - icon + label for attention type with appropriate color"
+            ]
+          }
+        }
       },
       {
         "step_id": "i001",
         "title": "Create attention type icons",
         "scope": "planner-ui",
         "description": "Create new icons for attention types following existing icon pattern (see AlertIcon.tsx).\n\nCreate in packages/planner-ui/src/components/icons/:\n- ClockIcon.tsx (for awaiting_approval, stale_draft) - clock face\n- RefreshIcon.tsx (for change_request) - circular arrows\n- GateIcon.tsx (for gate_pending) - gate/barrier symbol\n- PlayIcon.tsx (for active/running) - play triangle\n\nFollow IconProps interface with size variants (sm: 14px, md: 16px, lg: 20px, xl: 24px). Export from icons/index.ts.",
-        "dependencies": ["i000"],
+        "dependencies": [
+          "i000"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "ClockIcon, RefreshIcon, GateIcon, PlayIcon created in components/icons/" },
-          { "id": "ac2", "description": "All icons use IconProps with size prop" },
-          { "id": "ac3", "description": "All icons exported from icons/index.ts" },
-          { "id": "ac4", "description": "Icons use currentColor for stroke, stroke-width 2" }
+          {
+            "id": "ac1",
+            "description": "ClockIcon, RefreshIcon, GateIcon, PlayIcon created in components/icons/"
+          },
+          {
+            "id": "ac2",
+            "description": "All icons use IconProps with size prop"
+          },
+          {
+            "id": "ac3",
+            "description": "All icons exported from icons/index.ts"
+          },
+          {
+            "id": "ac4",
+            "description": "Icons use currentColor for stroke, stroke-width 2"
+          }
         ]
       },
       {
@@ -98,10 +170,22 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "formatRelativeTime(date) returns human-readable relative time" },
-          { "id": "ac2", "description": "Uses Intl.RelativeTimeFormat for localization support" },
-          { "id": "ac3", "description": "Handles edge cases (invalid date, future dates)" },
-          { "id": "ac4", "description": "Unit tests cover common scenarios (seconds, minutes, hours, days, weeks)" }
+          {
+            "id": "ac1",
+            "description": "formatRelativeTime(date) returns human-readable relative time"
+          },
+          {
+            "id": "ac2",
+            "description": "Uses Intl.RelativeTimeFormat for localization support"
+          },
+          {
+            "id": "ac3",
+            "description": "Handles edge cases (invalid date, future dates)"
+          },
+          {
+            "id": "ac4",
+            "description": "Unit tests cover common scenarios (seconds, minutes, hours, days, weeks)"
+          }
         ]
       },
       {
@@ -109,14 +193,31 @@
         "title": "Create AttentionBadge component",
         "scope": "planner-ui",
         "description": "Component that renders icon + label for each attention type with appropriate color scheme.\n\nCreate packages/planner-ui/src/components/AttentionBadge.tsx:\n\nProps:\n- type: AttentionType\n- variant: 'compact' | 'full' (default 'full')\n- className?: string\n\nColor mapping (using CSS variables):\n- awaiting_approval: bg-warning/10 text-warning (orange)\n- change_request: bg-accent-purple/10 text-accent-purple (purple)\n- gate_pending: bg-warning/10 text-warning (orange)\n- execution_failed: bg-error/10 text-error (red) + shadow-glow effect\n- stale_draft: bg-bg-tertiary text-text-muted (muted gray)\n- active: bg-accent-cyan/10 text-accent-cyan (cyan)\n- unread_comments: bg-accent-cyan/10 text-accent-cyan (cyan)\n\nCompact mode: icon only (16px). Full mode: icon + label text.",
-        "dependencies": ["i001"],
+        "dependencies": [
+          "i001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Renders correct icon for each AttentionType using icons from i001" },
-          { "id": "ac2", "description": "Uses CSS variable colors: warning, accent-purple, error, accent-cyan, text-muted" },
-          { "id": "ac3", "description": "compact variant renders icon only (16px)" },
-          { "id": "ac4", "description": "full variant renders icon + human-readable label" },
-          { "id": "ac5", "description": "execution_failed type has glow effect (shadow-[0_0_12px_rgba(255,71,87,0.4)])" }
+          {
+            "id": "ac1",
+            "description": "Renders correct icon for each AttentionType using icons from i001"
+          },
+          {
+            "id": "ac2",
+            "description": "Uses CSS variable colors: warning, accent-purple, error, accent-cyan, text-muted"
+          },
+          {
+            "id": "ac3",
+            "description": "compact variant renders icon only (16px)"
+          },
+          {
+            "id": "ac4",
+            "description": "full variant renders icon + human-readable label"
+          },
+          {
+            "id": "ac5",
+            "description": "execution_failed type has glow effect (shadow-[0_0_12px_rgba(255,71,87,0.4)])"
+          }
         ]
       },
       {
@@ -124,15 +225,36 @@
         "title": "Create AttentionItem component",
         "scope": "planner-ui",
         "description": "Card variant for plans in attention sections. Shows plan goal, attention badge, and time context.\n\nCreate packages/planner-ui/src/components/AttentionItem.tsx:\n\nProps:\n- plan: PlanSummary (with attention_types)\n- timeContext: string (e.g., 'submitted 2h ago')\n- className?: string\n\nLayout:\n- Same base card style as PlansListPage (bg-bg-card border border-border-subtle rounded-xl)\n- Left accent border colored by attention type (border-l-4)\n- Plan goal (truncated), version, scope badges\n- AttentionBadge (compact) + time context on right\n- Link wraps entire card, navigates to /plans/{plan_id}\n- Hover: subtle glow matching attention type color\n\nReuse existing card pattern from PlansListPage.tsx (getCardAccentClasses pattern).",
-        "dependencies": ["i002", "i003"],
+        "dependencies": [
+          "i002",
+          "i003"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Shows plan.goal truncated with ellipsis" },
-          { "id": "ac2", "description": "Shows AttentionBadge (compact) for primary attention type" },
-          { "id": "ac3", "description": "Shows timeContext text (e.g., 'submitted 2h ago')" },
-          { "id": "ac4", "description": "Left border colored by attention type" },
-          { "id": "ac5", "description": "Hover shows subtle glow matching attention color" },
-          { "id": "ac6", "description": "Clicking navigates to /plans/{plan_id}" }
+          {
+            "id": "ac1",
+            "description": "Shows plan.goal truncated with ellipsis"
+          },
+          {
+            "id": "ac2",
+            "description": "Shows AttentionBadge (compact) for primary attention type"
+          },
+          {
+            "id": "ac3",
+            "description": "Shows timeContext text (e.g., 'submitted 2h ago')"
+          },
+          {
+            "id": "ac4",
+            "description": "Left border colored by attention type"
+          },
+          {
+            "id": "ac5",
+            "description": "Hover shows subtle glow matching attention color"
+          },
+          {
+            "id": "ac6",
+            "description": "Clicking navigates to /plans/{plan_id}"
+          }
         ]
       },
       {
@@ -143,13 +265,34 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Header shows title and count badge when count > 0" },
-          { "id": "ac2", "description": "Clicking header toggles collapsed state" },
-          { "id": "ac3", "description": "ChevronIcon rotates smoothly (transform: rotate)" },
-          { "id": "ac4", "description": "Collapsed state persists in localStorage as 'section-collapsed-{sectionId}'" },
-          { "id": "ac5", "description": "Content animates with max-height transition (200ms)" },
-          { "id": "ac6", "description": "hideWhenEmpty=true hides entire section when no children" },
-          { "id": "ac7", "description": "emptyState shown when no children and not hidden" }
+          {
+            "id": "ac1",
+            "description": "Header shows title and count badge when count > 0"
+          },
+          {
+            "id": "ac2",
+            "description": "Clicking header toggles collapsed state"
+          },
+          {
+            "id": "ac3",
+            "description": "ChevronIcon rotates smoothly (transform: rotate)"
+          },
+          {
+            "id": "ac4",
+            "description": "Collapsed state persists in localStorage as 'section-collapsed-{sectionId}'"
+          },
+          {
+            "id": "ac5",
+            "description": "Content animates with max-height transition (200ms)"
+          },
+          {
+            "id": "ac6",
+            "description": "hideWhenEmpty=true hides entire section when no children"
+          },
+          {
+            "id": "ac7",
+            "description": "emptyState shown when no children and not hidden"
+          }
         ]
       },
       {
@@ -157,15 +300,36 @@
         "title": "Create NeedsAttentionSection component",
         "scope": "planner-ui",
         "description": "Groups plans by attention type, showing most urgent items first.\n\nCreate packages/planner-ui/src/components/NeedsAttentionSection.tsx:\n\nProps:\n- plans: PlanSummary[] (filtered to those with attention needs)\n\nBehavior:\n1. Filter out plans with attention_types = ['none'] or ['active']\n2. Group by primary attention type (attention_types[0])\n3. Sort groups by urgency: execution_failed > change_request > gate_pending > awaiting_approval > stale_draft > unread_comments\n4. Within each group, sort by updated_at (most recent first)\n\nLayout:\n- Uses CollapsibleSection with title 'Needs Attention' and accentColor based on highest urgency\n- Each group: heading with icon + label + count (e.g., 'Failed Executions (2)')\n- AttentionItems under each group heading\n- Empty state: CheckIcon with 'All caught up!' message in success/green accent",
-        "dependencies": ["i004", "i005"],
+        "dependencies": [
+          "i004",
+          "i005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Groups plans by attention_types[0] (primary attention)" },
-          { "id": "ac2", "description": "Groups sorted: execution_failed > change_request > gate_pending > awaiting_approval > stale_draft > unread_comments" },
-          { "id": "ac3", "description": "Each group shows icon, label, and count" },
-          { "id": "ac4", "description": "Plans within group sorted by updated_at descending" },
-          { "id": "ac5", "description": "Empty state shows CheckIcon + 'All caught up!' with success accent" },
-          { "id": "ac6", "description": "Uses CollapsibleSection with sectionId='needs-attention'" }
+          {
+            "id": "ac1",
+            "description": "Groups plans by attention_types[0] (primary attention)"
+          },
+          {
+            "id": "ac2",
+            "description": "Groups sorted: execution_failed > change_request > gate_pending > awaiting_approval > stale_draft > unread_comments"
+          },
+          {
+            "id": "ac3",
+            "description": "Each group shows icon, label, and count"
+          },
+          {
+            "id": "ac4",
+            "description": "Plans within group sorted by updated_at descending"
+          },
+          {
+            "id": "ac5",
+            "description": "Empty state shows CheckIcon + 'All caught up!' with success accent"
+          },
+          {
+            "id": "ac6",
+            "description": "Uses CollapsibleSection with sectionId='needs-attention'"
+          }
         ]
       },
       {
@@ -173,14 +337,32 @@
         "title": "Create WorkingOnSection component",
         "scope": "planner-ui",
         "description": "Shows user's active work: drafts updated recently and running executions.\n\nCreate packages/planner-ui/src/components/WorkingOnSection.tsx:\n\nProps:\n- plans: PlanSummary[] (filtered to those with 'active' attention type)\n\nBehavior:\n1. Filter to plans where attention_types includes 'active'\n2. Sort by updated_at descending (most recently touched first)\n3. Hide section entirely if no active plans (hideWhenEmpty=true)\n\nLayout:\n- Uses CollapsibleSection with title 'Working On' and accentColor='cyan'\n- AttentionItems showing plan goal + 'Last edited X ago' or 'Running' for executions\n- Simpler than NeedsAttention - no grouping, just a list",
-        "dependencies": ["i004", "i005"],
+        "dependencies": [
+          "i004",
+          "i005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Shows plans with attention_types including 'active'" },
-          { "id": "ac2", "description": "Sorted by updated_at descending" },
-          { "id": "ac3", "description": "Section hidden entirely when no active plans" },
-          { "id": "ac4", "description": "Uses CollapsibleSection with sectionId='working-on' and hideWhenEmpty=true" },
-          { "id": "ac5", "description": "Time context shows 'Last edited X ago' or 'Running'" }
+          {
+            "id": "ac1",
+            "description": "Shows plans with attention_types including 'active'"
+          },
+          {
+            "id": "ac2",
+            "description": "Sorted by updated_at descending"
+          },
+          {
+            "id": "ac3",
+            "description": "Section hidden entirely when no active plans"
+          },
+          {
+            "id": "ac4",
+            "description": "Uses CollapsibleSection with sectionId='working-on' and hideWhenEmpty=true"
+          },
+          {
+            "id": "ac5",
+            "description": "Time context shows 'Last edited X ago' or 'Running'"
+          }
         ]
       },
       {
@@ -188,13 +370,27 @@
         "title": "Create useAttentionPlans hook",
         "scope": "planner-ui",
         "description": "Hook to categorize plans into attention sections for PlansListPage.\n\nCreate packages/planner-ui/src/hooks/useAttentionPlans.ts:\n\nexport function useAttentionPlans(plans: PlanSummary[]): {\n  needsAttention: PlanSummary[];\n  workingOn: PlanSummary[];\n  allOther: PlanSummary[];\n  loading: boolean;\n}\n\nCategorization rules:\n- needsAttention: plans with attention_types that include urgent types (not 'none', not only 'active')\n- workingOn: plans with attention_types including 'active'\n- allOther: remaining plans (can overlap with workingOn - user might want to see all)\n\nMemoize categorization to prevent unnecessary re-renders.",
-        "dependencies": ["i000"],
+        "dependencies": [
+          "i000"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Returns needsAttention array with urgent plans" },
-          { "id": "ac2", "description": "Returns workingOn array with active plans" },
-          { "id": "ac3", "description": "Returns allOther array with remaining plans" },
-          { "id": "ac4", "description": "Uses useMemo to prevent unnecessary recalculations" }
+          {
+            "id": "ac1",
+            "description": "Returns needsAttention array with urgent plans"
+          },
+          {
+            "id": "ac2",
+            "description": "Returns workingOn array with active plans"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns allOther array with remaining plans"
+          },
+          {
+            "id": "ac4",
+            "description": "Uses useMemo to prevent unnecessary recalculations"
+          }
         ]
       },
       {
@@ -202,16 +398,41 @@
         "title": "Integrate sections into PlansListPage",
         "scope": "planner-ui",
         "description": "Replace current flat list in PlansListPage with attention-based sections.\n\nModify packages/planner-ui/src/pages/PlansListPage.tsx:\n\n1. Import new components: NeedsAttentionSection, WorkingOnSection, CollapsibleSection\n2. Use useAttentionPlans hook to categorize fetched plans\n3. Update layout:\n   - Header section stays the same (title, description, New Plan button)\n   - Remove filter tabs (or move to All Plans section)\n   - Add NeedsAttentionSection at top\n   - Add WorkingOnSection below\n   - Add 'All Plans' CollapsibleSection at bottom with existing filter + list\n\n4. Preserve existing functionality:\n   - Filter tabs work within All Plans section\n   - Empty state still shows when zero total plans\n   - Error state unchanged\n   - Loading state shows skeletons for all sections",
-        "dependencies": ["i006", "i007", "i008"],
+        "dependencies": [
+          "i006",
+          "i007",
+          "i008"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Page shows sections in order: Needs Attention, Working On, All Plans" },
-          { "id": "ac2", "description": "Needs Attention section visible when plans need action" },
-          { "id": "ac3", "description": "Working On section visible when active plans exist (hidden when empty)" },
-          { "id": "ac4", "description": "All Plans section contains filter tabs and remaining plans" },
-          { "id": "ac5", "description": "Existing filter functionality works in All Plans section" },
-          { "id": "ac6", "description": "Empty state (no plans at all) shows original empty state UI" },
-          { "id": "ac7", "description": "Loading state shows skeleton matching section structure" }
+          {
+            "id": "ac1",
+            "description": "Page shows sections in order: Needs Attention, Working On, All Plans"
+          },
+          {
+            "id": "ac2",
+            "description": "Needs Attention section visible when plans need action"
+          },
+          {
+            "id": "ac3",
+            "description": "Working On section visible when active plans exist (hidden when empty)"
+          },
+          {
+            "id": "ac4",
+            "description": "All Plans section contains filter tabs and remaining plans"
+          },
+          {
+            "id": "ac5",
+            "description": "Existing filter functionality works in All Plans section"
+          },
+          {
+            "id": "ac6",
+            "description": "Empty state (no plans at all) shows original empty state UI"
+          },
+          {
+            "id": "ac7",
+            "description": "Loading state shows skeleton matching section structure"
+          }
         ]
       },
       {
@@ -219,22 +440,34 @@
         "title": "Add skeleton loading states",
         "scope": "planner-ui",
         "description": "Create skeleton components for attention sections during loading.\n\nCreate packages/planner-ui/src/components/AttentionSkeleton.tsx:\n\n- SectionSkeleton: matches CollapsibleSection header shape\n- AttentionItemSkeleton: matches AttentionItem card shape\n\nUse existing skeleton pattern (bg-bg-tertiary animate-pulse rounded).\n\nUpdate PlansListPage loading state to show:\n- 1 SectionSkeleton for Needs Attention with 2 AttentionItemSkeletons\n- 1 SectionSkeleton for Working On with 1 AttentionItemSkeleton\n- Existing list skeletons for All Plans",
-        "dependencies": ["i009"],
+        "dependencies": [
+          "i009"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "SectionSkeleton matches CollapsibleSection header dimensions" },
-          { "id": "ac2", "description": "AttentionItemSkeleton matches AttentionItem card dimensions" },
-          { "id": "ac3", "description": "Skeletons use bg-bg-tertiary with animate-pulse" },
-          { "id": "ac4", "description": "PlansListPage loading state shows appropriate skeletons" }
+          {
+            "id": "ac1",
+            "description": "SectionSkeleton matches CollapsibleSection header dimensions"
+          },
+          {
+            "id": "ac2",
+            "description": "AttentionItemSkeleton matches AttentionItem card dimensions"
+          },
+          {
+            "id": "ac3",
+            "description": "Skeletons use bg-bg-tertiary with animate-pulse"
+          },
+          {
+            "id": "ac4",
+            "description": "PlansListPage loading state shows appropriate skeletons"
+          }
         ]
       }
     ]
   },
-
   "plan_tests": {
     "coverage": "unit",
     "priority": "high",
-    "strategy": "Focus on logic correctness and key behaviors. Visual styling verified manually during implementation.",
     "cases": [
       {
         "type": "happy",
@@ -378,6 +611,11 @@
       "localStorage mock for persistence tests"
     ]
   },
-
-  "references": []
+  "references": [],
+  "context": {
+    "tester": {
+      "strategy": "Focus on logic correctness and key behaviors. Visual styling verified manually during implementation.",
+      "migrated_from": "plan_tests"
+    }
+  }
 }

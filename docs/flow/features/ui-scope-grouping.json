@@ -4,23 +4,43 @@
   "type": "feature",
   "status": "completed",
   "priority": "medium",
-  "dependencies": ["ui-attention-sections"],
-
+  "dependencies": [
+    "ui-attention-sections"
+  ],
   "summary": {
     "goal": "Group plans in 'All Plans' section by scope for easier navigation of large plan sets.",
     "context": "Plans have scopes (repos, services, domains) in their data model. Grouping by scope helps users find related plans. This is orthogonal to attention-based sections - it organizes the 'everything else' view.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "All Plans section can toggle between flat list and grouped-by-scope view" },
-      { "id": "ac2", "description": "Scope groups are collapsible with plan count badges" },
-      { "id": "ac3", "description": "Plans with multiple scopes appear under each relevant scope" },
-      { "id": "ac4", "description": "Plans with no scope appear under 'Uncategorized' group" },
-      { "id": "ac5", "description": "Search/filter works within grouped view" },
-      { "id": "ac6", "description": "View preference (flat vs grouped) persists in localStorage" }
+      {
+        "id": "ac1",
+        "description": "All Plans section can toggle between flat list and grouped-by-scope view"
+      },
+      {
+        "id": "ac2",
+        "description": "Scope groups are collapsible with plan count badges"
+      },
+      {
+        "id": "ac3",
+        "description": "Plans with multiple scopes appear under each relevant scope"
+      },
+      {
+        "id": "ac4",
+        "description": "Plans with no scope appear under 'Uncategorized' group"
+      },
+      {
+        "id": "ac5",
+        "description": "Search/filter works within grouped view"
+      },
+      {
+        "id": "ac6",
+        "description": "View preference (flat vs grouped) persists in localStorage"
+      }
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui"],
+    "scopes": [
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "i001",
@@ -30,11 +50,26 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "groupPlansByScope(plans) returns Map<string, PlanSummary[]>" },
-          { "id": "ac2", "description": "Plan with scopes=['api', 'frontend'] appears in both 'api' and 'frontend' groups" },
-          { "id": "ac3", "description": "Plan with scopes=undefined or scopes=[] goes to 'Uncategorized'" },
-          { "id": "ac4", "description": "Groups sorted alphabetically, 'Uncategorized' last" },
-          { "id": "ac5", "description": "Unit test covers all edge cases (empty array, no scopes, multi-scope)" }
+          {
+            "id": "ac1",
+            "description": "groupPlansByScope(plans) returns Map<string, PlanSummary[]>"
+          },
+          {
+            "id": "ac2",
+            "description": "Plan with scopes=['api', 'frontend'] appears in both 'api' and 'frontend' groups"
+          },
+          {
+            "id": "ac3",
+            "description": "Plan with scopes=undefined or scopes=[] goes to 'Uncategorized'"
+          },
+          {
+            "id": "ac4",
+            "description": "Groups sorted alphabetically, 'Uncategorized' last"
+          },
+          {
+            "id": "ac5",
+            "description": "Unit test covers all edge cases (empty array, no scopes, multi-scope)"
+          }
         ]
       },
       {
@@ -45,10 +80,22 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Renders two buttons: 'List' and 'Grouped' with distinct icons" },
-          { "id": "ac2", "description": "Active state matches ViewModeToggle styling (bg-accent-cyan text-bg-deep)" },
-          { "id": "ac3", "description": "Calls onChange with new mode when clicked" },
-          { "id": "ac4", "description": "Icons are inline SVG, 14x14, stroke-based per design_system.icons" }
+          {
+            "id": "ac1",
+            "description": "Renders two buttons: 'List' and 'Grouped' with distinct icons"
+          },
+          {
+            "id": "ac2",
+            "description": "Active state matches ViewModeToggle styling (bg-accent-cyan text-bg-deep)"
+          },
+          {
+            "id": "ac3",
+            "description": "Calls onChange with new mode when clicked"
+          },
+          {
+            "id": "ac4",
+            "description": "Icons are inline SVG, 14x14, stroke-based per design_system.icons"
+          }
         ]
       },
       {
@@ -59,11 +106,26 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Header shows scope name and plan count in badge" },
-          { "id": "ac2", "description": "ChevronIcon rotates on expand/collapse (right -> down)" },
-          { "id": "ac3", "description": "Body animates open/close smoothly (CSS transition)" },
-          { "id": "ac4", "description": "Plan cards match existing PlansListPage card styling" },
-          { "id": "ac5", "description": "Empty state shows 'No plans' message if plans.length === 0" }
+          {
+            "id": "ac1",
+            "description": "Header shows scope name and plan count in badge"
+          },
+          {
+            "id": "ac2",
+            "description": "ChevronIcon rotates on expand/collapse (right -> down)"
+          },
+          {
+            "id": "ac3",
+            "description": "Body animates open/close smoothly (CSS transition)"
+          },
+          {
+            "id": "ac4",
+            "description": "Plan cards match existing PlansListPage card styling"
+          },
+          {
+            "id": "ac5",
+            "description": "Empty state shows 'No plans' message if plans.length === 0"
+          }
         ]
       },
       {
@@ -74,10 +136,22 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Returns current viewMode ('list' or 'grouped')" },
-          { "id": "ac2", "description": "setViewMode updates state and writes to localStorage" },
-          { "id": "ac3", "description": "Persists across page reloads" },
-          { "id": "ac4", "description": "Falls back to 'list' if localStorage is corrupted/empty" }
+          {
+            "id": "ac1",
+            "description": "Returns current viewMode ('list' or 'grouped')"
+          },
+          {
+            "id": "ac2",
+            "description": "setViewMode updates state and writes to localStorage"
+          },
+          {
+            "id": "ac3",
+            "description": "Persists across page reloads"
+          },
+          {
+            "id": "ac4",
+            "description": "Falls back to 'list' if localStorage is corrupted/empty"
+          }
         ]
       },
       {
@@ -88,11 +162,26 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "isExpanded(scopeName) returns true/false correctly" },
-          { "id": "ac2", "description": "toggleExpansion persists change to localStorage" },
-          { "id": "ac3", "description": "expandAll/collapseAll work and persist" },
-          { "id": "ac4", "description": "Default state is all expanded" },
-          { "id": "ac5", "description": "Collapse state persists across page reloads" }
+          {
+            "id": "ac1",
+            "description": "isExpanded(scopeName) returns true/false correctly"
+          },
+          {
+            "id": "ac2",
+            "description": "toggleExpansion persists change to localStorage"
+          },
+          {
+            "id": "ac3",
+            "description": "expandAll/collapseAll work and persist"
+          },
+          {
+            "id": "ac4",
+            "description": "Default state is all expanded"
+          },
+          {
+            "id": "ac5",
+            "description": "Collapse state persists across page reloads"
+          }
         ]
       },
       {
@@ -100,15 +189,39 @@
         "title": "Integrate grouped view into PlansListPage",
         "scope": "planner-ui",
         "description": "Update PlansListPage.tsx to support both flat list and grouped-by-scope views.\n\nChanges to PlansListPage:\n1. Add imports: PlansViewModeToggle, ScopeGroup, usePlansViewMode, useScopeGroupExpansion, groupPlansByScope\n2. Call usePlansViewMode() and useScopeGroupExpansion() hooks\n3. Add PlansViewModeToggle in header, next to existing filter tabs\n4. Compute scopeGroups using useMemo when viewMode === 'grouped'\n5. Conditionally render:\n   - viewMode === 'list': existing <ul> with plan cards\n   - viewMode === 'grouped': ScopeGroup components per scope\n6. Apply status filter BEFORE grouping (filter plans first, then group)\n\nFiltering logic:\n- Current filter (draft/approved/published/all) applies to plans array\n- Filtered plans are then grouped by scope\n- Empty groups (after filtering) should be hidden\n\nLayout adjustment:\n- Add view toggle button to header row, right of filter tabs\n- Responsive: on mobile, toggle could stack below filters",
-        "dependencies": ["i001", "i002", "i003", "i004", "i005"],
+        "dependencies": [
+          "i001",
+          "i002",
+          "i003",
+          "i004",
+          "i005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PlansViewModeToggle appears in header, switches between list/grouped views" },
-          { "id": "ac2", "description": "Grouped view shows ScopeGroup for each scope with plans" },
-          { "id": "ac3", "description": "Status filter (draft/approved/published) works in grouped view" },
-          { "id": "ac4", "description": "Empty scope groups (after filtering) are not displayed" },
-          { "id": "ac5", "description": "View mode persists when navigating away and back" },
-          { "id": "ac6", "description": "Scope collapse states persist independently of view mode" }
+          {
+            "id": "ac1",
+            "description": "PlansViewModeToggle appears in header, switches between list/grouped views"
+          },
+          {
+            "id": "ac2",
+            "description": "Grouped view shows ScopeGroup for each scope with plans"
+          },
+          {
+            "id": "ac3",
+            "description": "Status filter (draft/approved/published) works in grouped view"
+          },
+          {
+            "id": "ac4",
+            "description": "Empty scope groups (after filtering) are not displayed"
+          },
+          {
+            "id": "ac5",
+            "description": "View mode persists when navigating away and back"
+          },
+          {
+            "id": "ac6",
+            "description": "Scope collapse states persist independently of view mode"
+          }
         ]
       },
       {
@@ -116,15 +229,35 @@
         "title": "Add search functionality to grouped view",
         "scope": "planner-ui",
         "description": "Add a search input to PlansListPage that filters plans by goal text, working in both list and grouped views.\n\nChanges:\n1. Add search state: const [searchQuery, setSearchQuery] = useState('')\n2. Add search input in header (after filter tabs, before view toggle)\n3. Filter plans by: plan.goal.toLowerCase().includes(searchQuery.toLowerCase())\n4. Apply search filter BEFORE status filter AND grouping\n\nSearch input styling (from design_system.patterns.forms):\n- bg-bg-secondary border-border-default rounded-md\n- focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50\n- Placeholder: 'Search plans...'\n- Clear button (X) when query is non-empty\n\nEdge cases:\n- Empty search: show all plans (subject to status filter)\n- No results: show 'No plans match your search' message\n- Grouped view with search: hide empty groups after search filtering",
-        "dependencies": ["i006"],
+        "dependencies": [
+          "i006"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Search input appears in header between filters and view toggle" },
-          { "id": "ac2", "description": "Search filters plans by goal text (case-insensitive)" },
-          { "id": "ac3", "description": "Search works in both list and grouped views" },
-          { "id": "ac4", "description": "Clear button appears when search has text" },
-          { "id": "ac5", "description": "No results state shows appropriate message" },
-          { "id": "ac6", "description": "Empty groups after search are hidden in grouped view" }
+          {
+            "id": "ac1",
+            "description": "Search input appears in header between filters and view toggle"
+          },
+          {
+            "id": "ac2",
+            "description": "Search filters plans by goal text (case-insensitive)"
+          },
+          {
+            "id": "ac3",
+            "description": "Search works in both list and grouped views"
+          },
+          {
+            "id": "ac4",
+            "description": "Clear button appears when search has text"
+          },
+          {
+            "id": "ac5",
+            "description": "No results state shows appropriate message"
+          },
+          {
+            "id": "ac6",
+            "description": "Empty groups after search are hidden in grouped view"
+          }
         ]
       },
       {
@@ -135,19 +268,29 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PlanCard renders identical output to current inline card markup" },
-          { "id": "ac2", "description": "PlanCard is exported from components/index.ts" },
-          { "id": "ac3", "description": "PlansListPage uses PlanCard instead of inline markup" },
-          { "id": "ac4", "description": "ScopeGroup uses PlanCard for rendering plans" }
+          {
+            "id": "ac1",
+            "description": "PlanCard renders identical output to current inline card markup"
+          },
+          {
+            "id": "ac2",
+            "description": "PlanCard is exported from components/index.ts"
+          },
+          {
+            "id": "ac3",
+            "description": "PlansListPage uses PlanCard instead of inline markup"
+          },
+          {
+            "id": "ac4",
+            "description": "ScopeGroup uses PlanCard for rendering plans"
+          }
         ]
       }
     ]
   },
-
   "plan_tests": {
     "coverage": "unit",
     "priority": "medium",
-    "strategy": "Focus on the pure logic (grouping utility) with unit tests. UI interactions are straightforward toggles/clicks covered by acceptance criteria during implementation. Skip E2E for this non-critical feature.",
     "cases": [
       {
         "type": "happy",
@@ -213,14 +356,35 @@
     "data_requirements": [
       "Mock PlanSummary objects with various scope configurations: single scope, multi-scope, no scope, empty array",
       "localStorage mock for hook tests (jest.spyOn or testing-library/react-hooks)"
-    ],
-    "notes": "The groupPlansByScope utility is pure logic - ideal for unit tests. The hooks are simple state+localStorage wrappers. Components (PlansViewModeToggle, ScopeGroup, PlanCard) are presentational with minimal logic - visual correctness verified during implementation, not automated tests."
+    ]
   },
-
   "references": [
-    { "type": "code", "title": "PlansListPage (current)", "path": "packages/planner-ui/src/pages/PlansListPage.tsx" },
-    { "type": "code", "title": "ViewModeToggle (pattern)", "path": "packages/planner-ui/src/components/ViewModeToggle.tsx" },
-    { "type": "code", "title": "StepEditor (collapse pattern)", "path": "packages/planner-ui/src/components/StepEditor.tsx" },
-    { "type": "code", "title": "PlanSummary type", "path": "packages/planner-ui/src/types/plan.ts" }
-  ]
+    {
+      "type": "code",
+      "title": "PlansListPage (current)",
+      "path": "packages/planner-ui/src/pages/PlansListPage.tsx"
+    },
+    {
+      "type": "code",
+      "title": "ViewModeToggle (pattern)",
+      "path": "packages/planner-ui/src/components/ViewModeToggle.tsx"
+    },
+    {
+      "type": "code",
+      "title": "StepEditor (collapse pattern)",
+      "path": "packages/planner-ui/src/components/StepEditor.tsx"
+    },
+    {
+      "type": "code",
+      "title": "PlanSummary type",
+      "path": "packages/planner-ui/src/types/plan.ts"
+    }
+  ],
+  "context": {
+    "tester": {
+      "strategy": "Focus on the pure logic (grouping utility) with unit tests. UI interactions are straightforward toggles/clicks covered by acceptance criteria during implementation. Skip E2E for this non-critical feature.",
+      "migrated_from": "plan_tests",
+      "notes": "The groupPlansByScope utility is pure logic - ideal for unit tests. The hooks are simple state+localStorage wrappers. Components (PlansViewModeToggle, ScopeGroup, PlanCard) are presentational with minimal logic - visual correctness verified during implementation, not automated tests."
+    }
+  }
 }

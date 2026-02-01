@@ -1,14 +1,18 @@
 {
   "feature_id": "schema-db-migration",
-  "title": "Database Migration for Understanding & Specification",
+  "title": "Database Migration for Understanding, Context & Specification",
   "type": "feature",
-  "status": "draft",
+  "status": "complete",
   "priority": "high",
   "dependencies": ["schema-understanding", "schema-specification"],
   "parent_epic": "schema-enrichment",
+  "extends_for_context": {
+    "note": "Context column addition is part of schema-context feature (c005)",
+    "see": "schema-context.json"
+  },
   "summary": {
     "goal": "Update database schema and storage layer to persist understanding (plan-level) and specification (step-level, stored within steps JSONB)",
-    "context": "SQLite with better-sqlite3 stores JSON as TEXT. Understanding is a new column on plan_versions. Specification is stored within the existing steps JSONB column (no new column needed).",
+    "context": "SQLite with better-sqlite3 stores JSON as TEXT. Understanding is a new column on plan_versions. Specification is stored within the existing steps JSONB column (no new column needed). Context column will be added as part of schema-context feature.",
     "acceptance_criteria": [
       { "id": "ac1", "description": "Migration adds 'understanding' TEXT column to plan_versions (default '{}')" },
       { "id": "ac2", "description": "Migration is idempotent (safe to re-run)" },

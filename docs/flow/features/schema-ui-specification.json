@@ -2,30 +2,53 @@
   "feature_id": "schema-ui-specification",
   "title": "Step-Level Specification UI",
   "type": "feature",
-  "status": "draft",
+  "status": "in_progress",
+  "change_request": {
+    "reason": "Implementation diverged from plan - hardcoded domain tabs instead of freeform",
+    "original_implementation": "Hardcoded tabs (Architecture, Design, Testing, Security) with typed editors per domain",
+    "required_implementation": "Dynamic tabs from specification keys + KeyValueEditor for freeform fields + AddDomainPopover for custom domains",
+    "date": "2026-02-01"
+  },
   "priority": "medium",
   "dependencies": ["schema-api-endpoints"],
   "parent_epic": "schema-enrichment",
   "summary": {
-    "goal": "Extend StepEditor with tabbed specification sections (Architecture, Design, Testing, Security) per step",
-    "context": "Each step can have its own micro-specifications detailing architecture decisions, design elements, test cases, and security requirements relevant to that step. This is step-level (not plan-level) specification.",
+    "goal": "Extend StepEditor with tabbed specification sections supporting freeform domains (suggested: Architecture, Model, Design, Testing, Security) per step",
+    "context": "Each step can have its own micro-specifications detailing architecture decisions, data model schemas, design elements, test cases, and security requirements relevant to that step. This is step-level (not plan-level) specification. Schema is freeform - any domain, any fields.",
+    "freeform_rationale": "Different steps need different domains. The Orchestrator is an LLM that can understand any JSON structure. Suggested domains are for convenience but users can add custom domains.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "StepEditor expanded view shows tabs: Details | Architecture | Design | Testing | Security" },
+      { "id": "ac1", "description": "StepEditor expanded view shows tabs: Details + dynamic domain tabs from specification" },
       { "id": "ac2", "description": "Details tab contains existing step fields (description, dependencies, acceptance criteria, gate)" },
-      { "id": "ac3", "description": "Architecture tab shows: decisions list, API contracts, boundaries (relevant to this step)" },
-      { "id": "ac4", "description": "Design tab shows: components, views, interactions (relevant to this step)" },
-      { "id": "ac5", "description": "Testing tab shows: test cases, coverage notes (for this step)" },
-      { "id": "ac6", "description": "Security tab shows: requirements, threats (for this step)" },
-      { "id": "ac7", "description": "Empty tabs show 'Add [domain] details' CTA" },
-      { "id": "ac8", "description": "Tabs with content show dot indicator on tab label" },
-      { "id": "ac9", "description": "Inline editing for all spec fields (draft plans only)" },
-      { "id": "ac10", "description": "Changes auto-save via debounced PATCH" },
-      { "id": "ac11", "description": "Step header shows small icons indicating which spec domains have content" }
+      { "id": "ac3", "description": "'+' button after last tab allows adding new domain (suggested or custom)" },
+      { "id": "ac4", "description": "Each domain tab uses KeyValueEditor for freeform fields" },
+      { "id": "ac5", "description": "Suggested domains (Architecture, Model, Design, Testing, Security) shown in add popover" },
+      { "id": "ac6", "description": "Empty tabs show 'Add [domain] details' CTA with suggested fields as hints" },
+      { "id": "ac7", "description": "Tabs with content show dot indicator on tab label" },
+      { "id": "ac8", "description": "Inline editing for all spec fields (draft plans only)" },
+      { "id": "ac9", "description": "Changes auto-save via debounced PATCH" },
+      { "id": "ac10", "description": "Step header shows small icons indicating which spec domains have content" }
     ]
   },
   "design_spec": {
     "location": "Inside StepEditor component when step is expanded",
-    "pattern": "step-spec-tabs"
+    "pattern": "step-spec-tabs",
+    "ui_pattern": {
+      "add_domain": {
+        "trigger": "'+' button after last domain tab",
+        "action": "Shows popover with suggested domains (Architecture, Model, Design, Testing, Security) as quick-add buttons, plus 'Custom domain' text input",
+        "result": "New tab appears with domain name as label"
+      },
+      "add_field": {
+        "trigger": "'+ Add field' button within domain card",
+        "action": "Adds new row with editable key (text input) and value (textarea)",
+        "suggestions": "Shows placeholder hints for suggested fields based on domain (from SUGGESTED_DOMAINS)"
+      },
+      "delete": {
+        "field": "X button per field row",
+        "domain": "Delete domain option in domain tab dropdown (with confirmation)"
+      },
+      "reuse_from_context": "KeyValueEditor component shared with Context tab (src/components/context/KeyValueEditor.tsx)"
+    }
   },
   "plan_implementation": {
     "scopes": ["planner-ui"],
@@ -68,107 +91,66 @@
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
           { "id": "ac1", "description": "Component: src/components/spec/SpecEmptyState.tsx" },
-          { "id": "ac2", "description": "Props: message: string, cta: string, onAdd: () => void" },
-          { "id": "ac3", "description": "Renders centered message with 'Add' button" },
-          { "id": "ac4", "description": "Follows design pattern from design_spec" }
+          { "id": "ac2", "description": "Props: domain: string, fieldHints?: string[], onAddField: () => void" },
+          { "id": "ac3", "description": "Renders centered message with 'Add first field' button" },
+          { "id": "ac4", "description": "Shows suggested fields from fieldHints as placeholder hints" }
         ]
       },
       {
         "step_id": "us004",
-        "title": "Create SpecItemCard component",
+        "title": "Create DomainSpecEditor component",
         "scope": "planner-ui",
-        "description": "Create reusable editable card for spec list items",
-        "dependencies": [],
+        "description": "Create generic freeform editor for any domain specification (reuses KeyValueEditor from context)",
+        "dependencies": ["us003"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Component: src/components/spec/SpecItemCard.tsx" },
-          { "id": "ac2", "description": "Props: item: T, fields: FieldConfig[], isEditing: boolean, onSave, onDelete, onEdit" },
-          { "id": "ac3", "description": "View mode: displays fields as text with edit/delete buttons" },
-          { "id": "ac4", "description": "Edit mode: displays form inputs with Save/Cancel buttons" },
-          { "id": "ac5", "description": "Follows bg-bg-secondary styling from design pattern" }
+          { "id": "ac1", "description": "Component: src/components/spec/DomainSpecEditor.tsx" },
+          { "id": "ac2", "description": "Props: domain: string, spec: Record<string, unknown>, isEditable: boolean, onChange: (spec) => void" },
+          { "id": "ac3", "description": "Reuses KeyValueEditor from src/components/context/KeyValueEditor.tsx" },
+          { "id": "ac4", "description": "Passes fieldHints from SUGGESTED_DOMAINS when domain matches" },
+          { "id": "ac5", "description": "Empty state shows SpecEmptyState with suggested fields" }
         ]
       },
       {
         "step_id": "us005",
-        "title": "Create ArchitectureSpecEditor component",
+        "title": "Create AddDomainPopover component",
         "scope": "planner-ui",
-        "description": "Create editor for architecture specification",
-        "dependencies": ["us003", "us004"],
+        "description": "Create popover for adding new domain tabs to step specification",
+        "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Component: src/components/spec/ArchitectureSpecEditor.tsx" },
-          { "id": "ac2", "description": "Props: spec: ArchitectureSpec, isEditable: boolean, onChange: (spec) => void" },
-          { "id": "ac3", "description": "Sections: Decisions list, API Contracts list, Boundaries list" },
-          { "id": "ac4", "description": "Each section uses SpecItemCard for items" },
-          { "id": "ac5", "description": "Each section has add button when editable" },
-          { "id": "ac6", "description": "Empty sections show SpecEmptyState" }
+          { "id": "ac1", "description": "Component: src/components/spec/AddDomainPopover.tsx" },
+          { "id": "ac2", "description": "Shows suggested domains (Architecture, Model, Design, Testing, Security) as quick-add buttons" },
+          { "id": "ac3", "description": "'Custom domain' input field for entering any domain name" },
+          { "id": "ac4", "description": "Disables already-added domains in suggestions" },
+          { "id": "ac5", "description": "onAddDomain callback with domain name" }
         ]
       },
       {
         "step_id": "us006",
-        "title": "Create DesignSpecEditor component",
-        "scope": "planner-ui",
-        "description": "Create editor for design specification",
-        "dependencies": ["us003", "us004"],
-        "owner_role": "frontend:Coder",
-        "acceptance_criteria": [
-          { "id": "ac1", "description": "Component: src/components/spec/DesignSpecEditor.tsx" },
-          { "id": "ac2", "description": "Props: spec: DesignSpec, isEditable: boolean, onChange: (spec) => void" },
-          { "id": "ac3", "description": "Sections: Components list, Views list, Interactions list" },
-          { "id": "ac4", "description": "Each section uses SpecItemCard for items" }
-        ]
-      },
-      {
-        "step_id": "us007",
-        "title": "Create TestingSpecEditor component",
-        "scope": "planner-ui",
-        "description": "Create editor for testing specification",
-        "dependencies": ["us003", "us004"],
-        "owner_role": "frontend:Coder",
-        "acceptance_criteria": [
-          { "id": "ac1", "description": "Component: src/components/spec/TestingSpecEditor.tsx" },
-          { "id": "ac2", "description": "Props: spec: TestingSpec, isEditable: boolean, onChange: (spec) => void" },
-          { "id": "ac3", "description": "Sections: Test Cases list with type/priority badges, Coverage Notes textarea" },
-          { "id": "ac4", "description": "Test case items show type and priority as colored badges" }
-        ]
-      },
-      {
-        "step_id": "us008",
-        "title": "Create SecuritySpecEditor component",
-        "scope": "planner-ui",
-        "description": "Create editor for security specification",
-        "dependencies": ["us003", "us004"],
-        "owner_role": "frontend:Coder",
-        "acceptance_criteria": [
-          { "id": "ac1", "description": "Component: src/components/spec/SecuritySpecEditor.tsx" },
-          { "id": "ac2", "description": "Props: spec: SecuritySpec, isEditable: boolean, onChange: (spec) => void" },
-          { "id": "ac3", "description": "Sections: Security Requirements list, Threats list with likelihood/impact" },
-          { "id": "ac4", "description": "Threat items show likelihood and impact as colored indicators" }
-        ]
-      },
-      {
-        "step_id": "us009",
         "title": "Create StepSpecificationTabs component",
         "scope": "planner-ui",
-        "description": "Create tabbed container for step specifications",
-        "dependencies": ["us005", "us006", "us007", "us008"],
+        "description": "Create tabbed container for step specifications with dynamic domains",
+        "dependencies": ["us004", "us005"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
           { "id": "ac1", "description": "Component: src/components/StepSpecificationTabs.tsx" },
           { "id": "ac2", "description": "Props: step: Step, isEditable: boolean, onSpecUpdate: (domain, spec) => void" },
           { "id": "ac3", "description": "Uses shadcn Tabs component" },
-          { "id": "ac4", "description": "Tabs: Details (existing fields), Architecture, Design, Testing, Security" },
-          { "id": "ac5", "description": "Tab triggers show dot indicator when domain has content" },
-          { "id": "ac6", "description": "Details tab renders existing StepEditor fields (refactored)" },
-          { "id": "ac7", "description": "Each spec tab renders corresponding SpecEditor" }
+          { "id": "ac4", "description": "Tabs: Details (fixed) + dynamic domain tabs from specification keys" },
+          { "id": "ac5", "description": "'+' button after last tab opens AddDomainPopover" },
+          { "id": "ac6", "description": "Tab triggers show dot indicator when domain has content" },
+          { "id": "ac7", "description": "Details tab renders existing StepEditor fields (refactored)" },
+          { "id": "ac8", "description": "Each domain tab renders DomainSpecEditor" },
+          { "id": "ac9", "description": "Delete domain option in domain tab dropdown (with confirmation)" }
         ]
       },
       {
-        "step_id": "us010",
+        "step_id": "us007",
         "title": "Refactor StepEditor for tabs",
         "scope": "planner-ui",
         "description": "Refactor StepEditor to use StepSpecificationTabs when expanded",
-        "dependencies": ["us009", "us002"],
+        "dependencies": ["us006", "us002"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
           { "id": "ac1", "description": "Existing expanded content moved to 'Details' tab" },
@@ -180,33 +162,35 @@
         "integration": true
       },
       {
-        "step_id": "us011",
+        "step_id": "us008",
         "title": "Add spec indicator icons to step header",
         "scope": "planner-ui",
         "description": "Add small icons to step header showing which spec domains have content",
-        "dependencies": ["us010"],
+        "dependencies": ["us007"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
           { "id": "ac1", "description": "Component: StepHeaderIcons (or inline in StepEditor)" },
-          { "id": "ac2", "description": "Shows icon for each domain that has content in specification" },
-          { "id": "ac3", "description": "Icons: ArchitectIcon, PaletteIcon, TestTubeIcon, ShieldIcon" },
-          { "id": "ac4", "description": "Empty domains: icon at 30% opacity or hidden" },
-          { "id": "ac5", "description": "Populated domains: icon at full opacity" }
+          { "id": "ac2", "description": "Shows icon for each domain key that has content in specification" },
+          { "id": "ac3", "description": "Suggested domain icons: ArchitectIcon, DatabaseIcon (model), PaletteIcon (design), TestTubeIcon (testing), ShieldIcon (security)" },
+          { "id": "ac4", "description": "Custom domains: show generic icon (DocumentIcon or similar)" },
+          { "id": "ac5", "description": "Populated domains: icon at full opacity; empty/missing: hidden" }
         ]
       },
       {
-        "step_id": "us012",
+        "step_id": "us009",
         "title": "Add tests for Specification UI",
         "scope": "planner-ui",
         "description": "Add component tests for Specification UI",
-        "dependencies": ["us010"],
+        "dependencies": ["us007"],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Test: StepSpecificationTabs renders all 5 tabs" },
-          { "id": "ac2", "description": "Test: Tab indicators show for domains with content" },
-          { "id": "ac3", "description": "Test: Each SpecEditor renders items and empty states correctly" },
-          { "id": "ac4", "description": "Test: Add/edit/delete item flows work" },
-          { "id": "ac5", "description": "Test: StepEditor shows tabs when expanded" }
+          { "id": "ac1", "description": "Test: StepSpecificationTabs renders Details tab + dynamic domain tabs from specification" },
+          { "id": "ac2", "description": "Test: '+' button opens AddDomainPopover with suggested and custom options" },
+          { "id": "ac3", "description": "Test: Tab indicators show for domains with content" },
+          { "id": "ac4", "description": "Test: DomainSpecEditor renders existing fields and allows adding new ones" },
+          { "id": "ac5", "description": "Test: StepEditor shows tabs when expanded" },
+          { "id": "ac6", "description": "Test: Adding domain creates new tab" },
+          { "id": "ac7", "description": "Test: Deleting domain removes tab" }
         ]
       }
     ]

@@ -4,9 +4,11 @@
   "type": "feature",
   "status": "completed",
   "priority": "medium",
-  "dependencies": ["schema-org-initiative", "ui-sidebar-layout"],
+  "dependencies": [
+    "schema-org-initiative",
+    "ui-sidebar-layout"
+  ],
   "replaces": "ui-roadmap-view",
-
   "summary": {
     "goal": "Visualize plan execution flow based on dependencies and workflow state, not calendar time",
     "context": "In agent-driven planning, time is not the primary constraint - dependencies and human gates are. Plans complete when agents finish and humans approve, not on calendar schedules. Pipeline view shows execution sequence (what can run now, what's waiting) and workflow state (drafting, gate, running, done).",
@@ -25,47 +27,69 @@
       "Resource allocation"
     ],
     "acceptance_criteria": [
-      { "id": "ac1", "description": "Route /pipeline shows pipeline view" },
-      { "id": "ac2", "description": "View toggle between Sequence and Board modes" },
-      { "id": "ac3", "description": "Sequence view: columns are dependency waves (NOW, Wave 2, Wave 3, ..., DONE)" },
-      { "id": "ac4", "description": "Sequence view: NOW column contains plans with no unmet dependencies" },
-      { "id": "ac5", "description": "Sequence view: Wave N contains plans waiting on Wave N-1 items" },
-      { "id": "ac6", "description": "Board view: columns are workflow states (Drafting, Gate, Approved, Running, Complete)" },
-      { "id": "ac7", "description": "Board view: Gate column highlighted with accent color to draw attention" },
-      { "id": "ac8", "description": "Plan cards show: goal (truncated), initiative badge, status indicator" },
-      { "id": "ac9", "description": "Plan cards show gate indicator (red dot) when awaiting human approval" },
-      { "id": "ac10", "description": "Clicking plan card navigates to plan editor" },
-      { "id": "ac11", "description": "Initiative filter: tabs for All + each initiative" },
-      { "id": "ac12", "description": "Status filter dropdown: All, Active, Blocked, Complete" },
-      { "id": "ac13", "description": "Column headers show count of items in each column" },
-      { "id": "ac14", "description": "Dependency arrows shown in Sequence view connecting dependent plans" },
-      { "id": "ac15", "description": "Empty state when no plans exist" }
+      {
+        "id": "ac1",
+        "description": "Route /pipeline shows pipeline view"
+      },
+      {
+        "id": "ac2",
+        "description": "View toggle between Sequence and Board modes"
+      },
+      {
+        "id": "ac3",
+        "description": "Sequence view: columns are dependency waves (NOW, Wave 2, Wave 3, ..., DONE)"
+      },
+      {
+        "id": "ac4",
+        "description": "Sequence view: NOW column contains plans with no unmet dependencies"
+      },
+      {
+        "id": "ac5",
+        "description": "Sequence view: Wave N contains plans waiting on Wave N-1 items"
+      },
+      {
+        "id": "ac6",
+        "description": "Board view: columns are workflow states (Drafting, Gate, Approved, Running, Complete)"
+      },
+      {
+        "id": "ac7",
+        "description": "Board view: Gate column highlighted with accent color to draw attention"
+      },
+      {
+        "id": "ac8",
+        "description": "Plan cards show: goal (truncated), initiative badge, status indicator"
+      },
+      {
+        "id": "ac9",
+        "description": "Plan cards show gate indicator (red dot) when awaiting human approval"
+      },
+      {
+        "id": "ac10",
+        "description": "Clicking plan card navigates to plan editor"
+      },
+      {
+        "id": "ac11",
+        "description": "Initiative filter: tabs for All + each initiative"
+      },
+      {
+        "id": "ac12",
+        "description": "Status filter dropdown: All, Active, Blocked, Complete"
+      },
+      {
+        "id": "ac13",
+        "description": "Column headers show count of items in each column"
+      },
+      {
+        "id": "ac14",
+        "description": "Dependency arrows shown in Sequence view connecting dependent plans"
+      },
+      {
+        "id": "ac15",
+        "description": "Empty state when no plans exist"
+      }
     ]
   },
-
   "design_spec": {
-    "approach": "Linear-style two-row toolbar with initiative pills. Two view modes (Sequence/Board) sharing common plan card components.",
-    "shadcn_components": [
-      "ToggleGroup",
-      "Select",
-      "Badge",
-      "Tooltip",
-      "Card",
-      "Button"
-    ],
-    "toolbar_pattern": {
-      "description": "Two-row toolbar like Linear's Projects view",
-      "row1": {
-        "layout": "flex justify-between items-center h-12 px-4 border-b border-border-subtle",
-        "left": "Breadcrumb: 'Pipeline' or 'Pipeline > [Initiative Name]'",
-        "right": "Button: '+ New Plan' (primary)"
-      },
-      "row2": {
-        "layout": "flex justify-between items-center h-12 px-4 gap-4",
-        "left": "InitiativeTabs (horizontal pills) + '+ New' inline button",
-        "right": "Status filter (Select) + View toggle (ToggleGroup: Sequence | Board)"
-      }
-    },
     "views": [
       {
         "view_id": "pipeline-page",
@@ -78,8 +102,16 @@
             "use": "breadcrumb + actions",
             "layout": "flex justify-between items-center h-12 px-4 border-b border-border-subtle",
             "children": [
-              { "component": "Breadcrumb", "use": "page context", "props": "'Pipeline' base, shows '> [Initiative]' when filtered" },
-              { "component": "Button", "use": "new plan", "props": "primary, '+ New Plan', navigates to /plans/new" }
+              {
+                "component": "Breadcrumb",
+                "use": "page context",
+                "props": "'Pipeline' base, shows '> [Initiative]' when filtered"
+              },
+              {
+                "component": "Button",
+                "use": "new plan",
+                "props": "primary, '+ New Plan', navigates to /plans/new"
+              }
             ]
           },
           {
@@ -92,8 +124,16 @@
                 "use": "left section",
                 "layout": "flex items-center gap-2",
                 "children": [
-                  { "component": "InitiativeTabs", "use": "initiative filter pills", "custom": true },
-                  { "component": "Button", "use": "new initiative", "props": "ghost, size=sm, '+ New', opens initiative modal" }
+                  {
+                    "component": "InitiativeTabs",
+                    "use": "initiative filter pills",
+                    "custom": true
+                  },
+                  {
+                    "component": "Button",
+                    "use": "new initiative",
+                    "props": "ghost, size=sm, '+ New', opens initiative modal"
+                  }
                 ]
               },
               {
@@ -101,14 +141,32 @@
                 "use": "right section",
                 "layout": "flex items-center gap-3",
                 "children": [
-                  { "component": "Select", "use": "status filter", "props": "w-32, options: All | Active | Blocked | Complete" },
-                  { "component": "ToggleGroup", "use": "view mode", "props": "type=single, Sequence icon | Board icon" }
+                  {
+                    "component": "Select",
+                    "use": "status filter",
+                    "props": "w-32, options: All | Active | Blocked | Complete"
+                  },
+                  {
+                    "component": "ToggleGroup",
+                    "use": "view mode",
+                    "props": "type=single, Sequence icon | Board icon"
+                  }
                 ]
               }
             ]
           },
-          { "component": "SequenceView", "use": "sequence mode", "custom": true, "conditional": "view === 'sequence'" },
-          { "component": "BoardView", "use": "board mode", "custom": true, "conditional": "view === 'board'" }
+          {
+            "component": "SequenceView",
+            "use": "sequence mode",
+            "custom": true,
+            "conditional": "view === 'sequence'"
+          },
+          {
+            "component": "BoardView",
+            "use": "board mode",
+            "custom": true,
+            "conditional": "view === 'board'"
+          }
         ]
       },
       {
@@ -116,8 +174,16 @@
         "name": "Initiative Filter Tabs",
         "layout": "flex items-center gap-1 overflow-x-auto",
         "elements": [
-          { "component": "TabPill", "use": "All tab", "props": "always first, 'All' text, no icon" },
-          { "component": "TabPill", "use": "each initiative", "props": "icon (emoji) + name, colored left border matching initiative color" }
+          {
+            "component": "TabPill",
+            "use": "All tab",
+            "props": "always first, 'All' text, no icon"
+          },
+          {
+            "component": "TabPill",
+            "use": "each initiative",
+            "props": "icon (emoji) + name, colored left border matching initiative color"
+          }
         ],
         "states": {
           "default": "bg-transparent text-text-secondary px-3 py-1.5 rounded-md text-sm",
@@ -130,15 +196,45 @@
         "name": "Sequence View (Dependency Waves)",
         "layout": "horizontal scroll, CSS grid columns",
         "elements": [
-          { "component": "WaveColumn", "use": "each dependency wave", "custom": true, "props": "header with count, vertical stack of cards" },
-          { "component": "PlanCard", "use": "each plan", "custom": true },
-          { "component": "DependencyArrow", "use": "connecting lines", "custom": true, "props": "SVG overlay, curved bezier" }
+          {
+            "component": "WaveColumn",
+            "use": "each dependency wave",
+            "custom": true,
+            "props": "header with count, vertical stack of cards"
+          },
+          {
+            "component": "PlanCard",
+            "use": "each plan",
+            "custom": true
+          },
+          {
+            "component": "DependencyArrow",
+            "use": "connecting lines",
+            "custom": true,
+            "props": "SVG overlay, curved bezier"
+          }
         ],
         "columns": [
-          { "id": "now", "title": "NOW", "description": "No unmet dependencies, ready to execute" },
-          { "id": "wave-2", "title": "Wave 2", "description": "Waiting on NOW items" },
-          { "id": "wave-n", "title": "Wave N", "description": "Waiting on Wave N-1 items" },
-          { "id": "done", "title": "DONE", "description": "Completed plans" }
+          {
+            "id": "now",
+            "title": "NOW",
+            "description": "No unmet dependencies, ready to execute"
+          },
+          {
+            "id": "wave-2",
+            "title": "Wave 2",
+            "description": "Waiting on NOW items"
+          },
+          {
+            "id": "wave-n",
+            "title": "Wave N",
+            "description": "Waiting on Wave N-1 items"
+          },
+          {
+            "id": "done",
+            "title": "DONE",
+            "description": "Completed plans"
+          }
         ]
       },
       {
@@ -146,15 +242,55 @@
         "name": "Board View (Kanban)",
         "layout": "horizontal scroll, flex columns, gap-4, p-4",
         "elements": [
-          { "component": "BoardColumn", "use": "each workflow state", "custom": true, "props": "header with count, vertical stack of cards" },
-          { "component": "PlanCard", "use": "each plan", "custom": true }
+          {
+            "component": "BoardColumn",
+            "use": "each workflow state",
+            "custom": true,
+            "props": "header with count, vertical stack of cards"
+          },
+          {
+            "component": "PlanCard",
+            "use": "each plan",
+            "custom": true
+          }
         ],
         "columns": [
-          { "id": "drafting", "title": "Drafting", "status_filter": "draft", "description": "Plans being written", "style": "default" },
-          { "id": "gate", "title": "Gate", "status_filter": "draft+submitted", "highlight": true, "description": "Awaiting human approval", "style": "gate_attention" },
-          { "id": "approved", "title": "Approved", "status_filter": "approved", "description": "Ready to execute", "style": "default" },
-          { "id": "running", "title": "Running", "status_filter": "published+active", "description": "Currently executing", "style": "running" },
-          { "id": "complete", "title": "Complete", "status_filter": "published+done", "description": "Finished", "style": "success" }
+          {
+            "id": "drafting",
+            "title": "Drafting",
+            "status_filter": "draft",
+            "description": "Plans being written",
+            "style": "default"
+          },
+          {
+            "id": "gate",
+            "title": "Gate",
+            "status_filter": "draft+submitted",
+            "highlight": true,
+            "description": "Awaiting human approval",
+            "style": "gate_attention"
+          },
+          {
+            "id": "approved",
+            "title": "Approved",
+            "status_filter": "approved",
+            "description": "Ready to execute",
+            "style": "default"
+          },
+          {
+            "id": "running",
+            "title": "Running",
+            "status_filter": "published+active",
+            "description": "Currently executing",
+            "style": "running"
+          },
+          {
+            "id": "complete",
+            "title": "Complete",
+            "status_filter": "published+done",
+            "description": "Finished",
+            "style": "success"
+          }
         ],
         "column_styles": {
           "default": "bg-bg-secondary rounded-xl border border-border-subtle",
@@ -168,10 +304,26 @@
         "name": "Pipeline Plan Card",
         "layout": "bg-bg-card rounded-lg p-3, compact",
         "elements": [
-          { "component": "header", "use": "goal text", "props": "font-medium, line-clamp-2" },
-          { "component": "InitiativeBadge", "use": "initiative indicator", "props": "icon + name, small" },
-          { "component": "StatusIndicator", "use": "status dot", "props": "draft=muted, approved=cyan, running=orange, done=green" },
-          { "component": "GateIndicator", "use": "attention marker", "props": "red dot when gate pending, pulse animation" }
+          {
+            "component": "header",
+            "use": "goal text",
+            "props": "font-medium, line-clamp-2"
+          },
+          {
+            "component": "InitiativeBadge",
+            "use": "initiative indicator",
+            "props": "icon + name, small"
+          },
+          {
+            "component": "StatusIndicator",
+            "use": "status dot",
+            "props": "draft=muted, approved=cyan, running=orange, done=green"
+          },
+          {
+            "component": "GateIndicator",
+            "use": "attention marker",
+            "props": "red dot when gate pending, pulse animation"
+          }
         ],
         "states": {
           "default": "border-border-subtle",
@@ -185,36 +337,34 @@
         "name": "No Pipeline Data",
         "layout": "centered, max-w-sm",
         "elements": [
-          { "component": "illustration", "use": "empty graphic", "props": "pipeline/flow icon, muted" },
-          { "component": "text", "use": "message", "props": "'No plans in pipeline'" },
-          { "component": "subtext", "use": "guidance", "props": "'Create plans to see them flow through the pipeline'" },
-          { "component": "Button", "use": "cta", "props": "primary, '+ New Plan'" }
+          {
+            "component": "illustration",
+            "use": "empty graphic",
+            "props": "pipeline/flow icon, muted"
+          },
+          {
+            "component": "text",
+            "use": "message",
+            "props": "'No plans in pipeline'"
+          },
+          {
+            "component": "subtext",
+            "use": "guidance",
+            "props": "'Create plans to see them flow through the pipeline'"
+          },
+          {
+            "component": "Button",
+            "use": "cta",
+            "props": "primary, '+ New Plan'"
+          }
         ]
       }
-    ],
-    "custom_needed": [
-      "ToolbarRow1 - Breadcrumb + New Plan button (flex justify-between)",
-      "ToolbarRow2 - Initiative tabs + filters + view toggle (flex justify-between)",
-      "InitiativeTabs - Horizontal pill tabs for initiative filtering (like Linear's project tabs). Pills show icon + name, active state with cyan accent.",
-      "TabPill - Individual initiative tab pill component with icon, name, active/hover states",
-      "SequenceView - CSS grid layout with wave columns and SVG dependency arrows overlay",
-      "BoardView - Flex columns for kanban workflow states",
-      "WaveColumn - Column container for sequence view (NOW highlighted cyan)",
-      "BoardColumn - Column container for board view (Gate column orange glow, Running cyan tint)",
-      "PlanCard - Compact card with goal (line-clamp-2), initiative badge, status dot, gate indicator",
-      "DependencyArrow - SVG overlay for sequence view connections (curved bezier paths)"
-    ],
-    "color_mapping": {
-      "now_column": "bg-accent-cyan/5 border-accent-cyan/20",
-      "gate_column": "bg-accent-orange/10 border-accent-orange",
-      "done_column": "bg-accent-green/5 border-accent-green/20",
-      "gate_card": "border-accent-orange shadow-glow-orange",
-      "running_card": "border-accent-cyan"
-    }
+    ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui"],
+    "scopes": [
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "p001",
@@ -224,11 +374,67 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "RowsIcon exported (horizontal lines for sequence view)" },
-          { "id": "ac2", "description": "ColumnsIcon exported (vertical lines for board view)" },
-          { "id": "ac3", "description": "PipelineIcon exported (flow/branch icon for empty state)" },
-          { "id": "ac4", "description": "All icons follow existing pattern: stroke-based, currentColor, configurable size via className" }
-        ]
+          {
+            "id": "ac1",
+            "description": "RowsIcon exported (horizontal lines for sequence view)"
+          },
+          {
+            "id": "ac2",
+            "description": "ColumnsIcon exported (vertical lines for board view)"
+          },
+          {
+            "id": "ac3",
+            "description": "PipelineIcon exported (flow/branch icon for empty state)"
+          },
+          {
+            "id": "ac4",
+            "description": "All icons follow existing pattern: stroke-based, currentColor, configurable size via className"
+          }
+        ],
+        "specification": {
+          "design": {
+            "custom_components": [
+              "ToolbarRow1 - Breadcrumb + New Plan button (flex justify-between)",
+              "ToolbarRow2 - Initiative tabs + filters + view toggle (flex justify-between)",
+              "InitiativeTabs - Horizontal pill tabs for initiative filtering (like Linear's project tabs). Pills show icon + name, active state with cyan accent.",
+              "TabPill - Individual initiative tab pill component with icon, name, active/hover states",
+              "SequenceView - CSS grid layout with wave columns and SVG dependency arrows overlay",
+              "BoardView - Flex columns for kanban workflow states",
+              "WaveColumn - Column container for sequence view (NOW highlighted cyan)",
+              "BoardColumn - Column container for board view (Gate column orange glow, Running cyan tint)",
+              "PlanCard - Compact card with goal (line-clamp-2), initiative badge, status dot, gate indicator",
+              "DependencyArrow - SVG overlay for sequence view connections (curved bezier paths)"
+            ],
+            "shadcn_components": [
+              "ToggleGroup",
+              "Select",
+              "Badge",
+              "Tooltip",
+              "Card",
+              "Button"
+            ],
+            "color_mapping": {
+              "now_column": "bg-accent-cyan/5 border-accent-cyan/20",
+              "gate_column": "bg-accent-orange/10 border-accent-orange",
+              "done_column": "bg-accent-green/5 border-accent-green/20",
+              "gate_card": "border-accent-orange shadow-glow-orange",
+              "running_card": "border-accent-cyan"
+            },
+            "toolbar_pattern": {
+              "description": "Two-row toolbar like Linear's Projects view",
+              "row1": {
+                "layout": "flex justify-between items-center h-12 px-4 border-b border-border-subtle",
+                "left": "Breadcrumb: 'Pipeline' or 'Pipeline > [Initiative Name]'",
+                "right": "Button: '+ New Plan' (primary)"
+              },
+              "row2": {
+                "layout": "flex justify-between items-center h-12 px-4 gap-4",
+                "left": "InitiativeTabs (horizontal pills) + '+ New' inline button",
+                "right": "Status filter (Select) + View toggle (ToggleGroup: Sequence | Board)"
+              }
+            }
+          }
+        }
       },
       {
         "step_id": "p002",
@@ -238,12 +444,30 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "usePipelinePlans({ initiativeId?, statusFilter? }) hook exported" },
-          { "id": "ac2", "description": "Returns { plans, waveGroups, statusGroups, isLoading, error }" },
-          { "id": "ac3", "description": "waveGroups: { now: Plan[], wave2: Plan[], wave3: Plan[], ..., done: Plan[] } computed from dependencies" },
-          { "id": "ac4", "description": "statusGroups: { drafting: Plan[], gate: Plan[], approved: Plan[], running: Plan[], complete: Plan[] }" },
-          { "id": "ac5", "description": "Wave computation: NOW = plans with no incomplete dependencies, Wave N = plans whose dependencies are all in Wave N-1 or earlier, DONE = published+done plans" },
-          { "id": "ac6", "description": "Gate detection: plan.status === 'draft' AND plan.submitted === true" }
+          {
+            "id": "ac1",
+            "description": "usePipelinePlans({ initiativeId?, statusFilter? }) hook exported"
+          },
+          {
+            "id": "ac2",
+            "description": "Returns { plans, waveGroups, statusGroups, isLoading, error }"
+          },
+          {
+            "id": "ac3",
+            "description": "waveGroups: { now: Plan[], wave2: Plan[], wave3: Plan[], ..., done: Plan[] } computed from dependencies"
+          },
+          {
+            "id": "ac4",
+            "description": "statusGroups: { drafting: Plan[], gate: Plan[], approved: Plan[], running: Plan[], complete: Plan[] }"
+          },
+          {
+            "id": "ac5",
+            "description": "Wave computation: NOW = plans with no incomplete dependencies, Wave N = plans whose dependencies are all in Wave N-1 or earlier, DONE = published+done plans"
+          },
+          {
+            "id": "ac6",
+            "description": "Gate detection: plan.status === 'draft' AND plan.submitted === true"
+          }
         ]
       },
       {
@@ -251,15 +475,35 @@
         "title": "Create TabPill component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/TabPill.tsx - individual pill button for initiative filtering. Shows optional icon, label text, and handles active/hover states per design_spec.",
-        "dependencies": ["p001"],
+        "dependencies": [
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "TabPill accepts { label, icon?, color?, isActive, onClick } props" },
-          { "id": "ac2", "description": "Default state: bg-transparent text-text-secondary px-3 py-1.5 rounded-md text-sm" },
-          { "id": "ac3", "description": "Hover state: bg-bg-tertiary text-text-primary" },
-          { "id": "ac4", "description": "Active state: bg-accent-cyan/10 text-accent-cyan font-medium" },
-          { "id": "ac5", "description": "If icon provided, renders icon before label" },
-          { "id": "ac6", "description": "If color provided, shows 4px left border with that color when active" }
+          {
+            "id": "ac1",
+            "description": "TabPill accepts { label, icon?, color?, isActive, onClick } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Default state: bg-transparent text-text-secondary px-3 py-1.5 rounded-md text-sm"
+          },
+          {
+            "id": "ac3",
+            "description": "Hover state: bg-bg-tertiary text-text-primary"
+          },
+          {
+            "id": "ac4",
+            "description": "Active state: bg-accent-cyan/10 text-accent-cyan font-medium"
+          },
+          {
+            "id": "ac5",
+            "description": "If icon provided, renders icon before label"
+          },
+          {
+            "id": "ac6",
+            "description": "If color provided, shows 4px left border with that color when active"
+          }
         ]
       },
       {
@@ -267,15 +511,35 @@
         "title": "Create InitiativeTabs component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/InitiativeTabs.tsx - horizontal scrolling row of TabPill components. Shows 'All' tab first, then one tab per initiative from useInitiatives hook.",
-        "dependencies": ["p003"],
+        "dependencies": [
+          "p003"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "InitiativeTabs accepts { selectedId, onSelect } props" },
-          { "id": "ac2", "description": "Renders 'All' TabPill first (selectedId === null means All is active)" },
-          { "id": "ac3", "description": "Maps initiatives from useInitiatives() to TabPill components" },
-          { "id": "ac4", "description": "Each initiative pill shows: initiative.icon (emoji), initiative.name" },
-          { "id": "ac5", "description": "Horizontal scrolling: flex items-center gap-1 overflow-x-auto" },
-          { "id": "ac6", "description": "onSelect(initiativeId | null) called when tab clicked" }
+          {
+            "id": "ac1",
+            "description": "InitiativeTabs accepts { selectedId, onSelect } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Renders 'All' TabPill first (selectedId === null means All is active)"
+          },
+          {
+            "id": "ac3",
+            "description": "Maps initiatives from useInitiatives() to TabPill components"
+          },
+          {
+            "id": "ac4",
+            "description": "Each initiative pill shows: initiative.icon (emoji), initiative.name"
+          },
+          {
+            "id": "ac5",
+            "description": "Horizontal scrolling: flex items-center gap-1 overflow-x-auto"
+          },
+          {
+            "id": "ac6",
+            "description": "onSelect(initiativeId | null) called when tab clicked"
+          }
         ]
       },
       {
@@ -283,18 +547,47 @@
         "title": "Create PipelinePlanCard component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/PipelinePlanCard.tsx - compact card showing plan goal, initiative badge, status indicator, and gate indicator. Distinct from existing PlanCard (which is for list views).",
-        "dependencies": ["p001"],
+        "dependencies": [
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PipelinePlanCard accepts { plan, onClick } props" },
-          { "id": "ac2", "description": "Shows plan.summary.goal with line-clamp-2 (max 2 lines, truncated)" },
-          { "id": "ac3", "description": "Shows InitiativeBadge if plan.initiative is set (icon + name, small text)" },
-          { "id": "ac4", "description": "Shows status dot: draft=text-muted, approved=accent-cyan, published=accent-green" },
-          { "id": "ac5", "description": "Shows red pulsing dot when plan.submitted === true (awaiting gate approval)" },
-          { "id": "ac6", "description": "Card styling: bg-bg-card rounded-lg p-3 border border-border-subtle" },
-          { "id": "ac7", "description": "Hover state: border-border-default cursor-pointer" },
-          { "id": "ac8", "description": "Gate state (submitted): border-accent-orange shadow-glow-orange" },
-          { "id": "ac9", "description": "onClick navigates to /plans/:plan_id" }
+          {
+            "id": "ac1",
+            "description": "PipelinePlanCard accepts { plan, onClick } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Shows plan.summary.goal with line-clamp-2 (max 2 lines, truncated)"
+          },
+          {
+            "id": "ac3",
+            "description": "Shows InitiativeBadge if plan.initiative is set (icon + name, small text)"
+          },
+          {
+            "id": "ac4",
+            "description": "Shows status dot: draft=text-muted, approved=accent-cyan, published=accent-green"
+          },
+          {
+            "id": "ac5",
+            "description": "Shows red pulsing dot when plan.submitted === true (awaiting gate approval)"
+          },
+          {
+            "id": "ac6",
+            "description": "Card styling: bg-bg-card rounded-lg p-3 border border-border-subtle"
+          },
+          {
+            "id": "ac7",
+            "description": "Hover state: border-border-default cursor-pointer"
+          },
+          {
+            "id": "ac8",
+            "description": "Gate state (submitted): border-accent-orange shadow-glow-orange"
+          },
+          {
+            "id": "ac9",
+            "description": "onClick navigates to /plans/:plan_id"
+          }
         ]
       },
       {
@@ -302,16 +595,39 @@
         "title": "Create WaveColumn component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/WaveColumn.tsx - column container for SequenceView. Shows header with title and count, vertical stack of PipelinePlanCard components.",
-        "dependencies": ["p005"],
+        "dependencies": [
+          "p005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "WaveColumn accepts { title, plans, variant, onPlanClick } props" },
-          { "id": "ac2", "description": "Header shows title + count badge (e.g., 'NOW (3)')" },
-          { "id": "ac3", "description": "Renders PipelinePlanCard for each plan in vertical stack" },
-          { "id": "ac4", "description": "Column width: min-w-[280px] flex-shrink-0" },
-          { "id": "ac5", "description": "variant='now' uses bg-accent-cyan/5 border-accent-cyan/20 styling" },
-          { "id": "ac6", "description": "variant='done' uses bg-accent-green/5 border-accent-green/20 styling" },
-          { "id": "ac7", "description": "variant='default' uses bg-bg-secondary border-border-subtle" }
+          {
+            "id": "ac1",
+            "description": "WaveColumn accepts { title, plans, variant, onPlanClick } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Header shows title + count badge (e.g., 'NOW (3)')"
+          },
+          {
+            "id": "ac3",
+            "description": "Renders PipelinePlanCard for each plan in vertical stack"
+          },
+          {
+            "id": "ac4",
+            "description": "Column width: min-w-[280px] flex-shrink-0"
+          },
+          {
+            "id": "ac5",
+            "description": "variant='now' uses bg-accent-cyan/5 border-accent-cyan/20 styling"
+          },
+          {
+            "id": "ac6",
+            "description": "variant='done' uses bg-accent-green/5 border-accent-green/20 styling"
+          },
+          {
+            "id": "ac7",
+            "description": "variant='default' uses bg-bg-secondary border-border-subtle"
+          }
         ]
       },
       {
@@ -319,16 +635,39 @@
         "title": "Create BoardColumn component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/BoardColumn.tsx - column container for BoardView. Similar to WaveColumn but with workflow-specific styling (gate highlight, running accent).",
-        "dependencies": ["p005"],
+        "dependencies": [
+          "p005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "BoardColumn accepts { title, plans, variant, onPlanClick } props" },
-          { "id": "ac2", "description": "Header shows title + count badge" },
-          { "id": "ac3", "description": "Renders PipelinePlanCard for each plan in vertical stack" },
-          { "id": "ac4", "description": "variant='gate' uses bg-accent-orange/10 border-2 border-accent-orange shadow-glow-orange" },
-          { "id": "ac5", "description": "variant='running' uses bg-accent-cyan/5 border border-accent-cyan/30" },
-          { "id": "ac6", "description": "variant='complete' uses bg-accent-green/5 border border-accent-green/20" },
-          { "id": "ac7", "description": "variant='default' uses bg-bg-secondary rounded-xl border border-border-subtle" }
+          {
+            "id": "ac1",
+            "description": "BoardColumn accepts { title, plans, variant, onPlanClick } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Header shows title + count badge"
+          },
+          {
+            "id": "ac3",
+            "description": "Renders PipelinePlanCard for each plan in vertical stack"
+          },
+          {
+            "id": "ac4",
+            "description": "variant='gate' uses bg-accent-orange/10 border-2 border-accent-orange shadow-glow-orange"
+          },
+          {
+            "id": "ac5",
+            "description": "variant='running' uses bg-accent-cyan/5 border border-accent-cyan/30"
+          },
+          {
+            "id": "ac6",
+            "description": "variant='complete' uses bg-accent-green/5 border border-accent-green/20"
+          },
+          {
+            "id": "ac7",
+            "description": "variant='default' uses bg-bg-secondary rounded-xl border border-border-subtle"
+          }
         ]
       },
       {
@@ -339,11 +678,26 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "DependencyArrow accepts { from: {x,y}, to: {x,y}, color? } props" },
-          { "id": "ac2", "description": "Renders SVG path element with quadratic bezier curve" },
-          { "id": "ac3", "description": "Default color: var(--border-default)" },
-          { "id": "ac4", "description": "Arrow ends with small arrowhead marker" },
-          { "id": "ac5", "description": "Path curves naturally from right edge of source card to left edge of target card" }
+          {
+            "id": "ac1",
+            "description": "DependencyArrow accepts { from: {x,y}, to: {x,y}, color? } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Renders SVG path element with quadratic bezier curve"
+          },
+          {
+            "id": "ac3",
+            "description": "Default color: var(--border-default)"
+          },
+          {
+            "id": "ac4",
+            "description": "Arrow ends with small arrowhead marker"
+          },
+          {
+            "id": "ac5",
+            "description": "Path curves naturally from right edge of source card to left edge of target card"
+          }
         ]
       },
       {
@@ -351,16 +705,41 @@
         "title": "Create SequenceView component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/SequenceView.tsx - main view showing plans grouped by dependency waves. Uses CSS grid for columns and SVG overlay for dependency arrows.",
-        "dependencies": ["p006", "p008", "p002"],
+        "dependencies": [
+          "p006",
+          "p008",
+          "p002"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "SequenceView accepts { plans, waveGroups, onPlanClick } props" },
-          { "id": "ac2", "description": "Renders horizontal scrolling grid with WaveColumn for each wave: NOW, Wave 2, ..., DONE" },
-          { "id": "ac3", "description": "NOW column has variant='now' styling" },
-          { "id": "ac4", "description": "DONE column has variant='done' styling" },
-          { "id": "ac5", "description": "Renders SVG overlay with DependencyArrow for each plan dependency" },
-          { "id": "ac6", "description": "Uses refs to measure card positions for accurate arrow placement" },
-          { "id": "ac7", "description": "Column headers show count: 'NOW (3)', 'Wave 2 (5)', etc." }
+          {
+            "id": "ac1",
+            "description": "SequenceView accepts { plans, waveGroups, onPlanClick } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Renders horizontal scrolling grid with WaveColumn for each wave: NOW, Wave 2, ..., DONE"
+          },
+          {
+            "id": "ac3",
+            "description": "NOW column has variant='now' styling"
+          },
+          {
+            "id": "ac4",
+            "description": "DONE column has variant='done' styling"
+          },
+          {
+            "id": "ac5",
+            "description": "Renders SVG overlay with DependencyArrow for each plan dependency"
+          },
+          {
+            "id": "ac6",
+            "description": "Uses refs to measure card positions for accurate arrow placement"
+          },
+          {
+            "id": "ac7",
+            "description": "Column headers show count: 'NOW (3)', 'Wave 2 (5)', etc."
+          }
         ]
       },
       {
@@ -368,16 +747,40 @@
         "title": "Create BoardView component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/BoardView.tsx - kanban-style view showing plans grouped by workflow status. Gate column highlighted for human attention.",
-        "dependencies": ["p007", "p002"],
+        "dependencies": [
+          "p007",
+          "p002"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "BoardView accepts { statusGroups, onPlanClick } props" },
-          { "id": "ac2", "description": "Renders 5 columns: Drafting, Gate, Approved, Running, Complete" },
-          { "id": "ac3", "description": "Gate column uses variant='gate' (orange highlight)" },
-          { "id": "ac4", "description": "Running column uses variant='running' (cyan tint)" },
-          { "id": "ac5", "description": "Complete column uses variant='complete' (green tint)" },
-          { "id": "ac6", "description": "Columns have gap-4 spacing and p-4 padding" },
-          { "id": "ac7", "description": "Horizontal scroll when columns exceed viewport width" }
+          {
+            "id": "ac1",
+            "description": "BoardView accepts { statusGroups, onPlanClick } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Renders 5 columns: Drafting, Gate, Approved, Running, Complete"
+          },
+          {
+            "id": "ac3",
+            "description": "Gate column uses variant='gate' (orange highlight)"
+          },
+          {
+            "id": "ac4",
+            "description": "Running column uses variant='running' (cyan tint)"
+          },
+          {
+            "id": "ac5",
+            "description": "Complete column uses variant='complete' (green tint)"
+          },
+          {
+            "id": "ac6",
+            "description": "Columns have gap-4 spacing and p-4 padding"
+          },
+          {
+            "id": "ac7",
+            "description": "Horizontal scroll when columns exceed viewport width"
+          }
         ]
       },
       {
@@ -385,16 +788,40 @@
         "title": "Create PipelineToolbar component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/PipelineToolbar.tsx - two-row toolbar following the two_row_toolbar pattern. Row 1: breadcrumb + New Plan button. Row 2: InitiativeTabs + status filter + view toggle.",
-        "dependencies": ["p004", "p001"],
+        "dependencies": [
+          "p004",
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PipelineToolbar accepts { selectedInitiative, onInitiativeSelect, statusFilter, onStatusFilterChange, viewMode, onViewModeChange } props" },
-          { "id": "ac2", "description": "Row 1: 'Pipeline' breadcrumb (or 'Pipeline > [Initiative Name]' when filtered) + '+ New Plan' primary button" },
-          { "id": "ac3", "description": "Row 2 left: InitiativeTabs + ghost '+ New' button for adding initiative" },
-          { "id": "ac4", "description": "Row 2 right: Status filter Select (All/Active/Blocked/Complete) + View toggle (Sequence/Board icons)" },
-          { "id": "ac5", "description": "Row 1 layout: flex justify-between items-center h-12 px-4 border-b border-border-subtle" },
-          { "id": "ac6", "description": "Row 2 layout: flex justify-between items-center h-12 px-4 gap-4" },
-          { "id": "ac7", "description": "View toggle uses ToggleGroup with RowsIcon (sequence) and ColumnsIcon (board)" }
+          {
+            "id": "ac1",
+            "description": "PipelineToolbar accepts { selectedInitiative, onInitiativeSelect, statusFilter, onStatusFilterChange, viewMode, onViewModeChange } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Row 1: 'Pipeline' breadcrumb (or 'Pipeline > [Initiative Name]' when filtered) + '+ New Plan' primary button"
+          },
+          {
+            "id": "ac3",
+            "description": "Row 2 left: InitiativeTabs + ghost '+ New' button for adding initiative"
+          },
+          {
+            "id": "ac4",
+            "description": "Row 2 right: Status filter Select (All/Active/Blocked/Complete) + View toggle (Sequence/Board icons)"
+          },
+          {
+            "id": "ac5",
+            "description": "Row 1 layout: flex justify-between items-center h-12 px-4 border-b border-border-subtle"
+          },
+          {
+            "id": "ac6",
+            "description": "Row 2 layout: flex justify-between items-center h-12 px-4 gap-4"
+          },
+          {
+            "id": "ac7",
+            "description": "View toggle uses ToggleGroup with RowsIcon (sequence) and ColumnsIcon (board)"
+          }
         ]
       },
       {
@@ -402,15 +829,35 @@
         "title": "Create PipelineEmptyState component",
         "scope": "planner-ui",
         "description": "Create src/components/pipeline/PipelineEmptyState.tsx - centered empty state shown when no plans exist. Shows illustration, message, and CTA button.",
-        "dependencies": ["p001"],
+        "dependencies": [
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PipelineEmptyState renders when no plans in pipeline" },
-          { "id": "ac2", "description": "Shows PipelineIcon (muted color) as illustration" },
-          { "id": "ac3", "description": "Shows 'No plans in pipeline' message text" },
-          { "id": "ac4", "description": "Shows 'Create plans to see them flow through the pipeline' subtext" },
-          { "id": "ac5", "description": "Shows '+ New Plan' primary button that navigates to /plans/new" },
-          { "id": "ac6", "description": "Layout: centered, max-w-sm, flex-col items-center gap-4" }
+          {
+            "id": "ac1",
+            "description": "PipelineEmptyState renders when no plans in pipeline"
+          },
+          {
+            "id": "ac2",
+            "description": "Shows PipelineIcon (muted color) as illustration"
+          },
+          {
+            "id": "ac3",
+            "description": "Shows 'No plans in pipeline' message text"
+          },
+          {
+            "id": "ac4",
+            "description": "Shows 'Create plans to see them flow through the pipeline' subtext"
+          },
+          {
+            "id": "ac5",
+            "description": "Shows '+ New Plan' primary button that navigates to /plans/new"
+          },
+          {
+            "id": "ac6",
+            "description": "Layout: centered, max-w-sm, flex-col items-center gap-4"
+          }
         ]
       },
       {
@@ -418,18 +865,51 @@
         "title": "Create PipelinePage component",
         "scope": "planner-ui",
         "description": "Create src/pages/PipelinePage.tsx - main page component that composes PipelineToolbar, SequenceView/BoardView, and PipelineEmptyState. Manages view mode state and filter state.",
-        "dependencies": ["p009", "p010", "p011", "p012", "p002"],
+        "dependencies": [
+          "p009",
+          "p010",
+          "p011",
+          "p012",
+          "p002"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PipelinePage uses usePipelinePlans hook for data" },
-          { "id": "ac2", "description": "Manages viewMode state: 'sequence' | 'board' (default: 'sequence')" },
-          { "id": "ac3", "description": "Manages selectedInitiative state (null = All)" },
-          { "id": "ac4", "description": "Manages statusFilter state: 'all' | 'active' | 'blocked' | 'complete'" },
-          { "id": "ac5", "description": "Renders PipelineToolbar with all filter/toggle controls" },
-          { "id": "ac6", "description": "Renders SequenceView when viewMode === 'sequence'" },
-          { "id": "ac7", "description": "Renders BoardView when viewMode === 'board'" },
-          { "id": "ac8", "description": "Renders PipelineEmptyState when plans.length === 0" },
-          { "id": "ac9", "description": "onPlanClick navigates to /plans/:plan_id using useNavigate" }
+          {
+            "id": "ac1",
+            "description": "PipelinePage uses usePipelinePlans hook for data"
+          },
+          {
+            "id": "ac2",
+            "description": "Manages viewMode state: 'sequence' | 'board' (default: 'sequence')"
+          },
+          {
+            "id": "ac3",
+            "description": "Manages selectedInitiative state (null = All)"
+          },
+          {
+            "id": "ac4",
+            "description": "Manages statusFilter state: 'all' | 'active' | 'blocked' | 'complete'"
+          },
+          {
+            "id": "ac5",
+            "description": "Renders PipelineToolbar with all filter/toggle controls"
+          },
+          {
+            "id": "ac6",
+            "description": "Renders SequenceView when viewMode === 'sequence'"
+          },
+          {
+            "id": "ac7",
+            "description": "Renders BoardView when viewMode === 'board'"
+          },
+          {
+            "id": "ac8",
+            "description": "Renders PipelineEmptyState when plans.length === 0"
+          },
+          {
+            "id": "ac9",
+            "description": "onPlanClick navigates to /plans/:plan_id using useNavigate"
+          }
         ]
       },
       {
@@ -437,12 +917,23 @@
         "title": "Add /pipeline route",
         "scope": "planner-ui",
         "description": "Add /pipeline route to src/App.tsx or router configuration. Route renders PipelinePage component.",
-        "dependencies": ["p013"],
+        "dependencies": [
+          "p013"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Route /pipeline exists and renders PipelinePage" },
-          { "id": "ac2", "description": "Route is protected by existing auth/layout wrapper" },
-          { "id": "ac3", "description": "Navigation to /pipeline from sidebar Pipeline link works (ui-sidebar-layout integration)" }
+          {
+            "id": "ac1",
+            "description": "Route /pipeline exists and renders PipelinePage"
+          },
+          {
+            "id": "ac2",
+            "description": "Route is protected by existing auth/layout wrapper"
+          },
+          {
+            "id": "ac3",
+            "description": "Navigation to /pipeline from sidebar Pipeline link works (ui-sidebar-layout integration)"
+          }
         ]
       },
       {
@@ -453,10 +944,22 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "ToggleGroup, ToggleGroupItem exported from ui/ToggleGroup.tsx" },
-          { "id": "ac2", "description": "Uses @radix-ui/react-toggle-group primitives" },
-          { "id": "ac3", "description": "Styled with Mission Control theme: bg-bg-tertiary, active item bg-bg-elevated text-text-primary" },
-          { "id": "ac4", "description": "Supports type='single' for mutually exclusive selection" }
+          {
+            "id": "ac1",
+            "description": "ToggleGroup, ToggleGroupItem exported from ui/ToggleGroup.tsx"
+          },
+          {
+            "id": "ac2",
+            "description": "Uses @radix-ui/react-toggle-group primitives"
+          },
+          {
+            "id": "ac3",
+            "description": "Styled with Mission Control theme: bg-bg-tertiary, active item bg-bg-elevated text-text-primary"
+          },
+          {
+            "id": "ac4",
+            "description": "Supports type='single' for mutually exclusive selection"
+          }
         ]
       },
       {
@@ -467,11 +970,26 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Select, SelectTrigger, SelectContent, SelectItem, SelectValue exported" },
-          { "id": "ac2", "description": "Uses @radix-ui/react-select primitives" },
-          { "id": "ac3", "description": "Styled with Mission Control theme: bg-bg-secondary, border-border-default, text-text-primary" },
-          { "id": "ac4", "description": "Dropdown content uses bg-bg-card, rounded-md, shadow-modal" },
-          { "id": "ac5", "description": "Selected item highlighted with bg-accent-cyan/10 text-accent-cyan" }
+          {
+            "id": "ac1",
+            "description": "Select, SelectTrigger, SelectContent, SelectItem, SelectValue exported"
+          },
+          {
+            "id": "ac2",
+            "description": "Uses @radix-ui/react-select primitives"
+          },
+          {
+            "id": "ac3",
+            "description": "Styled with Mission Control theme: bg-bg-secondary, border-border-default, text-text-primary"
+          },
+          {
+            "id": "ac4",
+            "description": "Dropdown content uses bg-bg-card, rounded-md, shadow-modal"
+          },
+          {
+            "id": "ac5",
+            "description": "Selected item highlighted with bg-accent-cyan/10 text-accent-cyan"
+          }
         ]
       },
       {
@@ -479,16 +997,43 @@
         "title": "Write tests for pipeline components",
         "scope": "planner-ui",
         "description": "Add tests for core pipeline components: usePipelinePlans, PipelinePlanCard, SequenceView, BoardView, PipelineToolbar.",
-        "dependencies": ["p002", "p005", "p009", "p010", "p011"],
+        "dependencies": [
+          "p002",
+          "p005",
+          "p009",
+          "p010",
+          "p011"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "usePipelinePlans.test.ts: wave computation logic tested (NOW = no deps, Wave N = deps in N-1)" },
-          { "id": "ac2", "description": "usePipelinePlans.test.ts: status grouping logic tested" },
-          { "id": "ac3", "description": "PipelinePlanCard.test.tsx: renders goal, initiative badge, status dot" },
-          { "id": "ac4", "description": "PipelinePlanCard.test.tsx: gate indicator shown when submitted" },
-          { "id": "ac5", "description": "SequenceView.test.tsx: renders correct number of wave columns" },
-          { "id": "ac6", "description": "BoardView.test.tsx: renders 5 workflow columns with correct variants" },
-          { "id": "ac7", "description": "All tests pass: npm run test" }
+          {
+            "id": "ac1",
+            "description": "usePipelinePlans.test.ts: wave computation logic tested (NOW = no deps, Wave N = deps in N-1)"
+          },
+          {
+            "id": "ac2",
+            "description": "usePipelinePlans.test.ts: status grouping logic tested"
+          },
+          {
+            "id": "ac3",
+            "description": "PipelinePlanCard.test.tsx: renders goal, initiative badge, status dot"
+          },
+          {
+            "id": "ac4",
+            "description": "PipelinePlanCard.test.tsx: gate indicator shown when submitted"
+          },
+          {
+            "id": "ac5",
+            "description": "SequenceView.test.tsx: renders correct number of wave columns"
+          },
+          {
+            "id": "ac6",
+            "description": "BoardView.test.tsx: renders 5 workflow columns with correct variants"
+          },
+          {
+            "id": "ac7",
+            "description": "All tests pass: npm run test"
+          }
         ]
       },
       {
@@ -496,17 +1041,27 @@
         "title": "Add view mode persistence",
         "scope": "planner-ui",
         "description": "Persist view mode (sequence/board) selection to localStorage so user preference is remembered across sessions.",
-        "dependencies": ["p013"],
+        "dependencies": [
+          "p013"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "View mode persisted to localStorage key 'pipeline-view-mode'" },
-          { "id": "ac2", "description": "Initial view mode read from localStorage on mount" },
-          { "id": "ac3", "description": "Falls back to 'sequence' if no stored preference" }
+          {
+            "id": "ac1",
+            "description": "View mode persisted to localStorage key 'pipeline-view-mode'"
+          },
+          {
+            "id": "ac2",
+            "description": "Initial view mode read from localStorage on mount"
+          },
+          {
+            "id": "ac3",
+            "description": "Falls back to 'sequence' if no stored preference"
+          }
         ]
       }
     ]
   },
-
   "notes": {
     "rationale": "Traditional roadmaps assume time-based scheduling. Agent-driven planning has unpredictable durations - work completes when agents finish, not on calendar dates. The real constraints are dependencies (what blocks what) and human gates (approval checkpoints). Pipeline view surfaces these constraints instead of pretending we know timing.",
     "completion_status": "COMPLETED",
@@ -548,5 +1103,11 @@
       "Step-level pipeline (drill into plan steps)",
       "Batch approval from Gate column"
     ]
+  },
+  "context": {
+    "designer": {
+      "approach": "Linear-style two-row toolbar with initiative pills. Two view modes (Sequence/Board) sharing common plan card components.",
+      "migrated_from": "design_spec"
+    }
   }
 }

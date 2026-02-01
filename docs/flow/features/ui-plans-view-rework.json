@@ -4,41 +4,69 @@
   "type": "feature",
   "status": "completed",
   "priority": "medium",
-  "dependencies": ["schema-org-initiative", "ui-sidebar-layout"],
-
+  "dependencies": [
+    "schema-org-initiative",
+    "ui-sidebar-layout"
+  ],
   "summary": {
     "goal": "Rework PlansListPage to work with sidebar layout, add initiative filter, and support 'My Plans' vs 'All Plans' views",
     "context": "Current PlansListPage has attention sections (Needs Attention, Working On) and All Plans with filter tabs. Keep this structure but: (1) remove page header (sidebar provides context), (2) add initiative dropdown filter, (3) split into My Plans (owner_user_id = current) vs All Plans routes.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "Route /plans shows all plans (All Plans view)" },
-      { "id": "ac2", "description": "Route /plans/my shows only plans where owner_user_id matches current user" },
-      { "id": "ac3", "description": "Initiative dropdown filter at top: 'All Initiatives' + list of initiatives" },
-      { "id": "ac4", "description": "When initiative selected, only plans with that initiative_id shown" },
-      { "id": "ac5", "description": "Status filter tabs remain: All, Draft, Approved, Published" },
-      { "id": "ac6", "description": "Search input remains, searches goal and scope" },
-      { "id": "ac7", "description": "Attention sections (Needs Attention, Working On) shown at top when relevant" },
-      { "id": "ac8", "description": "Plan cards show initiative badge (icon + name) if assigned" },
-      { "id": "ac9", "description": "New Plan button in content area (not just sidebar)" },
-      { "id": "ac10", "description": "Page header removed (workspace context is in sidebar)" },
-      { "id": "ac11", "description": "View mode toggle (list/grouped) remains" }
+      {
+        "id": "ac1",
+        "description": "Route /plans shows all plans (All Plans view)"
+      },
+      {
+        "id": "ac2",
+        "description": "Route /plans/my shows only plans where owner_user_id matches current user"
+      },
+      {
+        "id": "ac3",
+        "description": "Initiative dropdown filter at top: 'All Initiatives' + list of initiatives"
+      },
+      {
+        "id": "ac4",
+        "description": "When initiative selected, only plans with that initiative_id shown"
+      },
+      {
+        "id": "ac5",
+        "description": "Status filter tabs remain: All, Draft, Approved, Published"
+      },
+      {
+        "id": "ac6",
+        "description": "Search input remains, searches goal and scope"
+      },
+      {
+        "id": "ac7",
+        "description": "Attention sections (Needs Attention, Working On) shown at top when relevant"
+      },
+      {
+        "id": "ac8",
+        "description": "Plan cards show initiative badge (icon + name) if assigned"
+      },
+      {
+        "id": "ac9",
+        "description": "New Plan button in content area (not just sidebar)"
+      },
+      {
+        "id": "ac10",
+        "description": "Page header removed (workspace context is in sidebar)"
+      },
+      {
+        "id": "ac11",
+        "description": "View mode toggle (list/grouped) remains"
+      }
     ]
   },
-
   "design_spec": {
-    "approach": "Evolve existing PlansListPage, remove page header, add initiative filter",
-    "toolbar": { "pattern": "two_row_toolbar", "customizations": { "row1_action": "+ New Plan", "breadcrumb": "Plans" } },
-    "shadcn_components": [
-      "Select",
-      "Input",
-      "Button",
-      "Badge",
-      "ToggleGroup"
-    ],
     "views": [
       {
         "view_id": "plans-list",
         "name": "All Plans / My Plans",
-        "routes": ["/plans", "/plans/my"],
+        "routes": [
+          "/plans",
+          "/plans/my"
+        ],
         "layout": "full width content area, two-row toolbar at top",
         "elements": [
           {
@@ -46,8 +74,16 @@
             "use": "breadcrumb + action",
             "pattern_ref": "two_row_toolbar.row1",
             "children": [
-              { "component": "Breadcrumb", "use": "page context", "props": "'Plans' or 'My Plans'" },
-              { "component": "Button", "use": "new plan", "props": "primary, '+ New Plan'" }
+              {
+                "component": "Breadcrumb",
+                "use": "page context",
+                "props": "'Plans' or 'My Plans'"
+              },
+              {
+                "component": "Button",
+                "use": "new plan",
+                "props": "primary, '+ New Plan'"
+              }
             ]
           },
           {
@@ -55,14 +91,38 @@
             "use": "filters + view toggle",
             "pattern_ref": "two_row_toolbar.row2",
             "children": [
-              { "component": "InitiativeTabs", "use": "initiative filter pills", "custom": true },
-              { "component": "ToggleGroup", "use": "status filter", "props": "All | Draft | Approved | Published" },
-              { "component": "ToggleGroup", "use": "view mode", "props": "list icon | grid icon" }
+              {
+                "component": "InitiativeTabs",
+                "use": "initiative filter pills",
+                "custom": true
+              },
+              {
+                "component": "ToggleGroup",
+                "use": "status filter",
+                "props": "All | Draft | Approved | Published"
+              },
+              {
+                "component": "ToggleGroup",
+                "use": "view mode",
+                "props": "list icon | grid icon"
+              }
             ]
           },
-          { "component": "Input", "use": "search", "props": "SearchIcon prefix, placeholder 'Search plans...'" },
-          { "component": "NeedsAttentionSection", "use": "attention items", "props": "existing component, more compact" },
-          { "component": "PlansList", "use": "plan cards", "props": "existing list with initiative badge added" }
+          {
+            "component": "Input",
+            "use": "search",
+            "props": "SearchIcon prefix, placeholder 'Search plans...'"
+          },
+          {
+            "component": "NeedsAttentionSection",
+            "use": "attention items",
+            "props": "existing component, more compact"
+          },
+          {
+            "component": "PlansList",
+            "use": "plan cards",
+            "props": "existing list with initiative badge added"
+          }
         ]
       },
       {
@@ -70,8 +130,16 @@
         "name": "Plan Card with Initiative Badge",
         "layout": "existing PlanCard + initiative badge",
         "elements": [
-          { "component": "existing", "use": "goal, status, step count, updated time" },
-          { "component": "InitiativeBadge", "use": "initiative indicator", "custom": true, "props": "icon + name, muted colors, small" }
+          {
+            "component": "existing",
+            "use": "goal, status, step count, updated time"
+          },
+          {
+            "component": "InitiativeBadge",
+            "use": "initiative indicator",
+            "custom": true,
+            "props": "icon + name, muted colors, small"
+          }
         ]
       },
       {
@@ -87,15 +155,12 @@
       "Add InitiativeBadge to PlanCard when initiative_id is set",
       "Make attention sections more compact (smaller cards)",
       "Support /plans/my route filtering by owner_user_id"
-    ],
-    "custom_needed": [
-      "InitiativeBadge - small inline badge with initiative icon + name",
-      "FilterBar - composed toolbar for all filter controls"
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-ui"],
+    "scopes": [
+      "planner-ui"
+    ],
     "steps": [
       {
         "step_id": "p001",
@@ -105,22 +170,64 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PlanSummary interface includes initiative_id?: string" },
-          { "id": "ac2", "description": "PlanSummary interface includes initiative?: { name: string; icon?: string; color?: string }" },
-          { "id": "ac3", "description": "PlanSummary interface includes owner_user_id?: string" }
-        ]
+          {
+            "id": "ac1",
+            "description": "PlanSummary interface includes initiative_id?: string"
+          },
+          {
+            "id": "ac2",
+            "description": "PlanSummary interface includes initiative?: { name: string; icon?: string; color?: string }"
+          },
+          {
+            "id": "ac3",
+            "description": "PlanSummary interface includes owner_user_id?: string"
+          }
+        ],
+        "specification": {
+          "design": {
+            "custom_components": [
+              "InitiativeBadge - small inline badge with initiative icon + name",
+              "FilterBar - composed toolbar for all filter controls"
+            ],
+            "shadcn_components": [
+              "Select",
+              "Input",
+              "Button",
+              "Badge",
+              "ToggleGroup"
+            ],
+            "toolbar": {
+              "pattern": "two_row_toolbar",
+              "customizations": {
+                "row1_action": "+ New Plan",
+                "breadcrumb": "Plans"
+              }
+            }
+          }
+        }
       },
       {
         "step_id": "p002",
         "title": "Update listPlans API to support initiative filter",
         "scope": "planner-ui",
         "description": "Update src/api/index.ts listPlans() function to accept optional initiative_id query param. Backend endpoint GET /plans?initiative_id=xxx is provided by schema-org-initiative.",
-        "dependencies": ["p001"],
+        "dependencies": [
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "listPlans(params?: { initiative_id?: string; owner_user_id?: string }) signature updated" },
-          { "id": "ac2", "description": "Query params appended to URL when provided" },
-          { "id": "ac3", "description": "Returns PlanSummary[] with initiative data included" }
+          {
+            "id": "ac1",
+            "description": "listPlans(params?: { initiative_id?: string; owner_user_id?: string }) signature updated"
+          },
+          {
+            "id": "ac2",
+            "description": "Query params appended to URL when provided"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns PlanSummary[] with initiative data included"
+          }
         ],
         "integration": true
       },
@@ -129,13 +236,27 @@
         "title": "Create InitiativeBadge component",
         "scope": "planner-ui",
         "description": "Create src/components/InitiativeBadge.tsx - a small inline badge showing initiative icon + name. Uses muted colors, small text. Displayed on PlanCard when plan has initiative_id.",
-        "dependencies": ["p001"],
+        "dependencies": [
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "InitiativeBadge accepts { initiative: { name: string; icon?: string; color?: string } } props" },
-          { "id": "ac2", "description": "Displays color dot (using initiative.color or default) + name" },
-          { "id": "ac3", "description": "Styled: inline-flex, text-xs, text-text-muted, bg-bg-tertiary/50, rounded, px-1.5 py-0.5" },
-          { "id": "ac4", "description": "Color dot is 6x6 rounded-full with initiative.color as bg or accent-purple default" }
+          {
+            "id": "ac1",
+            "description": "InitiativeBadge accepts { initiative: { name: string; icon?: string; color?: string } } props"
+          },
+          {
+            "id": "ac2",
+            "description": "Displays color dot (using initiative.color or default) + name"
+          },
+          {
+            "id": "ac3",
+            "description": "Styled: inline-flex, text-xs, text-text-muted, bg-bg-tertiary/50, rounded, px-1.5 py-0.5"
+          },
+          {
+            "id": "ac4",
+            "description": "Color dot is 6x6 rounded-full with initiative.color as bg or accent-purple default"
+          }
         ]
       },
       {
@@ -143,13 +264,27 @@
         "title": "Update PlanCard to show InitiativeBadge",
         "scope": "planner-ui",
         "description": "Modify src/components/PlanCard.tsx to render InitiativeBadge when plan.initiative is present. Place badge in the metadata row (after scopes, before version).",
-        "dependencies": ["p003"],
+        "dependencies": [
+          "p003"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "PlanCard renders InitiativeBadge when plan.initiative is defined" },
-          { "id": "ac2", "description": "Badge positioned in metadata row between scopes and version" },
-          { "id": "ac3", "description": "Separator dot appears before badge when scopes exist" },
-          { "id": "ac4", "description": "No badge or extra space when plan.initiative is undefined" }
+          {
+            "id": "ac1",
+            "description": "PlanCard renders InitiativeBadge when plan.initiative is defined"
+          },
+          {
+            "id": "ac2",
+            "description": "Badge positioned in metadata row between scopes and version"
+          },
+          {
+            "id": "ac3",
+            "description": "Separator dot appears before badge when scopes exist"
+          },
+          {
+            "id": "ac4",
+            "description": "No badge or extra space when plan.initiative is undefined"
+          }
         ]
       },
       {
@@ -157,15 +292,35 @@
         "title": "Create InitiativeTabs component",
         "scope": "planner-ui",
         "description": "Create src/components/InitiativeTabs.tsx - horizontal scrollable pills for filtering by initiative. Shows 'All' + list of initiatives. Uses catalog design_system two_row_toolbar pattern for row2 filter tabs.",
-        "dependencies": ["p001"],
+        "dependencies": [
+          "p001"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "InitiativeTabs accepts { initiatives: Initiative[]; selected: string | null; onSelect: (id: string | null) => void } props" },
-          { "id": "ac2", "description": "'All' pill is first, clicking it calls onSelect(null)" },
-          { "id": "ac3", "description": "Each initiative rendered as pill with color dot + name" },
-          { "id": "ac4", "description": "Selected pill has bg-bg-elevated, text-text-primary, shadow-sm" },
-          { "id": "ac5", "description": "Unselected pills have text-text-muted, hover:text-text-secondary" },
-          { "id": "ac6", "description": "Container scrolls horizontally on overflow, hides scrollbar" }
+          {
+            "id": "ac1",
+            "description": "InitiativeTabs accepts { initiatives: Initiative[]; selected: string | null; onSelect: (id: string | null) => void } props"
+          },
+          {
+            "id": "ac2",
+            "description": "'All' pill is first, clicking it calls onSelect(null)"
+          },
+          {
+            "id": "ac3",
+            "description": "Each initiative rendered as pill with color dot + name"
+          },
+          {
+            "id": "ac4",
+            "description": "Selected pill has bg-bg-elevated, text-text-primary, shadow-sm"
+          },
+          {
+            "id": "ac5",
+            "description": "Unselected pills have text-text-muted, hover:text-text-secondary"
+          },
+          {
+            "id": "ac6",
+            "description": "Container scrolls horizontally on overflow, hides scrollbar"
+          }
         ]
       },
       {
@@ -173,16 +328,39 @@
         "title": "Create PlansToolbar component",
         "scope": "planner-ui",
         "description": "Create src/components/PlansToolbar.tsx implementing two_row_toolbar pattern. Row1: breadcrumb (Plans/My Plans) + New Plan button. Row2: InitiativeTabs + status ToggleGroup + view mode toggle. Layout per catalog.design_system.patterns.two_row_toolbar.",
-        "dependencies": ["p005"],
+        "dependencies": [
+          "p005"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Row1 layout: flex justify-between items-center h-12 px-4 border-b border-border-subtle" },
-          { "id": "ac2", "description": "Row1 left: 'Plans' or 'My Plans' text (font-display text-lg font-semibold)" },
-          { "id": "ac3", "description": "Row1 right: + New Plan button (Link to /plans/new, primary style)" },
-          { "id": "ac4", "description": "Row2 layout: flex justify-between items-center h-12 px-4 gap-4" },
-          { "id": "ac5", "description": "Row2 left: InitiativeTabs" },
-          { "id": "ac6", "description": "Row2 right: status ToggleGroup + view mode ToggleGroup" },
-          { "id": "ac7", "description": "PlansToolbar accepts props: { title, initiatives, selectedInitiative, onInitiativeSelect, statusFilter, onStatusChange, viewMode, onViewModeChange }" }
+          {
+            "id": "ac1",
+            "description": "Row1 layout: flex justify-between items-center h-12 px-4 border-b border-border-subtle"
+          },
+          {
+            "id": "ac2",
+            "description": "Row1 left: 'Plans' or 'My Plans' text (font-display text-lg font-semibold)"
+          },
+          {
+            "id": "ac3",
+            "description": "Row1 right: + New Plan button (Link to /plans/new, primary style)"
+          },
+          {
+            "id": "ac4",
+            "description": "Row2 layout: flex justify-between items-center h-12 px-4 gap-4"
+          },
+          {
+            "id": "ac5",
+            "description": "Row2 left: InitiativeTabs"
+          },
+          {
+            "id": "ac6",
+            "description": "Row2 right: status ToggleGroup + view mode ToggleGroup"
+          },
+          {
+            "id": "ac7",
+            "description": "PlansToolbar accepts props: { title, initiatives, selectedInitiative, onInitiativeSelect, statusFilter, onStatusChange, viewMode, onViewModeChange }"
+          }
         ]
       },
       {
@@ -193,11 +371,26 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "usePlansFilter() returns { initiative, status, search, viewMode, setInitiative, setStatus, setSearch, setViewMode }" },
-          { "id": "ac2", "description": "initiative and status synced to URL query params (?initiative=xxx&status=draft)" },
-          { "id": "ac3", "description": "viewMode persisted to localStorage (existing usePlansViewMode logic can be merged)" },
-          { "id": "ac4", "description": "Search query is local state only (not in URL)" },
-          { "id": "ac5", "description": "Hook exported from src/hooks/index.ts" }
+          {
+            "id": "ac1",
+            "description": "usePlansFilter() returns { initiative, status, search, viewMode, setInitiative, setStatus, setSearch, setViewMode }"
+          },
+          {
+            "id": "ac2",
+            "description": "initiative and status synced to URL query params (?initiative=xxx&status=draft)"
+          },
+          {
+            "id": "ac3",
+            "description": "viewMode persisted to localStorage (existing usePlansViewMode logic can be merged)"
+          },
+          {
+            "id": "ac4",
+            "description": "Search query is local state only (not in URL)"
+          },
+          {
+            "id": "ac5",
+            "description": "Hook exported from src/hooks/index.ts"
+          }
         ]
       },
       {
@@ -208,10 +401,22 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "useCurrentUser() returns { user_id: string; name?: string }" },
-          { "id": "ac2", "description": "For v1, returns { user_id: 'default-user' } as placeholder" },
-          { "id": "ac3", "description": "TODO comment notes: 'Replace with actual auth context when implemented'" },
-          { "id": "ac4", "description": "Hook exported from src/hooks/index.ts" }
+          {
+            "id": "ac1",
+            "description": "useCurrentUser() returns { user_id: string; name?: string }"
+          },
+          {
+            "id": "ac2",
+            "description": "For v1, returns { user_id: 'default-user' } as placeholder"
+          },
+          {
+            "id": "ac3",
+            "description": "TODO comment notes: 'Replace with actual auth context when implemented'"
+          },
+          {
+            "id": "ac4",
+            "description": "Hook exported from src/hooks/index.ts"
+          }
         ]
       },
       {
@@ -222,9 +427,18 @@
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Route /plans/my exists and renders PlansListPage" },
-          { "id": "ac2", "description": "PlansListPage receives isMyPlans prop from route" },
-          { "id": "ac3", "description": "Route /plans continues to work (isMyPlans=false or undefined)" }
+          {
+            "id": "ac1",
+            "description": "Route /plans/my exists and renders PlansListPage"
+          },
+          {
+            "id": "ac2",
+            "description": "PlansListPage receives isMyPlans prop from route"
+          },
+          {
+            "id": "ac3",
+            "description": "Route /plans continues to work (isMyPlans=false or undefined)"
+          }
         ]
       },
       {
@@ -232,16 +446,44 @@
         "title": "Refactor PlansListPage to use new components",
         "scope": "planner-ui",
         "description": "Refactor src/pages/PlansListPage.tsx: (1) Remove header section entirely, (2) Add PlansToolbar at top, (3) Use usePlansFilter hook, (4) Fetch initiatives using useInitiatives, (5) Filter plans by initiative_id when selected, (6) Filter by owner_user_id when isMyPlans=true.",
-        "dependencies": ["p002", "p004", "p006", "p007", "p008", "p009"],
+        "dependencies": [
+          "p002",
+          "p004",
+          "p006",
+          "p007",
+          "p008",
+          "p009"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Header section (lines 93-113 current) removed completely" },
-          { "id": "ac2", "description": "PlansToolbar rendered at top of page content" },
-          { "id": "ac3", "description": "Initiatives fetched with useInitiatives hook" },
-          { "id": "ac4", "description": "Plans filtered by selected initiative_id (client-side or via API param)" },
-          { "id": "ac5", "description": "When isMyPlans=true, plans filtered by owner_user_id === currentUser.user_id" },
-          { "id": "ac6", "description": "PlansToolbar title shows 'Plans' or 'My Plans' based on isMyPlans" },
-          { "id": "ac7", "description": "All existing functionality preserved: attention sections, status filter, search, view mode toggle" }
+          {
+            "id": "ac1",
+            "description": "Header section (lines 93-113 current) removed completely"
+          },
+          {
+            "id": "ac2",
+            "description": "PlansToolbar rendered at top of page content"
+          },
+          {
+            "id": "ac3",
+            "description": "Initiatives fetched with useInitiatives hook"
+          },
+          {
+            "id": "ac4",
+            "description": "Plans filtered by selected initiative_id (client-side or via API param)"
+          },
+          {
+            "id": "ac5",
+            "description": "When isMyPlans=true, plans filtered by owner_user_id === currentUser.user_id"
+          },
+          {
+            "id": "ac6",
+            "description": "PlansToolbar title shows 'Plans' or 'My Plans' based on isMyPlans"
+          },
+          {
+            "id": "ac7",
+            "description": "All existing functionality preserved: attention sections, status filter, search, view mode toggle"
+          }
         ]
       },
       {
@@ -249,13 +491,27 @@
         "title": "Add search input to PlansToolbar",
         "scope": "planner-ui",
         "description": "Move search input into PlansToolbar as a third element in row2 (right side, before view mode toggle), or keep it below toolbar. Design decision: keep below toolbar for now since row2 is already dense.",
-        "dependencies": ["p010"],
+        "dependencies": [
+          "p010"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Search input rendered below toolbar, full width, with left padding matching content" },
-          { "id": "ac2", "description": "Search icon prefix, placeholder 'Search plans...'" },
-          { "id": "ac3", "description": "Clear button appears when search has value" },
-          { "id": "ac4", "description": "Search filters displayPlans as before (existing fuzzy search logic)" }
+          {
+            "id": "ac1",
+            "description": "Search input rendered below toolbar, full width, with left padding matching content"
+          },
+          {
+            "id": "ac2",
+            "description": "Search icon prefix, placeholder 'Search plans...'"
+          },
+          {
+            "id": "ac3",
+            "description": "Clear button appears when search has value"
+          },
+          {
+            "id": "ac4",
+            "description": "Search filters displayPlans as before (existing fuzzy search logic)"
+          }
         ]
       },
       {
@@ -263,13 +519,27 @@
         "title": "Make attention sections more compact",
         "scope": "planner-ui",
         "description": "Update NeedsAttentionSection and WorkingOnSection to be more compact per design_spec. Smaller padding, tighter spacing. This allows more content above the fold.",
-        "dependencies": ["p010"],
+        "dependencies": [
+          "p010"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "NeedsAttentionSection cards have reduced padding (py-2.5 instead of py-4)" },
-          { "id": "ac2", "description": "Section header is smaller (text-sm instead of text-base)" },
-          { "id": "ac3", "description": "Gap between cards reduced (gap-2 instead of gap-3)" },
-          { "id": "ac4", "description": "WorkingOnSection follows same compact styling" }
+          {
+            "id": "ac1",
+            "description": "NeedsAttentionSection cards have reduced padding (py-2.5 instead of py-4)"
+          },
+          {
+            "id": "ac2",
+            "description": "Section header is smaller (text-sm instead of text-base)"
+          },
+          {
+            "id": "ac3",
+            "description": "Gap between cards reduced (gap-2 instead of gap-3)"
+          },
+          {
+            "id": "ac4",
+            "description": "WorkingOnSection follows same compact styling"
+          }
         ]
       },
       {
@@ -277,14 +547,34 @@
         "title": "Write tests for new components",
         "scope": "planner-ui",
         "description": "Add tests for InitiativeBadge, InitiativeTabs, PlansToolbar, usePlansFilter. Cover rendering, interactions, and state management.",
-        "dependencies": ["p003", "p005", "p006", "p007"],
+        "dependencies": [
+          "p003",
+          "p005",
+          "p006",
+          "p007"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "InitiativeBadge.test.tsx: renders name and color dot, handles missing color" },
-          { "id": "ac2", "description": "InitiativeTabs.test.tsx: renders All + initiatives, calls onSelect with correct id" },
-          { "id": "ac3", "description": "PlansToolbar.test.tsx: renders both rows, buttons work" },
-          { "id": "ac4", "description": "usePlansFilter.test.ts: manages state, syncs URL params" },
-          { "id": "ac5", "description": "All tests pass: npm run test" }
+          {
+            "id": "ac1",
+            "description": "InitiativeBadge.test.tsx: renders name and color dot, handles missing color"
+          },
+          {
+            "id": "ac2",
+            "description": "InitiativeTabs.test.tsx: renders All + initiatives, calls onSelect with correct id"
+          },
+          {
+            "id": "ac3",
+            "description": "PlansToolbar.test.tsx: renders both rows, buttons work"
+          },
+          {
+            "id": "ac4",
+            "description": "usePlansFilter.test.ts: manages state, syncs URL params"
+          },
+          {
+            "id": "ac5",
+            "description": "All tests pass: npm run test"
+          }
         ]
       },
       {
@@ -292,16 +582,40 @@
         "title": "Update PlansListPage tests",
         "scope": "planner-ui",
         "description": "Update existing PlansListPage tests to account for removed header, new toolbar, and initiative filtering. Ensure tests still pass with new structure.",
-        "dependencies": ["p010", "p013"],
+        "dependencies": [
+          "p010",
+          "p013"
+        ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Remove tests for old header element" },
-          { "id": "ac2", "description": "Add tests for PlansToolbar rendering" },
-          { "id": "ac3", "description": "Add tests for initiative filter functionality" },
-          { "id": "ac4", "description": "Add tests for /plans/my route filtering" },
-          { "id": "ac5", "description": "All existing functionality tests still pass" }
+          {
+            "id": "ac1",
+            "description": "Remove tests for old header element"
+          },
+          {
+            "id": "ac2",
+            "description": "Add tests for PlansToolbar rendering"
+          },
+          {
+            "id": "ac3",
+            "description": "Add tests for initiative filter functionality"
+          },
+          {
+            "id": "ac4",
+            "description": "Add tests for /plans/my route filtering"
+          },
+          {
+            "id": "ac5",
+            "description": "All existing functionality tests still pass"
+          }
         ]
       }
     ]
+  },
+  "context": {
+    "designer": {
+      "approach": "Evolve existing PlansListPage, remove page header, add initiative filter",
+      "migrated_from": "design_spec"
+    }
   }
 }

@@ -4,21 +4,52 @@
   "type": "feature",
   "status": "completed",
   "priority": "critical",
-  "dependencies": ["relay-core"],
-
+  "dependencies": [
+    "relay-core"
+  ],
   "summary": {
     "goal": "Enable all agents (persistent and spawned) to be first-class citizens via MCP tools. Agents self-report their status, ask questions directly, and join plan channels. Both agent types use identical interfaces - MCP is the unified protocol.",
     "acceptance_criteria": [
-      { "id": "ac1", "description": "MCP tool 'report_agent_status' allows agents to report state (working/idle/needs_input/error) with activity text" },
-      { "id": "ac2", "description": "MCP tool 'ask_user_question' allows agents to create questions in the queue (sets needs_input state)" },
-      { "id": "ac3", "description": "MCP tool 'join_plan_channel' allows agents to join plan channels via adminJoinChannel" },
-      { "id": "ac4", "description": "Spawned agents appear in UI status bar when they call report_agent_status" },
-      { "id": "ac5", "description": "Spawned agents can send messages to plan channel after joining" },
-      { "id": "ac6", "description": "Questions from spawned agents show in Question Queue with needs_input indicator" },
-      { "id": "ac7", "description": "Spawned agent task includes MCP server URL and plan context" },
-      { "id": "ac8", "description": "Plan channels visible in relay dashboard with correct membership" },
-      { "id": "ac9", "description": "PRESENCE comes from relay daemon listConnectedAgents(), STATE comes from agent-status broadcasts" },
-      { "id": "ac10", "description": "PlannerLead uses same MCP tools as spawned agents (dogfooding)" }
+      {
+        "id": "ac1",
+        "description": "MCP tool 'report_agent_status' allows agents to report state (working/idle/needs_input/error) with activity text"
+      },
+      {
+        "id": "ac2",
+        "description": "MCP tool 'ask_user_question' allows agents to create questions in the queue (sets needs_input state)"
+      },
+      {
+        "id": "ac3",
+        "description": "MCP tool 'join_plan_channel' allows agents to join plan channels via adminJoinChannel"
+      },
+      {
+        "id": "ac4",
+        "description": "Spawned agents appear in UI status bar when they call report_agent_status"
+      },
+      {
+        "id": "ac5",
+        "description": "Spawned agents can send messages to plan channel after joining"
+      },
+      {
+        "id": "ac6",
+        "description": "Questions from spawned agents show in Question Queue with needs_input indicator"
+      },
+      {
+        "id": "ac7",
+        "description": "Spawned agent task includes MCP server URL and plan context"
+      },
+      {
+        "id": "ac8",
+        "description": "Plan channels visible in relay dashboard with correct membership"
+      },
+      {
+        "id": "ac9",
+        "description": "PRESENCE comes from relay daemon listConnectedAgents(), STATE comes from agent-status broadcasts"
+      },
+      {
+        "id": "ac10",
+        "description": "PlannerLead uses same MCP tools as spawned agents (dogfooding)"
+      }
     ],
     "out_of_scope_v1": [
       "Cross-plan agent visibility",
@@ -26,9 +57,11 @@
       "Automatic state cleanup on agent disconnect (use relay presence)"
     ]
   },
-
   "plan_implementation": {
-    "scopes": ["planner-core", "mcp-tools"],
+    "scopes": [
+      "planner-core",
+      "mcp-tools"
+    ],
     "steps": [
       {
         "step_id": "step-1",
@@ -36,12 +69,86 @@
         "title": "Create report_agent_status MCP tool",
         "description": "Add MCP tool for agents to report their state. Stores state in agent-status registry and broadcasts via relay. Both persistent and spawned agents use this.",
         "acceptance_criteria": [
-          { "id": "ac1-1", "description": "Tool accepts: agentId, role, state, activity?, thought?" },
-          { "id": "ac1-2", "description": "Tool calls emitAgentJoined() on first report (registers agent)" },
-          { "id": "ac1-3", "description": "Tool calls emitAgentStatusUpdate() on subsequent reports" },
-          { "id": "ac1-4", "description": "State broadcasts received by UI via relay" }
+          {
+            "id": "ac1-1",
+            "description": "Tool accepts: agentId, role, state, activity?, thought?"
+          },
+          {
+            "id": "ac1-2",
+            "description": "Tool calls emitAgentJoined() on first report (registers agent)"
+          },
+          {
+            "id": "ac1-3",
+            "description": "Tool calls emitAgentStatusUpdate() on subsequent reports"
+          },
+          {
+            "id": "ac1-4",
+            "description": "State broadcasts received by UI via relay"
+          }
         ],
-        "dependencies": []
+        "dependencies": [],
+        "specification": {
+          "design": {
+            "architecture": {
+              "principle": "MCP as the unified interface - both persistent and spawned agents use identical tools",
+              "key_insight": "Spawned agents CAN call MCP tools (separate processes with HTTP access). This makes them first-class citizens with no proxy needed.",
+              "separation_of_concerns": {
+                "relay_daemon_provides": [
+                  "PRESENCE tracking - who is connected (listConnectedAgents)",
+                  "Message routing - channels, DMs, broadcasts",
+                  "Agent spawning/release lifecycle",
+                  "Channel membership management (adminJoinChannel)"
+                ],
+                "planner_core_provides": [
+                  "STATE tracking - working/idle/needs_input/error (agent-status.ts)",
+                  "Rich status info - activity, step, thought/question text",
+                  "Question management - create/answer/queue",
+                  "MCP tools - unified interface for all agents"
+                ]
+              },
+              "removed": [
+                "spawnedAgents Map in client.ts (use relay's tracking)",
+                "Manual presence tracking (use listConnectedAgents)",
+                "Emit-on-behalf pattern (agents self-report via MCP)"
+              ],
+              "kept": [
+                "agent-status.ts - for STATE (not presence) tracking",
+                "emitAgentStatusUpdate - called by MCP tools, not directly by planner-core"
+              ]
+            },
+            "data_flow": {
+              "agent_state_reporting": "Agent -> MCP report_agent_status -> agent-status registry -> relay broadcast -> UI",
+              "agent_question_asking": "Agent -> MCP ask_user_question -> question DB + needs_input state -> UI queue",
+              "agent_channel_join": "Agent -> MCP join_plan_channel -> adminJoinChannel -> relay membership",
+              "presence_query": "UI -> GET /api/agents -> listConnectedAgents() + activeAgents -> merged response"
+            },
+            "mcp_tools": {
+              "report_agent_status": {
+                "input": "{ agentId: string, role: AgentRole, state: AgentState, activity?: string, thought?: string }",
+                "behavior": "First call registers agent (emitAgentJoined), subsequent calls update state (emitAgentStatusUpdate)",
+                "output": "{ success: boolean }"
+              },
+              "ask_user_question": {
+                "input": "{ planId: string, question: string, options?: string[], context?: string }",
+                "behavior": "Creates question in DB, sets agent state to needs_input with question as thought",
+                "output": "{ questionId: string, success: boolean }"
+              },
+              "join_plan_channel": {
+                "input": "{ planId: string }",
+                "behavior": "Calls adminJoinChannel(#plan-{planId}, callerAgentName)",
+                "output": "{ channel: string, success: boolean }"
+              }
+            },
+            "spawn_flow": {
+              "1_spawn": "PlannerLead calls spawnAgent({ name, task, planId })",
+              "2_relay_handles": "Relay daemon spawns process, tracks presence",
+              "3_pre_join": "Planner-core calls adminJoinChannel(planChannel, agentName) immediately",
+              "4_task_includes": "MCP server URL + planId + instructions to use MCP tools",
+              "5_agent_reports": "Spawned agent calls MCP report_agent_status on start",
+              "6_agent_works": "Agent uses MCP tools for questions, status updates"
+            }
+          }
+        }
       },
       {
         "step_id": "step-2",
@@ -49,12 +156,26 @@
         "title": "Create ask_user_question MCP tool",
         "description": "Add MCP tool for agents to ask questions. Creates question in DB, sets agent state to needs_input, broadcasts to UI.",
         "acceptance_criteria": [
-          { "id": "ac2-1", "description": "Tool accepts: planId, question, options?, context?" },
-          { "id": "ac2-2", "description": "Tool creates question in storage (existing question API)" },
-          { "id": "ac2-3", "description": "Tool sets agent state to needs_input with question as thought" },
-          { "id": "ac2-4", "description": "Returns questionId for tracking answer" }
+          {
+            "id": "ac2-1",
+            "description": "Tool accepts: planId, question, options?, context?"
+          },
+          {
+            "id": "ac2-2",
+            "description": "Tool creates question in storage (existing question API)"
+          },
+          {
+            "id": "ac2-3",
+            "description": "Tool sets agent state to needs_input with question as thought"
+          },
+          {
+            "id": "ac2-4",
+            "description": "Returns questionId for tracking answer"
+          }
         ],
-        "dependencies": ["step-1"]
+        "dependencies": [
+          "step-1"
+        ]
       },
       {
         "step_id": "step-3",
@@ -62,9 +183,18 @@
         "title": "Create join_plan_channel MCP tool",
         "description": "Add MCP tool for agents to join plan channels. Uses relay adminJoinChannel() to add agent to channel membership.",
         "acceptance_criteria": [
-          { "id": "ac3-1", "description": "Tool accepts: planId (derives channel name)" },
-          { "id": "ac3-2", "description": "Tool calls adminJoinChannel(planChannel, callingAgentName)" },
-          { "id": "ac3-3", "description": "Returns success/failure with channel name" }
+          {
+            "id": "ac3-1",
+            "description": "Tool accepts: planId (derives channel name)"
+          },
+          {
+            "id": "ac3-2",
+            "description": "Tool calls adminJoinChannel(planChannel, callingAgentName)"
+          },
+          {
+            "id": "ac3-3",
+            "description": "Returns success/failure with channel name"
+          }
         ],
         "dependencies": []
       },
@@ -74,12 +204,28 @@
         "title": "Update spawn flow with MCP context",
         "description": "When spawning agents, include MCP server URL in task. Optionally pre-register channel membership for immediate communication.",
         "acceptance_criteria": [
-          { "id": "ac4-1", "description": "Spawned agent task includes MCP server URL (e.g., http://localhost:3001)" },
-          { "id": "ac4-2", "description": "Spawned agent task includes planId for context" },
-          { "id": "ac4-3", "description": "adminJoinChannel() called immediately after spawn for instant channel access" },
-          { "id": "ac4-4", "description": "Task instructs agent to use MCP tools for status/questions" }
+          {
+            "id": "ac4-1",
+            "description": "Spawned agent task includes MCP server URL (e.g., http://localhost:3001)"
+          },
+          {
+            "id": "ac4-2",
+            "description": "Spawned agent task includes planId for context"
+          },
+          {
+            "id": "ac4-3",
+            "description": "adminJoinChannel() called immediately after spawn for instant channel access"
+          },
+          {
+            "id": "ac4-4",
+            "description": "Task instructs agent to use MCP tools for status/questions"
+          }
         ],
-        "dependencies": ["step-1", "step-2", "step-3"]
+        "dependencies": [
+          "step-1",
+          "step-2",
+          "step-3"
+        ]
       },
       {
         "step_id": "step-5",
@@ -87,11 +233,22 @@
         "title": "Migrate PlannerLead to use MCP tools",
         "description": "Refactor PlannerLead to use the same MCP tools as spawned agents. Proves the interface works for both agent types.",
         "acceptance_criteria": [
-          { "id": "ac5-1", "description": "PlannerLead calls report_agent_status MCP tool for state changes" },
-          { "id": "ac5-2", "description": "PlannerLead calls ask_user_question MCP tool (not direct emitAgentStatusUpdate)" },
-          { "id": "ac5-3", "description": "Behavior identical to current but via MCP" }
+          {
+            "id": "ac5-1",
+            "description": "PlannerLead calls report_agent_status MCP tool for state changes"
+          },
+          {
+            "id": "ac5-2",
+            "description": "PlannerLead calls ask_user_question MCP tool (not direct emitAgentStatusUpdate)"
+          },
+          {
+            "id": "ac5-3",
+            "description": "Behavior identical to current but via MCP"
+          }
         ],
-        "dependencies": ["step-4"]
+        "dependencies": [
+          "step-4"
+        ]
       },
       {
         "step_id": "step-6",
@@ -99,11 +256,22 @@
         "title": "Remove duplicate presence tracking",
         "description": "Remove manual agent presence tracking that duplicates relay daemon functionality. Use listConnectedAgents() for presence, agent-status for state.",
         "acceptance_criteria": [
-          { "id": "ac6-1", "description": "Remove spawnedAgents Map from client.ts (relay tracks this)" },
-          { "id": "ac6-2", "description": "activeAgents Map tracks STATE only, not presence" },
-          { "id": "ac6-3", "description": "emitAgentLeft() called from relay disconnect callback (if agent goes offline)" }
+          {
+            "id": "ac6-1",
+            "description": "Remove spawnedAgents Map from client.ts (relay tracks this)"
+          },
+          {
+            "id": "ac6-2",
+            "description": "activeAgents Map tracks STATE only, not presence"
+          },
+          {
+            "id": "ac6-3",
+            "description": "emitAgentLeft() called from relay disconnect callback (if agent goes offline)"
+          }
         ],
-        "dependencies": ["step-5"]
+        "dependencies": [
+          "step-5"
+        ]
       },
       {
         "step_id": "step-7",
@@ -111,11 +279,22 @@
         "title": "Add presence polling/subscription",
         "description": "Frontend should poll or subscribe to relay presence for who's online, merged with agent-status for rich state.",
         "acceptance_criteria": [
-          { "id": "ac7-1", "description": "API endpoint /api/agents returns merged presence + state" },
-          { "id": "ac7-2", "description": "Presence from listConnectedAgents(), state from activeAgents registry" },
-          { "id": "ac7-3", "description": "Frontend useAgentOrchestration uses this endpoint" }
+          {
+            "id": "ac7-1",
+            "description": "API endpoint /api/agents returns merged presence + state"
+          },
+          {
+            "id": "ac7-2",
+            "description": "Presence from listConnectedAgents(), state from activeAgents registry"
+          },
+          {
+            "id": "ac7-3",
+            "description": "Frontend useAgentOrchestration uses this endpoint"
+          }
         ],
-        "dependencies": ["step-6"]
+        "dependencies": [
+          "step-6"
+        ]
       },
       {
         "step_id": "step-8",
@@ -123,77 +302,30 @@
         "title": "Verify end-to-end flow",
         "description": "Integration test: spawn agent, agent reports status via MCP, asks question via MCP, appears correctly in UI.",
         "acceptance_criteria": [
-          { "id": "ac8-1", "description": "Spawn agent -> agent calls MCP report_agent_status -> appears in status bar" },
-          { "id": "ac8-2", "description": "Agent calls MCP ask_user_question -> question in queue, agent shows needs_input" },
-          { "id": "ac8-3", "description": "Agent calls MCP join_plan_channel -> can send/receive in channel" },
-          { "id": "ac8-4", "description": "Plan channels visible in relay dashboard with correct members" }
+          {
+            "id": "ac8-1",
+            "description": "Spawn agent -> agent calls MCP report_agent_status -> appears in status bar"
+          },
+          {
+            "id": "ac8-2",
+            "description": "Agent calls MCP ask_user_question -> question in queue, agent shows needs_input"
+          },
+          {
+            "id": "ac8-3",
+            "description": "Agent calls MCP join_plan_channel -> can send/receive in channel"
+          },
+          {
+            "id": "ac8-4",
+            "description": "Plan channels visible in relay dashboard with correct members"
+          }
         ],
-        "dependencies": ["step-7"]
+        "dependencies": [
+          "step-7"
+        ]
       }
     ]
   },
-
-  "design_spec": {
-    "architecture": {
-      "principle": "MCP as the unified interface - both persistent and spawned agents use identical tools",
-      "key_insight": "Spawned agents CAN call MCP tools (separate processes with HTTP access). This makes them first-class citizens with no proxy needed.",
-      "separation_of_concerns": {
-        "relay_daemon_provides": [
-          "PRESENCE tracking - who is connected (listConnectedAgents)",
-          "Message routing - channels, DMs, broadcasts",
-          "Agent spawning/release lifecycle",
-          "Channel membership management (adminJoinChannel)"
-        ],
-        "planner_core_provides": [
-          "STATE tracking - working/idle/needs_input/error (agent-status.ts)",
-          "Rich status info - activity, step, thought/question text",
-          "Question management - create/answer/queue",
-          "MCP tools - unified interface for all agents"
-        ]
-      },
-      "removed": [
-        "spawnedAgents Map in client.ts (use relay's tracking)",
-        "Manual presence tracking (use listConnectedAgents)",
-        "Emit-on-behalf pattern (agents self-report via MCP)"
-      ],
-      "kept": [
-        "agent-status.ts - for STATE (not presence) tracking",
-        "emitAgentStatusUpdate - called by MCP tools, not directly by planner-core"
-      ]
-    },
-    "mcp_tools": {
-      "report_agent_status": {
-        "input": "{ agentId: string, role: AgentRole, state: AgentState, activity?: string, thought?: string }",
-        "behavior": "First call registers agent (emitAgentJoined), subsequent calls update state (emitAgentStatusUpdate)",
-        "output": "{ success: boolean }"
-      },
-      "ask_user_question": {
-        "input": "{ planId: string, question: string, options?: string[], context?: string }",
-        "behavior": "Creates question in DB, sets agent state to needs_input with question as thought",
-        "output": "{ questionId: string, success: boolean }"
-      },
-      "join_plan_channel": {
-        "input": "{ planId: string }",
-        "behavior": "Calls adminJoinChannel(#plan-{planId}, callerAgentName)",
-        "output": "{ channel: string, success: boolean }"
-      }
-    },
-    "data_flow": {
-      "agent_state_reporting": "Agent -> MCP report_agent_status -> agent-status registry -> relay broadcast -> UI",
-      "agent_question_asking": "Agent -> MCP ask_user_question -> question DB + needs_input state -> UI queue",
-      "agent_channel_join": "Agent -> MCP join_plan_channel -> adminJoinChannel -> relay membership",
-      "presence_query": "UI -> GET /api/agents -> listConnectedAgents() + activeAgents -> merged response"
-    },
-    "spawn_flow": {
-      "1_spawn": "PlannerLead calls spawnAgent({ name, task, planId })",
-      "2_relay_handles": "Relay daemon spawns process, tracks presence",
-      "3_pre_join": "Planner-core calls adminJoinChannel(planChannel, agentName) immediately",
-      "4_task_includes": "MCP server URL + planId + instructions to use MCP tools",
-      "5_agent_reports": "Spawned agent calls MCP report_agent_status on start",
-      "6_agent_works": "Agent uses MCP tools for questions, status updates"
-    }
-  },
-
+  "design_spec": {},
   "change_history": [
     {
       "date": "2026-01-30",
