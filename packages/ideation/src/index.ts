@@ -15,3 +15,6 @@ export * from './storage/index.js';
 
 // API Layer
 export * from './api/index.js';
+
+// Interviewer (Lead Agent)
+export * from './interviewer/index.js';
