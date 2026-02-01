@@ -5,6 +5,7 @@ import { createQuestion as createQuestionEntity } from '../../domain/question.js
 import { emitQuestionEvent } from '../../events/question-events.js';
 import { emitAgentStatusUpdate } from '../../relay/agent-status.js';
 import { sendMessage, sendChannelMessage } from '../../relay/client.js';
+import { getPlanChannelId } from '../../relay/channels.js';
 import type { QAMessagePayload } from '../../relay/index.js';
 import { notFound, badRequest } from '../middleware.js';
 
@@ -187,7 +188,7 @@ export function createQuestionHandlers(storage: PlanStorage) {
         });
 
         // Send Q&A to plan channel for agent visibility
-        const planChannel = `#plan-${question.plan_id}`;
+        const planChannel = getPlanChannelId(question.plan_id);
         const qaBody = `Q: ${question.text}\nA: ${answer}`;
         const qaPayload: QAMessagePayload = {
           type: 'qa',

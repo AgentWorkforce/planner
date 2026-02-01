@@ -379,7 +379,8 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
 
       // Pre-join agent to plan channel for immediate communication
       if (options.planId) {
-        const channel = `#plan-${options.planId}`;
+        // Use 8-char prefix to match getPlanChannelId() format
+        const channel = `#plan-${options.planId.slice(0, 8)}`;
         const joined = client.adminJoinChannel(channel, options.name);
         if (joined) {
           console.log(`[relay] Pre-joined ${options.name} to ${channel}`);

@@ -208,8 +208,8 @@ describe('Question Handlers - Integration Tests', () => {
       // Get the call arguments
       const [channel, body, payload] = (sendChannelMessage as ReturnType<typeof vi.fn>).mock.calls[0];
 
-      // Verify channel format
-      expect(channel).toBe(`#plan-${planId}`);
+      // Verify channel format (uses 8-char prefix)
+      expect(channel).toBe(`#plan-${planId.slice(0, 8)}`);
 
       // Verify body contains Q&A text
       expect(body).toContain('Q: Should I use TypeScript?');

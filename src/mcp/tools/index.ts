@@ -15,6 +15,7 @@ import {
   type AgentState,
 } from '../../relay/agent-status.js';
 import { getClient, sendMessage } from '../../relay/client.js';
+import { getPlanChannelId } from '../../relay/channels.js';
 
 /**
  * All available tools with their schemas.
@@ -1626,7 +1627,7 @@ function handleJoinPlanChannel(args: Record<string, unknown>): ToolResponse {
   }
 
   // Derive channel name from plan ID
-  const channel = `#plan-${planId}`;
+  const channel = getPlanChannelId(planId);
 
   // Use adminJoinChannel to add the agent to the channel
   const joined = client.adminJoinChannel(channel, agentId);
