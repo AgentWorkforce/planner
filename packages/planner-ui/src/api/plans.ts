@@ -8,6 +8,9 @@ import type {
   Step,
 } from '@/types';
 
+// Re-export types for convenience
+export type { Plan, PlanVersion, PlanWithVersion, PlanSummary, PlanStatus, Step };
+
 // Plan operations
 
 export interface ListPlansParams {

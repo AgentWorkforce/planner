@@ -85,19 +85,21 @@ export function EditableText({
         onChange={(e) => setEditValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
-        className={`w-full px-2 py-1 bg-bg-secondary border border-accent-cyan rounded text-text-primary focus:ring-1 focus:ring-accent-cyan/50 outline-none ${className}`}
+        className={`inline-block px-1 -mx-1 m-0 font-[inherit] bg-accent-cyan/10 leading-[inherit] border-x-0 border-t-0 border-b-2 rounded-none outline-none focus:outline-none focus-visible:outline-none ring-0 ${className}`}
         placeholder={placeholder}
+        style={{ fieldSizing: 'content', outline: 'none', borderColor: 'var(--color-accent-cyan)' } as React.CSSProperties}
       />
     );
   }
 
   return (
     <Tag
-      className={`inline-block rounded px-1 -mx-1 transition-colors ${
+      className={`inline-block rounded px-1 -mx-1 transition-colors border-b-2 ${
         disabled
           ? 'cursor-default'
-          : 'cursor-pointer hover:bg-bg-hover'
+          : 'cursor-text hover:outline hover:outline-1 hover:outline-dashed hover:outline-accent-cyan'
       } ${className}`}
+      style={{ borderColor: 'transparent' }}
       onClick={startEditing}
       role="button"
       tabIndex={disabled ? -1 : 0}

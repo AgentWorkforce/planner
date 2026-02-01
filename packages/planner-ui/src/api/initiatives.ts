@@ -6,6 +6,9 @@ import type {
   UpdateInitiativeInput,
 } from '../types/initiative';
 
+// Re-export types for convenience
+export type { Initiative, InitiativeWithPlanCounts, CreateInitiativeInput, UpdateInitiativeInput };
+
 // Initiative operations
 
 /**

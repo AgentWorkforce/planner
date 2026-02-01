@@ -8,7 +8,6 @@ describe('InitiativeBadge', () => {
       const initiative = {
         initiative_id: 'init-1',
         name: 'Q1 Launch',
-        icon: '🚀',
         color: '#00d9ff',
       };
 
@@ -17,37 +16,20 @@ describe('InitiativeBadge', () => {
       expect(screen.getByText('Q1 Launch')).toBeInTheDocument();
     });
 
-    it('renders initiative icon', () => {
+    it('renders without error when color is undefined', () => {
       const initiative = {
         initiative_id: 'init-1',
         name: 'Q1 Launch',
-        icon: '🚀',
-        color: '#00d9ff',
-      };
-
-      render(<InitiativeBadge initiative={initiative} />);
-
-      const icon = screen.getByText('🚀');
-      expect(icon).toBeInTheDocument();
-      expect(icon).toHaveAttribute('aria-hidden', 'true');
-    });
-
-    it('renders without icon when icon is undefined', () => {
-      const initiative = {
-        initiative_id: 'init-1',
-        name: 'Q1 Launch',
-        color: '#00d9ff',
       };
 
       render(<InitiativeBadge initiative={initiative} />);
 
       expect(screen.getByText('Q1 Launch')).toBeInTheDocument();
-      expect(screen.queryByRole('img')).not.toBeInTheDocument();
     });
   });
 
-  describe('color styling', () => {
-    it('applies background color with 0.1 alpha from initiative color', () => {
+  describe('color dot', () => {
+    it('renders colored dot with initiative color', () => {
       const initiative = {
         initiative_id: 'init-1',
         name: 'Q1 Launch',
@@ -55,88 +37,24 @@ describe('InitiativeBadge', () => {
       };
 
       const { container } = render(<InitiativeBadge initiative={initiative} />);
-      const badge = container.querySelector('span');
+      const dot = container.querySelector('.rounded-full[aria-hidden="true"]');
 
-      expect(badge).toHaveStyle({
-        backgroundColor: 'rgba(255, 107, 53, 0.1)',
-      });
+      expect(dot).toBeInTheDocument();
+      expect(dot).toHaveStyle({ backgroundColor: '#ff6b35' });
     });
 
-    it('applies border color with 0.3 alpha from initiative color', () => {
-      const initiative = {
-        initiative_id: 'init-1',
-        name: 'Q1 Launch',
-        color: '#ff6b35',
-      };
-
-      const { container } = render(<InitiativeBadge initiative={initiative} />);
-      const badge = container.querySelector('span');
-
-      expect(badge).toHaveStyle({
-        borderColor: 'rgba(255, 107, 53, 0.3)',
-      });
-    });
-
-    it('applies text color from initiative color', () => {
-      const initiative = {
-        initiative_id: 'init-1',
-        name: 'Q1 Launch',
-        color: '#ff6b35',
-      };
-
-      const { container } = render(<InitiativeBadge initiative={initiative} />);
-      const badge = container.querySelector('span');
-
-      expect(badge).toHaveStyle({
-        color: '#ff6b35',
-      });
-    });
-
-    it('uses default purple color when color is undefined', () => {
+    it('uses default cyan color when color is undefined', () => {
       const initiative = {
         initiative_id: 'init-1',
         name: 'Q1 Launch',
       };
 
       const { container } = render(<InitiativeBadge initiative={initiative} />);
-      const badge = container.querySelector('span');
+      const dot = container.querySelector('.rounded-full[aria-hidden="true"]');
 
-      // Default color is #9333ea (accent-purple-600)
-      expect(badge).toHaveStyle({
-        backgroundColor: 'rgba(147, 51, 234, 0.1)',
-        borderColor: 'rgba(147, 51, 234, 0.3)',
-        color: '#9333ea',
-      });
-    });
-
-    it('handles hex colors with # prefix', () => {
-      const initiative = {
-        initiative_id: 'init-1',
-        name: 'Q1 Launch',
-        color: '#00d9ff',
-      };
-
-      const { container } = render(<InitiativeBadge initiative={initiative} />);
-      const badge = container.querySelector('span');
-
-      expect(badge).toHaveStyle({
-        backgroundColor: 'rgba(0, 217, 255, 0.1)',
-      });
-    });
-
-    it('handles hex colors without # prefix', () => {
-      const initiative = {
-        initiative_id: 'init-1',
-        name: 'Q1 Launch',
-        color: '00d9ff',
-      };
-
-      const { container } = render(<InitiativeBadge initiative={initiative} />);
-      const badge = container.querySelector('span');
-
-      expect(badge).toHaveStyle({
-        backgroundColor: 'rgba(0, 217, 255, 0.1)',
-      });
+      expect(dot).toBeInTheDocument();
+      // Default color is #00d9ff (accent-cyan)
+      expect(dot).toHaveStyle({ backgroundColor: '#00d9ff' });
     });
   });
 
@@ -151,7 +69,7 @@ describe('InitiativeBadge', () => {
       const { container } = render(<InitiativeBadge initiative={initiative} />);
       const badge = container.querySelector('span');
 
-      expect(badge).toHaveClass('text-xs', 'px-2', 'py-0.5');
+      expect(badge).toHaveClass('text-xs', 'px-1.5', 'py-0.5');
     });
 
     it('applies small size classes when size="sm"', () => {
@@ -164,7 +82,7 @@ describe('InitiativeBadge', () => {
       const { container } = render(<InitiativeBadge initiative={initiative} size="sm" />);
       const badge = container.querySelector('span');
 
-      expect(badge).toHaveClass('text-xs', 'px-2', 'py-0.5');
+      expect(badge).toHaveClass('text-xs', 'px-1.5', 'py-0.5');
     });
 
     it('applies medium size classes when size="md"', () => {
@@ -177,7 +95,33 @@ describe('InitiativeBadge', () => {
       const { container } = render(<InitiativeBadge initiative={initiative} size="md" />);
       const badge = container.querySelector('span');
 
-      expect(badge).toHaveClass('text-sm', 'px-2.5', 'py-1');
+      expect(badge).toHaveClass('text-sm', 'px-2', 'py-1');
+    });
+
+    it('applies small dot size by default', () => {
+      const initiative = {
+        initiative_id: 'init-1',
+        name: 'Q1 Launch',
+        color: '#00d9ff',
+      };
+
+      const { container } = render(<InitiativeBadge initiative={initiative} />);
+      const dot = container.querySelector('.rounded-full[aria-hidden="true"]');
+
+      expect(dot).toHaveClass('w-2', 'h-2');
+    });
+
+    it('applies medium dot size when size="md"', () => {
+      const initiative = {
+        initiative_id: 'init-1',
+        name: 'Q1 Launch',
+        color: '#00d9ff',
+      };
+
+      const { container } = render(<InitiativeBadge initiative={initiative} size="md" />);
+      const dot = container.querySelector('.rounded-full[aria-hidden="true"]');
+
+      expect(dot).toHaveClass('w-2.5', 'h-2.5');
     });
   });
 
@@ -196,9 +140,9 @@ describe('InitiativeBadge', () => {
         'inline-flex',
         'items-center',
         'gap-1.5',
-        'rounded-full',
-        'border',
-        'font-medium'
+        'rounded',
+        'bg-bg-tertiary',
+        'text-text-secondary'
       );
     });
 
@@ -215,6 +159,21 @@ describe('InitiativeBadge', () => {
       const badge = container.querySelector('span');
 
       expect(badge).toHaveClass('custom-class');
+    });
+  });
+
+  describe('accessibility', () => {
+    it('marks color dot as aria-hidden', () => {
+      const initiative = {
+        initiative_id: 'init-1',
+        name: 'Q1 Launch',
+        color: '#00d9ff',
+      };
+
+      const { container } = render(<InitiativeBadge initiative={initiative} />);
+      const dot = container.querySelector('.rounded-full');
+
+      expect(dot).toHaveAttribute('aria-hidden', 'true');
     });
   });
 });

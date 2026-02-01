@@ -1,4 +1,4 @@
-export type IconSize = 'sm' | 'md' | 'lg' | 'xl';
+export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface IconProps {
   size?: IconSize;
@@ -6,6 +6,7 @@ export interface IconProps {
 }
 
 export const iconSizes: Record<IconSize, number> = {
+  xs: 12,
   sm: 14,
   md: 16,
   lg: 20,

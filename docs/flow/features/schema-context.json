@@ -1,0 +1,704 @@
+{
+  "feature_id": "schema-context",
+  "title": "Context Schema & Domain Model",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": [
+    "schema-understanding"
+  ],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Add plan-level context field to PlanVersion as a freeform Record<role, Record<string, unknown>> that captures formalized decisions by role",
+    "context": "We have 'understanding' (loose observations) and 'specification' (implementation details). Context bridges them - it captures formalized decisions that emerge from understanding and guide specification. The flow is: understanding (observations) -> context (decisions) -> specification (implementation).",
+    "model": {
+      "position": "Plan-level, alongside understanding",
+      "structure": "Record<string, Record<string, unknown>> - any role key, any fields within. Schema is freeform; suggested roles/fields are documented for agent prompts but not enforced.",
+      "purpose": "Crystallize exploratory observations into actionable decisions that guide step-level specs"
+    },
+    "freeform_rationale": "Different roles think differently, orgs have different needs. PlannerLead spawns specialist agents dynamically. The Orchestrator is an LLM that can understand any JSON structure. Intelligence lives in agent prompts, not Zod schemas.",
+    "in_scope": [
+      "Zod schemas for RoleContext variants (DesignerContext, ArchitectContext, TesterContext, SecurityContext)",
+      "Plan-level ContextSchema as Record<string, RoleContext>",
+      "Database column addition to plan_versions (JSONB)",
+      "API endpoints for reading/updating context per role",
+      "MCP tools for agents to write context",
+      "UI tab in PlanEditorPage for viewing/editing context"
+    ],
+    "out_of_scope": [
+      "Automatic derivation of context from understanding (manual for now)",
+      "Context approval workflow (deferred)",
+      "Per-role sign-off on context decisions"
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "PlanVersion schema includes optional 'context' field as z.record(z.string(), z.record(z.string(), z.unknown()))"
+      },
+      {
+        "id": "ac2",
+        "description": "Suggested roles documented: designer, architect, modeler, tester, security (not enforced in schema)"
+      },
+      {
+        "id": "ac3",
+        "description": "Suggested fields per role documented in design_spec (for agent prompts, not schema validation)"
+      },
+      {
+        "id": "ac4",
+        "description": "Database stores context at plan_versions level in JSONB column"
+      },
+      {
+        "id": "ac5",
+        "description": "GET /plans/:id/versions/:version returns context field"
+      },
+      {
+        "id": "ac6",
+        "description": "PATCH /plans/:id/versions/:version/context/:role updates role-specific context (any fields)"
+      },
+      {
+        "id": "ac7",
+        "description": "PlanEditorPage has Context tab (alongside Plan | Understanding)"
+      },
+      {
+        "id": "ac8",
+        "description": "Context tab shows role cards dynamically based on populated roles"
+      },
+      {
+        "id": "ac9",
+        "description": "'+' button allows adding new role tab with suggested roles or custom role name"
+      },
+      {
+        "id": "ac10",
+        "description": "Within each role tab, key-value editor allows adding/editing any fields"
+      },
+      {
+        "id": "ac11",
+        "description": "Context fields are editable inline on draft plans"
+      },
+      {
+        "id": "ac12",
+        "description": "MCP tools can read and write context per role (any fields)"
+      },
+      {
+        "id": "ac13",
+        "description": "Existing plans without context continue to work (backward compatible)"
+      }
+    ]
+  },
+  "design_spec": {
+    "schema_approach": "Freeform: z.record(z.string(), z.record(z.string(), z.unknown())). The suggested roles and fields below are documentation for agent prompts - they are NOT enforced by Zod validation. Agents use these as guidelines; users can add any role or field.",
+    "ui_pattern": {
+      "add_role": {
+        "trigger": "'+' button after last role tab",
+        "action": "Shows popover with suggested roles (Designer, Architect, Modeler, Tester, Security) as quick-add buttons, plus 'Custom role' text input",
+        "result": "New tab appears with role name as label"
+      },
+      "add_field": {
+        "trigger": "'+ Add field' button within role card",
+        "action": "Adds new row with editable key (text input) and value (textarea)",
+        "suggestions": "Shows placeholder hints for suggested fields based on role (from suggested_fields below)"
+      },
+      "delete": {
+        "field": "X button per field row",
+        "role": "Delete role option in role tab dropdown (with confirmation)"
+      }
+    },
+    "suggested_roles": {
+      "designer": {
+        "description": "Design system decisions that guide UI implementation",
+        "suggested_fields": [
+          "library",
+          "theme",
+          "typography",
+          "patterns",
+          "icons"
+        ],
+        "field_hints": {
+          "library": "Component library (e.g., shadcn/ui)",
+          "theme": "Theme decisions - feel, colors, etc.",
+          "typography": "Font family decisions - display, body, mono",
+          "patterns": "Pattern decisions - cards, buttons, forms",
+          "icons": "Icon approach - inline SVG, icon library, etc."
+        }
+      },
+      "architect": {
+        "description": "Technical architecture decisions that guide implementation",
+        "suggested_fields": [
+          "tech_stack",
+          "api_style",
+          "storage",
+          "boundaries"
+        ],
+        "field_hints": {
+          "tech_stack": "Core technologies (e.g., TypeScript, Express, SQLite)",
+          "api_style": "API design approach (e.g., REST with Zod validation)",
+          "storage": "Storage technology and approach",
+          "boundaries": "Component/service boundaries with ownership"
+        }
+      },
+      "modeler": {
+        "description": "Data model decisions that guide schema and storage design",
+        "suggested_fields": [
+          "approach",
+          "entities",
+          "relationships",
+          "conventions",
+          "migrations"
+        ],
+        "field_hints": {
+          "approach": "Overall modeling approach (e.g., JSONB for nested data, relational for queried fields)",
+          "entities": "Core domain entities",
+          "relationships": "Key entity relationships (e.g., Plan 1:N PlanVersion)",
+          "conventions": "Naming conventions, ID formats, timestamp handling",
+          "migrations": "Migration strategy (e.g., idempotent, additive only)"
+        }
+      },
+      "tester": {
+        "description": "Testing strategy decisions that guide test implementation",
+        "suggested_fields": [
+          "framework",
+          "coverage_target",
+          "strategy",
+          "test_data"
+        ],
+        "field_hints": {
+          "framework": "Testing framework (e.g., Vitest)",
+          "coverage_target": "Coverage goal (e.g., 80%)",
+          "strategy": "Test type strategy (e.g., unit + integration + e2e)",
+          "test_data": "Required test data/fixtures"
+        }
+      },
+      "security": {
+        "description": "Security decisions that guide implementation constraints",
+        "suggested_fields": [
+          "auth",
+          "compliance",
+          "data_handling"
+        ],
+        "field_hints": {
+          "auth": "Authentication approach (e.g., JWT)",
+          "compliance": "Compliance requirements (e.g., OWASP Top 10)",
+          "data_handling": "Data handling policy (e.g., No PII stored)"
+        }
+      }
+    }
+  },
+  "plan_implementation": {
+    "scopes": [
+      "planner-core",
+      "planner-ui"
+    ],
+    "steps": [
+      {
+        "step_id": "c001",
+        "title": "Create context.ts domain file",
+        "scope": "planner-core",
+        "description": "Create src/domain/context.ts with freeform Zod schema for context",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "RoleContextSchema = z.record(z.string(), z.unknown()) - any fields per role"
+          },
+          {
+            "id": "ac2",
+            "description": "ContextSchema = z.record(z.string(), RoleContextSchema) - any role keys"
+          },
+          {
+            "id": "ac3",
+            "description": "SUGGESTED_ROLES constant with suggested role names and field hints (for UI/agent prompts)"
+          },
+          {
+            "id": "ac4",
+            "description": "All schemas and types exported"
+          },
+          {
+            "id": "ac5",
+            "description": "JSDoc comments document the freeform nature and point to suggested_roles"
+          }
+        ]
+      },
+      {
+        "step_id": "c002",
+        "title": "Add context to PlanVersion schema",
+        "scope": "planner-core",
+        "description": "Update src/domain/plan.ts to include optional context field in PlanVersionSchema",
+        "dependencies": [
+          "c001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "PlanVersionSchema includes: context: ContextSchema.optional()"
+          },
+          {
+            "id": "ac2",
+            "description": "PlanVersion type includes context?: Context"
+          },
+          {
+            "id": "ac3",
+            "description": "createPlanVersion() does not set context (remains undefined)"
+          }
+        ]
+      },
+      {
+        "step_id": "c003",
+        "title": "Export types for frontend",
+        "scope": "planner-core",
+        "description": "Ensure Context types are exported via src/domain/index.ts for frontend consumption",
+        "dependencies": [
+          "c001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "src/domain/index.ts exports all Context schemas"
+          },
+          {
+            "id": "ac2",
+            "description": "src/domain/index.ts exports all Context types"
+          }
+        ]
+      },
+      {
+        "step_id": "c004",
+        "title": "Add context.test.ts",
+        "scope": "planner-core",
+        "description": "Create unit tests for freeform context schemas",
+        "dependencies": [
+          "c001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Test: ContextSchema accepts any role key (designer, architect, custom_role)"
+          },
+          {
+            "id": "ac2",
+            "description": "Test: RoleContextSchema accepts any field names and values"
+          },
+          {
+            "id": "ac3",
+            "description": "Test: ContextSchema accepts empty object {}"
+          },
+          {
+            "id": "ac4",
+            "description": "Test: ContextSchema accepts nested objects and arrays as field values"
+          },
+          {
+            "id": "ac5",
+            "description": "Test: SUGGESTED_ROLES constant contains expected roles and field hints"
+          }
+        ]
+      },
+      {
+        "step_id": "c005",
+        "title": "Add context column to plan_versions table",
+        "scope": "planner-core",
+        "description": "Update database migration to add context JSONB column to plan_versions",
+        "dependencies": [
+          "c002"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Migration adds 'context' column to plan_versions (JSONB, nullable)"
+          },
+          {
+            "id": "ac2",
+            "description": "Migration is idempotent (safe to re-run)"
+          },
+          {
+            "id": "ac3",
+            "description": "Existing rows have context = NULL (backward compatible)"
+          }
+        ]
+      },
+      {
+        "step_id": "c006",
+        "title": "Update storage layer for context",
+        "scope": "planner-core",
+        "description": "Update SQLite storage to read/write context field",
+        "dependencies": [
+          "c005"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "getPlanVersion() includes context in returned PlanVersion"
+          },
+          {
+            "id": "ac2",
+            "description": "savePlanVersion() persists context to database"
+          },
+          {
+            "id": "ac3",
+            "description": "updateContext() method for partial context updates per role"
+          },
+          {
+            "id": "ac4",
+            "description": "Null context handled as empty object on read"
+          }
+        ]
+      },
+      {
+        "step_id": "c007",
+        "title": "Add context API endpoints",
+        "scope": "planner-core",
+        "description": "Add REST endpoints for reading and updating context",
+        "dependencies": [
+          "c006"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "GET /plans/:id/versions/:version returns context in response"
+          },
+          {
+            "id": "ac2",
+            "description": "PATCH /plans/:id/versions/:version/context/:role updates specific role context"
+          },
+          {
+            "id": "ac3",
+            "description": "PATCH validates role context against appropriate schema"
+          },
+          {
+            "id": "ac4",
+            "description": "PATCH returns 400 on approved plan"
+          },
+          {
+            "id": "ac5",
+            "description": "PATCH merges fields (partial update, not replace)"
+          }
+        ]
+      },
+      {
+        "step_id": "c008",
+        "title": "Add context API tests",
+        "scope": "planner-core",
+        "description": "Add API tests for context endpoints",
+        "dependencies": [
+          "c007"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Test: GET returns context when present"
+          },
+          {
+            "id": "ac2",
+            "description": "Test: PATCH updates designer context"
+          },
+          {
+            "id": "ac3",
+            "description": "Test: PATCH updates architect context with boundaries"
+          },
+          {
+            "id": "ac4",
+            "description": "Test: PATCH rejects update on approved plan"
+          },
+          {
+            "id": "ac5",
+            "description": "Test: PATCH merges fields (preserves unmodified)"
+          }
+        ]
+      },
+      {
+        "step_id": "c009",
+        "title": "Add MCP tools for context",
+        "scope": "planner-core",
+        "description": "Add MCP tools for agents to read and write context",
+        "dependencies": [
+          "c006"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "get_plan_context tool returns context for a plan version"
+          },
+          {
+            "id": "ac2",
+            "description": "update_plan_context tool updates context for a specific role"
+          },
+          {
+            "id": "ac3",
+            "description": "Tools validate against role-specific schemas"
+          },
+          {
+            "id": "ac4",
+            "description": "Tools handle missing context gracefully (empty object)"
+          }
+        ]
+      },
+      {
+        "step_id": "c010",
+        "title": "Add Context tab to PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Add Context tab alongside Plan and Understanding tabs",
+        "dependencies": [
+          "c007"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "PlanEditorPage shows Plan | Understanding | Context tabs"
+          },
+          {
+            "id": "ac2",
+            "description": "Context tab component created: ContextTab.tsx"
+          },
+          {
+            "id": "ac3",
+            "description": "Tab fetches context from API on mount"
+          },
+          {
+            "id": "ac4",
+            "description": "Tab shows loading state while fetching"
+          }
+        ]
+      },
+      {
+        "step_id": "c011",
+        "title": "Create KeyValueEditor component",
+        "scope": "planner-ui",
+        "description": "Create reusable key-value editor for freeform fields",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Component: src/components/context/KeyValueEditor.tsx"
+          },
+          {
+            "id": "ac2",
+            "description": "Props: fields: Record<string, unknown>, onChange, isEditable, fieldHints?: Record<string, string>"
+          },
+          {
+            "id": "ac3",
+            "description": "Renders each key-value pair as editable row (key input + value input/textarea)"
+          },
+          {
+            "id": "ac4",
+            "description": "'+ Add field' button adds new row with empty key/value"
+          },
+          {
+            "id": "ac5",
+            "description": "X button per row deletes field"
+          },
+          {
+            "id": "ac6",
+            "description": "Shows placeholder hints from fieldHints when key matches"
+          },
+          {
+            "id": "ac7",
+            "description": "Handles string, array (as comma-separated), and nested object values"
+          }
+        ]
+      },
+      {
+        "step_id": "c012",
+        "title": "Create RoleContextCard component",
+        "scope": "planner-ui",
+        "description": "Create card component for displaying and editing a role's freeform context",
+        "dependencies": [
+          "c011"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "RoleContextCard.tsx shows role name in header with icon (from SUGGESTED_ROLES or generic)"
+          },
+          {
+            "id": "ac2",
+            "description": "Card body uses KeyValueEditor for freeform fields"
+          },
+          {
+            "id": "ac3",
+            "description": "Passes fieldHints from SUGGESTED_ROLES when role matches"
+          },
+          {
+            "id": "ac4",
+            "description": "Card handles empty context state (shows 'Add first field' CTA)"
+          },
+          {
+            "id": "ac5",
+            "description": "Delete role option in header dropdown (with confirmation)"
+          }
+        ]
+      },
+      {
+        "step_id": "c013",
+        "title": "Create AddRolePopover component",
+        "scope": "planner-ui",
+        "description": "Create popover for adding new role tabs",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Component: src/components/context/AddRolePopover.tsx"
+          },
+          {
+            "id": "ac2",
+            "description": "Shows suggested roles (Designer, Architect, Modeler, Tester, Security) as quick-add buttons"
+          },
+          {
+            "id": "ac3",
+            "description": "'Custom role' input field for entering any role name"
+          },
+          {
+            "id": "ac4",
+            "description": "Disables already-added roles in suggestions"
+          },
+          {
+            "id": "ac5",
+            "description": "onAddRole callback with role name"
+          }
+        ]
+      },
+      {
+        "step_id": "c014",
+        "title": "Update ContextTab with dynamic roles",
+        "scope": "planner-ui",
+        "description": "Update ContextTab to support dynamic role addition",
+        "dependencies": [
+          "c010",
+          "c012",
+          "c013"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Tab bar shows one tab per role in context + '+' button at end"
+          },
+          {
+            "id": "ac2",
+            "description": "'+' button opens AddRolePopover"
+          },
+          {
+            "id": "ac3",
+            "description": "Adding role creates new tab and initializes empty context for that role"
+          },
+          {
+            "id": "ac4",
+            "description": "Tab content shows RoleContextCard for selected role"
+          },
+          {
+            "id": "ac5",
+            "description": "Deleting role via RoleContextCard removes tab"
+          }
+        ]
+      },
+      {
+        "step_id": "c015",
+        "title": "Add Context UI tests",
+        "scope": "planner-ui",
+        "description": "Add tests for context UI components",
+        "dependencies": [
+          "c014"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Test: ContextTab renders role tabs dynamically from context keys"
+          },
+          {
+            "id": "ac2",
+            "description": "Test: KeyValueEditor renders existing fields and allows editing"
+          },
+          {
+            "id": "ac3",
+            "description": "Test: AddRolePopover shows suggested roles and custom input"
+          },
+          {
+            "id": "ac4",
+            "description": "Test: Adding role creates new tab"
+          },
+          {
+            "id": "ac5",
+            "description": "Test: Adding/editing fields calls onChange"
+          },
+          {
+            "id": "ac6",
+            "description": "Test: Empty context shows 'Add your first role' CTA with '+' button"
+          }
+        ]
+      }
+    ]
+  },
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      {
+        "type": "happy",
+        "scope": "api",
+        "description": "PATCH context with any role name (designer, custom_role) -> GET returns it"
+      },
+      {
+        "type": "happy",
+        "scope": "api",
+        "description": "PATCH context with any field names and nested objects -> GET returns them"
+      },
+      {
+        "type": "edge",
+        "scope": "api",
+        "description": "PATCH context merges fields (new fields added, existing preserved)"
+      },
+      {
+        "type": "edge",
+        "scope": "storage",
+        "description": "Existing plans without context load correctly with context={}"
+      },
+      {
+        "type": "error",
+        "scope": "api",
+        "description": "PATCH context on approved plan returns 400"
+      },
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "Context tab renders tabs dynamically from context keys"
+      },
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "'+' button shows AddRolePopover with suggested roles and custom input"
+      },
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "KeyValueEditor renders existing fields and allows adding new ones"
+      },
+      {
+        "type": "edge",
+        "scope": "ui",
+        "description": "Empty context shows 'Add your first role' CTA"
+      }
+    ],
+    "data_requirements": [
+      "Draft plan with context for suggested role (designer) and custom role (qa_lead)",
+      "Plan with nested objects and arrays in context fields",
+      "Approved plan (for rejection test)"
+    ]
+  },
+  "context": {
+    "tester": {
+      "strategy": "Integration tests at API and UI boundaries. Unit tests covered in individual feature implementation steps (c004, c008, c015).",
+      "migrated_from": "plan_tests"
+    }
+  }
+}

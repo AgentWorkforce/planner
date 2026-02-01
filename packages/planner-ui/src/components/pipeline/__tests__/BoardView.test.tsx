@@ -137,7 +137,8 @@ describe('BoardView', () => {
     it('renders nothing when statusGroups is empty', () => {
       const { container } = renderWithRouter(<BoardView statusGroups={[]} />);
 
-      const columns = container.querySelectorAll('.min-w-\\[240px\\]');
+      // BoardColumn uses flex-1 min-w-0 for equal width columns
+      const columns = container.querySelectorAll('.flex-1');
       expect(columns).toHaveLength(0);
     });
 
@@ -166,14 +167,15 @@ describe('BoardView', () => {
   });
 
   describe('layout and scrolling', () => {
-    it('applies horizontal scroll layout with gap', () => {
+    it('applies flex layout with gap for Kanban columns', () => {
       const statusGroups: StatusGroup[] = [
         { status: 'drafting', label: 'Drafting', plans: [] },
       ];
 
       const { container } = renderWithRouter(<BoardView statusGroups={statusGroups} />);
 
-      const layout = container.querySelector('.flex.overflow-x-auto.gap-3');
+      // Implementation uses flex h-full gap-3 p-3 for Kanban layout
+      const layout = container.querySelector('.flex.h-full.gap-3');
       expect(layout).toBeInTheDocument();
     });
 

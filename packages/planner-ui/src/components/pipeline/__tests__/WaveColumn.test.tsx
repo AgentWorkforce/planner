@@ -175,19 +175,20 @@ describe('WaveColumn', () => {
   });
 
   describe('layout and dimensions', () => {
-    it('applies min-width of 280px', () => {
+    it('uses flex-1 min-w-0 for equal width Kanban columns', () => {
       const plans = [createMockPlan()];
       const { container } = renderWithRouter(<WaveColumn wave="NOW" plans={plans} />);
 
-      const column = container.querySelector('.min-w-\\[280px\\]');
+      // Implementation uses flex-1 min-w-0 for Kanban-style equal width columns
+      const column = container.querySelector('.flex-1.min-w-0');
       expect(column).toBeInTheDocument();
     });
 
-    it('prevents shrinking with flex-shrink-0', () => {
+    it('allows columns to share space equally', () => {
       const plans = [createMockPlan()];
       const { container } = renderWithRouter(<WaveColumn wave="NOW" plans={plans} />);
 
-      const column = container.querySelector('.flex-shrink-0');
+      const column = container.querySelector('.flex-1');
       expect(column).toBeInTheDocument();
     });
 

@@ -42,7 +42,7 @@ export function DecisionLogHeader({
   onAgentChange,
 }: DecisionLogHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+    <div className="flex items-center justify-between">
       {/* Title with count */}
       <h2 className="text-lg font-semibold text-text-primary">
         Decisions ({count})

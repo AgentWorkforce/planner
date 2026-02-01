@@ -1,5 +1,4 @@
 export { useExecutionStatus } from './useExecutionStatus';
-export { useAIChat } from './useAIChat';
 export { useAIImprovements } from './useAIImprovements';
 export { useChangeRequests } from './useChangeRequests';
 export { useAIConnectionStatus } from './useAIConnectionStatus';
@@ -10,7 +9,7 @@ export { usePlanEvents } from './usePlanEvents';
 export type { PlanChangeEvent, UsePlanEventsReturn } from './usePlanEvents';
 export { useAttentionPlans } from './useAttentionPlans';
 export { usePlansViewMode } from './usePlansViewMode';
-export type { PlansViewMode } from '@/components/PlansViewModeToggle';
+export type { PlansViewMode } from './usePlansViewMode';
 export { useScopeGroupExpansion } from './useScopeGroupExpansion';
 export {
   useCommandPalette,
@@ -29,6 +28,7 @@ export { useChannels } from './useChannels';
 export { useChannelMessages } from './useChannelMessages';
 export { usePresence } from './usePresence';
 export { useActiveChannels } from './useActiveChannels';
+export { useDmChannel } from './useDmChannel';
 
 // Initiative management hooks
 export { useInitiatives, invalidateInitiatives } from './useInitiatives';

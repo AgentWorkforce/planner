@@ -6,7 +6,7 @@ export function ChannelPage() {
 
   if (!channelId) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="text-text-muted">No channel selected</div>
       </div>
     );
@@ -15,5 +15,10 @@ export function ChannelPage() {
   // Decode the channel ID (it may be URL-encoded)
   const decodedChannelId = decodeURIComponent(channelId);
 
-  return <ChannelView channelId={decodedChannelId} />;
+  // Full height container for chat-app style layout
+  return (
+    <div className="h-full flex flex-col">
+      <ChannelView channelId={decodedChannelId} />
+    </div>
+  );
 }
