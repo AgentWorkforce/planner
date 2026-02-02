@@ -1,0 +1,55 @@
+{
+  "feature_id": "ideation-ui",
+  "title": "Ideation UI Package",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-api"],
+  "summary": {
+    "goal": "Build the frontend application for human-initiated brainstorming sessions. Provides a conversational interface with the Interviewer agent while displaying specialist observations in real-time.",
+    "in_scope": [
+      "3-column layout (nav sidebar, chat, specialists panel)",
+      "Session list and management",
+      "Chat interface with Interviewer (pure user ↔ Interviewer, no specialist interjections)",
+      "Specialist observations panel (minimal view - confidence, keywords, alerts)",
+      "Confidence bar and Send to Planner action in chat header",
+      "Relay WebSocket/SSE integration for real-time updates"
+    ],
+    "out_of_scope": [
+      "Mode A: Signal-driven ideation UI",
+      "Full observation detail views (v2)",
+      "Trajectory visualization (v2)",
+      "Mobile responsive (v2)"
+    ],
+    "constraints": [
+      "Must use existing design system (Mission Control theme)",
+      "Must follow planner-ui patterns (React, Vite, Tailwind CSS 4, shadcn/ui)",
+      "WebSocket connection to ideation-core for real-time messaging",
+      "Reuse components from planner-ui where applicable"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "User can create a new ideation session from the UI" },
+      { "id": "ac2", "description": "User can see list of sessions with status indicators (active, abandoned)" },
+      { "id": "ac3", "description": "Chat interface displays conversation with Interviewer (user ↔ assistant only)" },
+      { "id": "ac4", "description": "Right sidebar shows specialist confidence and keywords in real-time" },
+      { "id": "ac5", "description": "Concerns and questions from specialists are highlighted in sidebar" },
+      { "id": "ac6", "description": "Confidence bar in header shows aggregate confidence (red→orange→green)" },
+      { "id": "ac7", "description": "Send to Planner button always enabled (advisory confidence, not blocking)" },
+      { "id": "ac8", "description": "Sessions stay active after sending to Planner (continue ideating)" },
+      { "id": "ac9", "description": "Real-time updates via SSE (no polling)" }
+    ],
+    "decisions": [
+      { "decision": "Separate package (packages/ideation-ui/)", "rationale": "Clean separation, independent deployment, mirrors planner-ui pattern" },
+      { "decision": "Minimal specialist view for MVP", "rationale": "Show confidence, keywords, alerts only - full details in v2" },
+      { "decision": "3-column layout", "rationale": "Consistent with planner-ui, familiar pattern for users" },
+      { "decision": "Chat is pure user ↔ Interviewer", "rationale": "Specialists contribute via sidebar, not chat. Interviewer facilitates conversation." },
+      { "decision": "Copy components from planner-ui", "rationale": "Simpler MVP, extract to shared-ui later when both UIs are stable" }
+    ]
+  },
+  "sub_features": [
+    "ideation-ui-layout",
+    "ideation-ui-session-list",
+    "ideation-ui-chat",
+    "ideation-ui-specialists-panel"
+  ]
+}

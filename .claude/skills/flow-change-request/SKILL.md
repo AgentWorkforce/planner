@@ -61,6 +61,10 @@ Accept? [Y/n/edit]
 |------------|------------|
 | summary | user_flow, plan_implementation |
 | user_flow | plan_tests, validation_uiux |
+| understanding | context (decisions derive from observations) |
+| context | plan_implementation, design_spec (decisions inform plans) |
+| design_spec | plan_implementation.steps.specification.design |
+| specification | (implementation work—flag for developer review) |
 | plan_implementation | (implementation work—flag for developer review) |
 
 ```
@@ -94,9 +98,10 @@ Re-run these? [Y/n/select]
 
 | Skill | Section |
 |-------|---------|
-| flow-discover | `summary` (from code) |
-| flow-brainstorm | `summary` (from ideas) |
-| flow-planner | `plan_implementation` |
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
 | flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
 | flow-ui-ux-validation | `validation_uiux` |

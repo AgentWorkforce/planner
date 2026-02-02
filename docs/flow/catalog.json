@@ -90,12 +90,48 @@
         "list": "overflow-y-auto max-h-[45vh] divide-y divide-border-subtle",
         "footer": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-t border-border-subtle",
         "usage": ["ui-question-queue"]
+      },
+      "step-spec-tabs": {
+        "description": "Tabbed interface inside expanded step for spec domains",
+        "tabs": ["Details", "Architecture", "Design", "Testing", "Security"],
+        "tab_list": "flex gap-1 bg-transparent border-b border-border-subtle px-4",
+        "tab_trigger": "px-3 py-2 text-sm text-text-muted hover:text-text-secondary data-[state=active]:text-text-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-cyan",
+        "tab_content": "p-4",
+        "indicator_dot": "w-1.5 h-1.5 rounded-full bg-accent-cyan ml-1.5",
+        "usage": ["schema-ui-specification"]
+      },
+      "agent-observation-card": {
+        "description": "Collapsible card showing agent observations",
+        "card": "bg-bg-card border border-border-subtle rounded-lg overflow-hidden",
+        "header": "flex items-center justify-between px-4 py-3 bg-bg-tertiary border-b border-border-subtle cursor-pointer hover:bg-bg-secondary/50",
+        "body": "p-4 space-y-4",
+        "confidence_badges": {
+          "exploring": "bg-accent-purple/20 text-accent-purple",
+          "forming": "bg-warning/20 text-warning",
+          "confident": "bg-success/20 text-success"
+        },
+        "keyword_chip": "px-2 py-0.5 bg-accent-cyan/10 text-accent-cyan text-xs rounded",
+        "usage": ["schema-ui-understanding"]
       }
     },
     "icons": "Inline SVG, stroke-based, strokeWidth=2, currentColor, sizes: 14/16/20/24px"
   },
 
   "components": [
+    {
+      "id": "ideation-core",
+      "name": "Ideation Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod", "Relay"],
+      "path": "packages/ideation/",
+      "description": "Backend service for brainstorming facilitation, session management, and nugget crystallization. Transforms raw intent into refined understanding ready for planning."
+    },
+    {
+      "id": "ideation-ui",
+      "name": "Ideation UI",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui"],
+      "path": "packages/ideation-ui/",
+      "description": "Frontend application for human-initiated brainstorming sessions with Interviewer agent and real-time specialist observations."
+    },
     {
       "id": "planner-core",
       "name": "Planner Core API",
@@ -109,20 +145,48 @@
       "tech": ["TypeScript", "React"],
       "path": "packages/planner-ui/",
       "description": "Frontend application for plan creation, editing, approval workflow, and execution visibility"
+    },
+    {
+      "id": "forge-core",
+      "name": "Forge Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Redis", "BullMQ", "Relay SDK"],
+      "path": "packages/forge/",
+      "description": "Execution engine that takes ForgePlans and coordinates agents to produce artifacts. Forgemaster (TypeScript service), Workers, Auditors, Gates, Trajectories, and Durability."
+    },
+    {
+      "id": "forge-ui",
+      "name": "Forge UI",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui"],
+      "path": "packages/forge-ui/",
+      "description": "Mission Control dashboard for run monitoring, gate approvals, trajectory exploration, and question queue management."
     }
   ],
 
   "features": [
+    { "id": "ideation-package", "title": "Ideation Package", "type": "epic", "status": "draft", "priority": "critical", "component": "ideation-core", "design_reference": "docs/flow/features/ideation-package.json" },
+    { "id": "ideation-domain", "title": "Ideation Domain Model", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-package" },
+    { "id": "ideation-storage", "title": "Ideation Storage Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-domain"], "parent": "ideation-package" },
+    { "id": "ideation-api", "title": "Ideation REST API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-storage"], "parent": "ideation-package" },
+    { "id": "ideation-lead", "title": "Interviewer Persistent Agent", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-api"], "parent": "ideation-package" },
+    { "id": "ideation-specialists", "title": "Guardian Specialist Agents", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-lead"], "parent": "ideation-package" },
+    { "id": "ideation-planner-handoff", "title": "Planner Handoff Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-lead", "ideation-specialists"], "parent": "ideation-package" },
+
+    { "id": "ideation-ui", "title": "Ideation UI Package", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-ui", "dependencies": ["ideation-api"], "design_reference": "docs/flow/features/ideation-ui.json" },
+    { "id": "ideation-ui-layout", "title": "Ideation Layout & Navigation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-list", "title": "Session List & Management", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-chat", "title": "Chat Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-specialists-panel", "title": "Specialists Panel", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
-    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
+    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
     { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved" },
     { "id": "domain-versioning", "title": "Versioning and Diffs", "type": "feature", "status": "approved" },
 
     { "id": "storage", "title": "Storage Layer", "type": "epic", "status": "approved" },
-    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
+    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
 
     { "id": "rest-api", "title": "REST API", "type": "epic", "status": "approved" },
-    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
+    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
     { "id": "api-workflow", "title": "Workflow Endpoints", "type": "feature", "status": "approved" },
     { "id": "api-change-requests", "title": "Change Request Endpoint", "type": "feature", "status": "approved" },
 
@@ -152,7 +216,7 @@
     { "id": "ui-change-request-ui", "title": "Change Request Handling", "type": "feature", "status": "approved" },
 
     { "id": "ui-ai-integration", "title": "AI Integration", "type": "epic", "status": "approved" },
-    { "id": "ui-ai-chat", "title": "AI Chat", "type": "feature", "status": "approved" },
+    { "id": "ui-ai-chat", "title": "AI Chat (Legacy)", "type": "feature", "status": "deprecated", "superseded_by": ["ui-relay-messaging", "ui-direct-messaging", "planner-lead-service"], "note": "ChatPanel removed - functionality now in MessagingSidebar" },
     { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" },
 
     { "id": "relay-integration", "title": "Agent Relay Integration", "type": "epic", "status": "approved" },
@@ -205,13 +269,57 @@
     { "id": "ui-pipeline-view", "title": "Pipeline View", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"], "replaces": "ui-roadmap-view" },
 
     { "id": "ui-agent-orchestration", "title": "Agent Orchestration UX", "type": "epic", "status": "approved", "priority": "high", "dependencies": ["ui-relay-messaging", "planner-lead-service"], "design_reference": "docs/ux-agent-orchestration.md" },
-    { "id": "ui-status-bar", "title": "Agent Status Bar", "type": "feature", "status": "approved", "priority": "high", "dependencies": [] },
-    { "id": "ui-agent-avatars", "title": "Agent Avatar Components", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-status-bar"] },
+    { "id": "ui-status-bar", "title": "Agent Status Bar", "type": "feature", "status": "completed", "priority": "high", "dependencies": [] },
+    { "id": "ui-agent-avatars", "title": "Agent Avatar Components", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
     { "id": "ui-chat-bubbles", "title": "Agent Chat Bubbles", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-agent-avatars", "ui-question-queue"] },
     { "id": "ui-question-queue", "title": "Question Queue Management", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
     { "id": "ui-question-notification-bubble", "title": "Mini Question Notification Bubble", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-question-queue", "ui-agent-avatars", "ui-status-bar"] },
     { "id": "ui-user-trajectory", "title": "User Trajectory Integration", "type": "feature", "status": "in_progress", "priority": "medium", "dependencies": ["ui-question-queue", "ui-chat-bubbles"] },
 
-    { "id": "relay-agent-integration", "title": "Relay Agent Integration", "type": "feature", "status": "completed", "priority": "critical", "dependencies": ["relay-core"], "note": "MCP as unified interface for all agents. Relay for presence, planner-core for state.", "audit_note": "3 MCP tools (report_agent_status, ask_user_question, join_plan_channel), spawn flow updated with MCP context, /api/agents endpoint for merged presence+state, frontend hook updated." }
+    { "id": "relay-agent-integration", "title": "Relay Agent Integration", "type": "feature", "status": "completed", "priority": "critical", "dependencies": ["relay-core"], "note": "MCP as unified interface for all agents. Relay for presence, planner-core for state.", "audit_note": "3 MCP tools (report_agent_status, ask_user_question, join_plan_channel), spawn flow updated with MCP context, /api/agents endpoint for merged presence+state, frontend hook updated." },
+
+    { "id": "qa-channel-broadcast", "title": "Q&A Channel Broadcast", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-question-queue", "ui-relay-messaging"] },
+
+    { "id": "ui-direct-messaging", "title": "Direct Messaging Agents", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["ui-relay-messaging", "ui-status-bar", "ui-agent-avatars"] },
+
+    { "id": "schema-enrichment", "title": "PlanVersion Schema Enrichment", "type": "epic", "status": "draft", "priority": "critical", "dependencies": [], "extends": ["domain-plan", "storage-sqlite", "api-plan-crud"], "design_reference": ".context/planner-schema-enrichment.md" },
+    { "id": "schema-understanding", "title": "Understanding Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-specification", "title": "Specification Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-db-migration", "title": "Database Migration for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-understanding", "schema-specification"] },
+    { "id": "schema-api-endpoints", "title": "API Endpoints for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-db-migration"] },
+    { "id": "schema-ui-understanding", "title": "Understanding Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-ui-specification", "title": "Specification Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding & Specification", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+
+    { "id": "forge-core", "title": "Forge Core Package", "type": "epic", "status": "draft", "priority": "critical", "component": "forge-core", "design_reference": "docs/flow/features/forge-core.json" },
+    { "id": "forge-domain", "title": "Forge Domain Model", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "forge-core" },
+    { "id": "forge-storage", "title": "Forge State Database", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-domain"], "parent": "forge-core" },
+    { "id": "forge-task-queue", "title": "Task Queue Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-storage"], "parent": "forge-core" },
+    { "id": "forge-workspace-manager", "title": "Git Worktree Workspace Manager", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-storage"], "parent": "forge-core" },
+    { "id": "forge-relay-integration", "title": "Relay Agent Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-workspace-manager", "forge-task-queue"], "parent": "forge-core" },
+    { "id": "forge-auditor-dispatch", "title": "Auditor Dispatch & Verification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-relay-integration"], "parent": "forge-core" },
+    { "id": "forge-gate-handling", "title": "Human Gate Handling", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-relay-integration"], "parent": "forge-core" },
+    { "id": "forge-trajectory-capture", "title": "Trajectory Capture & Retrospectives", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-relay-integration"], "parent": "forge-core" },
+    { "id": "forge-durability", "title": "Durability & Recovery", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-trajectory-capture", "forge-storage"], "parent": "forge-core" },
+    { "id": "forge-mcp-tools", "title": "Agent MCP Tools", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-domain"], "parent": "forge-core" },
+    { "id": "forge-api", "title": "Forge REST API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-storage", "forge-task-queue"], "parent": "forge-core" },
+    { "id": "forge-planner-adapter", "title": "Planner Handoff Adapter", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-domain", "forge-api"], "parent": "forge-core" },
+    { "id": "forge-user-trajectory", "title": "User Trajectory & Preference Learning", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-trajectory-capture"], "parent": "forge-core" },
+    { "id": "forge-question-queue", "title": "Question Queue Backend", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-user-trajectory", "forge-mcp-tools"], "parent": "forge-core" },
+    { "id": "forge-guardian-agents", "title": "Guardian Agent Support", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-relay-integration", "forge-trajectory-capture"], "parent": "forge-core" },
+    { "id": "forge-retrospective", "title": "Agent Retrospective Prompting", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-trajectory-capture", "forge-relay-integration"], "parent": "forge-core" },
+    { "id": "forge-cli", "title": "Forge CLI Commands", "type": "feature", "status": "draft", "priority": "low", "dependencies": ["forge-api", "forge-trajectory-capture"], "parent": "forge-core" },
+
+    { "id": "forge-ui", "title": "Forge UI Package", "type": "epic", "status": "draft", "priority": "high", "component": "forge-ui", "dependencies": ["forge-api"], "design_reference": "docs/flow/features/forge-ui.json" },
+    { "id": "forge-ui-layout", "title": "Forge Layout & Navigation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "forge-ui" },
+    { "id": "forge-ui-runs-list", "title": "Runs List View", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-ui-layout"], "parent": "forge-ui" },
+    { "id": "forge-ui-run-dashboard", "title": "Run Dashboard", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-ui-layout"], "parent": "forge-ui" },
+    { "id": "forge-ui-preflight", "title": "Pre-Flight Check View", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-ui-layout"], "parent": "forge-ui" },
+    { "id": "forge-ui-gate-approval", "title": "Gate Approval UI", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-ui-run-dashboard"], "parent": "forge-ui" },
+    { "id": "forge-ui-timeline", "title": "Run Timeline View", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-ui-run-dashboard"], "parent": "forge-ui" },
+    { "id": "forge-ui-agent-cards", "title": "Active Agent Cards", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-ui-run-dashboard"], "parent": "forge-ui" },
+    { "id": "forge-ui-artifacts", "title": "Artifacts Display", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-ui-run-dashboard"], "parent": "forge-ui" },
+    { "id": "forge-ui-status-bar", "title": "Forge Status Bar Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-ui-layout"], "parent": "forge-ui" },
+    { "id": "forge-ui-question-queue", "title": "Agent Question Queue UI", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-ui-run-dashboard", "forge-question-queue"], "parent": "forge-ui" }
   ]
 }

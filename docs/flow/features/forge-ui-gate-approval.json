@@ -1,0 +1,248 @@
+{
+  "feature_id": "forge-ui-gate-approval",
+  "title": "Gate Approval UI",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-run-dashboard"],
+
+  "summary": {
+    "goal": "Interface for humans to approve or reject gates with full context. The primary human-in-the-loop interaction point.",
+    "acceptance_criteria": [
+      { "id": "fga-ac1", "description": "Gate details panel: step title, description, verification results summary" },
+      { "id": "fga-ac2", "description": "Artifacts section with clickable links (PRs, test reports, deployments)" },
+      { "id": "fga-ac3", "description": "Optional notes textarea for approval/rejection comments" },
+      { "id": "fga-ac4", "description": "Approve button (green, prominent) calls POST /gates/:id/approve" },
+      { "id": "fga-ac5", "description": "Reject button (red, secondary) calls POST /gates/:id/reject" },
+      { "id": "fga-ac6", "description": "Confirmation dialog before reject to prevent accidents" },
+      { "id": "fga-ac7", "description": "Badge count in status bar when gates are pending" },
+      { "id": "fga-ac8", "description": "Sound notification option for new gates" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Gates are the accountability checkpoint",
+        "Approval stores approver identity and timestamp",
+        "Rejection pauses run and may trigger change request"
+      ],
+      "patterns": [
+        "Modal or slide-over panel for gate details",
+        "Notification system integration"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "fga-s1",
+        "title": "Create gates API module",
+        "scope": "forge-ui",
+        "description": "API functions for gate management",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getPendingGates(runId?: string) returns { gates: Gate[] }" },
+          { "id": "ac2", "description": "getGate(taskId) returns gate details with task context" },
+          { "id": "ac3", "description": "approveGate(taskId, comment?: string) calls POST /gates/:taskId/approve" },
+          { "id": "ac4", "description": "rejectGate(taskId, reason: string) calls POST /gates/:taskId/reject" },
+          { "id": "ac5", "description": "Gate type: { gate_id, task_id, run_id, task_title, task_description, approver_role, status, artifacts, created_at }" }
+        ],
+        "specification": {
+          "api_endpoints": {
+            "list": "GET /gates/pending?run_id=X",
+            "approve": "POST /gates/:taskId/approve { comment? }",
+            "reject": "POST /gates/:taskId/reject { reason }"
+          },
+          "notes": "Endpoints defined in forge-gate-handling feature"
+        }
+      },
+      {
+        "step_id": "fga-s2",
+        "title": "Create GateCard component",
+        "scope": "forge-ui",
+        "description": "Summary card for a pending gate",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Gate icon with warning color" },
+          { "id": "ac2", "description": "Task title and approver role" },
+          { "id": "ac3", "description": "Time waiting (e.g., 'Waiting 5m')" },
+          { "id": "ac4", "description": "Review button to open detail panel" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/GateApprovalCard.tsx",
+          "pattern_description": "Similar gate card pattern",
+          "design": {
+            "card": "bg-warning/10 border border-warning/30 rounded-xl p-4",
+            "icon": "ShieldAlertIcon text-warning"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s3",
+        "title": "Create GateDetailPanel component",
+        "scope": "forge-ui",
+        "description": "Full gate review panel with approval actions",
+        "dependencies": ["fga-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Modal or slide-over panel" },
+          { "id": "ac2", "description": "Task details section: title, description, scope, acceptance criteria" },
+          { "id": "ac3", "description": "Verification results if available (from auditor)" },
+          { "id": "ac4", "description": "Artifacts section with external links" },
+          { "id": "ac5", "description": "Notes textarea for comments" },
+          { "id": "ac6", "description": "Approve button (prominent, green)" },
+          { "id": "ac7", "description": "Reject button (secondary, red)" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/GateApprovalCard.tsx (expanded view)",
+          "pattern_description": "Full context view with actions",
+          "design": {
+            "panel": "fixed inset-0 z-50 flex items-center justify-center bg-black/50",
+            "content": "bg-bg-secondary rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s4",
+        "title": "Create GateArtifactsList component",
+        "scope": "forge-ui",
+        "description": "List of artifacts related to a gate",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Groups artifacts by type (PRs, commits, tests, deployments)" },
+          { "id": "ac2", "description": "External links open in new tab" },
+          { "id": "ac3", "description": "Status badge for PRs (open, merged)" },
+          { "id": "ac4", "description": "Copy link button for each artifact" }
+        ],
+        "specification": {
+          "design": {
+            "list": "divide-y divide-border-subtle",
+            "item": "flex items-center justify-between py-2",
+            "link": "text-accent-cyan hover:underline"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s5",
+        "title": "Implement approve flow",
+        "scope": "forge-ui",
+        "description": "Handle gate approval with API call",
+        "dependencies": ["fga-s3"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Approve button calls approveGate(taskId, comment)" },
+          { "id": "ac2", "description": "Loading state on button during API call" },
+          { "id": "ac3", "description": "Success: close panel, show success toast, update dashboard" },
+          { "id": "ac4", "description": "Error: show error toast with message" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/WorkflowActions.tsx",
+          "pattern_description": "Same action + toast pattern"
+        }
+      },
+      {
+        "step_id": "fga-s6",
+        "title": "Implement reject flow with confirmation",
+        "scope": "forge-ui",
+        "description": "Handle gate rejection with required reason",
+        "dependencies": ["fga-s3"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Reject button opens confirmation dialog" },
+          { "id": "ac2", "description": "Confirmation requires reason text (required field)" },
+          { "id": "ac3", "description": "Warning message: 'Rejecting will fail this task and pause the run'" },
+          { "id": "ac4", "description": "Confirm calls rejectGate(taskId, reason)" },
+          { "id": "ac5", "description": "Success: close dialogs, show toast, update dashboard" }
+        ],
+        "specification": {
+          "design": {
+            "dialog": "AlertDialog with destructive action",
+            "reason_input": "required Textarea with label 'Reason for rejection'"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s7",
+        "title": "Create usePendingGates hook",
+        "scope": "forge-ui",
+        "description": "Data fetching and SSE for gate updates",
+        "dependencies": ["fga-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "usePendingGates(runId?) returns { gates, count, isLoading, error, refetch }" },
+          { "id": "ac2", "description": "SSE subscription for gate_reached, gate_approved, gate_rejected events" },
+          { "id": "ac3", "description": "Updates list on gate events" },
+          { "id": "ac4", "description": "Provides count for badge display" }
+        ],
+        "specification": {
+          "architecture": {
+            "events": ["gate_reached", "gate_approved", "gate_rejected"]
+          }
+        }
+      },
+      {
+        "step_id": "fga-s8",
+        "title": "Add gate notification to GateBanner",
+        "scope": "forge-ui",
+        "description": "Connect GateBanner to open gate detail panel",
+        "dependencies": ["fga-s3", "fga-s7"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GateBanner 'Review' button opens GateDetailPanel" },
+          { "id": "ac2", "description": "If multiple gates pending, show count and open list first" },
+          { "id": "ac3", "description": "Banner updates when gates are approved/rejected" }
+        ],
+        "specification": {
+          "integration": "Modify frd-s5 GateBanner to integrate with gate approval flow"
+        }
+      },
+      {
+        "step_id": "fga-s9",
+        "title": "Add sound notification",
+        "scope": "forge-ui",
+        "description": "Optional audio alert when gate is reached",
+        "dependencies": ["fga-s7"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Play notification sound when gate_reached event received" },
+          { "id": "ac2", "description": "Setting to enable/disable sound (stored in localStorage)" },
+          { "id": "ac3", "description": "Setting accessible from status bar or settings" }
+        ],
+        "specification": {
+          "design": {
+            "sound": "Short, professional notification tone",
+            "setting_key": "forge.gateNotificationSound"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s10",
+        "title": "Add pending gates badge to status bar",
+        "scope": "forge-ui",
+        "description": "Badge showing pending gate count",
+        "dependencies": ["fga-s7"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Badge shows count of pending gates" },
+          { "id": "ac2", "description": "Click opens gate review panel" },
+          { "id": "ac3", "description": "Warning color when gates pending" },
+          { "id": "ac4", "description": "Hidden when no gates pending" }
+        ],
+        "specification": {
+          "integration": "Add to forge-ui-status-bar feature",
+          "design": {
+            "badge": "bg-warning text-bg-deep text-xs font-bold px-1.5 py-0.5 rounded-full"
+          }
+        }
+      }
+    ]
+  }
+}

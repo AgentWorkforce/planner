@@ -1,0 +1,376 @@
+{
+  "feature_id": "forge-core",
+  "title": "Forge Core Package",
+  "type": "epic",
+  "status": "draft",
+  "priority": "critical",
+  "component": "forge-core",
+
+  "summary": {
+    "goal": "Build the execution engine that takes ForgePlans from Planner and coordinates agents (Workers, Auditors) to produce artifacts. The Forgemaster is a TypeScript service (NOT an LLM) that handles scheduling, workspace management, and coordination.",
+    "scope_in": [
+      "Forgemaster service (TypeScript, state machine, task queue)",
+      "Domain model (Run, Task, Artifact, TaskAttempt)",
+      "SQLite state database for runs and tasks",
+      "Redis/BullMQ task queue for scheduling",
+      "Git worktree workspace isolation per task",
+      "Relay SDK integration for agent spawning",
+      "Auditor dispatch and verification flow",
+      "Human gate handling and notifications",
+      "Trajectory capture via event sourcing",
+      "Durability (checkpointing, recovery from failures)",
+      "MCP tools for agent communication",
+      "REST API for run management",
+      "Planner handoff adapter (ForgePlan transformation)"
+    ],
+    "scope_in_phase2": [
+      "User trajectory & preference learning",
+      "Question queue with priority scoring",
+      "Guardian agent support (shadow + persistent context)",
+      "Agent retrospective prompting",
+      "Forge CLI commands"
+    ],
+    "scope_out": [
+      "Forge UI (separate package)",
+      "Multi-provider agent support (Phase 3)",
+      "Cloud execution via claude & (Phase 3)",
+      "Advanced analytics/insights (Phase 4)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Forgemaster receives approved ForgePlan and creates a Run with compiled task DAG" },
+      { "id": "ac2", "description": "Tasks are scheduled via BullMQ respecting dependencies and concurrency limits" },
+      { "id": "ac3", "description": "Each task gets isolated git worktree workspace with branch-per-task" },
+      { "id": "ac4", "description": "Workers are spawned via Relay SDK with MCP tools for reporting" },
+      { "id": "ac5", "description": "Auditors are dispatched after worker completion to verify acceptance criteria" },
+      { "id": "ac6", "description": "Human gates pause execution and notify via API/WebSocket" },
+      { "id": "ac7", "description": "All execution events are captured as trajectories for replay/retrospective" },
+      { "id": "ac8", "description": "Failed runs can be recovered from checkpoint without re-executing completed tasks" },
+      { "id": "ac9", "description": "REST API exposes run status, task details, gate approvals, and artifact references" },
+      { "id": "ac10", "description": "Planner can publish ForgePlan and receive run_id for tracking" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Forgemaster is software infrastructure, NOT an LLM agent - deterministic state machine",
+        "Separation: Forgemaster coordinates, agents do the actual work",
+        "Git worktrees enable parallel execution on same repo without conflicts",
+        "Event sourcing via trajectories enables recovery and retrospectives",
+        "BullMQ provides reliable task scheduling with Redis backing",
+        "MCP is the communication contract between Forgemaster and agents",
+        "ForgePlan is the contract between Planner and Forge - keeps packages independent"
+      ],
+      "patterns": [
+        "Task queue pattern with BullMQ for concurrency control",
+        "Event sourcing for durability and audit trail",
+        "State machine for run/task lifecycle",
+        "Worktree isolation for parallel-safe execution",
+        "Spawn-work-exit agent lifecycle (not persistent agents)"
+      ],
+      "questions": [],
+      "concerns": [
+        "Workspace cleanup must handle agent crashes gracefully",
+        "Redis is a required dependency - if unavailable, Forgemaster must fail fast with clear error explaining Redis is required"
+      ],
+      "confidence": "confident"
+    },
+    "security": {
+      "observations": [
+        "Agents execute in isolated worktrees - limited blast radius",
+        "MCP tools control what agents can report - no arbitrary code execution on Forgemaster",
+        "Gates provide human oversight for sensitive operations"
+      ],
+      "keywords": ["isolation", "worktree", "gate", "audit"],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "forgemaster_nature": "TypeScript service with state machine, NOT an LLM",
+      "storage": "SQLite for state, Redis for task queue",
+      "agent_spawning": "Relay SDK spawn() for task agents",
+      "workspace_strategy": "Git worktrees with branch-per-task",
+      "durability_strategy": "Event sourcing via trajectories + checkpointing"
+    },
+    "design_reference": ".context/forge-design.md"
+  },
+
+  "sub_features": [
+    {
+      "id": "forge-domain",
+      "title": "Forge Domain Model",
+      "priority": "critical",
+      "summary": {
+        "goal": "Define core domain entities: Run, Task, TaskAttempt, Artifact, and their state machines",
+        "acceptance_criteria": [
+          { "id": "fd-ac1", "description": "Run entity with states: pending, running, paused, completed, failed, cancelled" },
+          { "id": "fd-ac2", "description": "Task entity with states: pending, queued, running, auditing, completed, failed, blocked" },
+          { "id": "fd-ac3", "description": "TaskAttempt tracks individual execution attempts with start/end times" },
+          { "id": "fd-ac4", "description": "Artifact type represents references to produced work (commit, PR, file)" },
+          { "id": "fd-ac5", "description": "State transitions are validated (no invalid transitions)" },
+          { "id": "fd-ac6", "description": "ForgePlan and ForgeStep types match Planner contract" }
+        ]
+      }
+    },
+    {
+      "id": "forge-storage",
+      "title": "Forge State Database",
+      "priority": "critical",
+      "dependencies": ["forge-domain"],
+      "summary": {
+        "goal": "SQLite storage layer for runs, tasks, attempts, and artifacts",
+        "acceptance_criteria": [
+          { "id": "fs-ac1", "description": "runs table with JSONB for full Run document" },
+          { "id": "fs-ac2", "description": "tasks table with run_id, status, dependencies as JSONB" },
+          { "id": "fs-ac3", "description": "task_attempts table tracking each execution attempt" },
+          { "id": "fs-ac4", "description": "artifacts table with type, reference, and task linkage" },
+          { "id": "fs-ac5", "description": "Queries for ready tasks (dependencies satisfied), active runs, task history" }
+        ]
+      }
+    },
+    {
+      "id": "forge-task-queue",
+      "title": "Task Queue Integration",
+      "priority": "critical",
+      "dependencies": ["forge-storage"],
+      "summary": {
+        "goal": "Redis/BullMQ integration for reliable task scheduling with concurrency limits",
+        "acceptance_criteria": [
+          { "id": "ftq-ac1", "description": "BullMQ queue for ready tasks with configurable concurrency" },
+          { "id": "ftq-ac2", "description": "Priority scheduling (higher priority tasks first)" },
+          { "id": "ftq-ac3", "description": "Fair scheduling across runs (round-robin between active runs)" },
+          { "id": "ftq-ac4", "description": "Job retry on transient failures" },
+          { "id": "ftq-ac5", "description": "Dead letter queue for permanently failed tasks" }
+        ]
+      }
+    },
+    {
+      "id": "forge-workspace-manager",
+      "title": "Git Worktree Workspace Manager",
+      "priority": "critical",
+      "dependencies": ["forge-storage"],
+      "summary": {
+        "goal": "Manage isolated git worktree workspaces for each task",
+        "acceptance_criteria": [
+          { "id": "fwm-ac1", "description": "Create worktree from repo with unique branch (forge/run-X-task-Y)" },
+          { "id": "fwm-ac2", "description": "Write .forge/context.json with task description, criteria, expected artifacts" },
+          { "id": "fwm-ac3", "description": "Configure MCP tools in workspace for agent communication" },
+          { "id": "fwm-ac4", "description": "Cleanup worktree after task completion (configurable retention)" },
+          { "id": "fwm-ac5", "description": "Workspace creation failures throw WorkspaceError with type: disk_full, clone_failed, worktree_failed, permission_denied - no silent fallbacks" }
+        ]
+      }
+    },
+    {
+      "id": "forge-relay-integration",
+      "title": "Relay Agent Integration",
+      "priority": "critical",
+      "dependencies": ["forge-workspace-manager", "forge-task-queue"],
+      "summary": {
+        "goal": "Spawn and manage agents via Relay SDK for task execution",
+        "acceptance_criteria": [
+          { "id": "fri-ac1", "description": "Spawn worker agent with task prompt, workspace path, MCP config" },
+          { "id": "fri-ac2", "description": "Receive agent status updates via relay messages" },
+          { "id": "fri-ac3", "description": "Detect agent completion or failure" },
+          { "id": "fri-ac4", "description": "Handle agent timeout with graceful termination" },
+          { "id": "fri-ac5", "description": "Support multiple CLI providers (claude, codex, gemini) via configuration" }
+        ]
+      }
+    },
+    {
+      "id": "forge-auditor-dispatch",
+      "title": "Auditor Dispatch & Verification",
+      "priority": "high",
+      "dependencies": ["forge-relay-integration"],
+      "summary": {
+        "goal": "Dispatch auditor agents to verify worker output against acceptance criteria",
+        "acceptance_criteria": [
+          { "id": "fad-ac1", "description": "Spawn auditor after worker completion with artifacts and criteria" },
+          { "id": "fad-ac2", "description": "Auditor receives read-only access to workspace" },
+          { "id": "fad-ac3", "description": "Auditor reports pass/fail with detailed findings" },
+          { "id": "fad-ac4", "description": "Failed audit triggers task retry or escalation" },
+          { "id": "fad-ac5", "description": "Audit results stored with task attempt" }
+        ]
+      }
+    },
+    {
+      "id": "forge-gate-handling",
+      "title": "Human Gate Handling",
+      "priority": "high",
+      "dependencies": ["forge-relay-integration"],
+      "summary": {
+        "goal": "Pause execution at human gates and handle approvals",
+        "acceptance_criteria": [
+          { "id": "fgh-ac1", "description": "Detect gate steps in ForgePlan" },
+          { "id": "fgh-ac2", "description": "Pause run and mark task as awaiting_approval" },
+          { "id": "fgh-ac3", "description": "Expose pending gates via API" },
+          { "id": "fgh-ac4", "description": "Accept/reject gate via API with optional comment" },
+          { "id": "fgh-ac5", "description": "Resume execution after gate approval" },
+          { "id": "fgh-ac6", "description": "WebSocket/SSE notification when gate is reached" }
+        ]
+      }
+    },
+    {
+      "id": "forge-trajectory-capture",
+      "title": "Trajectory Capture & Retrospectives",
+      "priority": "high",
+      "dependencies": ["forge-relay-integration"],
+      "summary": {
+        "goal": "Capture all execution events as trajectories for replay and retrospective",
+        "acceptance_criteria": [
+          { "id": "ftc-ac1", "description": "Every state transition emits trajectory event" },
+          { "id": "ftc-ac2", "description": "Agent messages and tool calls captured" },
+          { "id": "ftc-ac3", "description": "Trajectory stored with run/task references" },
+          { "id": "ftc-ac4", "description": "Query trajectories by run, task, or time range" },
+          { "id": "ftc-ac5", "description": "Aggregate stats: completion rate, retry rate, average duration" }
+        ]
+      }
+    },
+    {
+      "id": "forge-durability",
+      "title": "Durability & Recovery",
+      "priority": "high",
+      "dependencies": ["forge-trajectory-capture", "forge-storage"],
+      "summary": {
+        "goal": "Enable recovery from failures without re-executing completed work",
+        "acceptance_criteria": [
+          { "id": "fdu-ac1", "description": "Checkpoint run state after each task completion" },
+          { "id": "fdu-ac2", "description": "Recover run from checkpoint on Forgemaster restart" },
+          { "id": "fdu-ac3", "description": "Detect orphaned agents and clean up" },
+          { "id": "fdu-ac4", "description": "Resume paused runs from last known state" },
+          { "id": "fdu-ac5", "description": "Health monitoring for long-running agents" }
+        ]
+      }
+    },
+    {
+      "id": "forge-mcp-tools",
+      "title": "Agent MCP Tools",
+      "priority": "critical",
+      "dependencies": ["forge-domain"],
+      "summary": {
+        "goal": "Define MCP tools that agents use to communicate with Forgemaster",
+        "acceptance_criteria": [
+          { "id": "fmt-ac1", "description": "report_progress tool for status updates" },
+          { "id": "fmt-ac2", "description": "report_complete tool with artifact list" },
+          { "id": "fmt-ac3", "description": "report_blocked tool with reason and suggested change" },
+          { "id": "fmt-ac4", "description": "request_human_input tool for blocking questions" },
+          { "id": "fmt-ac5", "description": "record_decision tool for trajectory decision capture" },
+          { "id": "fmt-ac6", "description": "MCP server runs alongside Forgemaster" }
+        ]
+      }
+    },
+    {
+      "id": "forge-api",
+      "title": "Forge REST API",
+      "priority": "high",
+      "dependencies": ["forge-storage", "forge-task-queue"],
+      "summary": {
+        "goal": "REST API for run management, monitoring, and gate approvals",
+        "acceptance_criteria": [
+          { "id": "fa-ac1", "description": "POST /runs - create run from ForgePlan" },
+          { "id": "fa-ac2", "description": "GET /runs - list runs with status filter" },
+          { "id": "fa-ac3", "description": "GET /runs/:id - get run details with tasks" },
+          { "id": "fa-ac4", "description": "POST /runs/:id/pause, /resume, /cancel - run control" },
+          { "id": "fa-ac5", "description": "GET /runs/:id/tasks/:taskId - task details with attempts" },
+          { "id": "fa-ac6", "description": "POST /gates/:id/approve, /reject - gate decisions" },
+          { "id": "fa-ac7", "description": "SSE /runs/:id/events - real-time updates" }
+        ]
+      }
+    },
+    {
+      "id": "forge-planner-adapter",
+      "title": "Planner Handoff Adapter",
+      "priority": "high",
+      "dependencies": ["forge-domain", "forge-api"],
+      "summary": {
+        "goal": "Transform Planner's PlanVersion to ForgePlan and handle handoff",
+        "acceptance_criteria": [
+          { "id": "fpa-ac1", "description": "Fetch approved PlanVersion from Planner API" },
+          { "id": "fpa-ac2", "description": "Transform to ForgePlan with executable task structure" },
+          { "id": "fpa-ac3", "description": "Map owner_role to agent CLI configuration" },
+          { "id": "fpa-ac4", "description": "Resolve scope to workspace path configuration" },
+          { "id": "fpa-ac5", "description": "Report run status back to Planner for UI visibility" }
+        ]
+      }
+    },
+    {
+      "id": "forge-user-trajectory",
+      "title": "User Trajectory & Preference Learning",
+      "priority": "high",
+      "dependencies": ["forge-trajectory-capture"],
+      "summary": {
+        "goal": "Capture user interactions and build preference model to reduce question fatigue",
+        "acceptance_criteria": [
+          { "id": "fut-ac1", "description": "UserTrajectory entity with events, derived preferences, patterns" },
+          { "id": "fut-ac2", "description": "Questions answered create trajectory events with reasoning" },
+          { "id": "fut-ac3", "description": "Agents can query preferences before asking questions" },
+          { "id": "fut-ac4", "description": "findSimilarQuestions for deduplication" }
+        ]
+      }
+    },
+    {
+      "id": "forge-question-queue",
+      "title": "Question Queue Backend",
+      "priority": "high",
+      "dependencies": ["forge-user-trajectory", "forge-mcp-tools"],
+      "summary": {
+        "goal": "Intelligent question prioritization and deduplication",
+        "acceptance_criteria": [
+          { "id": "fqq-ac1", "description": "Priority scoring: blocking_level×100 + steps_blocked×10 + agents_waiting×15" },
+          { "id": "fqq-ac2", "description": "Check user trajectory before adding to queue" },
+          { "id": "fqq-ac3", "description": "Multiple agents can subscribe to same question" },
+          { "id": "fqq-ac4", "description": "SSE events for new questions and answers" }
+        ]
+      }
+    },
+    {
+      "id": "forge-guardian-agents",
+      "title": "Guardian Agent Support",
+      "priority": "medium",
+      "dependencies": ["forge-relay-integration", "forge-trajectory-capture"],
+      "summary": {
+        "goal": "Persistent guardian agents that shadow workers with accumulated context",
+        "acceptance_criteria": [
+          { "id": "fga-ac1", "description": "Guardian config in forge-config.yaml" },
+          { "id": "fga-ac2", "description": "Spawn with Relay shadowOf capability" },
+          { "id": "fga-ac3", "description": "Project-scoped trajectory persistence" },
+          { "id": "fga-ac4", "description": "Predefined types: Security, Architect, QA" }
+        ]
+      }
+    },
+    {
+      "id": "forge-retrospective",
+      "title": "Agent Retrospective Prompting",
+      "priority": "medium",
+      "dependencies": ["forge-trajectory-capture", "forge-relay-integration"],
+      "summary": {
+        "goal": "Prompt agents for structured reflection after task completion",
+        "acceptance_criteria": [
+          { "id": "fr-ac1", "description": "Inject retrospective prompt after report_complete" },
+          { "id": "fr-ac2", "description": "Capture: summary, approach, decisions, challenges, learnings, confidence" },
+          { "id": "fr-ac3", "description": "Store in trajectory.retrospective" }
+        ]
+      }
+    },
+    {
+      "id": "forge-cli",
+      "title": "Forge CLI Commands",
+      "priority": "low",
+      "dependencies": ["forge-api", "forge-trajectory-capture"],
+      "summary": {
+        "goal": "CLI for headless Forge operations and trajectory exploration",
+        "acceptance_criteria": [
+          { "id": "fc-ac1", "description": "forge run start/list/status/pause/resume/cancel" },
+          { "id": "fc-ac2", "description": "forge trajectory show/export/search/decisions" },
+          { "id": "fc-ac3", "description": "forge gate list/approve/reject" }
+        ]
+      }
+    }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": []
+  }
+}

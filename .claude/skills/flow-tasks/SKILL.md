@@ -85,7 +85,7 @@ Feature: [feature_id]
 Step: [step_id] - [step_title]
 File: docs/flow/features/[feature_id].json
 
-DO: Implement this step per its acceptance_criteria in the feature file.
+DO: Implement this step per its acceptance_criteria and specification (if present) in the feature file.
 ```
 
 **POST**:
@@ -155,3 +155,18 @@ Each feature must have `plan_implementation.steps`. Skip features without plans,
 ## After All Tasks Created
 
 Stop. The user works through the tasks. You don't implement.
+
+## Fits the Whole
+
+| Skill | Section |
+|-------|---------|
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
+| **flow-tasks** | Creates executable tasks from plan |
+| flow-feature | `user_flow` |
+| flow-ui-ux-validation | `validation_uiux` |
+| flow-test-designer | `plan_tests` |
+| flow-visualize | Reads all, renders diagram |
+| flow-change-request | Updates any, cascades |

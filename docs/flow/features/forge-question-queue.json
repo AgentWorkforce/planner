@@ -1,0 +1,238 @@
+{
+  "feature_id": "forge-question-queue",
+  "title": "Question Queue Backend",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-user-trajectory", "forge-mcp-tools", "forge-storage"],
+
+  "summary": {
+    "goal": "Backend service for managing agent questions with intelligent prioritization, deduplication via user trajectory, and multi-agent answer subscription.",
+    "acceptance_criteria": [
+      { "id": "fqq-ac1", "description": "Questions scored with priority formula: blocking_level_value*100 + steps_blocked*10 + subscribers.length*15 + cascade_depth*5 - (can_use_default ? 30 : 0)" },
+      { "id": "fqq-ac2", "description": "Before adding to queue, check user trajectory for existing answer (similarity > 0.85)" },
+      { "id": "fqq-ac3", "description": "If similar question already in queue, subscribe agent to that answer" },
+      { "id": "fqq-ac4", "description": "Blocking levels: hard_block (3), soft_block (2), preference (1), fyi (0)" },
+      { "id": "fqq-ac5", "description": "When answered: update user trajectory, notify subscribed agents via relay, update preference model" },
+      { "id": "fqq-ac6", "description": "API: POST /questions (internal - called by MCP), GET /questions/pending, POST /questions/:id/answer" },
+      { "id": "fqq-ac7", "description": "SSE events for new questions and answers" },
+      { "id": "fqq-ac8", "description": "Default choice support: agent can proceed with default after timeout if can_use_default=true" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Question queue is backend counterpart to forge-ui-question-queue",
+        "Priority scoring enables intelligent ordering",
+        "Trajectory-aware deduplication prevents repeat questions",
+        "Multiple agents can wait for same answer (subscribers array)",
+        "agents_waiting in UI = subscribers.length"
+      ],
+      "patterns": [
+        "Priority queue with computed scores",
+        "Pub/sub for answer notification via relay",
+        "SSE for real-time updates to UI"
+      ],
+      "keywords": ["priority-queue", "deduplication", "pub-sub"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "priority_formula": "blocking_level_value*100 + steps_blocked*10 + subscribers.length*15 + cascade_depth*5 - (can_use_default ? 30 : 0)",
+      "blocking_levels": {
+        "hard_block": 3,
+        "soft_block": 2,
+        "preference": 1,
+        "fyi": 0
+      },
+      "notes": "agents_waiting shown in UI = subscribers.length from question entity"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fqq-s1",
+        "title": "Define Question entity schema",
+        "scope": "forge-core",
+        "description": "Define schema for questions in the queue",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "QuestionSchema: { question_id, run_id, task_id, agent_id, text, options?, blocking_level, steps_blocked, cascade_depth, can_use_default, default_value?, subscribers: string[], status, answer?, priority_score, created_at, answered_at? }" },
+          { "id": "ac2", "description": "BlockingLevelSchema: z.enum(['hard_block', 'soft_block', 'preference', 'fyi'])" },
+          { "id": "ac3", "description": "QuestionStatusSchema: z.enum(['pending', 'answered', 'dismissed', 'auto_defaulted'])" },
+          { "id": "ac4", "description": "createQuestion() factory with priority score calculation" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/question.ts",
+          "pattern_description": "Copy Question entity pattern from planner-core",
+          "notes": "subscribers array holds agent_ids waiting for this answer; subscribers.length = agents_waiting in UI"
+        }
+      },
+      {
+        "step_id": "fqq-s2",
+        "title": "Verify questions table in storage",
+        "scope": "forge-core",
+        "description": "Questions table schema defined in forge-storage, verify storage methods work",
+        "dependencies": ["fqq-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Verify ForgeStorage.createQuestion() works with question schema" },
+          { "id": "ac2", "description": "Verify ForgeStorage.getQuestion() retrieves by ID" },
+          { "id": "ac3", "description": "Verify ForgeStorage.updateQuestion() updates status, answer, subscribers" },
+          { "id": "ac4", "description": "Verify ForgeStorage.listPendingByPriority() returns sorted by priority_score DESC" }
+        ],
+        "specification": {
+          "notes": "Table schema defined in forge-storage fs-s5"
+        }
+      },
+      {
+        "step_id": "fqq-s3",
+        "title": "Implement priority scoring",
+        "scope": "forge-core",
+        "description": "Calculate priority score for question ordering",
+        "dependencies": ["fqq-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "calculatePriorityScore(question) implements formula" },
+          { "id": "ac2", "description": "Formula: blocking_level_value*100 + steps_blocked*10 + subscribers.length*15 + cascade_depth*5 - (can_use_default ? 30 : 0)" },
+          { "id": "ac3", "description": "Blocking level values: hard_block=3, soft_block=2, preference=1, fyi=0" },
+          { "id": "ac4", "description": "Score recalculated when subscribers added or steps_blocked changes" }
+        ],
+        "specification": {
+          "architecture": {
+            "formula": "blocking_level_value*100 + steps_blocked*10 + subscribers.length*15 + cascade_depth*5 - (can_use_default ? 30 : 0)"
+          }
+        }
+      },
+      {
+        "step_id": "fqq-s4",
+        "title": "Implement trajectory-aware deduplication with transparency",
+        "scope": "forge-core",
+        "description": "Check user trajectory before adding to queue, with explicit auto-answer visibility",
+        "dependencies": ["fqq-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Before adding question, call userTrajectory.findSimilarQuestions(text, threshold=0.85)" },
+          { "id": "ac2", "description": "If similar answer exists in trajectory: create question with status='auto_answered_from_trajectory'" },
+          { "id": "ac3", "description": "Store trajectory event 'question_auto_answered' with { question_text, matched_question_id, similarity_score, auto_answer }" },
+          { "id": "ac4", "description": "Emit SSE event 'question_auto_answered' so UI can display auto-answered questions in history" },
+          { "id": "ac5", "description": "Notify agent immediately with auto-answer via relay, include { source: 'trajectory', matched_question_id }" },
+          { "id": "ac6", "description": "Auto-answered questions visible in GET /questions/history (not just skipped silently)" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration": "Calls forge-user-trajectory findSimilarQuestions()",
+            "similarity_threshold": 0.85,
+            "transparency": "Auto-answered questions are stored and visible, not silently skipped. Users can review and override auto-answers."
+          }
+        }
+      },
+      {
+        "step_id": "fqq-s5",
+        "title": "Implement question subscription",
+        "scope": "forge-core",
+        "description": "Allow multiple agents to subscribe to same question",
+        "dependencies": ["fqq-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Before creating new question, check if similar question already pending" },
+          { "id": "ac2", "description": "If similar pending: subscribeToQuestion(questionId, agentId) adds to subscribers array" },
+          { "id": "ac3", "description": "Recalculate priority_score after adding subscriber" },
+          { "id": "ac4", "description": "When answered, all subscribers notified via relay message" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Pub/sub for answer notification",
+            "similarity": "Use same text similarity as trajectory dedup"
+          }
+        }
+      },
+      {
+        "step_id": "fqq-s6",
+        "title": "Implement answer flow",
+        "scope": "forge-core",
+        "description": "Handle question answering with side effects",
+        "dependencies": ["fqq-s2", "fqq-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "answerQuestion(questionId, answer, answeredBy) updates status to 'answered'" },
+          { "id": "ac2", "description": "Records answer in user trajectory via userTrajectory.recordUserDecision()" },
+          { "id": "ac3", "description": "Notifies all subscribers via relay message { type: 'question_answered', question_id, answer }" },
+          { "id": "ac4", "description": "Updates preference model if applicable" },
+          { "id": "ac5", "description": "Unblocks waiting tasks by setting task.status back to 'running'" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/questions.ts:answer",
+          "pattern_description": "Copy answer handler pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fqq-s7",
+        "title": "Create question queue API endpoints",
+        "scope": "forge-core",
+        "description": "REST API for question queue management",
+        "dependencies": ["fqq-s2", "fqq-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /questions creates question (called internally by MCP tool handler)" },
+          { "id": "ac2", "description": "GET /questions/pending returns sorted by priority score, includes subscribers.length as agents_waiting" },
+          { "id": "ac3", "description": "GET /questions/history returns all questions including auto_answered_from_trajectory for transparency" },
+          { "id": "ac4", "description": "POST /questions/:id/answer submits answer" },
+          { "id": "ac5", "description": "All emit SSE events for real-time UI updates" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/questions.ts",
+          "pattern_description": "Copy question handler pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fqq-s8",
+        "title": "Implement default value handling with visibility",
+        "scope": "forge-core",
+        "description": "Support agents proceeding with default if can_use_default and timeout reached, with explicit status",
+        "dependencies": ["fqq-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Scheduled job checks for pending questions past timeout" },
+          { "id": "ac2", "description": "If can_use_default=true and created_at + timeout < now, use default_value" },
+          { "id": "ac3", "description": "Set status to 'auto_defaulted' (distinct from 'answered')" },
+          { "id": "ac4", "description": "Store trajectory event 'question_auto_defaulted' with { question_id, default_value, timeout_duration }" },
+          { "id": "ac5", "description": "Emit SSE event 'question_auto_defaulted' for UI visibility" },
+          { "id": "ac6", "description": "Notify agent with { type: 'question_answered', answer, source: 'timeout_default' }" },
+          { "id": "ac7", "description": "Configurable timeout: FORGE_QUESTION_DEFAULT_TIMEOUT (default 5 min)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Scheduled job checks for timed-out defaultable questions",
+            "interval": "Every 60 seconds",
+            "visibility": "auto_defaulted is a distinct status visible in UI - not hidden as 'answered'"
+          }
+        }
+      },
+      {
+        "step_id": "fqq-s9",
+        "title": "Mount question routes on API router",
+        "scope": "forge-core",
+        "description": "Add question routes to the Forge API router",
+        "dependencies": ["fqq-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Question routes mounted under /questions on Forge router" },
+          { "id": "ac2", "description": "GET /questions/pending" },
+          { "id": "ac3", "description": "GET /questions/history" },
+          { "id": "ac4", "description": "POST /questions/:id/answer" }
+        ],
+        "specification": {
+          "integration": "Add to forge-api fa-s7 createForgeRouter"
+        }
+      }
+    ]
+  }
+}

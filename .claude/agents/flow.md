@@ -89,6 +89,38 @@ If unclear, ask: "Which would you like to do?" + list options.
 | "What features exist?" | flow-discover |
 | "I want to build X" | flow-brainstorm |
 
+## Section Ownership
+
+| Section | Skill | Purpose |
+|---------|-------|---------|
+| `summary` | flow-brainstorm/flow-discover | What the feature is |
+| `understanding` | Any agent (as needed) | Agent observations during ideation |
+| `context` | Any agent (as needed) | Formalized decisions by role |
+| `design_spec` | flow-ui-ux-designer | How it looks (views, components) |
+| `user_flow` | flow-feature | How it behaves (for testing) |
+| `plan_implementation` | flow-planner | How to build it (steps + specification) |
+| `plan_tests` | flow-test-designer | Test design/coverage |
+| `validation_uiux` | flow-ui-ux-validation | UI/UX validation results |
+| `audit` | flow-audit | Implementation verification |
+
+**Note**: `understanding` and `context` can be added by any skill when observations or decisions are made. They're not exclusive to one skill.
+
+## Understanding and Context
+
+These sections capture knowledge during the workflow:
+
+**Understanding** = Agent observations during ideation (keyed by role)
+- What patterns apply? What questions need answers? What concerns exist?
+- Common roles: architect, designer, tester, security, modeler
+
+**Context** = Formalized decisions by role (freeform key-value)
+- Tech stack choices, design decisions, testing strategies
+- Feature-level context can extend project-level `catalog.design_system`
+
+**Specification** = Step-level technical details in `plan_implementation.steps`
+- Architecture patterns, design choices, security requirements
+- Freeform: any domain (architecture, design, model, testing, security)
+
 ## Status Check
 
 Read `docs/flow/catalog.json` and `docs/flow/features/*.json`.
@@ -122,10 +154,11 @@ brainstorm ┘        │
                └──→ test-designer
 ```
 
-- **discover** or **brainstorm** first (creates catalog + summaries)
-- **planner** creates implementation steps
+- **discover** or **brainstorm** first (creates catalog + summaries + initial understanding/context)
+- **planner** creates implementation steps with specifications
 - **tasks** creates executable tasks with PRE/IMPL/POST/VERIFY/DOC
 - **feature** can run in parallel with planner
+- **ui-ux-designer** populates design_spec and context.designer
 - **ui-ux-validation** and **test-designer** require user_flow
 - All can be re-run via **change-request** if requirements change
 
@@ -147,6 +180,8 @@ Indicators: "actually we need...", "change X to Y", "add/remove requirement"
 
 - **Always write to docs/flow/** - never just chat summaries
 - **Always visualize after changes** - show what happened
+- **Capture understanding** - note observations during ideation
+- **Record context** - persist decisions for future reference
 - Status: ≤5 lines for quick checks
 - Suggestions: single sentence each
 - Don't switch skills without user confirmation

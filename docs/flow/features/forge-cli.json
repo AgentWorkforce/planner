@@ -1,0 +1,206 @@
+{
+  "feature_id": "forge-cli",
+  "title": "Forge CLI Commands",
+  "type": "feature",
+  "status": "draft",
+  "priority": "low",
+  "parent": "forge-core",
+  "dependencies": ["forge-api", "forge-trajectory-capture", "forge-gate-handling", "forge-question-queue"],
+
+  "summary": {
+    "goal": "Command-line interface for Forge operations: viewing runs, trajectories, decisions, and managing execution without UI.",
+    "acceptance_criteria": [
+      { "id": "fc-ac1", "description": "forge run start <plan.json> - start run from ForgePlan file" },
+      { "id": "fc-ac2", "description": "forge run list - list runs with status" },
+      { "id": "fc-ac3", "description": "forge run status <run_id> - show run progress" },
+      { "id": "fc-ac4", "description": "forge run pause/resume/cancel <run_id> - control execution" },
+      { "id": "fc-ac5", "description": "forge trajectory show <run_id> [task_id] - view trajectory" },
+      { "id": "fc-ac6", "description": "forge trajectory export <run_id> --format markdown|json" },
+      { "id": "fc-ac7", "description": "forge trajectory search <query> - search across trajectories" },
+      { "id": "fc-ac8", "description": "forge trajectory decisions <run_id> - list decisions made" },
+      { "id": "fc-ac9", "description": "forge gate list - show pending gates" },
+      { "id": "fc-ac10", "description": "forge gate approve/reject <task_id> - resolve gate" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "CLI provides headless access to all Forge operations",
+        "Useful for CI/CD integration and scripting",
+        "Trajectory commands enable debugging without UI"
+      ],
+      "patterns": [
+        "Commander or similar CLI framework",
+        "Calls Forge REST API under the hood",
+        "Output formats: table, JSON, markdown"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "cli_name": "forge",
+      "output_formats": ["table", "json", "markdown"],
+      "api_base_url": "configurable via FORGE_API_URL env var"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fc-s1",
+        "title": "Set up CLI framework",
+        "scope": "forge-core",
+        "description": "Initialize CLI with commander.js",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create packages/forge-core/src/cli/index.ts" },
+          { "id": "ac2", "description": "Use commander.js for command parsing" },
+          { "id": "ac3", "description": "Global --api-url and --format flags" },
+          { "id": "ac4", "description": "Configurable via FORGE_API_URL env var" }
+        ],
+        "specification": {
+          "architecture": {
+            "library": "commander",
+            "entry_point": "bin/forge"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s2",
+        "title": "Create API client for CLI",
+        "scope": "forge-core",
+        "description": "HTTP client for calling Forge API",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeApiClient class with all API methods" },
+          { "id": "ac2", "description": "Configurable base URL" },
+          { "id": "ac3", "description": "Error handling with descriptive messages" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "HTTP client wrapper"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s3",
+        "title": "Implement run commands",
+        "scope": "forge-core",
+        "description": "Commands for run management",
+        "dependencies": ["fc-s1", "fc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "forge run start <plan.json> - POST /runs with ForgePlan" },
+          { "id": "ac2", "description": "forge run list - GET /runs, display as table" },
+          { "id": "ac3", "description": "forge run status <run_id> - GET /runs/:id, show tasks" },
+          { "id": "ac4", "description": "forge run pause/resume/cancel - POST /runs/:id/pause etc." }
+        ],
+        "specification": {
+          "output": {
+            "list": "Table with run_id, plan_id, status, created_at",
+            "status": "Run details + task list"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s4",
+        "title": "Implement trajectory commands",
+        "scope": "forge-core",
+        "description": "Commands for trajectory viewing and export",
+        "dependencies": ["fc-s1", "fc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "forge trajectory show <run_id> - GET /runs/:id/trajectory" },
+          { "id": "ac2", "description": "forge trajectory show <run_id> <task_id> - filter by task" },
+          { "id": "ac3", "description": "forge trajectory export <run_id> --format json|markdown" },
+          { "id": "ac4", "description": "forge trajectory decisions <run_id> - filter to decision_recorded events" }
+        ],
+        "specification": {
+          "output": {
+            "show": "Timeline of events",
+            "export": "Full trajectory in requested format"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s5",
+        "title": "Implement gate commands",
+        "scope": "forge-core",
+        "description": "Commands for gate management",
+        "dependencies": ["fc-s1", "fc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "forge gate list - GET /gates/pending" },
+          { "id": "ac2", "description": "forge gate approve <task_id> [--comment '...'] - POST /gates/:taskId/approve" },
+          { "id": "ac3", "description": "forge gate reject <task_id> --reason '...' - POST /gates/:taskId/reject" }
+        ],
+        "specification": {
+          "output": {
+            "list": "Table with gate_id, task_title, run_id, approver_role"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s6",
+        "title": "Implement question commands",
+        "scope": "forge-core",
+        "description": "Commands for question queue management",
+        "dependencies": ["fc-s1", "fc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "forge question list - GET /questions/pending" },
+          { "id": "ac2", "description": "forge question answer <question_id> <answer> - POST /questions/:id/answer" },
+          { "id": "ac3", "description": "Interactive mode: prompt for answer if not provided" }
+        ],
+        "specification": {
+          "output": {
+            "list": "Table with question_id, text, blocking_level, priority_score"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s7",
+        "title": "Add output formatting",
+        "scope": "forge-core",
+        "description": "Support multiple output formats",
+        "dependencies": ["fc-s3", "fc-s4", "fc-s5", "fc-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Table format using cli-table3 or similar" },
+          { "id": "ac2", "description": "JSON format (raw API response)" },
+          { "id": "ac3", "description": "Markdown format for trajectory export" },
+          { "id": "ac4", "description": "--format flag on all commands" }
+        ],
+        "specification": {
+          "architecture": {
+            "library": "cli-table3 for tables"
+          }
+        }
+      },
+      {
+        "step_id": "fc-s8",
+        "title": "Create package binary",
+        "scope": "forge-core",
+        "description": "Package CLI as executable binary",
+        "dependencies": ["fc-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "bin/forge entry point in package.json" },
+          { "id": "ac2", "description": "npx forge works after npm install" },
+          { "id": "ac3", "description": "--help shows all commands and options" }
+        ],
+        "specification": {
+          "architecture": {
+            "bin": "bin/forge -> dist/cli/index.js"
+          }
+        }
+      }
+    ]
+  }
+}

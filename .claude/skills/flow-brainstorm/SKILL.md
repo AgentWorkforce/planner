@@ -5,13 +5,14 @@ user-invocable: false
 ---
 # Brainstorm: Idea → Feature Catalog
 
-**Owns**: `catalog.json`, feature `summary` section
+**Owns**: `catalog.json`, feature `summary` section, initial `understanding` and `context`
 
 ## Purpose
 
 Transform a vague idea into a processable, approved feature set by:
 - Clarifying goal, scope, constraints, success criteria
 - Exploring 2–3 approaches with trade-offs
+- Capturing initial observations and decisions
 - Producing catalog + feature files
 
 ## Output
@@ -26,6 +27,7 @@ Transform a vague idea into a processable, approved feature set by:
 - MVP by default; expand scope only when required by success criteria.
 - Persist decisions into files—no chat-only conclusions.
 - Acceptance criteria must be **assertions** (checkable outcomes), not tasks.
+- Capture observations and decisions in `understanding` and `context` sections.
 - After completion: single-sentence summary unless user requests more.
 
 ## Workflow
@@ -63,9 +65,31 @@ Collect until writable:
 For each approach: what it optimizes for, major trade-offs, risks.
 User chooses or accepts recommendation.
 
-### 5. Create Features
+**Capture observations**: As you explore approaches, note insights in `understanding`:
+- What patterns might apply?
+- What questions need answers?
+- What concerns emerged?
 
-Create feature files with `summary` section filled:
+### 5. Record Decisions
+
+When decisions are made during brainstorming, capture them in `context`:
+
+```json
+"context": {
+  "architect": {
+    "approach": "REST API with SQLite",
+    "rationale": "Simple, portable, no external dependencies"
+  },
+  "designer": {
+    "library": "shadcn/ui",
+    "theme": "dark mode by default"
+  }
+}
+```
+
+### 6. Create Features
+
+Create feature files with `summary`, `understanding`, and `context` sections:
 
 ```json
 {
@@ -82,6 +106,22 @@ Create feature files with `summary` section filled:
       { "id": "ac2", "description": "Invalid credentials show clear error" }
     ]
   },
+  "understanding": {
+    "architect": {
+      "observations": ["JWT tokens for session management", "Rate limiting needed"],
+      "questions": ["OAuth integration later?"],
+      "confidence": "forming"
+    }
+  },
+  "context": {
+    "architect": {
+      "auth_method": "JWT",
+      "session_duration": "7 days"
+    },
+    "security": {
+      "rate_limiting": "5 attempts per minute"
+    }
+  },
   "plan_implementation": {
     "scopes": ["backend", "frontend"],
     "steps": []
@@ -89,31 +129,72 @@ Create feature files with `summary` section filled:
 }
 ```
 
-### 6. Set Dependencies and Priority
+### 7. Set Dependencies and Priority
 
 For each feature:
 - `dependencies`: which features must complete first (creates DAG)
 - `priority`: critical/high/medium/low based on value and risk
 
-### 7. Organize as Epics
+### 8. Organize as Epics
 
 Group related features under epics:
 - Create epic file with `type: "epic"` and `sub_features` array
 - **Inline** if anticipated complexity is low (simple flow, few scopes)
 - **Separate file** if complex (multi-path flows, multiple scopes, high-risk)
 
-### 8. Approve
+### 9. Approve
 
 When feature list is stable:
 - Set `catalog.status = "approved"`
 - Set each feature's `status = "approved"`
+
+## Understanding During Brainstorm
+
+As you brainstorm, capture observations by role:
+
+| Role | What to capture |
+|------|-----------------|
+| architect | Tech decisions, patterns, integration points |
+| designer | UI/UX preferences, component choices |
+| tester | Testability concerns, edge cases identified |
+| security | Auth needs, data sensitivity, compliance |
+
+Example:
+```json
+"understanding": {
+  "architect": {
+    "observations": ["REST API pattern fits well", "May need WebSocket for real-time"],
+    "keywords": ["REST", "CRUD", "real-time"],
+    "questions": ["Should we support offline mode?"],
+    "concerns": ["Scaling if user count grows 10x"],
+    "confidence": "forming"
+  }
+}
+```
+
+## Context During Brainstorm
+
+When decisions are made (even tentative), record them:
+
+```json
+"context": {
+  "architect": {
+    "api_style": "REST with JSON",
+    "storage": "SQLite for MVP, PostgreSQL later"
+  },
+  "designer": {
+    "library": "shadcn/ui",
+    "dark_mode": "default"
+  }
+}
+```
 
 ## Fits the Whole
 
 | Skill | Section |
 |-------|---------|
 | flow-discover | `summary` (from code) |
-| **flow-brainstorm** | `summary` (from ideas) |
+| **flow-brainstorm** | `summary`, `understanding`, `context` (from ideas) |
 | flow-planner | `plan_implementation` |
 | flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
@@ -132,5 +213,7 @@ When feature list is stable:
 
 - Catalog exists with components (if multi-component)
 - Each feature has: goal, acceptance criteria, priority
+- Key observations captured in `understanding` (at least architect role)
+- Key decisions captured in `context` (any that were made)
 - Epics group related features logically
 - Unknowns are explicitly marked

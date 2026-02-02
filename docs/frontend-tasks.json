@@ -1,0 +1,550 @@
+{
+  "epic": "ideation-ui",
+  "total_tasks": 54,
+  "task_range": "#163-#216",
+  "generated": "2026-02-01",
+  "features": [
+    {
+      "feature_id": "ideation-ui-layout",
+      "tasks": "#163-#175",
+      "dependencies": []
+    },
+    {
+      "feature_id": "ideation-ui-session-list",
+      "tasks": "#176-#187",
+      "dependencies": ["ideation-ui-layout"]
+    },
+    {
+      "feature_id": "ideation-ui-chat",
+      "tasks": "#188-#203",
+      "dependencies": ["ideation-ui-layout"]
+    },
+    {
+      "feature_id": "ideation-ui-specialists-panel",
+      "tasks": "#204-#216",
+      "dependencies": ["ideation-ui-layout"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": 163,
+      "type": "PRE",
+      "subject": "[PRE] Analyze before ideation-ui-layout",
+      "activeForm": "Analyzing ideation-ui-layout",
+      "feature": "ideation-ui-layout",
+      "blockedBy": [],
+      "description": "Feature: ideation-ui-layout\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO:\n1. Run /cost and report the ACTUAL percentage. If > 50%, run /compact first\n2. Read the feature file to understand goal and acceptance criteria\n3. Check packages/planner-ui/ for patterns to copy (design system, components)\n4. Review vite.config.ts, tailwind.config.cjs, globals.css in planner-ui\n5. Identify any risks or blockers before implementing\n\nYou MUST state the actual context percentage. DO NOT proceed until you've reported it."
+    },
+    {
+      "id": 164,
+      "type": "IMPL",
+      "subject": "[IMPL] Initialize ideation-ui package (lay001)",
+      "activeForm": "Initializing ideation-ui package",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay001",
+      "blockedBy": [163],
+      "description": "Feature: ideation-ui-layout\nStep: lay001 - Initialize ideation-ui package\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- packages/ideation-ui/ with package.json, tsconfig.json, vite.config.ts\n- Dependencies: react, react-dom, react-router-dom, tailwindcss, @radix-ui/*, clsx, tailwind-merge\n- Copy vite.config.ts from planner-ui (proxy settings, aliases)\n- src/main.tsx with BrowserRouter setup\n\nLocation: packages/ideation-ui/"
+    },
+    {
+      "id": 165,
+      "type": "IMPL",
+      "subject": "[IMPL] Copy design system files from planner-ui (lay002)",
+      "activeForm": "Copying design system files",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay002",
+      "blockedBy": [164],
+      "description": "Feature: ideation-ui-layout\nStep: lay002 - Copy design system files from planner-ui\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Copy globals.css with all CSS variables (colors, shadows, etc.)\n- Copy tailwind.config.cjs with theme extensions\n- Copy src/lib/utils.ts (cn function for class merging)\n- Add ideation-specific variables: --specialists-panel-width\n\nLocation: packages/ideation-ui/"
+    },
+    {
+      "id": 166,
+      "type": "IMPL",
+      "subject": "[IMPL] Copy common UI components from planner-ui (lay003)",
+      "activeForm": "Copying common UI components",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay003",
+      "blockedBy": [165],
+      "description": "Feature: ideation-ui-layout\nStep: lay003 - Copy common UI components from planner-ui\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Copy components/ui/button.tsx\n- Copy components/ui/dialog.tsx (for modals)\n- Copy components/ui/textarea.tsx\n- Copy components/ui/badge.tsx\n- Copy components/LoadingSpinner.tsx\n- Copy components/icons/ directory (all SVG icon components)\n\nNote: These are candidates for shared-ui extraction later\n\nLocation: packages/ideation-ui/src/components/"
+    },
+    {
+      "id": 167,
+      "type": "IMPL",
+      "subject": "[IMPL] Create IdeationLayout component (lay004)",
+      "activeForm": "Creating IdeationLayout component",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay004",
+      "blockedBy": [166],
+      "description": "Feature: ideation-ui-layout\nStep: lay004 - Create IdeationLayout component\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- IdeationLayout accepts: sidebar, children (main), panel props\n- Left sidebar: fixed width (var(--sidebar-width)), full height, bg-bg-secondary\n- Main area: flex-1, overflow-y-auto\n- Right panel: fixed width (var(--specialists-panel-width)), collapsible\n\nLocation: packages/ideation-ui/src/components/layout/IdeationLayout.tsx"
+    },
+    {
+      "id": 168,
+      "type": "IMPL",
+      "subject": "[IMPL] Implement responsive panel collapse (lay005)",
+      "activeForm": "Implementing responsive panel collapse",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay005",
+      "blockedBy": [167],
+      "description": "Feature: ideation-ui-layout\nStep: lay005 - Implement responsive panel collapse\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useMediaQuery hook or Tailwind breakpoints hide panel < 1024px\n- Toggle button in header to show/hide panel manually\n- Panel state persisted to localStorage\n\nLocation: packages/ideation-ui/src/components/layout/"
+    },
+    {
+      "id": 169,
+      "type": "IMPL",
+      "subject": "[IMPL] Create sidebar navigation structure (lay006)",
+      "activeForm": "Creating sidebar navigation",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay006",
+      "blockedBy": [167],
+      "description": "Feature: ideation-ui-layout\nStep: lay006 - Create sidebar navigation structure\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Header: 'Ideation' title + New Session button\n- Body: scrollable area for SessionList component\n- Footer: optional settings/help links\n\nLocation: packages/ideation-ui/src/components/layout/"
+    },
+    {
+      "id": 170,
+      "type": "IMPL",
+      "subject": "[IMPL] Set up React Router routes (lay007)",
+      "activeForm": "Setting up routes",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay007",
+      "blockedBy": [167],
+      "description": "Feature: ideation-ui-layout\nStep: lay007 - Set up React Router routes\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- / - sessions list (default, shows empty state or list)\n- /session/:id - session chat view\n- All routes wrapped in IdeationLayout\n\nLocation: packages/ideation-ui/src/App.tsx"
+    },
+    {
+      "id": 171,
+      "type": "IMPL",
+      "subject": "[IMPL] Create API client hook (lay008)",
+      "activeForm": "Creating API client hook",
+      "feature": "ideation-ui-layout",
+      "step_id": "lay008",
+      "blockedBy": [164],
+      "description": "Feature: ideation-ui-layout\nStep: lay008 - Create API client hook\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- API_BASE_URL from environment variable\n- Methods: getSessions, getSession, createSession, sendMessage, sendToPlanner, abandon\n- Returns { data, loading, error } pattern\n\nCross-scope contract:\n- Consumes: ideation-api endpoints\n- Base URL: /api/ideation\n\nLocation: packages/ideation-ui/src/hooks/useIdeationApi.ts"
+    },
+    {
+      "id": 172,
+      "type": "POST",
+      "subject": "[POST] Review ideation-ui-layout changes",
+      "activeForm": "Reviewing ideation-ui-layout",
+      "feature": "ideation-ui-layout",
+      "blockedBy": [168, 169, 170, 171],
+      "description": "Feature: ideation-ui-layout\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO: Review this code as if it were a PR from another developer.\n\n1. Re-read ALL code written or modified for this feature\n2. Look for:\n   - Bugs, logic errors, off-by-one mistakes\n   - Missing edge cases or error handling\n   - Inconsistent patterns vs existing codebase\n   - Security issues (injection, auth, data exposure)\n   - Performance concerns (unnecessary re-renders, missing useMemo)\n   - Code that could be clearer or simpler\n3. Make fixes and improvements—don't just note them\n\nBe critical. If you wouldn't approve this PR, fix it before marking complete."
+    },
+    {
+      "id": 173,
+      "type": "VERIFY",
+      "subject": "[VERIFY] Check ideation-ui-layout criteria",
+      "activeForm": "Verifying ideation-ui-layout",
+      "feature": "ideation-ui-layout",
+      "blockedBy": [172],
+      "description": "Feature: ideation-ui-layout\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO:\n1. Read the feature's acceptance_criteria from the file\n2. For EACH criterion: confirm it is met (not assumed)\n3. Run relevant tests (typecheck, build, visual check)\n4. If any criterion is NOT met, fix it before marking complete\n\nList each criterion and its status in your response.\n\nAcceptance criteria to verify:\n- ac1: Left sidebar contains navigation (sessions list, new session button)\n- ac2: Center area is the main content (chat or session details)\n- ac3: Right sidebar shows specialists panel (collapsible)\n- ac4: Layout uses Mission Control design system\n- ac5: Responsive breakpoints handled (hide right sidebar on smaller screens)"
+    },
+    {
+      "id": 174,
+      "type": "DOC",
+      "subject": "[DOC] Document ideation-ui-layout completion",
+      "activeForm": "Documenting ideation-ui-layout",
+      "feature": "ideation-ui-layout",
+      "blockedBy": [173],
+      "description": "Feature: ideation-ui-layout\nFile: docs/flow/features/ideation-ui-layout.json\n\nDO:\n1. Compare what you built to the plan_implementation.steps\n2. If implementation diverged from plan, run `/flow change-request`\n3. Update feature status if complete\n\nMark complete only if implementation matches plan (or change request filed)."
+    },
+    {
+      "id": 175,
+      "type": "CHECKPOINT",
+      "subject": "[CHECKPOINT] Context check after ideation-ui-layout",
+      "activeForm": "Checking context",
+      "feature": "ideation-ui-layout",
+      "blockedBy": [174],
+      "description": "Feature: ideation-ui-layout complete.\n\nDO:\n1. Run /cost and report the ACTUAL percentage shown\n2. If > 50%, run /compact before marking complete\n3. Mark complete only after reporting the actual number\n\nYou MUST state the actual context percentage. \"Context is fine\" without a number = task NOT complete."
+    },
+    {
+      "id": 176,
+      "type": "PRE",
+      "subject": "[PRE] Analyze before ideation-ui-session-list",
+      "activeForm": "Analyzing ideation-ui-session-list",
+      "feature": "ideation-ui-session-list",
+      "blockedBy": [175],
+      "description": "Feature: ideation-ui-session-list\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO:\n1. Run /cost and report the ACTUAL percentage. If > 50%, run /compact first\n2. Read the feature file to understand goal and acceptance criteria\n3. Review the IdeationLayout sidebar slot where SessionList will be integrated\n4. Check API endpoints available: GET /api/ideation/sessions, POST /api/ideation/sessions\n5. Identify risks or blockers before implementing\n\nYou MUST state the actual context percentage. DO NOT proceed until you've reported it."
+    },
+    {
+      "id": 177,
+      "type": "IMPL",
+      "subject": "[IMPL] Create useSessions hook (ses001)",
+      "activeForm": "Creating useSessions hook",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses001",
+      "blockedBy": [176],
+      "description": "Feature: ideation-ui-session-list\nStep: ses001 - Create useSessions hook\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useSessions() returns { sessions: Session[], loading, error, refetch }\n- Calls GET /api/ideation/sessions on mount\n- Sessions sorted by updated_at DESC\n\nLocation: packages/ideation-ui/src/hooks/useSessions.ts"
+    },
+    {
+      "id": 178,
+      "type": "IMPL",
+      "subject": "[IMPL] Create SessionStatusBadge component (ses002)",
+      "activeForm": "Creating SessionStatusBadge",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses002",
+      "blockedBy": [176],
+      "description": "Feature: ideation-ui-session-list\nStep: ses002 - Create SessionStatusBadge component\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- SessionStatusBadge({ status, sendCount }) renders colored badge\n- active: bg-accent-cyan/20 text-accent-cyan\n- abandoned: bg-bg-tertiary text-text-muted\n- If sendCount > 0: shows linked plan icon with count badge if > 1\n\nLocation: packages/ideation-ui/src/components/sessions/SessionStatusBadge.tsx"
+    },
+    {
+      "id": 179,
+      "type": "IMPL",
+      "subject": "[IMPL] Create SessionItem component (ses003)",
+      "activeForm": "Creating SessionItem",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses003",
+      "blockedBy": [178],
+      "description": "Feature: ideation-ui-session-list\nStep: ses003 - Create SessionItem component\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- SessionItem({ session, isActive }) renders title, badge, timestamp\n- Title truncated from initial_intent (first 50 chars)\n- Hover state: bg-bg-tertiary\n- Active state: border-l-2 border-accent-cyan\n- onClick navigates to /session/:id\n\nLocation: packages/ideation-ui/src/components/sessions/SessionItem.tsx"
+    },
+    {
+      "id": 180,
+      "type": "IMPL",
+      "subject": "[IMPL] Create SessionList component (ses004)",
+      "activeForm": "Creating SessionList",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses004",
+      "blockedBy": [177, 179],
+      "description": "Feature: ideation-ui-session-list\nStep: ses004 - Create SessionList component\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- SessionList renders SessionItem for each session\n- Loading state: skeleton items\n- Empty state: illustration + 'Start your first brainstorm' message\n- Error state: error message with retry button\n\nLocation: packages/ideation-ui/src/components/sessions/SessionList.tsx"
+    },
+    {
+      "id": 181,
+      "type": "IMPL",
+      "subject": "[IMPL] Create NewSessionModal component (ses005)",
+      "activeForm": "Creating NewSessionModal",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses005",
+      "blockedBy": [176],
+      "description": "Feature: ideation-ui-session-list\nStep: ses005 - Create NewSessionModal component\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Modal with textarea for initial intent\n- Placeholder: 'What would you like to build or explore?'\n- Submit calls POST /api/ideation/sessions\n- On success: navigates to /session/:newId, closes modal\n- Loading state on submit button\n\nLocation: packages/ideation-ui/src/components/sessions/NewSessionModal.tsx"
+    },
+    {
+      "id": 182,
+      "type": "IMPL",
+      "subject": "[IMPL] Create NewSessionButton component (ses006)",
+      "activeForm": "Creating NewSessionButton",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses006",
+      "blockedBy": [181],
+      "description": "Feature: ideation-ui-session-list\nStep: ses006 - Create NewSessionButton component\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Button with + icon and 'New Session' text\n- Opens NewSessionModal on click\n- Uses primary button style (bg-accent-cyan)\n\nLocation: packages/ideation-ui/src/components/sessions/NewSessionButton.tsx"
+    },
+    {
+      "id": 183,
+      "type": "IMPL",
+      "subject": "[IMPL] Integrate SessionList into sidebar (ses007)",
+      "activeForm": "Integrating SessionList",
+      "feature": "ideation-ui-session-list",
+      "step_id": "ses007",
+      "blockedBy": [180, 182],
+      "description": "Feature: ideation-ui-session-list\nStep: ses007 - Integrate SessionList into sidebar\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Sidebar renders NewSessionButton in header\n- Sidebar renders SessionList in body\n- Current session highlighted based on route params\n\nLocation: packages/ideation-ui/src/components/layout/IdeationLayout.tsx (update)"
+    },
+    {
+      "id": 184,
+      "type": "POST",
+      "subject": "[POST] Review ideation-ui-session-list changes",
+      "activeForm": "Reviewing ideation-ui-session-list",
+      "feature": "ideation-ui-session-list",
+      "blockedBy": [183],
+      "description": "Feature: ideation-ui-session-list\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO: Review this code as if it were a PR from another developer.\n\n1. Re-read ALL code written or modified for this feature\n2. Look for:\n   - Bugs, logic errors, off-by-one mistakes\n   - Missing edge cases or error handling\n   - Inconsistent patterns vs existing codebase\n   - Performance concerns (unnecessary re-renders)\n   - Accessibility issues (keyboard nav, ARIA)\n3. Make fixes and improvements—don't just note them\n\nBe critical. If you wouldn't approve this PR, fix it before marking complete."
+    },
+    {
+      "id": 185,
+      "type": "VERIFY",
+      "subject": "[VERIFY] Check ideation-ui-session-list criteria",
+      "activeForm": "Verifying ideation-ui-session-list",
+      "feature": "ideation-ui-session-list",
+      "blockedBy": [184],
+      "description": "Feature: ideation-ui-session-list\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO:\n1. Read the feature's acceptance_criteria from the file\n2. For EACH criterion: confirm it is met (not assumed)\n3. Run typecheck and verify visual appearance\n4. If any criterion is NOT met, fix it before marking complete\n\nAcceptance criteria to verify:\n- ac1: Sessions listed with title (from initial_intent) and status badge\n- ac2: Status badges: active (cyan), abandoned (muted)\n- ac3: Sessions with planner_sends.length > 0 show 'Sent to Planner' indicator\n- ac4: 'New Session' button creates session with initial intent prompt\n- ac5: Clicking session navigates to chat view\n- ac6: Sessions sorted by updated_at (most recent first)\n- ac7: Empty state shown when no sessions exist"
+    },
+    {
+      "id": 186,
+      "type": "DOC",
+      "subject": "[DOC] Document ideation-ui-session-list completion",
+      "activeForm": "Documenting ideation-ui-session-list",
+      "feature": "ideation-ui-session-list",
+      "blockedBy": [185],
+      "description": "Feature: ideation-ui-session-list\nFile: docs/flow/features/ideation-ui-session-list.json\n\nDO:\n1. Compare what you built to the plan_implementation.steps\n2. If implementation diverged from plan, run `/flow change-request`\n3. Update feature status if complete\n\nMark complete only if implementation matches plan (or change request filed)."
+    },
+    {
+      "id": 187,
+      "type": "CHECKPOINT",
+      "subject": "[CHECKPOINT] Context check after ideation-ui-session-list",
+      "activeForm": "Checking context",
+      "feature": "ideation-ui-session-list",
+      "blockedBy": [186],
+      "description": "Feature: ideation-ui-session-list complete.\n\nDO:\n1. Run /cost and report the ACTUAL percentage shown\n2. If > 50%, run /compact before marking complete\n3. Mark complete only after reporting the actual number\n\nYou MUST state the actual context percentage. \"Context is fine\" without a number = task NOT complete."
+    },
+    {
+      "id": 188,
+      "type": "PRE",
+      "subject": "[PRE] Analyze before ideation-ui-chat",
+      "activeForm": "Analyzing ideation-ui-chat",
+      "feature": "ideation-ui-chat",
+      "blockedBy": [175],
+      "description": "Feature: ideation-ui-chat\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO:\n1. Run /cost and report the ACTUAL percentage. If > 50%, run /compact first\n2. Read the feature file to understand goal and acceptance criteria\n3. Review MessagingSidebar patterns in planner-ui for reusable patterns\n4. Check API endpoints: GET /api/ideation/sessions/:id, POST /api/ideation/sessions/:id/messages, GET /api/ideation/sessions/:id/events (SSE)\n5. Identify risks or blockers before implementing\n\nYou MUST state the actual context percentage. DO NOT proceed until you've reported it."
+    },
+    {
+      "id": 189,
+      "type": "IMPL",
+      "subject": "[IMPL] Create useSession hook (cht001)",
+      "activeForm": "Creating useSession hook",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht001",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht001 - Create useSession hook\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useSession(sessionId) returns { session, loading, error, refetch }\n- Calls GET /api/ideation/sessions/:id\n- Session includes transcript[] and understanding\n\nLocation: packages/ideation-ui/src/hooks/useSession.ts"
+    },
+    {
+      "id": 190,
+      "type": "IMPL",
+      "subject": "[IMPL] Create useSessionEvents hook (cht002)",
+      "activeForm": "Creating useSessionEvents hook",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht002",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht002 - Create useSessionEvents hook\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useSessionEvents(sessionId, handlers) subscribes to SSE\n- Connects to GET /api/ideation/sessions/:id/events\n- Handlers: onTranscript, onUnderstanding, onStatus, onConfidence\n- Auto-reconnect on connection loss\n- Cleanup on unmount\n\nCross-scope contract:\n- Consumes: ideation-api SSE endpoint\n- Event types: transcript_updated, understanding_updated, status_changed, confidence_changed\n\nLocation: packages/ideation-ui/src/hooks/useSessionEvents.ts"
+    },
+    {
+      "id": 191,
+      "type": "IMPL",
+      "subject": "[IMPL] Create ChatBubble component (cht003)",
+      "activeForm": "Creating ChatBubble",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht003",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht003 - Create ChatBubble component\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- ChatBubble({ message }) renders bubble with content\n- user role: right-aligned, bg-accent-cyan/20\n- assistant role: left-aligned, bg-bg-tertiary, Interviewer avatar\n- Timestamp shown subtly below bubble\n\nLocation: packages/ideation-ui/src/components/chat/ChatBubble.tsx"
+    },
+    {
+      "id": 192,
+      "type": "IMPL",
+      "subject": "[IMPL] Create ChatMessageList component (cht004)",
+      "activeForm": "Creating ChatMessageList",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht004",
+      "blockedBy": [191],
+      "description": "Feature: ideation-ui-chat\nStep: cht004 - Create ChatMessageList component\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- ChatMessageList({ messages }) renders ChatBubble for each\n- Auto-scroll to bottom when new messages arrive\n- useRef for scroll container, scrollIntoView on update\n- Loading skeleton when initial load\n\nLocation: packages/ideation-ui/src/components/chat/ChatMessageList.tsx"
+    },
+    {
+      "id": 193,
+      "type": "IMPL",
+      "subject": "[IMPL] Create ChatInput component (cht005)",
+      "activeForm": "Creating ChatInput",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht005",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht005 - Create ChatInput component\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Textarea that grows up to 4 lines\n- Send button (arrow icon) enabled when text present\n- Enter to send, Shift+Enter for newline\n- onSend(content) callback prop\n- Disabled state when sending (loading)\n\nLocation: packages/ideation-ui/src/components/chat/ChatInput.tsx"
+    },
+    {
+      "id": 194,
+      "type": "IMPL",
+      "subject": "[IMPL] Create useSendMessage hook (cht006)",
+      "activeForm": "Creating useSendMessage hook",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht006",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht006 - Create useSendMessage hook\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useSendMessage(sessionId) returns { send, sending }\n- send(content) calls POST /api/ideation/sessions/:id/messages\n- Optimistically adds user message to local state\n- sending boolean for loading indicator\n\nLocation: packages/ideation-ui/src/hooks/useSendMessage.ts"
+    },
+    {
+      "id": 195,
+      "type": "IMPL",
+      "subject": "[IMPL] Create ConfidenceBar component (cht007)",
+      "activeForm": "Creating ConfidenceBar",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht007",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht007 - Create ConfidenceBar component\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- ConfidenceBar({ score }) renders segmented bar (5 segments)\n- 0-20: 1 segment filled (red)\n- 21-40: 2 segments (red-orange)\n- 41-60: 3 segments (orange)\n- 61-80: 4 segments (yellow-green)\n- 81-100: 5 segments (green)\n- Tooltip shows breakdown by specialist\n\nLocation: packages/ideation-ui/src/components/chat/ConfidenceBar.tsx"
+    },
+    {
+      "id": 196,
+      "type": "IMPL",
+      "subject": "[IMPL] Create useConfidence hook (cht008)",
+      "activeForm": "Creating useConfidence hook",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht008",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht008 - Create useConfidence hook\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useConfidence(sessionId) returns { score, breakdown, loading }\n- Fetches GET /api/ideation/sessions/:id/confidence\n- Updates via SSE confidence_changed events\n\nLocation: packages/ideation-ui/src/hooks/useConfidence.ts"
+    },
+    {
+      "id": 197,
+      "type": "IMPL",
+      "subject": "[IMPL] Create ChatHeader component (cht009)",
+      "activeForm": "Creating ChatHeader",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht009",
+      "blockedBy": [195, 196],
+      "description": "Feature: ideation-ui-chat\nStep: cht009 - Create ChatHeader component\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Shows session title (truncated initial_intent)\n- Shows ConfidenceBar with current aggregate score\n- 'Send to Planner' button with color matching confidence (red/orange/green)\n- Button always enabled (advisory confidence, not blocking)\n- If session.planner_sends.length > 0, show 'Update Plan' instead of 'Send to Planner'\n\nLocation: packages/ideation-ui/src/components/chat/ChatHeader.tsx"
+    },
+    {
+      "id": 198,
+      "type": "IMPL",
+      "subject": "[IMPL] Create TypingIndicator component (cht010)",
+      "activeForm": "Creating TypingIndicator",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht010",
+      "blockedBy": [188],
+      "description": "Feature: ideation-ui-chat\nStep: cht010 - Create TypingIndicator component\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Three animated dots in a bubble\n- Shown after user sends message until response arrives\n- Left-aligned like assistant messages\n\nLocation: packages/ideation-ui/src/components/chat/TypingIndicator.tsx"
+    },
+    {
+      "id": 199,
+      "type": "IMPL",
+      "subject": "[IMPL] Create SessionChatView page (cht011)",
+      "activeForm": "Creating SessionChatView",
+      "feature": "ideation-ui-chat",
+      "step_id": "cht011",
+      "blockedBy": [189, 190, 192, 193, 194, 197, 198],
+      "description": "Feature: ideation-ui-chat\nStep: cht011 - Create SessionChatView page\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- Route: /session/:id\n- Uses useSession for initial data\n- Uses useSessionEvents to update transcript in real-time\n- Renders ChatHeader, ChatMessageList, ChatInput\n- Shows TypingIndicator when waiting for response\n- 404 state if session not found\n\nLocation: packages/ideation-ui/src/pages/SessionChatView.tsx"
+    },
+    {
+      "id": 200,
+      "type": "POST",
+      "subject": "[POST] Review ideation-ui-chat changes",
+      "activeForm": "Reviewing ideation-ui-chat",
+      "feature": "ideation-ui-chat",
+      "blockedBy": [199],
+      "description": "Feature: ideation-ui-chat\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO: Review this code as if it were a PR from another developer.\n\n1. Re-read ALL code written or modified for this feature\n2. Look for:\n   - Race conditions in SSE + API calls\n   - Memory leaks (missing cleanup)\n   - Infinite re-render loops\n   - Missing error handling for API calls\n   - Accessibility issues (keyboard nav, screen readers)\n3. Make fixes and improvements—don't just note them\n\nBe critical. If you wouldn't approve this PR, fix it before marking complete."
+    },
+    {
+      "id": 201,
+      "type": "VERIFY",
+      "subject": "[VERIFY] Check ideation-ui-chat criteria",
+      "activeForm": "Verifying ideation-ui-chat",
+      "feature": "ideation-ui-chat",
+      "blockedBy": [200],
+      "description": "Feature: ideation-ui-chat\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO:\n1. Read the feature's acceptance_criteria from the file\n2. For EACH criterion: confirm it is met (not assumed)\n3. Run typecheck and test the chat flow manually\n4. If any criterion is NOT met, fix it before marking complete\n\nAcceptance criteria to verify:\n- ac1: Messages displayed in chat bubble format (user right, Interviewer left)\n- ac2: Chat is pure user <-> Interviewer (no specialist messages in transcript)\n- ac3: Text input at bottom with send button\n- ac4: Messages appear in real-time via SSE\n- ac5: Auto-scroll to newest message\n- ac6: Loading indicator while waiting for Interviewer response\n- ac7: Session header shows confidence bar and 'Send to Planner' action"
+    },
+    {
+      "id": 202,
+      "type": "DOC",
+      "subject": "[DOC] Document ideation-ui-chat completion",
+      "activeForm": "Documenting ideation-ui-chat",
+      "feature": "ideation-ui-chat",
+      "blockedBy": [201],
+      "description": "Feature: ideation-ui-chat\nFile: docs/flow/features/ideation-ui-chat.json\n\nDO:\n1. Compare what you built to the plan_implementation.steps\n2. If implementation diverged from plan, run `/flow change-request`\n3. Update feature status if complete\n\nMark complete only if implementation matches plan (or change request filed)."
+    },
+    {
+      "id": 203,
+      "type": "CHECKPOINT",
+      "subject": "[CHECKPOINT] Context check after ideation-ui-chat",
+      "activeForm": "Checking context",
+      "feature": "ideation-ui-chat",
+      "blockedBy": [202],
+      "description": "Feature: ideation-ui-chat complete.\n\nDO:\n1. Run /cost and report the ACTUAL percentage shown\n2. If > 50%, run /compact before marking complete\n3. Mark complete only after reporting the actual number\n\nYou MUST state the actual context percentage. \"Context is fine\" without a number = task NOT complete."
+    },
+    {
+      "id": 204,
+      "type": "PRE",
+      "subject": "[PRE] Analyze before ideation-ui-specialists-panel",
+      "activeForm": "Analyzing ideation-ui-specialists-panel",
+      "feature": "ideation-ui-specialists-panel",
+      "blockedBy": [175],
+      "description": "Feature: ideation-ui-specialists-panel\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO:\n1. Run /cost and report the ACTUAL percentage. If > 50%, run /compact first\n2. Read the feature file to understand goal and acceptance criteria\n3. Understand the freeform understanding schema: Record<string, Record<string, unknown>>\n4. Check how confidence, keywords, concerns are extracted from freeform observations\n5. Identify risks or blockers before implementing\n\nKey insight: Specialists are DYNAMIC (not fixed 5), observations are FREEFORM. Panel must adapt to whatever specialists exist.\n\nYou MUST state the actual context percentage. DO NOT proceed until you've reported it."
+    },
+    {
+      "id": 205,
+      "type": "IMPL",
+      "subject": "[IMPL] Create ConfidenceDots component (pnl001)",
+      "activeForm": "Creating ConfidenceDots",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl001",
+      "blockedBy": [204],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl001 - Create ConfidenceDots component\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- ConfidenceDots({ level }) renders 3 dots\n- exploring: all dots empty/muted (text-accent-purple/30)\n- forming: 2 dots filled (text-warning)\n- confident: all 3 dots filled (text-success)\n- Each dot is 6px circle with appropriate fill\n\nLocation: packages/ideation-ui/src/components/specialists/ConfidenceDots.tsx"
+    },
+    {
+      "id": 206,
+      "type": "IMPL",
+      "subject": "[IMPL] Create specialist icon mapping (pnl002)",
+      "activeForm": "Creating icon mapping",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl002",
+      "blockedBy": [204],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl002 - Create specialist icon mapping\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- getSpecialistIcon(name, roleHint?) returns appropriate icon component\n- Known hints map: 'architecture'->building, 'data'->grid, 'design'->palette, 'test'->flask, 'security'->shield\n- Name matching: 'Architect'->building, 'Designer'->palette, etc. (case-insensitive contains)\n- Fallback: generic brain/lightbulb icon for unknown specialists\n- All icons: currentColor, size prop (default 16px)\n\nLocation: packages/ideation-ui/src/components/specialists/getSpecialistIcon.ts"
+    },
+    {
+      "id": 207,
+      "type": "IMPL",
+      "subject": "[IMPL] Create KeywordTag component (pnl003)",
+      "activeForm": "Creating KeywordTag",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl003",
+      "blockedBy": [204],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl003 - Create KeywordTag component\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- KeywordTag({ keyword }) renders pill-shaped tag\n- Styling: bg-accent-cyan/10 text-accent-cyan text-xs px-2 py-0.5 rounded-full\n- Truncates if keyword > 15 chars\n\nLocation: packages/ideation-ui/src/components/specialists/KeywordTag.tsx"
+    },
+    {
+      "id": 208,
+      "type": "IMPL",
+      "subject": "[IMPL] Create AlertCount component (pnl004)",
+      "activeForm": "Creating AlertCount",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl004",
+      "blockedBy": [204],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl004 - Create AlertCount component\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- AlertCount({ type, count }) renders icon + count\n- type='concern': warning icon, text-warning\n- type='question': help-circle icon, text-accent-purple\n- Hidden when count=0\n\nLocation: packages/ideation-ui/src/components/specialists/AlertCount.tsx"
+    },
+    {
+      "id": 209,
+      "type": "IMPL",
+      "subject": "[IMPL] Create SpecialistCard component (pnl005)",
+      "activeForm": "Creating SpecialistCard",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl005",
+      "blockedBy": [205, 206, 207, 208],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl005 - Create SpecialistCard component\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- SpecialistCard({ name, roleHint, observations }) renders card\n- Header: icon (from mapping) + name + ConfidenceDots (from observations.confidence)\n- Body: KeywordTags from observations.keywords if present (max 5)\n- Footer: AlertCount from observations.concerns and observations.questions if present\n- Empty state if observations is empty object: 'Thinking...'\n- Card styling: bg-bg-card border-border-subtle rounded-lg p-3\n\nNote: observations is Record<string, unknown> - extract confidence, keywords, concerns, questions if they exist\n\nLocation: packages/ideation-ui/src/components/specialists/SpecialistCard.tsx"
+    },
+    {
+      "id": 210,
+      "type": "IMPL",
+      "subject": "[IMPL] Create SpecialistsPanel component (pnl006)",
+      "activeForm": "Creating SpecialistsPanel",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl006",
+      "blockedBy": [209],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl006 - Create SpecialistsPanel component\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- SpecialistsPanel({ understanding, activeSpecialists }) renders panel\n- Header: 'Specialists' title with count badge\n- Body: SpecialistCard for each key in understanding (dynamic count)\n- Footer: total concerns/questions badge (aggregated from all)\n- Empty state when no specialists: 'Specialists will appear as needed'\n\nNote: understanding is Record<string, Record<string, unknown>> - keys are specialist names\n\nLocation: packages/ideation-ui/src/components/specialists/SpecialistsPanel.tsx"
+    },
+    {
+      "id": 211,
+      "type": "IMPL",
+      "subject": "[IMPL] Create useUnderstanding hook (pnl007)",
+      "activeForm": "Creating useUnderstanding hook",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl007",
+      "blockedBy": [204],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl007 - Create useUnderstanding hook\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- useUnderstanding(sessionId) returns { understanding, activeSpecialists }\n- Integrates with useSessionEvents for real-time updates\n- Returns Record<string, Record<string, unknown>> for understanding\n- Returns ActiveSpecialist[] for specialist metadata\n\nLocation: packages/ideation-ui/src/hooks/useUnderstanding.ts"
+    },
+    {
+      "id": 212,
+      "type": "IMPL",
+      "subject": "[IMPL] Integrate panel into IdeationLayout (pnl008)",
+      "activeForm": "Integrating panel",
+      "feature": "ideation-ui-specialists-panel",
+      "step_id": "pnl008",
+      "blockedBy": [210, 211],
+      "description": "Feature: ideation-ui-specialists-panel\nStep: pnl008 - Integrate panel into IdeationLayout\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Implement this step per its acceptance_criteria in the feature file.\n\nAcceptance criteria:\n- SpecialistsPanel rendered in IdeationLayout right slot\n- Receives understanding from useUnderstanding hook\n- Only shown when viewing a session (not on empty state)\n- Respects collapse state from layout\n\nLocation: packages/ideation-ui/src/components/layout/IdeationLayout.tsx (update)"
+    },
+    {
+      "id": 213,
+      "type": "POST",
+      "subject": "[POST] Review ideation-ui-specialists-panel changes",
+      "activeForm": "Reviewing ideation-ui-specialists-panel",
+      "feature": "ideation-ui-specialists-panel",
+      "blockedBy": [212],
+      "description": "Feature: ideation-ui-specialists-panel\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO: Review this code as if it were a PR from another developer.\n\n1. Re-read ALL code written or modified for this feature\n2. Look for:\n   - Type safety issues with freeform Record<string, unknown>\n   - Missing null checks on optional observation fields\n   - Re-render issues when understanding updates\n   - Inconsistent styling with design system\n3. Make fixes and improvements—don't just note them\n\nBe critical. If you wouldn't approve this PR, fix it before marking complete."
+    },
+    {
+      "id": 214,
+      "type": "VERIFY",
+      "subject": "[VERIFY] Check ideation-ui-specialists-panel criteria",
+      "activeForm": "Verifying ideation-ui-specialists-panel",
+      "feature": "ideation-ui-specialists-panel",
+      "blockedBy": [213],
+      "description": "Feature: ideation-ui-specialists-panel\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO:\n1. Read the feature's acceptance_criteria from the file\n2. For EACH criterion: confirm it is met (not assumed)\n3. Run typecheck and verify visual appearance\n4. If any criterion is NOT met, fix it before marking complete\n\nAcceptance criteria to verify:\n- ac1: Panel shows cards for all active_specialists (dynamic count)\n- ac2: Specialist name displayed (from understanding keys)\n- ac3: Confidence extracted from observations.confidence if present\n- ac4: Keywords extracted from observations.keywords if present (max 5 visible)\n- ac5: Concerns/questions extracted from observations if present\n- ac6: Panel updates in real-time as specialists contribute\n- ac7: Empty state when no specialists spawned yet\n- ac8: Panel is collapsible on smaller screens"
+    },
+    {
+      "id": 215,
+      "type": "DOC",
+      "subject": "[DOC] Document ideation-ui-specialists-panel completion",
+      "activeForm": "Documenting ideation-ui-specialists-panel",
+      "feature": "ideation-ui-specialists-panel",
+      "blockedBy": [214],
+      "description": "Feature: ideation-ui-specialists-panel\nFile: docs/flow/features/ideation-ui-specialists-panel.json\n\nDO:\n1. Compare what you built to the plan_implementation.steps\n2. If implementation diverged from plan, run `/flow change-request`\n3. Update feature status if complete\n\nMark complete only if implementation matches plan (or change request filed)."
+    },
+    {
+      "id": 216,
+      "type": "CHECKPOINT",
+      "subject": "[CHECKPOINT] Context check after ideation-ui-specialists-panel",
+      "activeForm": "Checking context",
+      "feature": "ideation-ui-specialists-panel",
+      "blockedBy": [215],
+      "description": "Feature: ideation-ui-specialists-panel complete.\n\nDO:\n1. Run /cost and report the ACTUAL percentage shown\n2. If > 50%, run /compact before marking complete\n3. This completes the ideation-ui epic - consider running `/flow audit` on ideation-ui\n4. Mark complete only after reporting the actual number\n\nYou MUST state the actual context percentage. \"Context is fine\" without a number = task NOT complete."
+    }
+  ]
+}

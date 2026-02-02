@@ -1,0 +1,162 @@
+{
+  "feature_id": "forge-workspace-manager",
+  "title": "Git Worktree Workspace Manager",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-core",
+  "dependencies": ["forge-storage", "forge-domain"],
+
+  "summary": {
+    "goal": "Manage isolated git worktree workspaces for each task. Each task gets its own directory with a unique branch, enabling parallel execution on the same repository.",
+    "acceptance_criteria": [
+      { "id": "fwm-ac1", "description": "createWorkspace(taskId, repoUrl, baseBranch, taskContext) creates worktree at /forge-workspaces/run-X-task-Y/repo" },
+      { "id": "fwm-ac2", "description": "Branch name pattern: forge/run-{runId}-task-{taskId}" },
+      { "id": "fwm-ac3", "description": "Write .forge/context.json with task description, criteria, expected artifacts" },
+      { "id": "fwm-ac4", "description": "Write .forge/mcp-config.json with Forge MCP server connection and task_id" },
+      { "id": "fwm-ac5", "description": "cleanupWorkspace(taskId) removes worktree and branch" },
+      { "id": "fwm-ac6", "description": "Configurable retention: keep workspaces for N hours after completion for debugging" },
+      { "id": "fwm-ac7", "description": "Workspace creation failures throw WorkspaceError with specific type (disk_full, clone_failed, worktree_failed, permission_denied) - task transitions to 'failed' state with error details" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Git worktrees share .git directory - lightweight isolation",
+        "Branch-per-task enables clean PRs and parallel work",
+        "Context file provides agent with all task info without relay round-trip",
+        "MCP config connects agent to Forgemaster for reporting"
+      ],
+      "patterns": [
+        "Worktree lifecycle: create -> use -> cleanup",
+        "Workspace base directory configurable via env var",
+        "Async git operations with proper error handling"
+      ],
+      "keywords": ["git", "worktree", "isolation", "branch"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "workspace_base": "/forge-workspaces (configurable via FORGE_WORKSPACE_BASE)",
+      "branch_pattern": "forge/run-{runId}-task-{taskId}",
+      "context_files": [".forge/context.json", ".forge/mcp-config.json"]
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fwm-s1",
+        "title": "Create WorkspaceManager interface",
+        "scope": "forge-core",
+        "description": "Define interface for workspace lifecycle operations",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "WorkspaceManager interface: createWorkspace(config), cleanupWorkspace(taskId), getWorkspacePath(taskId), scheduleCleanup(taskId, retentionHours)" },
+          { "id": "ac2", "description": "WorkspaceConfig type: { taskId, runId, repoUrl, baseBranch, taskContext: { step_id, title, description, acceptance_criteria[], artifacts_expected? } }" },
+          { "id": "ac3", "description": "WorkspaceResult type: { path, branchName, contextFile, mcpConfigFile }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/interface.ts",
+          "pattern_description": "Interface-first pattern for dependency injection"
+        }
+      },
+      {
+        "step_id": "fwm-s2",
+        "title": "Implement git worktree operations",
+        "scope": "forge-core",
+        "description": "Low-level git worktree add/remove commands via child_process",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "gitWorktreeAdd(repoPath, worktreePath, branchName, baseBranch) creates worktree" },
+          { "id": "ac2", "description": "gitWorktreeRemove(repoPath, worktreePath) removes worktree and optionally branch" },
+          { "id": "ac3", "description": "gitClone(repoUrl, targetPath) clones if repo not cached locally" },
+          { "id": "ac4", "description": "All operations are async and throw GitOperationError with stderr message on failure" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "child_process.execFile with promisify",
+            "error_handling": "Capture stderr, throw GitOperationError with full context including command and stderr"
+          }
+        }
+      },
+      {
+        "step_id": "fwm-s3",
+        "title": "Implement GitWorkspaceManager",
+        "scope": "forge-core",
+        "description": "WorkspaceManager implementation using git worktrees",
+        "dependencies": ["fwm-s1", "fwm-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createWorkspace creates /forge-workspaces/run-{runId}-task-{taskId}/repo directory" },
+          { "id": "ac2", "description": "Branch name pattern: forge/run-{runId}-task-{taskId}" },
+          { "id": "ac3", "description": "Writes .forge/context.json with task description, acceptance criteria" },
+          { "id": "ac4", "description": "Writes .forge/mcp-config.json with Forge MCP server URL and X-Task-ID header" },
+          { "id": "ac5", "description": "cleanupWorkspace removes worktree and optionally deletes branch" }
+        ],
+        "specification": {
+          "architecture": {
+            "base_path": "configurable via FORGE_WORKSPACE_BASE, default /forge-workspaces",
+            "context_file_format": "{ task_id, run_id, step_id, title, description, acceptance_criteria: [{ id, description }] }",
+            "mcp_config_format": "{ mcpServers: { forge: { url: 'http://localhost:3100', headers: { 'X-Task-ID': task_id } } } }"
+          }
+        }
+      },
+      {
+        "step_id": "fwm-s4",
+        "title": "Implement workspace retention policy",
+        "scope": "forge-core",
+        "description": "Keep completed workspaces for configurable period for debugging",
+        "dependencies": ["fwm-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "scheduleCleanup(taskId, retentionHours) records cleanup timestamp via ForgeStorage" },
+          { "id": "ac2", "description": "cleanupExpiredWorkspaces() queries ForgeStorage.getExpiredCleanups() and removes workspaces" },
+          { "id": "ac3", "description": "Configurable default retention (env var FORGE_WORKSPACE_RETENTION_HOURS, default 24)" },
+          { "id": "ac4", "description": "Scheduled cleanup job runs periodically (every hour)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Scheduled cleanup job (setInterval or cron)",
+            "default_retention": "24 hours",
+            "storage": "Uses workspace_cleanup table defined in forge-storage fs-s2"
+          }
+        }
+      },
+      {
+        "step_id": "fwm-s5",
+        "title": "Implement workspace creation error handling",
+        "scope": "forge-core",
+        "description": "Explicit error types and failure handling for workspace creation",
+        "dependencies": ["fwm-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "WorkspaceError class extends Error with type: 'disk_full' | 'clone_failed' | 'worktree_failed' | 'permission_denied'" },
+          { "id": "ac2", "description": "Check disk space before creating workspace (configurable threshold, default 1GB)" },
+          { "id": "ac3", "description": "Retry clone with exponential backoff (up to 3 attempts) - throw after retries exhausted" },
+          { "id": "ac4", "description": "Cleanup partial workspace on failure (remove any created directories)" },
+          { "id": "ac5", "description": "WorkspaceError includes actionable message: 'Workspace creation failed: {type}. {suggestion}'" },
+          { "id": "ac6", "description": "Caller (task queue) catches WorkspaceError and transitions task to 'failed' state with error.message" }
+        ],
+        "specification": {
+          "architecture": {
+            "error_types": {
+              "disk_full": "Disk space below threshold ({available}MB < {required}MB). Free up space or increase FORGE_WORKSPACE_DISK_THRESHOLD.",
+              "clone_failed": "Failed to clone {repoUrl} after 3 attempts. Check network and repository access.",
+              "worktree_failed": "Failed to create worktree: {stderr}. Check git version and repository state.",
+              "permission_denied": "Permission denied writing to {path}. Check FORGE_WORKSPACE_BASE permissions."
+            },
+            "disk_check": "statvfs or df command",
+            "no_silent_fallback": "All failures throw - no 'return null' or 'skip workspace' patterns"
+          }
+        }
+      }
+    ]
+  }
+}
