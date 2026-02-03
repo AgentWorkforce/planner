@@ -5,13 +5,15 @@ user-invocable: false
 ---
 # UI/UX Designer: Feature → Design Spec
 
-**Owns**: `catalog.design_system`, feature `design_spec` section
+**Owns**: `catalog.design_system`, feature `design_spec`, `context.designer`, `understanding.designer`
 
 ## Purpose
 
 Define how the product looks and feels before implementation:
 - Recommend a component library (shadcn, Radix, MUI, etc.)
 - Establish project-wide design patterns
+- Capture design decisions in context
+- Document design observations in understanding
 - Specify views per feature using library components
 
 Gives implementers concrete guidance. Gives validation a spec to check against.
@@ -27,6 +29,8 @@ If no summary → "Run /flow brainstorm or /flow discover first."
 **Be opinionated.** Modern UI has solved patterns. Recommend confidently, explain briefly, ask only when genuine ambiguity exists.
 
 **Use real libraries.** Don't define abstract components—reference actual library components by name.
+
+**Record decisions.** Capture design choices in `context.designer` for future reference.
 
 ## Workflow
 
@@ -66,7 +70,45 @@ Then set `catalog.design_system`:
 }
 ```
 
-### 2. Design Feature Views
+### 2. Record Designer Context
+
+When design decisions are made, capture them in feature's `context.designer`:
+
+```json
+"context": {
+  "designer": {
+    "library": "shadcn/ui",
+    "theme": "dark mode default",
+    "layout": "sidebar + main content",
+    "key_components": ["Card", "DataTable", "Sheet"],
+    "typography": "Inter for body, mono for code"
+  }
+}
+```
+
+This provides feature-level design context that may differ from project-level `design_system`.
+
+### 3. Record Designer Observations
+
+During design analysis, capture observations in `understanding.designer`:
+
+```json
+"understanding": {
+  "designer": {
+    "observations": [
+      "Existing pages use card-based layouts",
+      "Color palette is minimal - blue accent only",
+      "Forms follow vertical stack pattern"
+    ],
+    "keywords": ["card-based", "minimal", "vertical-forms"],
+    "questions": ["Should we add a secondary accent color?"],
+    "concerns": ["Mobile layout may need different approach"],
+    "confidence": "forming"
+  }
+}
+```
+
+### 4. Design Feature Views
 
 For each feature, describe views using library components:
 
@@ -98,7 +140,7 @@ Write to feature's `design_spec`:
 }
 ```
 
-### 3. Extract Shared Patterns
+### 5. Extract Shared Patterns
 
 When a UI pattern appears in 2+ features, extract to `catalog.design_system.patterns`:
 
@@ -119,14 +161,27 @@ Then reference in feature `design_spec`:
 
 **Check before designing**: Does this pattern exist in `catalog.patterns`? Reference it, don't duplicate.
 
-### 4. Flag Custom Components
+### 6. Flag Custom Components
 
 If library lacks something, note in `custom_needed`. These become tasks in flow-planner.
+
+## Context vs Design System
+
+| Level | Location | Purpose |
+|-------|----------|---------|
+| Project | `catalog.design_system` | Global defaults, library choice, patterns |
+| Feature | `feature.context.designer` | Feature-specific design decisions |
+
+Feature context can **override** or **extend** project design system. For example:
+- Project uses shadcn/ui → feature context notes "using Sheet for this modal instead of Dialog"
+- Project has blue accent → feature context notes "adding orange for warning states"
 
 ## Rules
 
 - State recommendations with brief reasoning. Don't over-ask.
 - Reference actual library component names and props.
+- **Record decisions in context.designer** for future reference.
+- **Note observations in understanding.designer** for design rationale.
 - Pause after each feature: "Any changes, or continue?"
 - Keep specs concise—enough to guide implementation, not pixel-perfect.
 - After completion: single-sentence summary.
@@ -135,9 +190,9 @@ If library lacks something, note in `custom_needed`. These become tasks in flow-
 
 | Skill | Reads | Writes |
 |-------|-------|--------|
-| flow-brainstorm | | `summary` |
-| **flow-ui-ux-designer** | `summary` | `catalog.design_system`, `design_spec` |
-| flow-planner | `design_spec` | `plan_implementation` |
+| flow-brainstorm | | `summary`, `understanding`, `context` |
+| **flow-ui-ux-designer** | `summary` | `catalog.design_system`, `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `design_spec`, `context` | `plan_implementation` |
 | flow-ui-ux-validation | `design_spec` | `validation_uiux` |
 
 ## Suggested Next Steps
@@ -152,3 +207,5 @@ If library lacks something, note in `custom_needed`. These become tasks in flow-
 - Components reference library by name
 - Custom components flagged in `custom_needed`
 - Shared patterns extracted to `catalog.design_system.patterns`
+- **Design decisions captured in `context.designer`**
+- **Design observations captured in `understanding.designer`**

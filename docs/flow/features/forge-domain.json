@@ -1,0 +1,222 @@
+{
+  "feature_id": "forge-domain",
+  "title": "Forge Domain Model",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-core",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Define core domain entities for the Forge execution engine: Run, Task, TaskAttempt, Artifact, and their state machines. These types form the foundation for all Forge operations.",
+    "acceptance_criteria": [
+      { "id": "fd-ac1", "description": "Run entity with states: pending, running, paused, completed, failed, cancelled" },
+      { "id": "fd-ac2", "description": "Task entity with states: pending, queued, running, auditing, awaiting_approval, completed, failed, blocked" },
+      { "id": "fd-ac3", "description": "TaskAttempt tracks individual execution attempts with start/end times and outcome" },
+      { "id": "fd-ac4", "description": "Artifact type represents references to produced work (commit, PR, file, deployment)" },
+      { "id": "fd-ac5", "description": "State transitions are validated - invalid transitions throw errors" },
+      { "id": "fd-ac6", "description": "ForgePlan and ForgeStep types define the contract with Planner" },
+      { "id": "fd-ac7", "description": "Run entity includes has_pending_gate flag for gate-based scheduling pause" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Run is the top-level execution unit, contains multiple Tasks",
+        "Task maps 1:1 to a ForgeStep from the plan",
+        "TaskAttempt enables retry tracking - multiple attempts per task",
+        "Artifacts are references, not content - live in their natural homes",
+        "State machines must be explicit and validated",
+        "awaiting_approval state used when human gate is reached",
+        "has_pending_gate flag pauses task scheduling while gate is pending"
+      ],
+      "patterns": [
+        "State machine pattern for Run and Task lifecycle",
+        "Immutable state transitions (log each transition)",
+        "Reference-based artifacts (commit SHA, PR URL, file path)"
+      ],
+      "keywords": ["Run", "Task", "Artifact", "state-machine", "ForgePlan"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "run_states": ["pending", "running", "paused", "completed", "failed", "cancelled"],
+      "task_states": ["pending", "queued", "running", "auditing", "awaiting_approval", "completed", "failed", "blocked"],
+      "artifact_types": ["commit", "pr", "file", "deployment", "test_result"]
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fd-s1",
+        "title": "Create Run status constants and schema",
+        "scope": "forge-core",
+        "description": "Define RunStatus constants and Zod schema for Run entity states",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunStatus const object with: pending, running, paused, completed, failed, cancelled" },
+          { "id": "ac2", "description": "RunStatusSchema Zod enum validates status values" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/status.ts",
+          "pattern_description": "Copy PlanStatus pattern: const object + Zod enum. See lines 1-18."
+        }
+      },
+      {
+        "step_id": "fd-s2",
+        "title": "Create Task status constants and schema",
+        "scope": "forge-core",
+        "description": "Define TaskStatus constants and Zod schema for Task entity states",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskStatus const object with: pending, queued, running, auditing, awaiting_approval, completed, failed, blocked" },
+          { "id": "ac2", "description": "TaskStatusSchema Zod enum validates status values" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/status.ts",
+          "pattern_description": "Same pattern as RunStatus - separate file or combined in forge/domain/status.ts"
+        }
+      },
+      {
+        "step_id": "fd-s3",
+        "title": "Create ForgePlan and ForgeStep schemas",
+        "scope": "forge-core",
+        "description": "Define the contract types that Forge accepts from Planner. These are the input types for creating a Run.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgePlanSchema: { plan_id, version, summary: { goal, context? }, steps: ForgeStep[] }" },
+          { "id": "ac2", "description": "ForgeStepSchema: { step_id, title, description?, scope?, owner_role?, dependencies: string[], acceptance_criteria?: { id, description }[], gate?: { type, approver_role? }, repo_url?: string, cli?: string, audit?: boolean }" },
+          { "id": "ac3", "description": "Export TypeScript types from Zod schemas" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/plan.ts",
+          "pattern_description": "Copy Zod schema pattern with z.object() + z.infer<typeof Schema> for types. See lines 10-39.",
+          "notes": "ForgeStep includes repo_url for workspace creation, cli for agent provider, and audit flag for auditor dispatch"
+        }
+      },
+      {
+        "step_id": "fd-s4",
+        "title": "Create Run entity schema and factory",
+        "scope": "forge-core",
+        "description": "Define Run entity that tracks execution of a ForgePlan",
+        "dependencies": ["fd-s1", "fd-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunSchema: { run_id, plan_id, plan_version, status: RunStatus, has_pending_gate: boolean, started_at?, completed_at?, error?, created_at, updated_at }" },
+          { "id": "ac2", "description": "createRun(forgePlan) factory returns validated Run in 'pending' status with has_pending_gate=false" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/plan.ts:44-54",
+          "pattern_description": "Copy createPlan factory pattern: generate UUID, set timestamps, return validated entity"
+        }
+      },
+      {
+        "step_id": "fd-s5",
+        "title": "Create Task entity schema and factory",
+        "scope": "forge-core",
+        "description": "Define Task entity that tracks execution of a single ForgeStep within a Run",
+        "dependencies": ["fd-s2", "fd-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskSchema: { task_id, run_id, step_id, step_title, status: TaskStatus, dependencies: string[], workspace_path?, agent_id?, current_attempt?, gate_id?, created_at, updated_at }" },
+          { "id": "ac2", "description": "createTask(runId, forgeStep) factory returns validated Task in 'pending' status" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/step.ts",
+          "pattern_description": "Copy createStep factory pattern for generating task_id and setting defaults",
+          "notes": "gate_id field links to Gate entity when task has a human approval gate"
+        }
+      },
+      {
+        "step_id": "fd-s6",
+        "title": "Create TaskAttempt entity schema",
+        "scope": "forge-core",
+        "description": "Define TaskAttempt entity that tracks individual execution attempts for retry support",
+        "dependencies": ["fd-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskAttemptSchema: { attempt_id, task_id, attempt_number, started_at, ended_at?, outcome: 'success' | 'failure' | 'timeout' | 'cancelled', error?, agent_id?, audit_findings?: AuditFinding[] }" },
+          { "id": "ac2", "description": "AuditFindingSchema: { criterion_id, status: 'pass' | 'fail', details: string }" },
+          { "id": "ac3", "description": "createTaskAttempt(taskId, attemptNumber) factory" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/plan.ts",
+          "pattern_description": "Use same Zod schema + factory pattern",
+          "notes": "audit_findings populated by auditor agent report_audit_result tool"
+        }
+      },
+      {
+        "step_id": "fd-s7",
+        "title": "Create Artifact entity schema",
+        "scope": "forge-core",
+        "description": "Define Artifact entity for tracking outputs produced by tasks",
+        "dependencies": ["fd-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ArtifactTypeSchema: z.enum(['commit', 'pr', 'file', 'deployment', 'test_result'])" },
+          { "id": "ac2", "description": "ArtifactSchema: { artifact_id, task_id, type: ArtifactType, reference: string, metadata?: Record<string, unknown>, created_at }" },
+          { "id": "ac3", "description": "createArtifact(taskId, type, reference, metadata?) factory" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/improvement.ts",
+          "pattern_description": "See ImprovementType enum pattern for artifact types"
+        }
+      },
+      {
+        "step_id": "fd-s8",
+        "title": "Create state transition validators",
+        "scope": "forge-core",
+        "description": "Implement functions to validate and execute state transitions for Run and Task",
+        "dependencies": ["fd-s4", "fd-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "VALID_RUN_TRANSITIONS map: { pending: ['running'], running: ['paused', 'completed', 'failed', 'cancelled'], paused: ['running', 'cancelled'], ... }" },
+          { "id": "ac2", "description": "VALID_TASK_TRANSITIONS map with all valid transitions including awaiting_approval" },
+          { "id": "ac3", "description": "validateRunTransition(from, to) throws if invalid" },
+          { "id": "ac4", "description": "validateTaskTransition(from, to) throws if invalid" },
+          { "id": "ac5", "description": "transitionRun(run, newStatus) returns updated Run with validated transition" },
+          { "id": "ac6", "description": "transitionTask(task, newStatus) returns updated Task with validated transition" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "State machine with explicit transition map",
+            "validation": "Throw descriptive error on invalid transition",
+            "task_transitions": {
+              "pending": ["queued"],
+              "queued": ["running"],
+              "running": ["auditing", "awaiting_approval", "completed", "failed", "blocked"],
+              "auditing": ["completed", "failed", "pending"],
+              "awaiting_approval": ["completed", "failed"],
+              "blocked": ["pending", "failed"],
+              "completed": [],
+              "failed": ["pending"]
+            }
+          }
+        }
+      },
+      {
+        "step_id": "fd-s9",
+        "title": "Create domain index and exports",
+        "scope": "forge-core",
+        "description": "Create index.ts exporting all domain types and functions",
+        "dependencies": ["fd-s1", "fd-s2", "fd-s3", "fd-s4", "fd-s5", "fd-s6", "fd-s7", "fd-s8"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/forge-core/src/domain/index.ts exports all schemas, types, factories, and validators" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/ directory structure",
+          "pattern_description": "Mirror planner-core domain structure: separate files per entity, central index.ts"
+        }
+      }
+    ]
+  }
+}

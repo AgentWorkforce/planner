@@ -1,0 +1,263 @@
+{
+  "feature_id": "forge-ui-status-bar",
+  "title": "Forge Status Bar Integration",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-layout"],
+
+  "summary": {
+    "goal": "Status bar showing active run progress at a glance. Persistent visibility without taking focus from other work.",
+    "acceptance_criteria": [
+      { "id": "fsb-ac1", "description": "Progress indicator showing task count (4/7) or percentage" },
+      { "id": "fsb-ac2", "description": "Active agent count with color-coded status dots" },
+      { "id": "fsb-ac3", "description": "Pending gates count with warning indicator" },
+      { "id": "fsb-ac4", "description": "Elapsed time counter (running runs only)" },
+      { "id": "fsb-ac5", "description": "Click status bar to expand full run dashboard" },
+      { "id": "fsb-ac6", "description": "Collapsed state shows minimal info for less intrusion" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Extends ui-status-bar pattern from planner-ui",
+        "Persistent visibility across navigation",
+        "Click to expand is key interaction",
+        "Need to determine which run to show when multiple runs or when viewing a run"
+      ],
+      "patterns": [
+        "Fixed bottom position",
+        "Collapsible/expandable states"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "active_run_selection": {
+        "priority_order": [
+          "1. Currently viewed run (from URL /forge/runs/:id) - highest priority",
+          "2. Any run with status='running' - show the running one",
+          "3. Most recent run (by started_at) - fallback when nothing is running"
+        ],
+        "multi_run_indicator": "When multiple runs are running but user is viewing one, show '+N running' indicator",
+        "implementation": "useActiveRun hook checks URL params first, then queries for running runs"
+      }
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "fsb-s1",
+        "title": "Create useActiveRun hook",
+        "scope": "forge-ui",
+        "description": "Track the currently active/running run with priority selection logic",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useActiveRun() returns { activeRun, isLoading, otherRunningCount }" },
+          { "id": "ac2", "description": "Priority 1: If URL is /forge/runs/:id, that run is active" },
+          { "id": "ac3", "description": "Priority 2: Any run with status='running'" },
+          { "id": "ac4", "description": "Priority 3: Most recent run by started_at" },
+          { "id": "ac5", "description": "otherRunningCount: number of other running runs (for multi-run indicator)" },
+          { "id": "ac6", "description": "SSE subscription for run status changes" },
+          { "id": "ac7", "description": "Clears activeRun when run completes/fails/cancels (if not viewing that run)" }
+        ],
+        "specification": {
+          "api_endpoint": "GET /runs?status=running",
+          "url_integration": "Use useParams() from react-router to check current runId",
+          "selection_logic": {
+            "step1": "Check if URL has runId param -> use that run",
+            "step2": "Else fetch running runs -> use first one",
+            "step3": "Else fetch most recent -> use that",
+            "otherRunningCount": "runningRuns.length - 1 if activeRun is running, else runningRuns.length"
+          }
+        }
+      },
+      {
+        "step_id": "fsb-s2",
+        "title": "Create StatusBarProgress component",
+        "scope": "forge-ui",
+        "description": "Progress indicator for status bar",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Circular or mini progress bar" },
+          { "id": "ac2", "description": "Task count text: '4/7 tasks'" },
+          { "id": "ac3", "description": "Percentage indicator" },
+          { "id": "ac4", "description": "Animated fill for running state" }
+        ],
+        "specification": {
+          "design": {
+            "bar": "h-1 w-24 bg-bg-tertiary rounded-full",
+            "fill": "bg-accent-cyan transition-all duration-300"
+          }
+        }
+      },
+      {
+        "step_id": "fsb-s3",
+        "title": "Create StatusBarAgents component",
+        "scope": "forge-ui",
+        "description": "Agent count and status dots",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Count of active agents" },
+          { "id": "ac2", "description": "Up to 5 status dots (green=working, orange=blocked)" },
+          { "id": "ac3", "description": "'+N' indicator if more than 5 agents" },
+          { "id": "ac4", "description": "Tooltip showing agent names on hover" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/StatusBar.tsx (agents section)",
+          "pattern_description": "Similar agent dots pattern"
+        }
+      },
+      {
+        "step_id": "fsb-s4",
+        "title": "Create StatusBarGates component",
+        "scope": "forge-ui",
+        "description": "Pending gates indicator",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Gate icon with count badge" },
+          { "id": "ac2", "description": "Warning color when gates pending" },
+          { "id": "ac3", "description": "Clickable to open gate approval panel" },
+          { "id": "ac4", "description": "Pulsing animation when attention needed" }
+        ],
+        "specification": {
+          "design": {
+            "icon": "ShieldIcon",
+            "badge": "absolute -top-1 -right-1 bg-warning text-bg-deep text-xs font-bold w-4 h-4 rounded-full",
+            "pulse": "animate-pulse"
+          }
+        }
+      },
+      {
+        "step_id": "fsb-s5",
+        "title": "Create StatusBarTimer component",
+        "scope": "forge-ui",
+        "description": "Elapsed time display",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Clock icon with time in HH:MM:SS format" },
+          { "id": "ac2", "description": "Updates every second for running runs" },
+          { "id": "ac3", "description": "Shows 'Paused' label when run is paused" },
+          { "id": "ac4", "description": "Static time for completed runs" }
+        ],
+        "specification": {
+          "design": {
+            "timer": "font-mono text-sm text-text-secondary"
+          }
+        }
+      },
+      {
+        "step_id": "fsb-s6",
+        "title": "Create ForgeStatusBar component",
+        "scope": "forge-ui",
+        "description": "Main status bar component with multi-run indicator",
+        "dependencies": ["fsb-s1", "fsb-s2", "fsb-s3", "fsb-s4", "fsb-s5"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Fixed bottom position, full width" },
+          { "id": "ac2", "description": "Sections: Progress | Agents | Gates | Timer" },
+          { "id": "ac3", "description": "Run name/goal on left side" },
+          { "id": "ac4", "description": "Collapsed state: h-8, minimal info" },
+          { "id": "ac5", "description": "Expanded state: h-12, full info" },
+          { "id": "ac6", "description": "Toggle collapse via chevron button" },
+          { "id": "ac7", "description": "Hidden when no active run" },
+          { "id": "ac8", "description": "Multi-run indicator: '+N running' badge when other runs are running" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/StatusBar.tsx",
+          "pattern_description": "Similar status bar pattern with sections",
+          "design": {
+            "bar": "fixed bottom-0 left-0 right-0 bg-bg-secondary border-t border-border-subtle z-50",
+            "expanded": "h-12 px-4 flex items-center gap-6",
+            "collapsed": "h-8 px-4 flex items-center justify-center gap-2",
+            "multi_run_badge": "ml-2 px-2 py-0.5 bg-accent-cyan/20 text-accent-cyan text-xs rounded-full"
+          }
+        }
+      },
+      {
+        "step_id": "fsb-s7",
+        "title": "Implement click to navigate",
+        "scope": "forge-ui",
+        "description": "Click status bar to go to run dashboard",
+        "dependencies": ["fsb-s6"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Click anywhere on bar navigates to /forge/runs/:activeRunId" },
+          { "id": "ac2", "description": "Cursor shows pointer on hover" },
+          { "id": "ac3", "description": "Ctrl/Cmd+click opens in new tab" },
+          { "id": "ac4", "description": "Does not navigate if clicking on interactive elements (gates button)" }
+        ],
+        "specification": {
+          "design": {
+            "cursor": "cursor-pointer",
+            "hover": "hover:bg-bg-tertiary/50"
+          }
+        }
+      },
+      {
+        "step_id": "fsb-s8",
+        "title": "Add collapse state persistence",
+        "scope": "forge-ui",
+        "description": "Remember collapsed state across sessions",
+        "dependencies": ["fsb-s6"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Store collapsed state in localStorage" },
+          { "id": "ac2", "description": "Key: 'forge.statusBarCollapsed'" },
+          { "id": "ac3", "description": "Default to expanded on first visit" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/hooks/usePlansViewMode.ts",
+          "pattern_description": "Similar localStorage persistence pattern"
+        }
+      },
+      {
+        "step_id": "fsb-s9",
+        "title": "Integrate into ForgeLayout",
+        "scope": "forge-ui",
+        "description": "Add ForgeStatusBar to layout",
+        "dependencies": ["fsb-s6"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeStatusBar rendered at bottom of ForgeLayout" },
+          { "id": "ac2", "description": "Main content has bottom padding to avoid overlap" },
+          { "id": "ac3", "description": "Bar receives activeRun data from hook" }
+        ],
+        "specification": {
+          "integration": "Modify ful-s8 ForgeLayout to include ForgeStatusBar"
+        }
+      },
+      {
+        "step_id": "fsb-s10",
+        "title": "Add questions indicator",
+        "scope": "forge-ui",
+        "description": "Show pending questions count in status bar",
+        "dependencies": ["fsb-s6"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Question icon with count badge" },
+          { "id": "ac2", "description": "Red color when blocking questions pending" },
+          { "id": "ac3", "description": "Click opens question queue panel" }
+        ],
+        "specification": {
+          "design": {
+            "icon": "MessageCircleQuestionIcon",
+            "badge": "bg-error text-white for blocking, bg-warning for preference"
+          },
+          "integration": "Ties into forge-ui-question-queue feature"
+        }
+      }
+    ]
+  }
+}

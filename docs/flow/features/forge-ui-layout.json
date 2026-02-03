@@ -1,0 +1,338 @@
+{
+  "feature_id": "forge-ui-layout",
+  "title": "Forge Layout & Navigation",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-ui",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Base layout with navigation, routing, and shared components for Forge UI. Establishes the application shell and core infrastructure.",
+    "acceptance_criteria": [
+      { "id": "ful-ac1", "description": "App shell with sidebar navigation matching Mission Control design" },
+      { "id": "ful-ac2", "description": "Routes: /forge (runs list), /forge/runs/:id (dashboard), /forge/runs/:id/timeline" },
+      { "id": "ful-ac3", "description": "Shared API client for Forge REST endpoints" },
+      { "id": "ful-ac4", "description": "SSE connection hook with auto-reconnect" },
+      { "id": "ful-ac5", "description": "Theme integration with Mission Control CSS variables" },
+      { "id": "ful-ac6", "description": "Loading and error state components" },
+      { "id": "ful-ac7", "description": "ForgeRunContext provider for shared run state across components" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Same patterns as planner-ui layout",
+        "SSE hook for real-time updates from Forge API",
+        "API client wraps fetch with auth and error handling",
+        "Context provider pattern for shared run state - SSE subscriptions managed at context level, not per-component"
+      ],
+      "patterns": [
+        "React Router for navigation",
+        "Context provider for SSE connection",
+        "Shared globals.css from design system",
+        "ForgeRunContext for run state management"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "routes": ["/forge", "/forge/runs/:id", "/forge/runs/:id/timeline"],
+      "api_base": "configurable, default /api",
+      "context_pattern": "ForgeRunContext provides { activeRun, tasks, gates, questions, agents } consumed via useForgeRun() hook"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "ful-s1",
+        "title": "Create package scaffolding",
+        "scope": "forge-ui",
+        "description": "Initialize the forge-ui package with Vite, React, TypeScript, and Tailwind CSS 4 configuration",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/forge-ui/ directory with package.json (name: @plannr/forge-ui)" },
+          { "id": "ac2", "description": "Vite config with React plugin and path aliases (@/ -> src/)" },
+          { "id": "ac3", "description": "TypeScript config extending shared tsconfig" },
+          { "id": "ac4", "description": "Tailwind CSS 4 config with @config directive in globals.css" },
+          { "id": "ac5", "description": "npm run dev starts Vite dev server on port 5174" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/package.json, vite.config.ts, tsconfig.json",
+          "pattern_description": "Copy planner-ui package structure and config files, adjust names"
+        }
+      },
+      {
+        "step_id": "ful-s2",
+        "title": "Copy and configure design system",
+        "scope": "forge-ui",
+        "description": "Set up Mission Control design system with CSS variables and Tailwind config",
+        "dependencies": ["ful-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "globals.css with all Mission Control CSS variables (--color-bg-deep, --color-accent-cyan, etc.)" },
+          { "id": "ac2", "description": "tailwind.config.cjs with color scales referencing CSS variables" },
+          { "id": "ac3", "description": "Font imports for Outfit, Inter, IBM Plex Mono" },
+          { "id": "ac4", "description": "Dark theme as default, no light theme toggle needed" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/globals.css, tailwind.config.cjs",
+          "pattern_description": "Copy globals.css and tailwind.config.cjs directly - same design system"
+        }
+      },
+      {
+        "step_id": "ful-s3",
+        "title": "Create API client module",
+        "scope": "forge-ui",
+        "description": "HTTP client for Forge API with error handling",
+        "dependencies": ["ful-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/api/client.ts with get<T>, post<T>, put<T>, del<T> functions" },
+          { "id": "ac2", "description": "ApiError class with status code and message" },
+          { "id": "ac3", "description": "Configurable FORGE_API_BASE (default /forge-api, can be environment variable)" },
+          { "id": "ac4", "description": "All methods include Content-Type: application/json header" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/api/client.ts",
+          "pattern_description": "Copy client.ts structure, change API_BASE constant"
+        }
+      },
+      {
+        "step_id": "ful-s4",
+        "title": "Create runs API module",
+        "scope": "forge-ui",
+        "description": "API functions for run management endpoints",
+        "dependencies": ["ful-s3"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "listRuns(filter?: { status?: string }) returns { runs: Run[] }" },
+          { "id": "ac2", "description": "getRun(runId) returns { run: Run, tasks: Task[] }" },
+          { "id": "ac3", "description": "pauseRun(runId) calls POST /runs/:id/pause" },
+          { "id": "ac4", "description": "resumeRun(runId) calls POST /runs/:id/resume" },
+          { "id": "ac5", "description": "cancelRun(runId) calls POST /runs/:id/cancel" },
+          { "id": "ac6", "description": "TypeScript types for Run, Task, Artifact matching forge-domain schemas" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/api/plans.ts",
+          "pattern_description": "Same pattern - typed API functions calling client methods",
+          "api_endpoints": {
+            "list": "GET /runs?status=X",
+            "get": "GET /runs/:id",
+            "pause": "POST /runs/:id/pause",
+            "resume": "POST /runs/:id/resume",
+            "cancel": "POST /runs/:id/cancel"
+          }
+        }
+      },
+      {
+        "step_id": "ful-s5",
+        "title": "Create TypeScript types",
+        "scope": "forge-ui",
+        "description": "Type definitions for Forge domain entities",
+        "dependencies": ["ful-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/types/run.ts: RunStatus, Run interface matching forge-domain" },
+          { "id": "ac2", "description": "src/types/task.ts: TaskStatus, Task, TaskAttempt interfaces" },
+          { "id": "ac3", "description": "src/types/artifact.ts: ArtifactType, Artifact interface" },
+          { "id": "ac4", "description": "src/types/gate.ts: GateStatus, Gate interface" },
+          { "id": "ac5", "description": "src/types/question.ts: BlockingLevel, Question interface" },
+          { "id": "ac6", "description": "src/types/index.ts re-exports all types" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/types/",
+          "pattern_description": "Mirror planner-ui types directory structure",
+          "domain_reference": "docs/flow/features/forge-domain.json for exact field names"
+        }
+      },
+      {
+        "step_id": "ful-s6",
+        "title": "Create SSE hook for run events",
+        "scope": "forge-ui",
+        "description": "Hook for subscribing to run SSE events with auto-reconnect",
+        "dependencies": ["ful-s3"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useRunEvents(runId, enabled, onEvent) hook" },
+          { "id": "ac2", "description": "Subscribes to GET /runs/:id/events SSE endpoint" },
+          { "id": "ac3", "description": "Handles events: run_status_changed, task_status_changed, gate_reached, agent_progress, question_added, question_answered" },
+          { "id": "ac4", "description": "Auto-reconnect on error (max 5 retries, 3s delay)" },
+          { "id": "ac5", "description": "Returns { isConnected, error } state" },
+          { "id": "ac6", "description": "Support for Last-Event-ID header on reconnection" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/hooks/usePlanEvents.ts",
+          "pattern_description": "Copy usePlanEvents structure, adapt for Forge event types"
+        }
+      },
+      {
+        "step_id": "ful-s6b",
+        "title": "Create ForgeRunContext provider",
+        "scope": "forge-ui",
+        "description": "Context provider for shared run state across components. SSE subscriptions managed at context level.",
+        "dependencies": ["ful-s6", "ful-s5"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeRunContext provides { activeRun, tasks, gates, questions, agents }" },
+          { "id": "ac2", "description": "ForgeRunProvider wraps app and manages SSE subscription" },
+          { "id": "ac3", "description": "useForgeRun() hook for consuming context in components" },
+          { "id": "ac4", "description": "SSE subscription managed once at provider level, not per-component" },
+          { "id": "ac5", "description": "Context updates on SSE events: run_status_changed, task_status_changed, gate_reached, agent_progress, question_added" },
+          { "id": "ac6", "description": "Loading and error states exposed via context" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "React Context + useReducer for state management",
+            "sse_management": "Single SSE connection at provider level, events dispatch to reducer",
+            "state_shape": {
+              "activeRun": "Run | null",
+              "tasks": "Task[]",
+              "gates": "Gate[]",
+              "questions": "Question[]",
+              "agents": "Agent[]",
+              "isLoading": "boolean",
+              "error": "Error | null",
+              "isConnected": "boolean"
+            }
+          },
+          "pattern_reference": "packages/planner-ui/src/context/RelayContext.tsx",
+          "pattern_description": "Similar context provider pattern with event-driven updates"
+        }
+      },
+      {
+        "step_id": "ful-s7",
+        "title": "Create sidebar component",
+        "scope": "forge-ui",
+        "description": "Navigation sidebar for Forge UI",
+        "dependencies": ["ful-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeSidebar component using shadcn/ui Sidebar primitives" },
+          { "id": "ac2", "description": "Logo/title section: 'Forge' with anvil icon" },
+          { "id": "ac3", "description": "Navigation items: Runs (list), Active (running runs), History (completed)" },
+          { "id": "ac4", "description": "Collapsible/expandable state persisted to localStorage" },
+          { "id": "ac5", "description": "Mobile-responsive with drawer behavior" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/sidebar/AppSidebar.tsx",
+          "pattern_description": "Simpler version - no initiatives, just run navigation",
+          "design": {
+            "logo": "anvil/hammer icon (forge theme)",
+            "sections": ["Navigation", "Active Runs (if any)"]
+          }
+        }
+      },
+      {
+        "step_id": "ful-s8",
+        "title": "Create Layout component",
+        "scope": "forge-ui",
+        "description": "Main layout wrapper with sidebar and content area",
+        "dependencies": ["ful-s7", "ful-s6b"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeLayout component using SidebarProvider, SidebarInset" },
+          { "id": "ac2", "description": "Outlet for React Router nested routes" },
+          { "id": "ac3", "description": "Mobile header with hamburger menu on small screens" },
+          { "id": "ac4", "description": "Main content area with overflow-auto and bottom padding for status bar" },
+          { "id": "ac5", "description": "ForgeRunProvider wraps content for shared run state" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/Layout.tsx",
+          "pattern_description": "Simplified version - no command palette or triage panel initially",
+          "context_integration": "ForgeLayout includes ForgeRunProvider to make run state available to all child routes"
+        }
+      },
+      {
+        "step_id": "ful-s9",
+        "title": "Set up React Router",
+        "scope": "forge-ui",
+        "description": "Configure routing for Forge UI pages",
+        "dependencies": ["ful-s8"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/App.tsx with BrowserRouter and Routes" },
+          { "id": "ac2", "description": "Route /forge -> RunsListPage (index)" },
+          { "id": "ac3", "description": "Route /forge/runs/:runId -> RunDashboardPage" },
+          { "id": "ac4", "description": "Route /forge/runs/:runId/timeline -> TimelinePage" },
+          { "id": "ac5", "description": "Route /forge/preflight/:planId -> PreflightPage" },
+          { "id": "ac6", "description": "All routes wrapped in ForgeLayout" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/App.tsx",
+          "pattern_description": "Same react-router-dom setup with nested routes"
+        }
+      },
+      {
+        "step_id": "ful-s10",
+        "title": "Create placeholder pages",
+        "scope": "forge-ui",
+        "description": "Stub page components for each route",
+        "dependencies": ["ful-s9"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunsListPage with title and 'Coming soon' message" },
+          { "id": "ac2", "description": "RunDashboardPage with title and useParams for runId" },
+          { "id": "ac3", "description": "TimelinePage with title and useParams for runId" },
+          { "id": "ac4", "description": "PreflightPage with title and useParams for planId" },
+          { "id": "ac5", "description": "All pages follow consistent layout pattern" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/pages/",
+          "pattern_description": "Simple page components with basic structure",
+          "notes": "These are stubs - actual implementation in separate features"
+        }
+      },
+      {
+        "step_id": "ful-s11",
+        "title": "Create loading and error components",
+        "scope": "forge-ui",
+        "description": "Shared components for loading states and error display",
+        "dependencies": ["ful-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "LoadingSpinner component with size variants (sm, md, lg)" },
+          { "id": "ac2", "description": "Skeleton component for content placeholders" },
+          { "id": "ac3", "description": "ErrorMessage component with retry button option" },
+          { "id": "ac4", "description": "EmptyState component with icon, title, description, optional action" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/LoadingSpinner.tsx, AttentionSkeleton.tsx",
+          "pattern_description": "Copy existing loading/error patterns",
+          "design": {
+            "spinner": "cyan accent color, pulse animation",
+            "skeleton": "bg-bg-tertiary with shimmer animation"
+          }
+        }
+      },
+      {
+        "step_id": "ful-s12",
+        "title": "Wire up Vite proxy",
+        "scope": "forge-ui",
+        "description": "Configure Vite to proxy API requests to Forge backend",
+        "dependencies": ["ful-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "vite.config.ts proxy /forge-api to localhost:3001" },
+          { "id": "ac2", "description": "WebSocket proxy for SSE connections" },
+          { "id": "ac3", "description": "CORS handled by proxy (no browser CORS issues in dev)" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/vite.config.ts",
+          "pattern_description": "Copy proxy configuration pattern",
+          "config": {
+            "target": "http://localhost:3001",
+            "changeOrigin": true,
+            "rewrite": "/forge-api -> /"
+          }
+        }
+      }
+    ]
+  }
+}

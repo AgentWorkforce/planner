@@ -5,7 +5,7 @@ user-invocable: false
 ---
 # Feature Flow: Feature → User Flow
 
-**Owns**: Feature `user_flow` section
+**Owns**: Feature `user_flow` section; may contribute to `understanding`
 
 ## Purpose
 
@@ -90,13 +90,32 @@ If a feature has >10 flow steps or multiple distinct paths:
 - Split into sub-features
 - Use epic structure with `sub_features` array
 
+### 6. Record Flow Observations (Optional)
+
+If significant patterns or concerns emerge while documenting flows, capture in understanding:
+
+```json
+"understanding": {
+  "architect": {
+    "observations": ["Complex state machine in checkout flow", "Multiple async operations"],
+    "concerns": ["Race condition possible between steps 3-4"]
+  },
+  "designer": {
+    "observations": ["Flow has 3 decision points", "Error states need clear messaging"]
+  }
+}
+```
+
+Only add understanding entries when genuinely useful—not required for every feature.
+
 ## Fits the Whole
 
 | Skill | Section |
 |-------|---------|
-| flow-discover | `summary` (from code) |
-| flow-brainstorm | `summary` (from ideas) |
-| flow-planner | `plan_implementation` |
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
 | flow-tasks | Creates executable tasks from plan |
 | **flow-feature** | `user_flow` |
 | flow-ui-ux-validation | `validation_uiux` |
@@ -115,3 +134,4 @@ If a feature has >10 flow steps or multiple distinct paths:
 - Each step is atomic and tagged
 - Assertions are observable
 - Happy path is complete; key variants documented
+- Flow observations captured in `understanding` (if significant patterns emerged)

@@ -1,0 +1,230 @@
+{
+  "feature_id": "forge-ui-runs-list",
+  "title": "Runs List View",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-layout"],
+
+  "summary": {
+    "goal": "List all runs with status filtering, search, and quick actions. Entry point for navigating to specific run dashboards.",
+    "acceptance_criteria": [
+      { "id": "frl-ac1", "description": "Table/card list showing: status badge, plan name, duration, task count" },
+      { "id": "frl-ac2", "description": "Filter tabs: All, Running, Completed, Failed, Paused" },
+      { "id": "frl-ac3", "description": "Click row/card to navigate to run dashboard" },
+      { "id": "frl-ac4", "description": "Import Plan button opens pre-flight check" },
+      { "id": "frl-ac5", "description": "Real-time status updates via SSE (running runs update live)" },
+      { "id": "frl-ac6", "description": "Empty state with helpful message" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Similar to plans list in planner-ui",
+        "SSE subscription for running runs only",
+        "Pagination for large run histories",
+        "Use lighter RunListItem type for list performance - full Run type only on dashboard"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "list_type": "RunListItem is lighter than full Run - optimized for list rendering",
+      "run_list_item_fields": ["run_id", "plan_id", "plan_goal", "status", "task_count", "completed_count", "duration_ms", "started_at", "ended_at"]
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "frl-s0",
+        "title": "Define RunListItem type",
+        "scope": "forge-ui",
+        "description": "Create lighter type for run list items, separate from full Run type",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunListItem type with fields: run_id, plan_id, plan_goal, status, task_count, completed_count, duration_ms, started_at, ended_at?" },
+          { "id": "ac2", "description": "listRuns API returns RunListItem[] not full Run[]" },
+          { "id": "ac3", "description": "Type exported from src/types/run.ts alongside Run type" }
+        ],
+        "specification": {
+          "architecture": {
+            "rationale": "Full Run includes tasks[], gates[], artifacts[] - too heavy for list view",
+            "pattern": "List views use summary type, detail views fetch full entity"
+          },
+          "type_definition": {
+            "run_id": "string",
+            "plan_id": "string",
+            "plan_goal": "string - extracted from plan for display",
+            "status": "RunStatus",
+            "task_count": "number - total tasks in run",
+            "completed_count": "number - completed tasks",
+            "duration_ms": "number - elapsed or total duration",
+            "started_at": "string - ISO timestamp",
+            "ended_at": "string | null - ISO timestamp, null if running"
+          }
+        }
+      },
+      {
+        "step_id": "frl-s1",
+        "title": "Create RunCard component",
+        "scope": "forge-ui",
+        "description": "Card component displaying run summary information",
+        "dependencies": ["frl-s0"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunCard displays: status badge, plan goal (truncated), task progress (X/Y)" },
+          { "id": "ac2", "description": "Duration shown: elapsed time for running, total time for completed" },
+          { "id": "ac3", "description": "Status badge with color coding: running=cyan, completed=green, failed=red, paused=orange" },
+          { "id": "ac4", "description": "Clickable card navigates to /forge/runs/:id" },
+          { "id": "ac5", "description": "Hover state with border highlight" },
+          { "id": "ac6", "description": "Uses RunListItem type, not full Run" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/PlanCard.tsx",
+          "pattern_description": "Similar card pattern with status badge and summary info",
+          "design": {
+            "layout": "bg-bg-card border-border-subtle rounded-xl p-4",
+            "status_badges": {
+              "running": "bg-accent-cyan/20 text-accent-cyan",
+              "completed": "bg-success/20 text-success",
+              "failed": "bg-error/20 text-error",
+              "paused": "bg-warning/20 text-warning",
+              "pending": "bg-text-muted/20 text-text-muted"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "frl-s2",
+        "title": "Create StatusFilterTabs component",
+        "scope": "forge-ui",
+        "description": "Filter tabs for run status",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tabs: All, Running, Completed, Failed, Paused" },
+          { "id": "ac2", "description": "Active tab highlighted with accent-cyan underline" },
+          { "id": "ac3", "description": "Count badges on each tab showing number of runs in that status" },
+          { "id": "ac4", "description": "Tab change updates URL query param (?status=running)" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/TabNavigation.tsx",
+          "pattern_description": "Reusable tab navigation pattern",
+          "design": {
+            "layout": "flex gap-2 border-b border-border-subtle",
+            "active": "border-b-2 border-accent-cyan text-text-primary",
+            "inactive": "text-text-muted hover:text-text-secondary"
+          }
+        }
+      },
+      {
+        "step_id": "frl-s3",
+        "title": "Create useRuns hook",
+        "scope": "forge-ui",
+        "description": "Data fetching hook for runs list with filtering",
+        "dependencies": ["frl-s0"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useRuns(filter?: { status?: string }) hook" },
+          { "id": "ac2", "description": "Returns { runs: RunListItem[], isLoading, error, refetch }" },
+          { "id": "ac3", "description": "Calls listRuns API with filter" },
+          { "id": "ac4", "description": "Auto-refetches when filter changes" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/hooks/useAttentionPlans.ts",
+          "pattern_description": "Similar fetch + state management pattern"
+        }
+      },
+      {
+        "step_id": "frl-s4",
+        "title": "Create useRunningUpdates hook",
+        "scope": "forge-ui",
+        "description": "SSE subscription for live updates to running runs",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useRunningUpdates(runIds: string[]) hook" },
+          { "id": "ac2", "description": "Subscribes to SSE for each running run" },
+          { "id": "ac3", "description": "Returns map of runId -> latest task counts" },
+          { "id": "ac4", "description": "Cleans up subscriptions on unmount" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Multiple SSE connections (one per running run)",
+            "optimization": "Only subscribe to runs with status='running'",
+            "events": ["task_status_changed", "run_status_changed"]
+          }
+        }
+      },
+      {
+        "step_id": "frl-s5",
+        "title": "Implement RunsListPage",
+        "scope": "forge-ui",
+        "description": "Main page component for runs list",
+        "dependencies": ["frl-s1", "frl-s2", "frl-s3", "frl-s4"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header with title 'Forge Runs' and Import Plan button" },
+          { "id": "ac2", "description": "StatusFilterTabs below header" },
+          { "id": "ac3", "description": "Grid of RunCards (responsive: 1 col mobile, 2 cols tablet, 3 cols desktop)" },
+          { "id": "ac4", "description": "Loading state shows skeleton cards" },
+          { "id": "ac5", "description": "Error state shows ErrorMessage with retry" },
+          { "id": "ac6", "description": "Empty state: 'No runs yet. Import a plan to get started.'" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/pages/PlansPage.tsx",
+          "pattern_description": "Similar page structure with header, filters, grid"
+        }
+      },
+      {
+        "step_id": "frl-s6",
+        "title": "Add Import Plan flow",
+        "scope": "forge-ui",
+        "description": "Button and navigation to start new run from plan",
+        "dependencies": ["frl-s5"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Import Plan button in header (primary style)" },
+          { "id": "ac2", "description": "Click opens modal with plan selector (list of published plans from Planner)" },
+          { "id": "ac3", "description": "Select plan navigates to /forge/preflight/:planId" },
+          { "id": "ac4", "description": "Modal fetches plans from Planner API: GET /api/plans?status=published" }
+        ],
+        "specification": {
+          "design": {
+            "button": "bg-accent-cyan text-bg-deep font-medium rounded-lg",
+            "modal": "Select a published plan to forge"
+          },
+          "api_integration": {
+            "endpoint": "Planner API /api/plans?status=published",
+            "note": "Cross-service call - see forge-ui-preflight for CORS/proxy config"
+          }
+        }
+      },
+      {
+        "step_id": "frl-s7",
+        "title": "Add pagination",
+        "scope": "forge-ui",
+        "description": "Pagination for large run lists",
+        "dependencies": ["frl-s5"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Pagination controls at bottom of list" },
+          { "id": "ac2", "description": "Page size: 12 runs per page" },
+          { "id": "ac3", "description": "Show total count: 'Showing 1-12 of 47 runs'" },
+          { "id": "ac4", "description": "URL params for page: ?page=2" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components (if pagination exists)",
+          "pattern_description": "Standard pagination pattern with prev/next buttons"
+        }
+      }
+    ]
+  }
+}

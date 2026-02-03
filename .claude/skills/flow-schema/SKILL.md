@@ -84,6 +84,33 @@ docs/flow/
     ]
   },
 
+  "understanding": {
+    "architect": {
+      "observations": ["Uses repository pattern", "SQLite for storage"],
+      "keywords": ["CRUD", "REST", "validation"],
+      "questions": ["Should we add caching?"],
+      "concerns": ["N+1 query potential"],
+      "references": ["src/storage/sqlite.ts"],
+      "confidence": "exploring|forming|confident"
+    },
+    "designer": { },
+    "tester": { },
+    "security": { }
+  },
+
+  "context": {
+    "designer": {
+      "library": "shadcn/ui",
+      "theme": "dark mode",
+      "patterns": "card-based lists"
+    },
+    "architect": {
+      "tech_stack": "TypeScript, Express, SQLite",
+      "api_style": "REST with Zod validation",
+      "storage": "JSONB for nested data"
+    }
+  },
+
   "design_spec": {
     "views": [
       {
@@ -124,7 +151,17 @@ docs/flow/
         "dependencies": ["i000"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [{ "id": "ac1", "description": "..." }],
-        "gate": { "type": "human_approval", "approver_role": "tech-lead" }
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" },
+        "specification": {
+          "architecture": {
+            "pattern": "middleware chain",
+            "tech": "express-jwt"
+          },
+          "security": {
+            "auth_method": "JWT",
+            "token_expiry": "1h"
+          }
+        }
       }
     ]
   },
@@ -189,9 +226,11 @@ docs/flow/
 | Section | Skill | Purpose |
 |---------|-------|---------|
 | `summary` | flow-brainstorm/flow-discover | What the feature is |
+| `understanding` | Any agent (as needed) | Agent observations during ideation |
+| `context` | Any agent (as needed) | Formalized decisions by role |
 | `design_spec` | flow-ui-ux-designer | How it looks (views, components) |
 | `user_flow` | flow-feature | How it behaves (for testing) |
-| `plan_implementation` | flow-planner | How to build it |
+| `plan_implementation` | flow-planner | How to build it (steps + specification) |
 | `plan_tests` | flow-test-designer | Test design/coverage |
 | `validation_uiux` | flow-ui-ux-validation | UI/UX validation results |
 | `audit` | flow-audit | Implementation verification |
@@ -199,6 +238,97 @@ docs/flow/
 | `sub_features` | Any | Nested features (inline or ref) |
 
 Note: `catalog.design_system` is owned by flow-ui-ux-designer (project-level).
+
+## Understanding
+
+Agent observations during ideation, keyed by role. Agents add their observations as needed.
+
+```json
+"understanding": {
+  "<role>": {
+    "observations": ["string"],
+    "keywords": ["string"],
+    "questions": ["string"],
+    "concerns": ["string"],
+    "references": ["string"],
+    "confidence": "exploring|forming|confident"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `observations` | string[] | What the agent noticed |
+| `keywords` | string[] | Key terms/concepts |
+| `questions` | string[] | Open questions to resolve |
+| `concerns` | string[] | Risks or issues identified |
+| `references` | string[] | Files/docs referenced |
+| `confidence` | enum | How confident the agent is |
+
+**Common roles**: architect, designer, tester, security, modeler
+
+**Confidence levels**:
+- `exploring` - Still gathering information
+- `forming` - Initial understanding taking shape
+- `confident` - Clear understanding established
+
+## Context
+
+Formalized decisions by role. Freeform key-value pairs - any field allowed.
+
+```json
+"context": {
+  "<role>": {
+    "<key>": "<value>",
+    ...
+  }
+}
+```
+
+**Suggested fields by role**:
+
+| Role | Suggested Fields |
+|------|------------------|
+| designer | library, theme, typography, patterns, icons |
+| architect | tech_stack, api_style, storage, boundaries |
+| modeler | approach, entities, relationships, conventions, migrations |
+| tester | framework, coverage_target, strategy, test_data |
+| security | auth, compliance, data_handling |
+
+Note: `catalog.design_system` provides project-level design context. Feature-level `context.designer` can override or extend for specific features.
+
+## Specification (Step-Level)
+
+Per-step domain specifications in `plan_implementation.steps[].specification`. Freeform - any domain, any fields.
+
+```json
+"specification": {
+  "<domain>": {
+    "<key>": "<value>",
+    ...
+  }
+}
+```
+
+**Suggested domains**: architecture, design, model, testing, security
+
+**Example**:
+```json
+"specification": {
+  "architecture": {
+    "pattern": "repository",
+    "tech": "better-sqlite3"
+  },
+  "design": {
+    "component": "Card",
+    "variants": "default, outline"
+  },
+  "security": {
+    "auth_required": true,
+    "permissions": ["admin", "user"]
+  }
+}
+```
 
 ## Status Semantics
 

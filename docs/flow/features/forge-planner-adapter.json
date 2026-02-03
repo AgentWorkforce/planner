@@ -1,0 +1,203 @@
+{
+  "feature_id": "forge-planner-adapter",
+  "title": "Planner Handoff Adapter",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-domain", "forge-api"],
+
+  "summary": {
+    "goal": "Transform Planner's PlanVersion into ForgePlan and handle the handoff workflow. Keep Planner and Forge packages independent via this adapter.",
+    "acceptance_criteria": [
+      { "id": "fpa-ac1", "description": "Fetch approved PlanVersion from Planner API by plan_id and version" },
+      { "id": "fpa-ac2", "description": "Transform PlanVersion steps to ForgeSteps with executable context" },
+      { "id": "fpa-ac3", "description": "Map owner_role (e.g., 'backend:Coder') to agent CLI configuration" },
+      { "id": "fpa-ac4", "description": "Resolve scope to workspace path configuration (scope -> repo URL mapping)" },
+      { "id": "fpa-ac5", "description": "Validate ForgePlan (no orphan dependencies, all criteria present)" },
+      { "id": "fpa-ac6", "description": "Report run status back to Planner - if Planner unreachable, log error and expose via /health/planner-status endpoint, but do NOT block run execution" },
+      { "id": "fpa-ac7", "description": "Send ChangeRequest to Planner when task is blocked and needs plan revision" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "ForgePlan is the contract - Forge doesn't depend on Planner types directly",
+        "Adapter pattern keeps packages decoupled",
+        "Role -> CLI mapping is configuration, not hardcoded",
+        "Scope -> repo mapping is project-specific configuration",
+        "Planner needs to implement status update endpoint for ac6"
+      ],
+      "patterns": [
+        "Adapter fetches from Planner, transforms, creates run via Forge API",
+        "Configuration file for role->cli and scope->repo mappings",
+        "Status webhook or polling from Planner to Forge"
+      ],
+      "keywords": ["adapter", "handoff", "ForgePlan", "transformation"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "planner_api_url": "configurable via PLANNER_API_URL",
+      "role_cli_mapping": "config file: { 'backend:Coder': 'claude', 'DevOps:Deployer': 'codex' }",
+      "scope_repo_mapping": "config file: { 'api-service': 'github.com/org/api', 'web-frontend': 'github.com/org/web' }"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fpa-s1",
+        "title": "Create forge configuration schema",
+        "scope": "forge-core",
+        "description": "Define configuration file format for role and scope mappings",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeConfigSchema with Zod validation" },
+          { "id": "ac2", "description": "role_cli_mapping: Record<string, { cli: string, timeout?: number, audit?: boolean }>" },
+          { "id": "ac3", "description": "scope_repo_mapping: Record<string, { repo_url: string, base_branch?: string }>" },
+          { "id": "ac4", "description": "loadForgeConfig(path) function with validation" }
+        ],
+        "specification": {
+          "architecture": {
+            "config_file": "forge-config.yaml or forge-config.json",
+            "example": {
+              "role_cli_mapping": { "backend:Coder": { "cli": "claude", "timeout": 1800 } },
+              "scope_repo_mapping": { "api-service": { "repo_url": "github.com/org/api" } }
+            }
+          }
+        }
+      },
+      {
+        "step_id": "fpa-s2",
+        "title": "Create PlannerClient for API access",
+        "scope": "forge-core",
+        "description": "HTTP client for fetching plans from Planner API",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlannerClient class with configurable base URL" },
+          { "id": "ac2", "description": "fetchPlanVersion(planId, version) returns PlanVersion" },
+          { "id": "ac3", "description": "reportRunStatus(planId, runId, status) - throws PlannerUnavailableError on failure (does not silently continue)" },
+          { "id": "ac4", "description": "createChangeRequest(planId, changeRequest) sends CR to Planner" }
+        ],
+        "specification": {
+          "architecture": {
+            "http_client": "fetch or axios",
+            "auth": "API key via header (configurable)",
+            "error_handling": "All network failures throw typed errors (PlannerUnavailableError, PlanNotFoundError) - no silent failures",
+            "note": "reportRunStatus requires Planner to implement POST /plans/:id/run-status endpoint"
+          }
+        }
+      },
+      {
+        "step_id": "fpa-s3",
+        "title": "Implement PlanVersion to ForgePlan transformer",
+        "scope": "forge-core",
+        "description": "Transform Planner's PlanVersion into ForgePlan format",
+        "dependencies": ["fpa-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "transformToForgePlan(planVersion, config) returns ForgePlan" },
+          { "id": "ac2", "description": "Maps PlanVersion.steps to ForgeSteps" },
+          { "id": "ac3", "description": "Resolves owner_role to CLI config via role_cli_mapping" },
+          { "id": "ac4", "description": "Resolves scope to repo URL via scope_repo_mapping" },
+          { "id": "ac5", "description": "Preserves dependencies, acceptance_criteria, gates" },
+          { "id": "ac6", "description": "Adds resolved fields to ForgeStep: repo_url, cli, audit from config" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Pure transformation function, no side effects",
+            "validation": "Validate output against ForgePlanSchema"
+          }
+        }
+      },
+      {
+        "step_id": "fpa-s4",
+        "title": "Implement ForgePlan validation",
+        "scope": "forge-core",
+        "description": "Validate ForgePlan before run creation",
+        "dependencies": ["fpa-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "validateForgePlan(plan) checks for issues" },
+          { "id": "ac2", "description": "Validate: no orphan dependencies (all referenced step_ids exist)" },
+          { "id": "ac3", "description": "Validate: no cycles in dependency graph" },
+          { "id": "ac4", "description": "Validate: all steps have repo_url resolved (from config)" },
+          { "id": "ac5", "description": "Returns { valid: boolean, errors: string[] }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/step.ts:validateStepDag",
+          "pattern_description": "Copy DAG validation pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fpa-s5",
+        "title": "Create handoff orchestration function",
+        "scope": "forge-core",
+        "description": "High-level function for complete plan handoff",
+        "dependencies": ["fpa-s2", "fpa-s3", "fpa-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "startRunFromPlanRef(planId, version, config) orchestrates full handoff" },
+          { "id": "ac2", "description": "Steps: fetch plan -> transform -> validate -> POST to Forge /runs -> report status" },
+          { "id": "ac3", "description": "Returns { run_id, tasks_count } on success" },
+          { "id": "ac4", "description": "Throws descriptive error on validation failure" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Orchestration function composing lower-level operations"
+          }
+        }
+      },
+      {
+        "step_id": "fpa-s6",
+        "title": "Implement run status reporting to Planner with explicit error handling",
+        "scope": "forge-core",
+        "description": "Report run progress back to Planner for UI visibility, with clear error visibility",
+        "dependencies": ["fpa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On run status change, call plannerClient.reportRunStatus()" },
+          { "id": "ac2", "description": "Status updates: started, paused, completed, failed, cancelled" },
+          { "id": "ac3", "description": "Include task completion counts in update" },
+          { "id": "ac4", "description": "On failure: store error in run.planner_sync_error field, expose via GET /runs/:id response" },
+          { "id": "ac5", "description": "Run continues executing even if Planner reporting fails - but error is VISIBLE not silent" },
+          { "id": "ac6", "description": "Health endpoint GET /health/planner includes planner_reachable: boolean and last_sync_error if any" },
+          { "id": "ac7", "description": "Retry failed status updates on next status change (best-effort catch-up)" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration_point": "Hook on run state transition in trajectory capture",
+            "error_visibility": "Errors stored in run.planner_sync_error and exposed in API - not logged and forgotten",
+            "retry_strategy": "Store pending updates, retry on next state change",
+            "note": "Requires Planner to implement POST /plans/:id/run-status endpoint"
+          }
+        }
+      },
+      {
+        "step_id": "fpa-s7",
+        "title": "Implement ChangeRequest creation for blocked tasks",
+        "scope": "forge-core",
+        "description": "Send ChangeRequest to Planner when task needs plan revision",
+        "dependencies": ["fpa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When task reports blocked with suggested_change, create ChangeRequest" },
+          { "id": "ac2", "description": "ChangeRequest includes: run_id, task_id, reason, suggested_changes" },
+          { "id": "ac3", "description": "Link ChangeRequest ID to task for tracking" },
+          { "id": "ac4", "description": "Pause run awaiting plan revision (optional, configurable)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/change-requests.ts",
+          "pattern_description": "Copy ChangeRequest creation pattern from planner-core"
+        }
+      }
+    ]
+  }
+}
