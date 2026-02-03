@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SessionWithDetails, useIdeationApi } from './useIdeationApi';
 
 interface UseSessionResult {
@@ -12,7 +12,11 @@ export function useSession(sessionId: string | undefined): UseSessionResult {
   const [session, setSession] = useState<SessionWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const api = useIdeationApi();
+  const { getSession } = useIdeationApi();
+
+  // Use ref to get stable reference to getSession
+  const getSessionRef = useRef(getSession);
+  getSessionRef.current = getSession;
 
   const fetchSession = useCallback(async () => {
     if (!sessionId) {
@@ -24,14 +28,14 @@ export function useSession(sessionId: string | undefined): UseSessionResult {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.getSession(sessionId);
+      const result = await getSessionRef.current(sessionId);
       setSession(result);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setLoading(false);
     }
-  }, [sessionId, api]);
+  }, [sessionId]);
 
   useEffect(() => {
     fetchSession();

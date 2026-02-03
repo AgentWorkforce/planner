@@ -47,7 +47,7 @@ export function SessionItem({ session, isActive }: SessionItemProps) {
     >
       <div className="flex flex-col gap-1">
         <span className="text-sm text-text-primary font-medium truncate">
-          {truncateIntent(session.initial_intent)}
+          {truncateIntent(session.source?.initial_intent ?? 'Untitled')}
         </span>
         <div className="flex items-center justify-between gap-2">
           <SessionStatusBadge

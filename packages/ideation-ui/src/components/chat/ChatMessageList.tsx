@@ -22,7 +22,7 @@ export function ChatMessageList({ messages, loading, isTyping }: ChatMessageList
   // Loading skeleton
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="p-4">
         <div className="flex gap-2 mb-4">
           <Skeleton className="w-8 h-8 rounded-full" />
           <div className="flex-1">
@@ -39,7 +39,7 @@ export function ChatMessageList({ messages, loading, isTyping }: ChatMessageList
   }
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto p-4">
+    <div ref={containerRef} className="p-4">
       {messages.map((message, index) => (
         <ChatBubble key={index} message={message} />
       ))}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useIdeationApi } from './useIdeationApi';
 import { useSessionEvents } from './useSessionEvents';
 
@@ -23,7 +23,11 @@ export function useUnderstanding(
     []
   );
   const [loading, setLoading] = useState(true);
-  const api = useIdeationApi();
+  const { getSession } = useIdeationApi();
+
+  // Use ref to get stable reference
+  const getSessionRef = useRef(getSession);
+  getSessionRef.current = getSession;
 
   const fetchUnderstanding = useCallback(async () => {
     if (!sessionId) {
@@ -35,7 +39,7 @@ export function useUnderstanding(
 
     setLoading(true);
     try {
-      const session = await api.getSession(sessionId);
+      const session = await getSessionRef.current(sessionId);
       if (session?.understanding) {
         setUnderstanding(session.understanding);
         // Extract active specialists from understanding keys
@@ -48,7 +52,7 @@ export function useUnderstanding(
     } finally {
       setLoading(false);
     }
-  }, [sessionId, api]);
+  }, [sessionId]);
 
   useEffect(() => {
     fetchUnderstanding();

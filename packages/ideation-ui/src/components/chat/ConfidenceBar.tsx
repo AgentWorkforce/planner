@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 
 interface ConfidenceBarProps {
   score: number;
-  breakdown?: Record<string, number>;
+  breakdown?: Record<string, string>;
 }
 
 function getSegmentCount(score: number): number {
@@ -71,7 +71,7 @@ export function ConfidenceBar({ score, breakdown = {} }: ConfidenceBarProps) {
             {Object.entries(breakdown).map(([specialist, value]) => (
               <div key={specialist} className="flex justify-between gap-4">
                 <span>{specialist}</span>
-                <span>{Math.round(value)}%</span>
+                <span className="capitalize">{value}</span>
               </div>
             ))}
           </div>

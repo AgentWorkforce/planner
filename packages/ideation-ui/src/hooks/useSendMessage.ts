@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { TranscriptMessage, useIdeationApi } from './useIdeationApi';
 
 interface UseSendMessageResult {
@@ -11,7 +11,14 @@ export function useSendMessage(
   onOptimisticAdd?: (message: TranscriptMessage) => void
 ): UseSendMessageResult {
   const [sending, setSending] = useState(false);
-  const api = useIdeationApi();
+  const { sendMessage } = useIdeationApi();
+
+  // Use refs to get stable references
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
+
+  const onOptimisticAddRef = useRef(onOptimisticAdd);
+  onOptimisticAddRef.current = onOptimisticAdd;
 
   const send = useCallback(async (content: string): Promise<TranscriptMessage | null> => {
     if (!sessionId || !content.trim()) return null;
@@ -22,16 +29,16 @@ export function useSendMessage(
       content: content.trim(),
       timestamp: new Date().toISOString(),
     };
-    onOptimisticAdd?.(optimisticMessage);
+    onOptimisticAddRef.current?.(optimisticMessage);
 
     setSending(true);
     try {
-      const result = await api.sendMessage(sessionId, content.trim());
+      const result = await sendMessageRef.current(sessionId, content.trim());
       return result;
     } finally {
       setSending(false);
     }
-  }, [sessionId, api, onOptimisticAdd]);
+  }, [sessionId]);
 
   return {
     send,

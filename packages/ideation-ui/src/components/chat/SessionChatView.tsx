@@ -21,10 +21,12 @@ export function SessionChatView({ sessionId }: SessionChatViewProps) {
 
   // Handle real-time transcript updates
   const handleTranscriptUpdate = useCallback((messages: TranscriptMessage[]) => {
+    console.log(`[SessionChatView] handleTranscriptUpdate called with ${messages?.length || 0} messages`);
     setTranscript(messages);
     // Stop typing indicator when we receive a new assistant message
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant') {
+      console.log(`[SessionChatView] Received assistant message, stopping typing indicator`);
       setIsTyping(false);
     }
   }, []);
@@ -107,7 +109,7 @@ export function SessionChatView({ sessionId }: SessionChatViewProps) {
     <div className="flex flex-col h-full">
       <ChatHeader session={session} />
 
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-y-auto relative">
         <ChatMessageList messages={transcript} />
         {isTyping && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-primary to-transparent">

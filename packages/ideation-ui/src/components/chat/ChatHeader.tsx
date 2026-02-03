@@ -11,7 +11,8 @@ interface ChatHeaderProps {
   session: SessionWithDetails;
 }
 
-function truncateTitle(intent: string, maxLength = 40): string {
+function truncateTitle(intent: string | undefined, maxLength = 40): string {
+  if (!intent) return 'New Session';
   if (intent.length <= maxLength) return intent;
   return intent.slice(0, maxLength).trim() + '...';
 }
@@ -45,10 +46,10 @@ export function ChatHeader({ session }: ChatHeaderProps) {
   };
 
   return (
-    <header className="h-14 px-4 flex items-center justify-between border-b border-border-subtle bg-bg-primary shrink-0">
+    <header className="h-14 px-4 flex items-center justify-between bg-bg-primary shrink-0">
       <div className="flex items-center gap-4 min-w-0">
         <h2 className="text-sm font-semibold text-text-primary truncate">
-          {truncateTitle(session.initial_intent)}
+          {truncateTitle(session.source?.initial_intent ?? 'Untitled')}
         </h2>
         <ConfidenceBar score={score} breakdown={breakdown} />
       </div>

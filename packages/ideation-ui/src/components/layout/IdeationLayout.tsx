@@ -31,15 +31,20 @@ export function IdeationLayout({
 
       {/* Right Panel (Specialists) */}
       {panel && (
-        <aside
-          className={cn(
-            "h-full bg-bg-secondary border-l border-border-subtle flex flex-col shrink-0 transition-all duration-200",
-            panelCollapsed ? "w-0 overflow-hidden" : "w-[var(--specialists-panel-width)]",
-            "hidden lg:flex"
-          )}
-        >
-          {!panelCollapsed && panel}
-        </aside>
+        <>
+          {/* Panel content in aside (hidden when collapsed) */}
+          <aside
+            className={cn(
+              "h-full bg-bg-secondary border-l border-border-subtle flex flex-col shrink-0 transition-all duration-200",
+              panelCollapsed ? "w-0 overflow-hidden" : "w-[var(--specialists-panel-width)]",
+              "hidden lg:flex"
+            )}
+          >
+            {!panelCollapsed && panel}
+          </aside>
+          {/* Floating expand button when collapsed (rendered outside aside to escape overflow-hidden) */}
+          {panelCollapsed && panel}
+        </>
       )}
     </div>
   );

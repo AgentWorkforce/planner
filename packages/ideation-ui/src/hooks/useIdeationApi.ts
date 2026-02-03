@@ -1,12 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 const API_BASE_URL = '/api/ideation';
 
 // Types matching the ideation backend
 export interface Session {
   id: string;
-  initial_intent: string;
   status: 'active' | 'abandoned';
+  source: {
+    type: 'human' | 'intake';
+    initial_intent: string;
+    channel_ref?: string;
+  };
   created_at: string;
   updated_at: string;
   planner_sends: Array<{
@@ -58,8 +62,9 @@ export function useIdeationApi() {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchJson<{ sessions: Session[] }>(`${API_BASE_URL}/sessions`);
-      return result.sessions;
+      // API returns array directly, not wrapped in { sessions: [] }
+      const result = await fetchJson<Session[]>(`${API_BASE_URL}/sessions`);
+      return result;
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       return [];
@@ -105,7 +110,7 @@ export function useIdeationApi() {
     try {
       const result = await fetchJson<TranscriptMessage>(`${API_BASE_URL}/sessions/${sessionId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ role: 'user', content }),
       });
       return result;
     } catch (err) {
@@ -148,11 +153,11 @@ export function useIdeationApi() {
     }
   }, []);
 
-  const getConfidence = useCallback(async (sessionId: string): Promise<{ score: number; breakdown: Record<string, number> } | null> => {
+  const getConfidence = useCallback(async (sessionId: string): Promise<{ score: number; breakdown: Record<string, string> } | null> => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchJson<{ score: number; breakdown: Record<string, number> }>(`${API_BASE_URL}/sessions/${sessionId}/confidence`);
+      const result = await fetchJson<{ score: number; breakdown: Record<string, string> }>(`${API_BASE_URL}/sessions/${sessionId}/confidence`);
       return result;
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -162,15 +167,34 @@ export function useIdeationApi() {
     }
   }, []);
 
+  // Memoize the methods object separately to prevent re-render loops
+  // when consumers include api in dependency arrays.
+  // Methods are already stable via useCallback with empty deps.
+  const methods = useMemo(
+    () => ({
+      getSessions,
+      getSession,
+      createSession,
+      sendMessage,
+      sendToPlanner,
+      abandonSession,
+      getConfidence,
+    }),
+    [
+      getSessions,
+      getSession,
+      createSession,
+      sendMessage,
+      sendToPlanner,
+      abandonSession,
+      getConfidence,
+    ]
+  );
+
+  // Return methods + state (state changes won't affect method references)
   return {
+    ...methods,
     loading,
     error,
-    getSessions,
-    getSession,
-    createSession,
-    sendMessage,
-    sendToPlanner,
-    abandonSession,
-    getConfidence,
   };
 }

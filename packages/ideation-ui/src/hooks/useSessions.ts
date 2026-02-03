@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session, useIdeationApi } from './useIdeationApi';
 
 interface UseSessionsResult {
@@ -12,13 +12,17 @@ export function useSessions(): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const api = useIdeationApi();
+  const { getSessions } = useIdeationApi();
+
+  // Use ref to get stable reference
+  const getSessionsRef = useRef(getSessions);
+  getSessionsRef.current = getSessions;
 
   const fetchSessions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.getSessions();
+      const result = await getSessionsRef.current();
       // Sort by updated_at DESC (most recent first)
       const sorted = [...result].sort((a, b) => {
         return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
@@ -29,7 +33,7 @@ export function useSessions(): UseSessionsResult {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, []);
 
   useEffect(() => {
     fetchSessions();

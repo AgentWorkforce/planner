@@ -21,3 +21,5 @@ export {
   TooltipProvider,
 } from './Tooltip';
 export { LoadingSpinner } from './LoadingSpinner';
+export { Toggle, toggleVariants } from './toggle';
+export { ToggleGroup, ToggleGroupItem } from './toggle-group';
