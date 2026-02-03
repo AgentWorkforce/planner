@@ -55,9 +55,41 @@ function deterministicUUID(name: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-// Deterministic UUID for the sample initiative
+// Deterministic UUIDs for initiatives by domain
 // Stable across re-runs so data is updated, not duplicated
-const SAMPLE_INITIATIVE_ID = deterministicUUID('planner-v1-initiative');
+const INITIATIVES = {
+  ideation: {
+    id: deterministicUUID('ideation-v1-initiative'),
+    name: 'Ideation v1',
+    description: 'Building the Ideation layer - brainstorming and crystallization',
+    icon: '💡',
+    color: '#fbbf24',
+  },
+  planner: {
+    id: deterministicUUID('planner-v1-initiative'),
+    name: 'Planner v1',
+    description: 'The plans used to build the Planner itself - dogfooding our own tool!',
+    icon: '🚀',
+    color: '#00d9ff',
+  },
+  forge: {
+    id: deterministicUUID('forge-v1-initiative'),
+    name: 'Forge v1',
+    description: 'Building the Forge execution engine - where plans become reality',
+    icon: '🔨',
+    color: '#f97316',
+  },
+} as const;
+
+/**
+ * Determine which initiative a feature belongs to based on its prefix.
+ */
+function getInitiativeForFeature(featureId: string): keyof typeof INITIATIVES {
+  if (featureId.startsWith('ideation-')) return 'ideation';
+  if (featureId.startsWith('forge-')) return 'forge';
+  // Default to planner for planner-*, flow-*, and any other features
+  return 'planner';
+}
 
 interface FlowAcceptanceCriterion {
   id: string;
@@ -397,7 +429,7 @@ function buildStepSpecification(
 
 async function migrate() {
   console.log('Starting migration from flow files to database...\n');
-  console.log(`Initiative ID: ${SAMPLE_INITIATIVE_ID}\n`);
+  console.log(`Initiatives: ideation, planner, forge\n`);
 
   // Read catalog
   const catalogPath = path.join(ROOT, 'docs/flow/catalog.json');
@@ -514,24 +546,29 @@ async function migrate() {
     console.log(`Created organization: Default (${defaultOrgId.slice(0, 8)}...)\n`);
   }
 
-  // Create or update the Planner v1 initiative under the default org
+  // Create or update all initiatives under the default org
   const insertInitiative = db.prepare(`
     INSERT OR REPLACE INTO initiatives (initiative_id, org_id, name, description, status, icon, color, display_order, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  insertInitiative.run(
-    SAMPLE_INITIATIVE_ID,
-    defaultOrgId,
-    'Planner v1',
-    'The plans used to build the Planner itself - dogfooding our own tool!',
-    'active',
-    '🚀',
-    '#00d9ff',
-    0,
-    now,
-    now
-  );
-  console.log('Created initiative: Planner v1\n');
+
+  let displayOrder = 0;
+  for (const [key, initiative] of Object.entries(INITIATIVES)) {
+    insertInitiative.run(
+      initiative.id,
+      defaultOrgId,
+      initiative.name,
+      initiative.description,
+      'active',
+      initiative.icon,
+      initiative.color,
+      displayOrder++,
+      now,
+      now
+    );
+    console.log(`Created initiative: ${initiative.name} (${key})`);
+  }
+  console.log('');
 
   // Prepare plan statements
   const insertPlan = db.prepare(`
@@ -569,14 +606,26 @@ async function migrate() {
   let withUnderstanding = 0;
   let withContext = 0;
 
+  // Track counts per initiative
+  const initiativeCounts: Record<keyof typeof INITIATIVES, number> = {
+    ideation: 0,
+    planner: 0,
+    forge: 0,
+  };
+
   // Second pass: import features
   const transaction = db.transaction(() => {
     for (const [featureId, feature] of allFeatures) {
       const planId = featureIdToPlanId.get(featureId)!;
       const status = mapStatus(feature.status);
 
+      // Determine which initiative this feature belongs to
+      const initiativeKey = getInitiativeForFeature(featureId);
+      const initiativeId = INITIATIVES[initiativeKey].id;
+      initiativeCounts[initiativeKey]++;
+
       // Create plan
-      insertPlan.run(planId, defaultOrgId, SAMPLE_INITIATIVE_ID, now, now);
+      insertPlan.run(planId, defaultOrgId, initiativeId, now, now);
 
       // Build summary
       const summary = {
@@ -721,15 +770,18 @@ async function migrate() {
   transaction();
 
   console.log(`\nMigration complete!`);
-  console.log(`  Initiative: Planner v1`);
   console.log(`  Plans imported/updated: ${importedCount}`);
   console.log(`  Steps imported: ${stepsCount}`);
   console.log(`  Epics with sub-plans: ${epicsWithSubPlans}`);
   console.log(`  With understanding: ${withUnderstanding}`);
   console.log(`  With context: ${withContext}`);
   console.log(`  Database: ${dbPath}`);
-  console.log(`\n  All plans are attached to the "Planner v1" initiative.`);
-  console.log(`  Note: Uses deterministic UUIDs - safe to re-run for updates.`);
+  console.log(`\n  Plans by initiative:`);
+  for (const [key, count] of Object.entries(initiativeCounts)) {
+    const initiative = INITIATIVES[key as keyof typeof INITIATIVES];
+    console.log(`    ${initiative.icon} ${initiative.name}: ${count} plans`);
+  }
+  console.log(`\n  Note: Uses deterministic UUIDs - safe to re-run for updates.`);
 
   db.close();
 }
