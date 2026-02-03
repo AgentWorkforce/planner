@@ -1,9 +1,11 @@
 {
   "feature_id": "ideation-concrete-blocks",
-  "title": "Concrete Blocks - Crystallized Concepts for User Validation",
+  "title": "[SUPERSEDED] Concrete Blocks - Crystallized Concepts for User Validation",
   "type": "feature",
-  "status": "draft",
-  "priority": "high",
+  "status": "superseded",
+  "superseded_by": "ideation-canvas-v2",
+  "superseded_note": "Core concept preserved (blocks as user-validatable artifacts) but implementation changed: physics canvas instead of treemap, three-column layout instead of sidebar, focus mode instead of modal. See ideation-canvas-v2.json for the new umbrella feature.",
+  "priority": "archived",
   "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"],
   "parent": "ideation-package",
   "summary": {

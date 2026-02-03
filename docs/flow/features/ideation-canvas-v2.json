@@ -1,0 +1,1220 @@
+{
+  "feature_id": "ideation-canvas-v2",
+  "title": "Ideation Canvas - Physics-Based Block Visualization",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-specialists", "ideation-domain", "ideation-api"],
+  "parent": "ideation-package",
+  "supersedes": ["ideation-concrete-blocks"],
+  "design_reference": "docs/design/ideation-canvas-ux.md",
+  "summary": {
+    "goal": "Replace the current ideation session view with a physics-based canvas where blocks visualize crystallizing concepts. Three-column layout (forming blocks | chat | curated blocks) with progressive revelation, focus mode for editing, and dashboard for session management. Solves the 'did you understand me?' problem through user-validated blocks before planner handoff.",
+    "problem_statement": {
+      "current_state": "Specialists produce freeform observations. The existing session view has a right sidebar with specialist cards. Users have no clear checkpoint to validate understanding before planning.",
+      "user_pain": "How do I know the agents understood my idea correctly? I'd need to read a PRD after planning and fine-tune it.",
+      "gap": "No intermediate artifact users can validate. No visual representation of concept maturity. No clear curation workflow."
+    },
+    "proposed_solution": {
+      "dual_output": {
+        "understanding": "Domain observations, concerns, patterns - the 'color' that informs HOW to plan (shown in AI Understanding panel)",
+        "blocks": "Crystallized concepts - the 'substance' that informs WHAT to plan (shown on physics canvas)"
+      },
+      "physics_canvas": "matter.js simulation where blocks form, grow with content, and seek attention based on confidence",
+      "curation_workflow": "Blocks progress through lifecycle (forming → curated), user explicitly curates before handoff",
+      "session_dashboard": "Physics-based dashboard showing all sessions as blocks, with Navigator agent for guidance"
+    },
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Session canvas has three-column layout: forming blocks (physics ~30%) | chat (~45%) | curated blocks (~25%)" },
+      { "id": "ac2", "description": "Blocks use matter.js physics: zero gravity with central attraction, collision, drag/shake on release" },
+      { "id": "ac3", "description": "Block lifecycle: forming (0-30%) → emerging (30-60%) → developing (60-90%) → ready (90%+) → curated" },
+      { "id": "ac4", "description": "Block SIZE driven by content amount (mini-spec detail); ATTENTION effects (glow/pulse) driven by confidence (0-100%)" },
+      { "id": "ac5", "description": "Progressive revelation: 0-30% = tiny ~20px dot (not clickable), 30-60% = 40-60px (clickable), 60-90% = 60-100px (full), 90%+ = glow/pulse" },
+      { "id": "ac6", "description": "Focus mode: clicking block transitions to detail panel (replaces physics column) + contextual chat" },
+      { "id": "ac7", "description": "User edits in focus mode are authoritative (AI doesn't overwrite), highlighted with color tint, and versioned" },
+      { "id": "ac8", "description": "Curate action moves block from physics area to right column with green accent border" },
+      { "id": "ac9", "description": "Auto-curation setting: user can enable auto-curation above configurable threshold (default 90%)" },
+      { "id": "ac10", "description": "AI Understanding panel (slide-in drawer): idea summary, overall confidence bar, specialist perspectives with synthesized 'takes'" },
+      { "id": "ac11", "description": "Handoff dialog handles un-curated blocks: leave out, include as context, or include all above X% threshold" },
+      { "id": "ac12", "description": "Session dashboard: physics blocks for sessions (left ~30%), Navigator meta-chat (center ~45%), sent-to-planner column (right ~25%)" },
+      { "id": "ac13", "description": "Dashboard: Initiative gravity wells + color coding group related sessions (same Initiative = same color tint)" },
+      { "id": "ac14", "description": "Dashboard: Abandoned sessions shrink to ~10x10px and drift toward edges (parking lot pattern)" },
+      { "id": "ac15", "description": "User can explicitly delete blocks (AI misunderstood or changed perspective)" },
+      { "id": "ac16", "description": "Header: ← Back (to dashboard), session title dropdown (switch sessions), AI Understanding button, → Planner button" },
+      { "id": "ac17", "description": "Specialist presence indicators: subtle avatars in header (filled = active, empty = idle), click opens AI Understanding focused on specialist" },
+      { "id": "ac18", "description": "Session switching via header dropdown or Cmd+K command palette" },
+      { "id": "ac19", "description": "URL structure: /ideation (dashboard), /ideation/session/:id (canvas), /ideation/session/:id?block=:blockId (focused)" },
+      { "id": "ac20", "description": "Auto-save: sessions save continuously, no explicit Save button needed" },
+      { "id": "ac21", "description": "Dashboard sent-to-planner column: static list with status badges (Planning, Plan Ready, Approved), click opens Planner view" },
+      { "id": "ac22", "description": "AI Understanding panel has Deep Insight mode (future): expand specialist card to see raw <object>:<keys>:<fields> data" },
+      { "id": "ac23", "description": "User settings: auto-curate threshold (default 90%), auto-curate enabled (default false), block visibility threshold (default 30%), theme (default System)" },
+      { "id": "ac24", "description": "Physics blocks rendered as positioned HTML divs (not canvas) for rich content support" },
+      { "id": "ac25", "description": "Both light mode (sandy/warm) and dark mode (mission control) themes supported from start" }
+    ],
+    "decisions": [
+      { "decision": "Physics canvas over treemap", "rationale": "More engaging, matches existing mockup, better represents organic concept formation" },
+      { "decision": "Three-column layout", "rationale": "Clear separation of forming (draft) vs curated blocks; chat stays central" },
+      { "decision": "Size = content, attention = confidence", "rationale": "User can see both how much is in a block AND how confident the AI is about it" },
+      { "decision": "Focus mode over modal", "rationale": "More immersive editing, contextual chat enables refinement via conversation" },
+      { "decision": "Curation explicit by default", "rationale": "User validation is the core value prop; auto-curation is opt-in for power users" },
+      { "decision": "Slide-in drawer for AI Understanding", "rationale": "Doesn't obscure canvas, can view while keeping context" },
+      { "decision": "Navigator agent for dashboard", "rationale": "Same agent as Interviewer but broader context; guides user across sessions" },
+      { "decision": "Block deletion allowed", "rationale": "User may want to remove blocks AI misunderstood or that are no longer relevant" },
+      { "decision": "StatusBar as shared package", "rationale": "@plannr/ui-agent-status-bar reusable across Ideation, Planner, Forge" },
+      { "decision": "Cross-session deduplication by Planner", "rationale": "If same concept exists in multiple sessions under one Initiative, Planner handles consolidation - keeps Ideation scope clean" },
+      { "decision": "Dashboard right column is static", "rationale": "No animation needed; static list with status badges is sufficient for sent sessions" },
+      { "decision": "Basic responsive layout", "rationale": "Plan ahead for mobile; canvas shows chat primarily, blocks in dropdowns/sequence. Dashboard mobile TBD." },
+      { "decision": "HTML divs for block rendering", "rationale": "Canvas element can't render rich content; positioned divs allow markdown, emoji, styled text" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Physics engine (matter.js) requires careful performance tuning for many blocks",
+        "Three-column layout needs flexible sizing for focus mode transitions",
+        "Block schema evolves: add confidence, keyword, emoji, userEdits[], remove maturity",
+        "Real-time updates via SSE for blocks, WebSocket for chat",
+        "Session dashboard reuses physics engine with different block semantics (sessions vs concepts)",
+        "Navigator agent is same codebase as Interviewer with different context/prompts",
+        "StatusBar package creates cross-app dependency - need clean interface",
+        "Gravity wells for Initiatives require physics force field implementation"
+      ],
+      "patterns": ["Physics simulation", "Progressive disclosure", "Focus mode transitions", "Curation workflow", "Cross-cutting components"],
+      "concerns": [
+        "Performance with many physics bodies (>50 blocks)",
+        "Smooth transitions between normal and focus mode",
+        "State management for nested views (canvas within dashboard)",
+        "Physics engine cleanup on unmount to prevent memory leaks",
+        "SSE reconnection handling for block updates"
+      ],
+      "confidence": "forming"
+    },
+    "designer": {
+      "observations": [
+        "Physics-based UI is engaging but needs clear visual hierarchy",
+        "Confidence thresholds create progressive revelation (dots → blocks → glowing blocks)",
+        "Focus mode requires clear visual transition and escape hatch (Close button)",
+        "Dashboard gravity wells need subtle visual grouping (dashed boundaries, color tints) without clutter",
+        "User edits must be visually distinct from AI content (subtle highlight tint)",
+        "AI Understanding panel shows synthesized 'takes' not raw bullet points",
+        "Theme support (light sandy/warm, dark mission control) must be consistent with planner"
+      ],
+      "patterns": ["Progressive revelation", "Focus mode", "Spatial grouping", "Status indicators", "Dual theming"],
+      "concerns": [
+        "Mobile responsiveness for physics-based layouts",
+        "Accessibility for physics interactions (keyboard navigation for blocks?)",
+        "Clear differentiation between session blocks and concept blocks",
+        "Color coding for Initiatives must be accessible (not just color, add pattern/badge)"
+      ],
+      "confidence": "forming"
+    },
+    "security": {
+      "observations": [
+        "User edits stored with version history - need proper sanitization",
+        "SSE connections need authentication token validation",
+        "Block content is markdown - XSS considerations for rendering"
+      ],
+      "concerns": [
+        "Markdown rendering must sanitize user input",
+        "Session access control - users should only see their sessions"
+      ],
+      "confidence": "exploring"
+    }
+  },
+  "context": {
+    "current_architecture": {
+      "session_view": "Header + tabs (Chat | Understanding | Docs) + right sidebar (SpecialistsPanel)",
+      "specialists_panel": "Cards showing per-specialist observations and confidence",
+      "session_list": "Simple list view at /ideation"
+    },
+    "proposed_architecture": {
+      "session_canvas": "Header + three columns (physics blocks | chat | curated blocks)",
+      "focus_mode": "Detail panel replaces physics column, contextual chat alongside",
+      "ai_understanding": "Slide-in drawer with idea summary, confidence bar, specialist perspectives",
+      "session_dashboard": "Physics blocks for sessions + Navigator meta-chat + sent-to-planner column"
+    },
+    "migration_path": "New canvas view is additive. Can coexist with current session view during development. Toggle between views for comparison."
+  },
+  "design_spec": {
+    "reference": "docs/design/ideation-canvas-ux.md",
+    "block_schema": {
+      "id": "string (uuid)",
+      "type": "string (freeform - feature, entity, flow, etc.)",
+      "title": "string",
+      "keyword": "string (short label for physics block display)",
+      "emoji": "string (visual identifier on block)",
+      "status": "'forming' | 'emerging' | 'developing' | 'ready' | 'curated'",
+      "confidence": "number (0-100, drives attention effects)",
+      "content": "string (markdown mini-spec)",
+      "userEdits": "UserEdit[] (tracked user modifications)",
+      "specialist": "string (which specialist created it)",
+      "sourceContext": "string (conversation turn references)",
+      "createdAt": "ISO timestamp",
+      "curatedAt": "ISO timestamp | null"
+    },
+    "user_edit_schema": {
+      "id": "string (uuid)",
+      "range": "{ start: number, end: number } (character positions)",
+      "content": "string (the text user added/modified)",
+      "timestamp": "ISO timestamp"
+    },
+    "layout": {
+      "canvas": {
+        "columns": ["forming-blocks (30%)", "chat (45%)", "curated-blocks (25%)"],
+        "header": "← Back | Session title dropdown | AI Understanding | → Planner"
+      },
+      "focus_mode": {
+        "columns": ["block-detail (expanded)", "chat-contextual (narrower)"],
+        "actions": ["Close", "Curate ✓"]
+      },
+      "dashboard": {
+        "columns": ["in-progress-sessions (30%)", "intake-strategy-metachat (45%)", "sent-to-planner (25%)"]
+      }
+    },
+    "physics": {
+      "engine": "matter.js",
+      "gravity": "zero (with central attraction force)",
+      "block_rendering": "positioned HTML divs (not canvas) for rich content",
+      "interactions": ["drag", "release-shake", "collision"],
+      "block_sizes": {
+        "forming": "~20px (tiny dot)",
+        "emerging": "40-60px",
+        "developing_ready": "60-100px"
+      }
+    },
+    "ai_understanding_panel": {
+      "sections": [
+        { "name": "Idea Summary", "content": "AI-generated synopsis of overall idea" },
+        { "name": "Overall Confidence", "content": "Aggregate confidence bar across specialists" },
+        { "name": "Specialist Perspectives", "content": "Per-specialist cards with synthesized 'take', confidence level, key concerns" },
+        { "name": "Blocks Status", "content": "Breakdown by lifecycle stage (future)" }
+      ],
+      "deep_insight_mode": "Expand specialist card to see raw <object>:<keys>:<fields> understanding data (future)"
+    },
+    "status_bar_component": {
+      "package": "@plannr/ui-agent-status-bar",
+      "interface": {
+        "StatusBarProps": {
+          "agents": "AgentStatus[]",
+          "overallConfidence": "number (optional)",
+          "actions": "StatusAction[] (optional)"
+        },
+        "AgentStatus": {
+          "id": "string",
+          "name": "string",
+          "avatar": "string (emoji or icon)",
+          "status": "'idle' | 'thinking' | 'observing' | 'contributing'",
+          "confidence": "number (optional)"
+        },
+        "StatusAction": {
+          "id": "string",
+          "label": "string",
+          "icon": "string (optional)",
+          "onClick": "() => void"
+        }
+      },
+      "shared_across": ["Ideation", "Planner", "Forge"]
+    },
+    "settings": {
+      "auto_curate_threshold": { "default": 90, "type": "number", "description": "Blocks above this % auto-curate" },
+      "auto_curate_enabled": { "default": false, "type": "boolean", "description": "Whether auto-curation is active" },
+      "block_visibility_threshold": { "default": 30, "type": "number", "description": "Minimum confidence to show block" },
+      "theme": { "default": "system", "type": "'light' | 'dark' | 'system'", "description": "Color theme" }
+    },
+    "theme": {
+      "light": {
+        "canvas-bg": "#f5f0e8",
+        "canvas-bg-subtle": "#ebe6de",
+        "text-primary": "#2d2d2d",
+        "text-muted": "#7a7a7a",
+        "block-draft": "#e8e4dc",
+        "block-draft-border": "#d4cfc5",
+        "block-curated": "#ffffff",
+        "block-curated-border": "#4a7c59",
+        "accent": "#4a7c59",
+        "accent-light": "#e8f0eb"
+      },
+      "dark": {
+        "canvas-bg": "#1a1a1a",
+        "canvas-bg-subtle": "#242424",
+        "text-primary": "#e5e5e5",
+        "text-muted": "#888888",
+        "block-draft": "#2a2a2a",
+        "block-draft-border": "#3a3a3a",
+        "block-curated": "#1e2a1e",
+        "block-curated-border": "#4a7c59",
+        "accent": "#5a9c6a",
+        "accent-light": "#1e2a1e"
+      }
+    },
+    "url_structure": {
+      "/ideation": "Session dashboard",
+      "/ideation/session/:id": "Canvas view (primary work view)",
+      "/ideation/session/:id?block=:blockId": "Canvas view with block focused"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core", "ideation-ui", "shared-ui"],
+    "phases": [
+      {
+        "phase": "1",
+        "name": "Canvas Foundation",
+        "description": "Three-column layout, header with navigation, physics simulation with mock blocks, basic chat integration (existing API)"
+      },
+      {
+        "phase": "2",
+        "name": "Block Schema & Backend",
+        "description": "Updated block schema (confidence, keyword, emoji, userEdits), storage, API endpoints (CRUD, curate, delete), specialist MCP tools (create_block, update_block)"
+      },
+      {
+        "phase": "3",
+        "name": "Block Integration & Physics",
+        "description": "Real-time block updates via SSE, progressive revelation visualization, physics behaviors (attraction, collision, drag/shake)"
+      },
+      {
+        "phase": "4",
+        "name": "Focus Mode & Editing",
+        "description": "Layout transition to detail panel, markdown editing with user edit highlighting, version tracking, contextual chat mode"
+      },
+      {
+        "phase": "5",
+        "name": "Curation & Handoff",
+        "description": "Curate action with animation to right column, auto-curation setting, handoff dialog with un-curated options, planner integration"
+      },
+      {
+        "phase": "6",
+        "name": "AI Understanding Panel",
+        "description": "Slide-in drawer, idea summary section, overall confidence bar, specialist perspective cards with synthesized takes, (future: deep insight mode)"
+      },
+      {
+        "phase": "7",
+        "name": "Session Dashboard",
+        "description": "Physics session blocks (reusing engine), Navigator agent meta-chat, sent-to-planner column with status badges, Initiative gravity wells + color coding, abandoned session parking lot"
+      },
+      {
+        "phase": "8",
+        "name": "Polish & Shared Components",
+        "description": "@plannr/ui-agent-status-bar package, theme refinement (light/dark), user settings persistence, mobile responsive considerations"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "cv2-001",
+        "title": "Create CanvasLayout component with three columns",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Build the foundational three-column layout (30% | 45% | 25%) with resizable panels. Left column for physics blocks, center for chat, right for curated blocks.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Layout renders three columns with flex: forming-blocks (30%), chat (45%), curated-blocks (25%)" },
+          { "id": "ac2", "description": "Columns resize proportionally on window resize" },
+          { "id": "ac3", "description": "Layout accepts children for each column slot" }
+        ],
+        "maps_to_feature_ac": ["ac1"],
+        "specification": {
+          "design": {
+            "component": "CanvasLayout",
+            "library": "custom with Tailwind",
+            "layout": "flex h-full, gap-0, columns with percentage widths",
+            "slots": ["formingBlocksSlot", "chatSlot", "curatedBlocksSlot"]
+          }
+        }
+      },
+      {
+        "step_id": "cv2-002",
+        "title": "Create CanvasHeader component",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Header bar with ← Back button, session title dropdown, AI Understanding button, and → Planner button.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "← Back button navigates to /ideation (dashboard)" },
+          { "id": "ac2", "description": "Session title is editable inline" },
+          { "id": "ac3", "description": "Dropdown lists other sessions for quick switch" },
+          { "id": "ac4", "description": "AI Understanding button triggers onOpenUnderstanding callback" },
+          { "id": "ac5", "description": "→ Planner button triggers onHandoff callback" }
+        ],
+        "maps_to_feature_ac": ["ac16", "ac18"],
+        "specification": {
+          "design": {
+            "component": "CanvasHeader",
+            "layout": "h-14 flex items-center justify-between px-4 border-b",
+            "elements": ["BackButton", "SessionTitleDropdown", "ActionButtons"]
+          }
+        }
+      },
+      {
+        "step_id": "cv2-003",
+        "title": "Integrate matter.js physics engine",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Set up matter.js with zero gravity and central attraction force. Create usePhysicsEngine hook for managing engine lifecycle.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "usePhysicsEngine(containerRef) returns { engine, addBody, removeBody, update }" },
+          { "id": "ac2", "description": "Engine has zero gravity with central attraction force toward container center" },
+          { "id": "ac3", "description": "Bodies collide and don't overlap" },
+          { "id": "ac4", "description": "Engine cleans up on unmount (no memory leaks)" }
+        ],
+        "maps_to_feature_ac": ["ac2"],
+        "specification": {
+          "architecture": {
+            "pattern": "React hook wrapping matter.js",
+            "tech": "matter-js",
+            "central_attraction": "Custom constraint or force applied each tick toward center",
+            "cleanup": "Engine.clear() and Runner.stop() on unmount"
+          }
+        }
+      },
+      {
+        "step_id": "cv2-004",
+        "title": "Create PhysicsBlock component",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Individual block rendered as positioned HTML div (not canvas) that syncs position with physics body. Shows emoji + keyword.",
+        "dependencies": ["cv2-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Block renders as absolutely positioned div" },
+          { "id": "ac2", "description": "Position updates from physics body via requestAnimationFrame" },
+          { "id": "ac3", "description": "Block displays emoji and keyword" },
+          { "id": "ac4", "description": "Dragging block moves physics body, release triggers shake on neighbors" }
+        ],
+        "maps_to_feature_ac": ["ac2", "ac24"],
+        "specification": {
+          "design": {
+            "component": "PhysicsBlock",
+            "rendering": "HTML div with position:absolute, transform for position",
+            "content": "emoji (large), keyword (small text below)",
+            "interactions": "onMouseDown starts drag, onMouseUp releases"
+          }
+        }
+      },
+      {
+        "step_id": "cv2-005",
+        "title": "Create FormingBlocksColumn component",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Left column container that hosts physics simulation and renders PhysicsBlock components for each block.",
+        "dependencies": ["cv2-003", "cv2-004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Container provides ref for physics engine bounds" },
+          { "id": "ac2", "description": "Renders PhysicsBlock for each non-curated block" },
+          { "id": "ac3", "description": "Blocks animate smoothly within container" }
+        ],
+        "maps_to_feature_ac": ["ac1", "ac2"]
+      },
+      {
+        "step_id": "cv2-006",
+        "title": "Create CuratedBlocksColumn component",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Right column showing stacked list of curated blocks with green accent border.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Renders vertical stack of curated block cards" },
+          { "id": "ac2", "description": "Each card has green accent border (--block-curated-border)" },
+          { "id": "ac3", "description": "Clicking a curated block triggers onBlockClick" },
+          { "id": "ac4", "description": "Empty state shows helpful message" }
+        ],
+        "maps_to_feature_ac": ["ac1", "ac8"]
+      },
+      {
+        "step_id": "cv2-007",
+        "title": "Integrate existing chat into center column",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Wire up existing chat components into the center column of the canvas layout.",
+        "dependencies": ["cv2-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Chat renders in center column" },
+          { "id": "ac2", "description": "Messages scroll correctly" },
+          { "id": "ac3", "description": "Input field at bottom works as before" }
+        ],
+        "maps_to_feature_ac": ["ac1"]
+      },
+      {
+        "step_id": "cv2-008",
+        "title": "Create canvas routes and navigation",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Set up routes: /ideation (dashboard placeholder), /ideation/session/:id (canvas), /ideation/session/:id?block=:blockId (focused).",
+        "dependencies": ["cv2-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "/ideation renders dashboard placeholder" },
+          { "id": "ac2", "description": "/ideation/session/:id renders CanvasPage with session data" },
+          { "id": "ac3", "description": "?block=:blockId query param triggers focus mode (placeholder for now)" }
+        ],
+        "maps_to_feature_ac": ["ac19"]
+      },
+      {
+        "step_id": "cv2-009",
+        "title": "Add canvas theme CSS variables",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Add light (sandy/warm) and dark (mission control) theme variables to globals.css for the canvas view.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Light theme variables defined: --canvas-bg, --canvas-bg-subtle, --block-draft, --block-curated, --accent" },
+          { "id": "ac2", "description": "Dark theme variables defined matching design spec" },
+          { "id": "ac3", "description": "Theme switches based on system preference or user setting" }
+        ],
+        "maps_to_feature_ac": ["ac25"]
+      },
+      {
+        "step_id": "cv2-010",
+        "title": "Phase 1 integration test",
+        "scope": "ideation-ui",
+        "phase": "1",
+        "description": "Verify canvas foundation works end-to-end with mock blocks.",
+        "dependencies": ["cv2-001", "cv2-002", "cv2-005", "cv2-006", "cv2-007", "cv2-008", "cv2-009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Canvas renders with all three columns" },
+          { "id": "ac2", "description": "Mock blocks animate in physics simulation" },
+          { "id": "ac3", "description": "Navigation between routes works" },
+          { "id": "ac4", "description": "Theme switching works" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead", "reason": "Phase 1 checkpoint before backend integration" }
+      },
+      {
+        "step_id": "cv2-011",
+        "title": "Define Block schema with Zod",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "Create Block type with all fields: id, type, title, keyword, emoji, status, confidence, content, userEdits[], specialist, sourceContext, createdAt, curatedAt.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BlockSchema Zod type with all fields from design_spec" },
+          { "id": "ac2", "description": "BlockStatus enum: 'forming' | 'emerging' | 'developing' | 'ready' | 'curated'" },
+          { "id": "ac3", "description": "UserEditSchema with id, range: {start, end}, content, timestamp" },
+          { "id": "ac4", "description": "Block.type is freeform string (not enum)" }
+        ],
+        "maps_to_feature_ac": ["ac3"],
+        "specification": {
+          "model": {
+            "entities": ["Block", "UserEdit"],
+            "status_enum": ["forming", "emerging", "developing", "ready", "curated"],
+            "confidence_range": "0-100"
+          }
+        }
+      },
+      {
+        "step_id": "cv2-012",
+        "title": "Add blocks[] to Session storage",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "Extend Session entity to store blocks as JSONB array. Update storage layer.",
+        "dependencies": ["cv2-011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Session.blocks: Block[] column added (JSONB)" },
+          { "id": "ac2", "description": "Existing sessions get empty blocks[] (backward compatible)" },
+          { "id": "ac3", "description": "Storage getSession returns blocks" },
+          { "id": "ac4", "description": "Storage updateSession can update blocks" }
+        ],
+        "maps_to_feature_ac": ["ac3"]
+      },
+      {
+        "step_id": "cv2-013",
+        "title": "Create block CRUD API endpoints",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "REST endpoints for block management within a session.",
+        "dependencies": ["cv2-012"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /api/ideation/sessions/:id/blocks returns Block[]" },
+          { "id": "ac2", "description": "POST /api/ideation/sessions/:id/blocks creates block, returns { id, status: 'forming', ... }" },
+          { "id": "ac3", "description": "PATCH /api/ideation/sessions/:id/blocks/:blockId updates block fields" },
+          { "id": "ac4", "description": "DELETE /api/ideation/sessions/:id/blocks/:blockId removes block" },
+          { "id": "ac5", "description": "POST /api/ideation/sessions/:id/blocks/:blockId/curate sets status='curated', curatedAt=now" }
+        ],
+        "maps_to_feature_ac": ["ac8", "ac15"],
+        "specification": {
+          "architecture": {
+            "pattern": "REST CRUD",
+            "validation": "Zod schemas for request bodies"
+          }
+        }
+      },
+      {
+        "step_id": "cv2-014",
+        "title": "Add block SSE events",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "Emit SSE events when blocks are created, updated, or deleted.",
+        "dependencies": ["cv2-013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SSE endpoint /api/ideation/sessions/:id/blocks/events streams block changes" },
+          { "id": "ac2", "description": "Events: block:created, block:updated, block:deleted, block:curated" },
+          { "id": "ac3", "description": "Event payload includes full block data" }
+        ],
+        "maps_to_feature_ac": ["ac20"]
+      },
+      {
+        "step_id": "cv2-015",
+        "title": "Create create_block MCP tool for specialists",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "MCP tool allowing specialists to create concrete blocks during conversation.",
+        "dependencies": ["cv2-013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "create_block tool accepts: session_id, type, title, keyword, emoji, content, confidence" },
+          { "id": "ac2", "description": "Block.specialist set to calling specialist name" },
+          { "id": "ac3", "description": "Block.sourceContext captures conversation turn reference" },
+          { "id": "ac4", "description": "Returns created block with id" }
+        ],
+        "maps_to_feature_ac": ["ac3"],
+        "specification": {
+          "architecture": {
+            "pattern": "MCP tool",
+            "tool_name": "create_block",
+            "invoked_by": "Specialist agents during observation"
+          }
+        }
+      },
+      {
+        "step_id": "cv2-016",
+        "title": "Create update_block MCP tool",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "MCP tool for specialists to update block confidence and content as understanding develops.",
+        "dependencies": ["cv2-015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "update_block tool accepts: session_id, block_id, confidence?, content?, status?" },
+          { "id": "ac2", "description": "Status transitions validated (can't skip stages)" },
+          { "id": "ac3", "description": "Returns updated block" }
+        ],
+        "maps_to_feature_ac": ["ac3", "ac4"]
+      },
+      {
+        "step_id": "cv2-017",
+        "title": "Update specialist prompts for block creation",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "Enhance specialist prompts with guidance on when and how to create blocks.",
+        "dependencies": ["cv2-015", "cv2-016"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Specialist prompts include block creation guidelines" },
+          { "id": "ac2", "description": "Confidence scoring guidelines: 0-30% forming, 30-60% emerging, etc." },
+          { "id": "ac3", "description": "Mini-spec format template in prompts" }
+        ],
+        "maps_to_feature_ac": ["ac3", "ac4"]
+      },
+      {
+        "step_id": "cv2-018",
+        "title": "Create useBlocks hook",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "React hook for fetching blocks and subscribing to SSE updates.",
+        "dependencies": ["cv2-013", "cv2-014"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useBlocks(sessionId) returns { blocks, loading, error, curateBlock, deleteBlock, refetch }" },
+          { "id": "ac2", "description": "Subscribes to SSE for real-time block updates" },
+          { "id": "ac3", "description": "SSE reconnection on disconnect" },
+          { "id": "ac4", "description": "curateBlock(blockId) calls curate endpoint" },
+          { "id": "ac5", "description": "deleteBlock(blockId) calls delete endpoint" }
+        ],
+        "maps_to_feature_ac": ["ac20"],
+        "integration": true
+      },
+      {
+        "step_id": "cv2-019",
+        "title": "Implement progressive revelation visualization",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "PhysicsBlock renders differently based on confidence: tiny dot (0-30%), small (30-60%), full (60-90%), glowing (90%+).",
+        "dependencies": ["cv2-004", "cv2-018"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "0-30% confidence: ~20px translucent dot, not clickable" },
+          { "id": "ac2", "description": "30-60% confidence: 40-60px block, emoji visible, clickable" },
+          { "id": "ac3", "description": "60-90% confidence: 60-100px full block with emoji + keyword" },
+          { "id": "ac4", "description": "90%+ confidence: full size with glow/pulse animation" }
+        ],
+        "maps_to_feature_ac": ["ac5"]
+      },
+      {
+        "step_id": "cv2-020",
+        "title": "Implement block size based on content",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "Block physical size scales with content amount (mini-spec length), while attention effects (glow) scale with confidence.",
+        "dependencies": ["cv2-019"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Block size calculated from content.length (more content = larger block)" },
+          { "id": "ac2", "description": "Size affects physics body mass (larger = more stable)" },
+          { "id": "ac3", "description": "Attention effects (glow intensity, pulse speed) scale with confidence" }
+        ],
+        "maps_to_feature_ac": ["ac4"]
+      },
+      {
+        "step_id": "cv2-021",
+        "title": "Wire FormingBlocksColumn to real data",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "Connect FormingBlocksColumn to useBlocks hook, rendering real blocks with physics.",
+        "dependencies": ["cv2-005", "cv2-018", "cv2-019", "cv2-020"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "FormingBlocksColumn receives blocks from useBlocks" },
+          { "id": "ac2", "description": "Filters to non-curated blocks only" },
+          { "id": "ac3", "description": "New blocks animate into physics simulation" },
+          { "id": "ac4", "description": "Removed blocks animate out" }
+        ],
+        "maps_to_feature_ac": ["ac2", "ac3"],
+        "integration": true
+      },
+      {
+        "step_id": "cv2-022",
+        "title": "Phase 3 integration test",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "Verify block integration with real backend data.",
+        "dependencies": ["cv2-021"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Blocks from specialists appear in real-time" },
+          { "id": "ac2", "description": "Progressive revelation works correctly" },
+          { "id": "ac3", "description": "Block updates (confidence changes) reflect immediately" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead", "reason": "Phase 3 checkpoint before focus mode" }
+      },
+      {
+        "step_id": "cv2-023",
+        "title": "Create FocusMode layout transition",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "When block is clicked, transition from three-column to two-column layout (detail panel + contextual chat).",
+        "dependencies": ["cv2-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Physics column fades/blurs when focus mode active" },
+          { "id": "ac2", "description": "Detail panel expands to replace physics column" },
+          { "id": "ac3", "description": "Chat column narrows but remains visible" },
+          { "id": "ac4", "description": "Smooth CSS transition between states" }
+        ],
+        "maps_to_feature_ac": ["ac6"]
+      },
+      {
+        "step_id": "cv2-024",
+        "title": "Create BlockDetailPanel component",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Detail panel showing block mini-spec with editable markdown, Close and Curate buttons.",
+        "dependencies": ["cv2-023"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Renders block title, type, emoji at top" },
+          { "id": "ac2", "description": "Mini-spec content rendered as markdown" },
+          { "id": "ac3", "description": "Close button exits focus mode" },
+          { "id": "ac4", "description": "Curate ✓ button triggers curation" }
+        ],
+        "maps_to_feature_ac": ["ac6"]
+      },
+      {
+        "step_id": "cv2-025",
+        "title": "Implement inline markdown editing",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Allow user to edit mini-spec markdown directly in BlockDetailPanel.",
+        "dependencies": ["cv2-024"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Content is editable (contenteditable or textarea toggle)" },
+          { "id": "ac2", "description": "Changes saved on blur or explicit save" },
+          { "id": "ac3", "description": "Markdown preview updates in real-time" }
+        ],
+        "maps_to_feature_ac": ["ac7"]
+      },
+      {
+        "step_id": "cv2-026",
+        "title": "Add user edit tracking and highlighting",
+        "scope": "ideation-core",
+        "phase": "4",
+        "description": "Backend support for tracking user edits with ranges and timestamps.",
+        "dependencies": ["cv2-011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PATCH /blocks/:id accepts userEdits array" },
+          { "id": "ac2", "description": "UserEdit stored with range, content, timestamp" },
+          { "id": "ac3", "description": "User edits flagged as authoritative (AI won't overwrite)" }
+        ],
+        "maps_to_feature_ac": ["ac7"]
+      },
+      {
+        "step_id": "cv2-027",
+        "title": "Implement user edit highlighting in UI",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Highlight user-edited portions of mini-spec with subtle color tint.",
+        "dependencies": ["cv2-025", "cv2-026"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "User edits highlighted with --accent-light background" },
+          { "id": "ac2", "description": "Highlight ranges calculated from userEdits array" },
+          { "id": "ac3", "description": "New edits tracked and added to userEdits" }
+        ],
+        "maps_to_feature_ac": ["ac7"]
+      },
+      {
+        "step_id": "cv2-028",
+        "title": "Implement contextual chat mode",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "When in focus mode, chat knows which block is focused for contextual refinement.",
+        "dependencies": ["cv2-023"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Chat header shows 'Discussing: {block.title}'" },
+          { "id": "ac2", "description": "Messages sent include block context" },
+          { "id": "ac3", "description": "AI responses can update the focused block" }
+        ],
+        "maps_to_feature_ac": ["ac6"]
+      },
+      {
+        "step_id": "cv2-029",
+        "title": "Add URL support for focused block",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Support ?block=:blockId query param to open canvas with block already focused.",
+        "dependencies": ["cv2-023", "cv2-008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "?block=:blockId opens canvas in focus mode for that block" },
+          { "id": "ac2", "description": "URL updates when entering/exiting focus mode" },
+          { "id": "ac3", "description": "Browser back button exits focus mode" }
+        ],
+        "maps_to_feature_ac": ["ac19"]
+      },
+      {
+        "step_id": "cv2-030",
+        "title": "Implement curate action with animation",
+        "scope": "ideation-ui",
+        "phase": "5",
+        "description": "Curate button moves block from physics area to curated column with smooth animation.",
+        "dependencies": ["cv2-018", "cv2-024"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Clicking Curate calls curateBlock()" },
+          { "id": "ac2", "description": "Block animates from physics position to curated column" },
+          { "id": "ac3", "description": "Block gains green accent border after curation" },
+          { "id": "ac4", "description": "Focus mode exits after curation" }
+        ],
+        "maps_to_feature_ac": ["ac8"]
+      },
+      {
+        "step_id": "cv2-031",
+        "title": "Create auto-curation setting",
+        "scope": "ideation-ui",
+        "phase": "5",
+        "description": "Setting to auto-curate blocks when confidence exceeds threshold.",
+        "dependencies": ["cv2-018"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Settings UI: auto-curate threshold slider (default 90%)" },
+          { "id": "ac2", "description": "Settings UI: auto-curate enabled checkbox (default false)" },
+          { "id": "ac3", "description": "When enabled, blocks at threshold+ auto-curate" },
+          { "id": "ac4", "description": "Settings persist to localStorage" }
+        ],
+        "maps_to_feature_ac": ["ac9", "ac23"]
+      },
+      {
+        "step_id": "cv2-032",
+        "title": "Create HandoffDialog component",
+        "scope": "ideation-ui",
+        "phase": "5",
+        "description": "Dialog shown when → Planner clicked, handling un-curated blocks.",
+        "dependencies": ["cv2-018"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Lists un-curated blocks with confidence %" },
+          { "id": "ac2", "description": "Options: Leave out, Include as context, Include above X%" },
+          { "id": "ac3", "description": "Threshold slider for 'Include above X%' option" },
+          { "id": "ac4", "description": "Cancel and Send to Planner buttons" }
+        ],
+        "maps_to_feature_ac": ["ac11"]
+      },
+      {
+        "step_id": "cv2-033",
+        "title": "Update planner handoff to include blocks",
+        "scope": "ideation-core",
+        "phase": "5",
+        "description": "Extend send-to-planner to include curated blocks and selected un-curated blocks.",
+        "dependencies": ["cv2-013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Handoff payload includes blocks[] array" },
+          { "id": "ac2", "description": "Blocks filtered based on handoff options (curated only, above threshold, etc.)" },
+          { "id": "ac3", "description": "Plan.source.blocks stores received blocks" }
+        ],
+        "maps_to_feature_ac": ["ac11"],
+        "integration": true
+      },
+      {
+        "step_id": "cv2-034",
+        "title": "Create AIUnderstandingDrawer component",
+        "scope": "ideation-ui",
+        "phase": "6",
+        "description": "Slide-in drawer showing AI's holistic understanding of the idea.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Drawer slides in from right (panels pattern)" },
+          { "id": "ac2", "description": "Close button in header" },
+          { "id": "ac3", "description": "Scrollable content area" }
+        ],
+        "maps_to_feature_ac": ["ac10"]
+      },
+      {
+        "step_id": "cv2-035",
+        "title": "Create IdeaSummarySection component",
+        "scope": "ideation-ui",
+        "phase": "6",
+        "description": "Section showing AI-generated synopsis of the overall idea.",
+        "dependencies": ["cv2-034"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Displays idea summary text from session" },
+          { "id": "ac2", "description": "Styled as quote/callout block" }
+        ],
+        "maps_to_feature_ac": ["ac10"]
+      },
+      {
+        "step_id": "cv2-036",
+        "title": "Create OverallConfidenceBar component",
+        "scope": "ideation-ui",
+        "phase": "6",
+        "description": "Aggregate confidence bar across all specialists.",
+        "dependencies": ["cv2-034"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Progress bar showing aggregate confidence %" },
+          { "id": "ac2", "description": "Calculated from specialist confidences" },
+          { "id": "ac3", "description": "Color gradient based on confidence level" }
+        ],
+        "maps_to_feature_ac": ["ac10"]
+      },
+      {
+        "step_id": "cv2-037",
+        "title": "Create SpecialistPerspectiveCard component",
+        "scope": "ideation-ui",
+        "phase": "6",
+        "description": "Card showing specialist's synthesized 'take' on the idea.",
+        "dependencies": ["cv2-034"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows specialist emoji, name, confidence level" },
+          { "id": "ac2", "description": "Synthesized perspective as natural language (not bullet points)" },
+          { "id": "ac3", "description": "Key concerns/questions section" },
+          { "id": "ac4", "description": "Confidence badge (exploring/forming/confident)" }
+        ],
+        "maps_to_feature_ac": ["ac10"]
+      },
+      {
+        "step_id": "cv2-038",
+        "title": "Integrate AIUnderstandingDrawer into canvas",
+        "scope": "ideation-ui",
+        "phase": "6",
+        "description": "Wire up AI Understanding button in header to open drawer.",
+        "dependencies": ["cv2-034", "cv2-035", "cv2-036", "cv2-037", "cv2-002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AI Understanding button opens drawer" },
+          { "id": "ac2", "description": "Drawer populated with session understanding data" },
+          { "id": "ac3", "description": "Clicking specialist avatar in header opens drawer focused on that specialist" }
+        ],
+        "maps_to_feature_ac": ["ac10", "ac17"],
+        "integration": true
+      },
+      {
+        "step_id": "cv2-039",
+        "title": "Add specialist presence indicators to header",
+        "scope": "ideation-ui",
+        "phase": "6",
+        "description": "Subtle specialist avatars in header showing active/idle state.",
+        "dependencies": ["cv2-002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Specialist avatars render in header (subtle, corner)" },
+          { "id": "ac2", "description": "Filled = active/processing, Empty circle = idle" },
+          { "id": "ac3", "description": "Hover shows specialist name + status" },
+          { "id": "ac4", "description": "Click opens AI Understanding drawer focused on specialist" }
+        ],
+        "maps_to_feature_ac": ["ac17"]
+      },
+      {
+        "step_id": "cv2-040",
+        "title": "Create SessionDashboard layout",
+        "scope": "ideation-ui",
+        "phase": "7",
+        "description": "Dashboard view with three columns: in-progress sessions, navigator chat, sent-to-planner.",
+        "dependencies": ["cv2-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Three-column layout (30% | 45% | 25%)" },
+          { "id": "ac2", "description": "Header with 'Ideation' title and + New Session button" },
+          { "id": "ac3", "description": "Left column for physics session blocks" },
+          { "id": "ac4", "description": "Center for Navigator chat + future intake/portfolio" },
+          { "id": "ac5", "description": "Right for sent-to-planner list" }
+        ],
+        "maps_to_feature_ac": ["ac12"]
+      },
+      {
+        "step_id": "cv2-041",
+        "title": "Create SessionPhysicsBlock component",
+        "scope": "ideation-ui",
+        "phase": "7",
+        "description": "Physics block representing a session (not a concept). Reuses physics engine.",
+        "dependencies": ["cv2-003", "cv2-004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Renders session title and progress indicator" },
+          { "id": "ac2", "description": "Size based on session content, attention based on confidence" },
+          { "id": "ac3", "description": "Click navigates to /ideation/session/:id" },
+          { "id": "ac4", "description": "Shows overall session confidence %" }
+        ],
+        "maps_to_feature_ac": ["ac12"]
+      },
+      {
+        "step_id": "cv2-042",
+        "title": "Implement Initiative gravity wells",
+        "scope": "ideation-ui",
+        "phase": "7",
+        "description": "Sessions under same Initiative are attracted to shared gravity well with color coding.",
+        "dependencies": ["cv2-041", "cv2-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sessions with same initiative_id attracted to shared center" },
+          { "id": "ac2", "description": "Gravity well visualized with dashed boundary" },
+          { "id": "ac3", "description": "Sessions color-tinted by Initiative (same initiative = same color)" },
+          { "id": "ac4", "description": "Unassigned sessions float freely (gray, no tint)" }
+        ],
+        "maps_to_feature_ac": ["ac13"]
+      },
+      {
+        "step_id": "cv2-043",
+        "title": "Implement abandoned session parking lot",
+        "scope": "ideation-ui",
+        "phase": "7",
+        "description": "Old sessions shrink and drift to edges over time.",
+        "dependencies": ["cv2-041"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sessions not touched for X days shrink to ~10x10px" },
+          { "id": "ac2", "description": "Abandoned sessions drift toward edges (inverse gravity or reduced attraction)" },
+          { "id": "ac3", "description": "Still clickable - can revive by opening" }
+        ],
+        "maps_to_feature_ac": ["ac14"]
+      },
+      {
+        "step_id": "cv2-044",
+        "title": "Create SentToPlannerColumn component",
+        "scope": "ideation-ui",
+        "phase": "7",
+        "description": "Static list of sessions that have been handed off to planner.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Lists sessions with handoff date" },
+          { "id": "ac2", "description": "Status badge: Planning, Plan Ready, Approved" },
+          { "id": "ac3", "description": "Click opens plan in Planner view" },
+          { "id": "ac4", "description": "Sorted by handoff date (most recent first)" }
+        ],
+        "maps_to_feature_ac": ["ac21"]
+      },
+      {
+        "step_id": "cv2-045",
+        "title": "Create Navigator meta-chat",
+        "scope": "ideation-ui",
+        "phase": "7",
+        "description": "Chat interface in dashboard center for Navigator agent guidance.",
+        "dependencies": ["cv2-040"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Chat interface in center column bottom" },
+          { "id": "ac2", "description": "Navigator agent context (all sessions, progress, connections)" },
+          { "id": "ac3", "description": "Can suggest what to work on next" },
+          { "id": "ac4", "description": "Can open specific sessions on request" }
+        ],
+        "maps_to_feature_ac": ["ac12"]
+      },
+      {
+        "step_id": "cv2-046",
+        "title": "Create Navigator agent prompt",
+        "scope": "ideation-core",
+        "phase": "7",
+        "description": "Navigator agent (same as Interviewer) with broader context for dashboard guidance.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Navigator prompt includes all sessions summary" },
+          { "id": "ac2", "description": "Sees confidence levels and content summaries" },
+          { "id": "ac3", "description": "Can identify connections between sessions" },
+          { "id": "ac4", "description": "Suggests next actions based on progress" }
+        ],
+        "maps_to_feature_ac": ["ac12"]
+      },
+      {
+        "step_id": "cv2-047",
+        "title": "Create @plannr/ui-agent-status-bar package",
+        "scope": "shared-ui",
+        "phase": "8",
+        "description": "Shared StatusBar component package for use across Ideation, Planner, Forge.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Package exports StatusBar component" },
+          { "id": "ac2", "description": "Props: agents: AgentStatus[], overallConfidence?, actions?: StatusAction[]" },
+          { "id": "ac3", "description": "AgentStatus: { id, name, avatar, status, confidence? }" },
+          { "id": "ac4", "description": "StatusAction: { id, label, icon?, onClick }" },
+          { "id": "ac5", "description": "Package published to internal registry or monorepo" }
+        ],
+        "maps_to_feature_ac": ["ac17"]
+      },
+      {
+        "step_id": "cv2-048",
+        "title": "Integrate StatusBar into Ideation canvas",
+        "scope": "ideation-ui",
+        "phase": "8",
+        "description": "Use shared StatusBar for specialist presence indicators.",
+        "dependencies": ["cv2-047", "cv2-039"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "StatusBar renders specialists in header" },
+          { "id": "ac2", "description": "Overall session confidence shown" },
+          { "id": "ac3", "description": "Actions: QA check, refresh" }
+        ],
+        "maps_to_feature_ac": ["ac17"],
+        "integration": true
+      },
+      {
+        "step_id": "cv2-049",
+        "title": "Create user settings persistence",
+        "scope": "ideation-ui",
+        "phase": "8",
+        "description": "Persist user settings (auto-curate, visibility threshold, theme) to localStorage.",
+        "dependencies": ["cv2-031"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Settings stored in localStorage" },
+          { "id": "ac2", "description": "Settings loaded on app init" },
+          { "id": "ac3", "description": "useSettings hook provides get/set" },
+          { "id": "ac4", "description": "Settings: auto_curate_threshold, auto_curate_enabled, block_visibility_threshold, theme" }
+        ],
+        "maps_to_feature_ac": ["ac23"]
+      },
+      {
+        "step_id": "cv2-050",
+        "title": "Theme refinement and consistency check",
+        "scope": "ideation-ui",
+        "phase": "8",
+        "description": "Ensure light/dark themes are consistent with design spec and planner aesthetic.",
+        "dependencies": ["cv2-009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Light theme matches sandy/warm spec" },
+          { "id": "ac2", "description": "Dark theme matches mission control spec" },
+          { "id": "ac3", "description": "Theme switch is seamless (no flicker)" },
+          { "id": "ac4", "description": "All canvas components use theme variables" }
+        ],
+        "maps_to_feature_ac": ["ac25"]
+      },
+      {
+        "step_id": "cv2-051",
+        "title": "Add Cmd+K command palette for session switching",
+        "scope": "ideation-ui",
+        "phase": "8",
+        "description": "Power user command palette for quick session navigation.",
+        "dependencies": ["cv2-002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cmd+K opens command palette" },
+          { "id": "ac2", "description": "Lists all sessions with search filter" },
+          { "id": "ac3", "description": "Enter navigates to selected session" },
+          { "id": "ac4", "description": "Recent sessions shown first" }
+        ],
+        "maps_to_feature_ac": ["ac18"]
+      },
+      {
+        "step_id": "cv2-052",
+        "title": "Mobile responsive foundations",
+        "scope": "ideation-ui",
+        "phase": "8",
+        "description": "Basic responsive layout planning for mobile (not full implementation).",
+        "dependencies": ["cv2-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Breakpoints defined for mobile (<768px)" },
+          { "id": "ac2", "description": "On mobile: chat is primary, blocks in dropdown/sequence" },
+          { "id": "ac3", "description": "Navigation buttons (← Back, → Planner) remain accessible" }
+        ],
+        "maps_to_feature_ac": ["ac1"]
+      },
+      {
+        "step_id": "cv2-053",
+        "title": "Final integration tests",
+        "scope": "ideation-ui",
+        "phase": "8",
+        "description": "End-to-end testing of complete canvas flow.",
+        "dependencies": ["cv2-048", "cv2-049", "cv2-050", "cv2-051"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Full flow: create session → chat → blocks form → curate → handoff" },
+          { "id": "ac2", "description": "Dashboard navigation works" },
+          { "id": "ac3", "description": "Settings persist across sessions" },
+          { "id": "ac4", "description": "All themes render correctly" }
+        ],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead", "reason": "Final approval before release" }
+      }
+    ]
+  },
+  "sub_features": {
+    "note": "These are logical groupings within the umbrella feature, not separate feature files",
+    "canvas_layout": {
+      "description": "Three-column physics-based session view with header",
+      "acceptance_criteria": ["ac1", "ac2", "ac16", "ac18", "ac19", "ac24"]
+    },
+    "block_lifecycle": {
+      "description": "Progressive revelation, sizing, attention, and curation workflow",
+      "acceptance_criteria": ["ac3", "ac4", "ac5", "ac8", "ac9", "ac15", "ac20"]
+    },
+    "focus_mode": {
+      "description": "Block detail editing with contextual chat",
+      "acceptance_criteria": ["ac6", "ac7"]
+    },
+    "ai_understanding": {
+      "description": "Specialist perspectives panel with synthesized takes",
+      "acceptance_criteria": ["ac10", "ac17", "ac22"]
+    },
+    "handoff": {
+      "description": "Curation and planner handoff flow",
+      "acceptance_criteria": ["ac11", "ac21"]
+    },
+    "dashboard": {
+      "description": "Session management with Navigator agent",
+      "acceptance_criteria": ["ac12", "ac13", "ac14"]
+    },
+    "shared_components": {
+      "description": "Cross-app components and theming",
+      "acceptance_criteria": ["ac23", "ac25"]
+    }
+  },
+  "notes": "This feature supersedes ideation-concrete-blocks. The core concept remains (blocks as user-validatable artifacts) but the implementation changes significantly: physics canvas instead of treemap, three-column layout instead of sidebar, focus mode instead of modal. See docs/design/ideation-canvas-ux.md for comprehensive UX specification."
+}

@@ -163,7 +163,8 @@
     { "id": "ideation-ui-chat", "title": "Chat Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
     { "id": "ideation-ui-specialists-panel", "title": "Specialists Panel", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
     { "id": "ideation-ui-session-tabs", "title": "Session View Tab Navigation", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-ui-chat", "ideation-ui-specialists-panel"], "parent": "ideation-ui" },
-    { "id": "ideation-concrete-blocks", "title": "Concrete Blocks - User-Validatable Concepts", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"], "parent": "ideation-package", "design_reference": "docs/flow/features/ideation-concrete-blocks.json" },
+    { "id": "ideation-concrete-blocks", "title": "[SUPERSEDED] Concrete Blocks", "type": "feature", "status": "superseded", "priority": "archived", "superseded_by": "ideation-canvas-v2", "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"], "parent": "ideation-package" },
+    { "id": "ideation-canvas-v2", "title": "Ideation Canvas - Physics-Based Blocks", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-specialists", "ideation-domain", "ideation-api"], "parent": "ideation-package", "design_reference": "docs/design/ideation-canvas-ux.md", "note": "Supersedes ideation-concrete-blocks. Physics canvas, three-column layout, focus mode, dashboard with Navigator." },
 
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
     { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
