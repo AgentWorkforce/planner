@@ -78,7 +78,7 @@ describe('planner-lead-status-integration', () => {
         'agent_status',
         expect.objectContaining({
           type: 'agent_joined',
-          agentId: 'planner-core',
+          agentId: 'Relay',
           role: 'planner-lead',
           displayName: 'Planning Assistant',
           state: 'idle',
@@ -99,7 +99,7 @@ describe('planner-lead-status-integration', () => {
       expect(joinedCall).toBeDefined();
 
       const event = joinedCall![3] as { agentId: string };
-      expect(event.agentId).toBe('planner-core');
+      expect(event.agentId).toBe('Relay');
 
       stopPlannerLead();
     });
@@ -326,7 +326,7 @@ describe('planner-lead-status-integration', () => {
         'agent_status',
         expect.objectContaining({
           type: 'agent_left',
-          agentId: 'planner-core',
+          agentId: 'Relay',
           reason: 'shutdown',
           timestamp: expect.any(String),
         })
@@ -376,7 +376,7 @@ describe('planner-lead-status-integration', () => {
 
       const agents = getActiveAgents();
       const plannerLeadEntry = Array.from(agents.entries()).find(
-        ([id]) => id === 'planner-core'
+        ([id]) => id === 'Relay'
       );
 
       expect(plannerLeadEntry).toBeDefined();
@@ -398,7 +398,7 @@ describe('planner-lead-status-integration', () => {
 
       const agents = getActiveAgents();
       const plannerLeadEntry = Array.from(agents.entries()).find(
-        ([id]) => id === 'planner-core'
+        ([id]) => id === 'Relay'
       );
 
       expect(plannerLeadEntry).toBeUndefined();
@@ -413,7 +413,7 @@ describe('planner-lead-status-integration', () => {
       // Verify initial idle state
       const agentsInitial = getActiveAgents();
       const plannerLeadInitial = Array.from(agentsInitial.entries()).find(
-        ([id]) => id === 'planner-core'
+        ([id]) => id === 'Relay'
       );
       expect(plannerLeadInitial![1].state).toBe('idle');
 
@@ -424,7 +424,7 @@ describe('planner-lead-status-integration', () => {
       // After completion, should be back to idle
       const agentsAfter = getActiveAgents();
       const plannerLeadAfter = Array.from(agentsAfter.entries()).find(
-        ([id]) => id === 'planner-core'
+        ([id]) => id === 'Relay'
       );
       expect(plannerLeadAfter![1].state).toBe('idle');
 

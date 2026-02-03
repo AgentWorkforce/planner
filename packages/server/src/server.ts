@@ -26,7 +26,15 @@ import {
   initPlannerLead,
   stopPlannerLead,
   createSessionTimeoutService,
+  initIdeationBridge,
+  stopIdeationBridge,
+  syncIdeationSessionChannels,
+  planChannelMiddleware,
+  qaChannelMiddleware,
 } from './relay/index.js';
+
+// Server API routes (relay-aware channel handlers)
+import { createServerRouter } from './api/routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -65,6 +73,17 @@ async function start(): Promise<void> {
   app.use(cors());
   app.use(express.json());
 
+  // Mount plan channel middleware (intercepts POST /api/plans to create channels)
+  app.use('/api', planChannelMiddleware);
+
+  // Mount QA channel middleware (broadcasts QA messages when questions are answered)
+  app.use('/api', qaChannelMiddleware);
+
+  // Mount server API router (relay-aware channel handlers - must come BEFORE planner router)
+  const storage = plannerService.getStorage();
+  const serverRouter = createServerRouter(storage);
+  app.use('/api', serverRouter);
+
   // Mount plugin routers
   app.use('/api', plannerService.router);
   app.use('/api/ideation', ideationService.router);
@@ -83,15 +102,21 @@ async function start(): Promise<void> {
   const mode = getRelayMode();
   console.log(`[relay] Mode: ${mode}`);
 
+  // Initialize ideation bridge (routes relay messages to ideation package)
+  initIdeationBridge();
+
   // Initialize channel management
   initChannelManagement();
 
   // Sync plan channels with existing plans
-  const storage = plannerService.getStorage();
   if (mode === 'connected') {
     const plans = storage.listPlans();
     const planIds = plans.map((p) => p.plan_id);
     syncPlanChannels(planIds);
+
+    // Sync ideation session channels with existing active sessions
+    const ideationStorage = ideationService.getStorage();
+    await syncIdeationSessionChannels(ideationStorage);
   }
 
   // Initialize PlannerLead agent
@@ -140,6 +165,9 @@ async function start(): Promise<void> {
 
     // Stop PlannerLead service
     stopPlannerLead();
+
+    // Stop ideation bridge
+    stopIdeationBridge();
 
     // Stop session timeout service
     sessionTimeoutService.stop();

@@ -71,7 +71,7 @@ export async function connect(): Promise<void> {
 
   try {
     client = new RelayClient({
-      agentName: 'planner-core',
+      agentName: 'Relay',
       socketPath: config.socketPath,
       reconnect: true,
       maxReconnectAttempts: config.maxReconnectAttempts,
@@ -99,6 +99,7 @@ export async function connect(): Promise<void> {
 
     // Wire up channel message routing - channel messages are different from direct messages
     client.onChannelMessage = (from: string, channel: string, body: string, envelope: { id: string; ts?: number; payload?: { data?: Record<string, unknown> } }) => {
+      console.log(`[relay] Received channel message from ${from} in ${channel}: "${body.substring(0, 50)}..."`);
       // Route to handlers with channel info in data
       for (const handler of messageHandlers) {
         try {
@@ -212,12 +213,16 @@ export function sendChannelMessage(
   body: string,
   data?: Record<string, unknown>
 ): boolean {
+  console.log(`[relay] sendChannelMessage called: channel=${channel}, body="${body.substring(0, 50)}..."`);
+
   if (!client || connectionState !== 'READY') {
-    console.error('[relay] Cannot send channel message: not connected');
+    console.error(`[relay] Cannot send channel message: not connected (client=${!!client}, state=${connectionState})`);
     return false;
   }
 
-  return client.sendChannelMessage(channel, body, { data });
+  const result = client.sendChannelMessage(channel, body, { data });
+  console.log(`[relay] SDK sendChannelMessage result for ${channel}: ${result}`);
+  return result;
 }
 
 /**

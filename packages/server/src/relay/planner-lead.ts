@@ -7,7 +7,7 @@
  * - Uses Anthropic API for response generation
  * - Can call planning tools (read_plan, add_step, etc.)
  *
- * Unlike spawn()-based agents, PlannerLead runs as part of the planner-core
+ * Unlike spawn()-based agents, PlannerLead runs as part of the Relay
  * process and persists across messages.
  */
 
@@ -68,7 +68,7 @@ function extractPlanIdFromChannel(channelId: string): string | null {
  */
 function shouldHandleMessage(from: string, body: string, channelId?: string): boolean {
   // Don't respond to our own messages
-  if (from === PLANNER_LEAD_CONFIG.name || from === 'planner-core') {
+  if (from === PLANNER_LEAD_CONFIG.name || from === 'Relay') {
     return false;
   }
 
@@ -318,8 +318,8 @@ export function initPlannerLead(storageInstance: PlanStorage): void {
   }
 
   // Use the same name as the relay client for proper matching
-  // This must match the agentName in client.ts ('planner-core')
-  agentId = 'planner-core';
+  // This must match the agentName in client.ts ('Relay')
+  agentId = 'Relay';
 
   storage = storageInstance;
 

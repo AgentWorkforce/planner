@@ -5,7 +5,8 @@
  * and UI subscribers can receive real-time Q&A updates.
  */
 
-import type { QuestionBlockingLevel } from '../domain/question.js';
+/** How severely a question is blocking agent progress */
+export type QuestionBlockingLevel = 'hard' | 'soft' | 'none';
 
 /**
  * Payload for Q&A channel messages.

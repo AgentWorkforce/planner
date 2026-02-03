@@ -21,7 +21,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
+// Go up from src/relay/ to packages/server/ to packages/ to project root
+const PROJECT_ROOT = path.resolve(__dirname, '../../../..');
 
 // Use project-local socket path (matches relay-daemon default behavior)
 const DEFAULT_SOCKET_PATH = path.join(PROJECT_ROOT, '.agent-relay', 'relay.sock');

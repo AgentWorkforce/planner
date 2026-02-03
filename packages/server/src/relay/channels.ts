@@ -46,8 +46,8 @@ export function createPlannerChannel(): boolean {
     return false;
   }
 
-  // Join the channel as planner-core (effectively creates it)
-  const joined = client.joinChannel(PLANNER_CHANNEL, 'Planner Core');
+  // Join the channel as Relay (effectively creates it)
+  const joined = client.joinChannel(PLANNER_CHANNEL, 'Relay');
   if (joined) {
     createdChannels.add(PLANNER_CHANNEL);
     console.log('[channels] Created #planner channel');

@@ -96,3 +96,38 @@ export {
   stopPlannerLead,
   notifyNewPlan,
 } from './planner-lead.js';
+
+// Ideation bridge exports
+export {
+  initIdeationBridge,
+  stopIdeationBridge,
+  syncIdeationSessionChannels,
+} from './ideation-bridge.js';
+
+// Plan channel middleware exports
+export { planChannelMiddleware } from './plan-channel-middleware.js';
+
+// QA channel middleware exports
+export { qaChannelMiddleware } from './qa-channel-middleware.js';
+
+// Agent status exports
+export {
+  getActiveAgents,
+  emitAgentJoined,
+  emitAgentStatusUpdate,
+  emitAgentLeft,
+  emitAgentsSnapshot,
+  type AgentState,
+  type AgentRole,
+  type AgentJoinedEvent,
+  type AgentStatusUpdateEvent,
+  type AgentLeftEvent,
+  type AgentsSnapshotEvent,
+  type AgentStatusEvent,
+} from './agent-status.js';
+
+// Chat exports
+export {
+  sendToAgent,
+  type AgentResponse,
+} from './chat.js';

@@ -106,7 +106,7 @@ describe('relay/client', () => {
 
       expect(RelayClient).toHaveBeenCalledWith(
         expect.objectContaining({
-          agentName: 'planner-core',
+          agentName: 'Relay',
           socketPath: expect.any(String),
           reconnect: true,
         })

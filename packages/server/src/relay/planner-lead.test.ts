@@ -151,8 +151,8 @@ describe('planner-lead', () => {
       expect(mockSendChannelMessage.mock.calls[0][0]).toBe('#plan-abc12345');
     });
 
-    it('ignores messages from planner-core', async () => {
-      await messageHandler!('planner-core', 'Test message', undefined, { channel: '#planner' });
+    it('ignores messages from Relay', async () => {
+      await messageHandler!('Relay', 'Test message', undefined, { channel: '#planner' });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -285,7 +285,7 @@ describe('planner-lead', () => {
 
       initPlannerLead(storage);
 
-      expect(getPlannerLeadAgentId()).toBe('planner-core');
+      expect(getPlannerLeadAgentId()).toBe('Relay');
 
       stopPlannerLead();
     });
