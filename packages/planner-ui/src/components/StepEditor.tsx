@@ -281,14 +281,8 @@ export function StepEditor({
           />
         </div>
 
-        {step.scope && (
-          <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-bg-elevated text-text-secondary rounded">
-            {step.scope}
-          </span>
-        )}
-
-        {/* Specification domain indicators - dynamically rendered */}
-        <div className="flex-shrink-0 flex items-center gap-0.5">
+        {/* Specification domain indicators - fixed width so scope doesn't shift */}
+        <div className="flex-shrink-0 flex items-center gap-0.5 min-w-[60px] justify-end">
           {Object.entries(step.specification || {}).map(([domain, spec]) => {
             const hasContent = spec && typeof spec === 'object' && Object.keys(spec).length > 0;
             // Map domain names to icons
@@ -315,6 +309,12 @@ export function StepEditor({
             );
           })}
         </div>
+
+        {step.scope && (
+          <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-bg-elevated text-text-secondary rounded">
+            {step.scope}
+          </span>
+        )}
 
         {onOpenComments && (
           <button

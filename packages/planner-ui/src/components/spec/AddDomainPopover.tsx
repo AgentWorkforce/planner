@@ -18,7 +18,8 @@
  * ```
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -145,6 +146,7 @@ function AddDomainPopoverContent({
 
 /**
  * Full popover with positioning and backdrop.
+ * Uses a portal to render at document root, avoiding container clipping issues.
  */
 export function AddDomainPopover({
   existingDomains,
@@ -152,30 +154,51 @@ export function AddDomainPopover({
   trigger,
 }: AddDomainPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
 
   const handleClose = () => setIsOpen(false);
 
+  // Calculate position when popover opens
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      // getBoundingClientRect() returns viewport-relative coords
+      // position: fixed also uses viewport-relative coords
+      // So we use them directly without adding scroll offsets
+      setPosition({
+        top: rect.bottom + 8, // 8px gap below trigger
+        left: rect.left,
+      });
+    }
+  }, [isOpen]);
+
   return (
-    <div className="relative inline-block">
+    <div className="inline-block" ref={triggerRef}>
       {/* Trigger */}
       <div onClick={() => setIsOpen((prev) => !prev)}>{trigger}</div>
 
-      {/* Popover */}
-      {isOpen && (
-        <>
-          {/* Backdrop to catch outside clicks */}
-          <div className="fixed inset-0 z-40" onClick={handleClose} aria-hidden="true" />
+      {/* Popover rendered via portal at document root */}
+      {isOpen &&
+        createPortal(
+          <>
+            {/* Backdrop to catch outside clicks */}
+            <div className="fixed inset-0 z-40" onClick={handleClose} aria-hidden="true" />
 
-          {/* Popover positioned below the trigger */}
-          <div className="absolute top-full left-0 mt-2 z-50 animate-in fade-in-0 zoom-in-95 duration-150">
-            <AddDomainPopoverContent
-              existingDomains={existingDomains}
-              onAddDomain={onAddDomain}
-              onClose={handleClose}
-            />
-          </div>
-        </>
-      )}
+            {/* Popover positioned below the trigger */}
+            <div
+              className="fixed z-50 animate-in fade-in-0 zoom-in-95 duration-150"
+              style={{ top: position.top, left: position.left }}
+            >
+              <AddDomainPopoverContent
+                existingDomains={existingDomains}
+                onAddDomain={onAddDomain}
+                onClose={handleClose}
+              />
+            </div>
+          </>,
+          document.body
+        )}
     </div>
   );
 }

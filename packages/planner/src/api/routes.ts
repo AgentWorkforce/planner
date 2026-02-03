@@ -5,17 +5,14 @@ import { createWorkflowHandlers } from './handlers/workflow.js';
 import { createChangeRequestHandlers } from './handlers/change-requests.js';
 import { createCommentHandlers } from './handlers/comments.js';
 import { createImprovementHandlers } from './handlers/improvements.js';
-import { createHealthHandlers } from './handlers/health.js';
 import { createMcpHandlers } from './handlers/mcp.js';
 import { createSessionHandlers } from './handlers/sessions.js';
-import { createChatHandlers } from './handlers/chat.js';
 import { createImportHandlers } from './handlers/import.js';
 import { createEventsHandler } from './handlers/events.js';
-import { createChannelHandlers } from './handlers/channels.js';
 import { createInitiativeHandlers } from './handlers/initiatives.js';
 import { createQuestionHandlers } from './handlers/questions.js';
 import { createTrajectoryHandlers } from './handlers/trajectories.js';
-import { createAgentHandlers } from './handlers/agents.js';
+import { createChatHandlers } from './handlers/chat.js';
 import { createOptionalMcpAuthMiddleware } from './middleware/mcp-auth.js';
 
 /**
@@ -28,17 +25,14 @@ export function createRouter(storage: PlanStorage): Router {
   const changeRequestHandlers = createChangeRequestHandlers(storage);
   const commentHandlers = createCommentHandlers(storage);
   const improvementHandlers = createImprovementHandlers(storage);
-  const healthHandlers = createHealthHandlers();
   const mcpHandlers = createMcpHandlers(storage);
   const sessionHandlers = createSessionHandlers(storage);
-  const chatHandlers = createChatHandlers(storage);
   const importHandlers = createImportHandlers(storage);
   const eventsHandler = createEventsHandler(storage);
-  const channelHandlers = createChannelHandlers(storage);
   const initiativeHandlers = createInitiativeHandlers(storage);
   const questionHandlers = createQuestionHandlers(storage);
   const trajectoryHandlers = createTrajectoryHandlers(storage);
-  const agentHandlers = createAgentHandlers();
+  const chatHandlers = createChatHandlers(storage);
   const mcpAuth = createOptionalMcpAuthMiddleware(storage);
 
   // Plan routes
@@ -87,13 +81,6 @@ export function createRouter(storage: PlanStorage): Router {
   router.post('/plans/:id/versions/:version/improvements/:improvementId/accept', improvementHandlers.accept);
   router.post('/plans/:id/versions/:version/improvements/:improvementId/dismiss', improvementHandlers.dismiss);
 
-  // Health check routes
-  router.get('/health/relay', healthHandlers.relayHealth);
-
-  // AI Chat routes
-  router.post('/ai/chat', chatHandlers.chat);
-  router.post('/ai/suggestions/apply', chatHandlers.applySuggestion);
-
   // Document import routes
   router.post('/plans/import', importHandlers.import);
   router.post('/plans/import/detect', importHandlers.detect);
@@ -103,11 +90,6 @@ export function createRouter(storage: PlanStorage): Router {
   // List is public (no auth), call uses optional auth for session context
   router.post('/mcp/tools/list', mcpHandlers.listTools);
   router.post('/mcp/tools/call', mcpAuth, mcpHandlers.callTool);
-
-  // Channel routes (relay messaging)
-  router.get('/channels', channelHandlers.list);
-  router.get('/channels/:id/messages', channelHandlers.messages);
-  router.get('/channels/:id/presence', channelHandlers.presence);
 
   // Initiative routes
   router.get('/initiatives', initiativeHandlers.list);
@@ -131,8 +113,8 @@ export function createRouter(storage: PlanStorage): Router {
   router.get('/plans/:id/trajectory/preferences', trajectoryHandlers.getPreferences);
   router.get('/plans/:id/trajectory/similar', trajectoryHandlers.findSimilar);
 
-  // Agent routes (merged presence + state)
-  router.get('/agents', agentHandlers.list);
+  // AI suggestion routes (domain logic only - chat route is in server package)
+  router.post('/ai/suggestions/apply', chatHandlers.applySuggestion);
 
   return router;
 }
