@@ -7,6 +7,7 @@
 import type { IdeationStorage } from '../storage/index.js';
 import type { PlannerClient } from '../api/handlers.js';
 import { createTranscriptMessage, createPlannerSend, createActiveSpecialist } from '../domain/index.js';
+import { ideationEvents } from '../api/events.js';
 import type {
   ToolResult,
   StartSessionInput,
@@ -64,6 +65,8 @@ export async function executeTool(
       case 'update_understanding': {
         const { session_id, specialist_name, observations } = input as UpdateUnderstandingInput;
         const session = await storage.updateUnderstanding(session_id, specialist_name, observations);
+        // Emit event so SSE clients get notified
+        ideationEvents.emitSessionEvent('session:understanding', session);
         return { success: true, data: { updated: true } };
       }
 
@@ -99,11 +102,8 @@ export async function executeTool(
             plan_version: plannerResult.version,
           };
         } else {
-          // Mock result when no planner client configured
-          result = {
-            plan_id: `plan-${Date.now()}`,
-            plan_version: 1,
-          };
+          // No planner client - fail loudly
+          return { success: false, error: 'Planner service unavailable. No planner client configured.' };
         }
 
         const send = createPlannerSend(payload, result);
@@ -132,8 +132,8 @@ export async function executeTool(
         if (spawnAgent) {
           agentId = await spawnAgent(session_id, name, focus, prompt_context);
         } else {
-          // Mock mode - generate fake agent ID
-          agentId = `mock-${name.toLowerCase()}-${Date.now()}`;
+          // No spawnAgent - fail loudly
+          return { success: false, error: 'Agent spawning unavailable. No spawnAgent callback configured.' };
         }
 
         // Record in session
@@ -148,6 +148,7 @@ export async function executeTool(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error(`[tool-executor] Error executing tool '${name}':`, error);
     return { success: false, error: message };
   }
 }

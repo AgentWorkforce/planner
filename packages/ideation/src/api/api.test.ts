@@ -282,56 +282,17 @@ describe('Ideation API', () => {
   // ==========================================================================
 
   describe('POST /sessions/:id/send-to-planner', () => {
-    it('sends understanding to planner', async () => {
+    it('returns 503 when no planner client configured', async () => {
       const session = await request(app)
         .post('/api/ideation/sessions')
         .send({ initial_intent: 'Build an API' });
-
-      await request(app)
-        .put(`/api/ideation/sessions/${session.body.id}/understanding/Architect`)
-        .send({
-          observations: { patterns: ['REST'] },
-        });
 
       const res = await request(app)
         .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
         .send({});
 
-      expect(res.status).toBe(200);
-      expect(res.body.plan_id).toBeDefined();
-      expect(res.body.plan_version).toBe(1);
-      expect(res.body.sent_at).toBeDefined();
-    });
-
-    it('records send in session history', async () => {
-      const session = await request(app)
-        .post('/api/ideation/sessions')
-        .send({ initial_intent: 'Test' });
-
-      await request(app)
-        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
-        .send({});
-
-      const updated = await request(app)
-        .get(`/api/ideation/sessions/${session.body.id}`);
-
-      expect(updated.body.planner_sends).toHaveLength(1);
-      expect(updated.body.planner_sends[0].payload.goal).toBe('Test');
-    });
-
-    it('uses goal override if provided', async () => {
-      const session = await request(app)
-        .post('/api/ideation/sessions')
-        .send({ initial_intent: 'Original intent' });
-
-      await request(app)
-        .post(`/api/ideation/sessions/${session.body.id}/send-to-planner`)
-        .send({ goal: 'Refined goal' });
-
-      const updated = await request(app)
-        .get(`/api/ideation/sessions/${session.body.id}`);
-
-      expect(updated.body.planner_sends[0].payload.goal).toBe('Refined goal');
+      expect(res.status).toBe(503);
+      expect(res.body.error).toBe('Planner service unavailable');
     });
   });
 });

@@ -292,6 +292,14 @@ ${customContext ? `\nAdditional Context:\n${customContext}` : ''}
 - update_observations: Store your observations (freeform structure)
 - read_understanding: See all specialists' current observations
 - queue_insight: Queue a question/observation/concern for the Interviewer
+
+## CRITICAL: Confidence Tracking
+You MUST include a 'confidence' field in EVERY update_observations call:
+- 'exploring': Still gathering information, many unknowns
+- 'forming': Have a partial picture, some clarity emerging
+- 'confident': Clear understanding of requirements in your domain
+
+This is REQUIRED. The system tracks aggregate confidence to determine planning readiness.
 `;
 
   return basePrompt + sessionContext;
@@ -319,7 +327,14 @@ You are an INVISIBLE observer. The user never sees you. Your job is to:
 
 ## Freeform Observations
 Your observations should capture insights in whatever structure makes sense for your domain.
-Always include a 'confidence' field: 'exploring' | 'forming' | 'confident'
+
+## CRITICAL: Confidence Tracking
+You MUST include a 'confidence' field in EVERY update_observations call:
+- 'exploring': Still gathering information, many unknowns
+- 'forming': Have a partial picture, some clarity emerging
+- 'confident': Clear understanding of requirements in your domain
+
+Update confidence as you learn more. This is used to track readiness for planning.
 `;
 }
 

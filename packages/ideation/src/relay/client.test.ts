@@ -12,13 +12,15 @@ import {
   getRelayMode,
   setConnectionState,
   dispatchMessage,
+  setSender,
 } from './client.js';
 
 describe('Ideation Relay Client', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset to disconnected state
+    // Reset to disconnected state and clear sender
     setConnectionState('disconnected');
+    setSender(null);
   });
 
   describe('onMessage', () => {
@@ -68,11 +70,24 @@ describe('Ideation Relay Client', () => {
       expect(result).toBe(false);
     });
 
-    it('should return true when connected', () => {
+    it('should return true when connected with sender', () => {
       setConnectionState('connected');
+      const mockSender = vi.fn().mockReturnValue(true);
+      setSender(mockSender);
+
       const result = sendChannelMessage('#ideation', 'Hello world');
 
       expect(result).toBe(true);
+      expect(mockSender).toHaveBeenCalledWith('#ideation', 'Hello world', undefined);
+    });
+
+    it('should return false when connected but no sender injected', () => {
+      setConnectionState('connected');
+      // No sender injected
+
+      const result = sendChannelMessage('#ideation', 'Hello world');
+
+      expect(result).toBe(false);
     });
   });
 

@@ -27,6 +27,10 @@ export const IDEATION_CHANNEL = '#ideation';
 /**
  * Generate session-specific channel ID.
  * Uses first 8 chars of session ID for brevity.
+ *
+ * NOTE: This creates a theoretical UUID collision risk since only 8 chars are used.
+ * For production, consider using full UUID or at least 12+ chars.
+ * Current implementation accepts the risk for cleaner channel names.
  */
 export function sessionChannelId(sessionId: string): string {
   return `#ideation-${sessionId.slice(0, 8)}`;

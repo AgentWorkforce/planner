@@ -7,6 +7,7 @@
 
 import type { IdeationStorage } from '../storage/index.js';
 import { specialistQueue } from '../interviewer/specialist-queue.js';
+import { ideationEvents } from '../api/events.js';
 import type {
   SpecialistToolResult,
   UpdateObservationsInput,
@@ -50,7 +51,10 @@ export async function executeSpecialistTool(
 
         // Update understanding for this specialist
         // Note: No validation - freeform observations
-        await storage.updateUnderstanding(session_id, specialistName, observations);
+        const session = await storage.updateUnderstanding(session_id, specialistName, observations);
+
+        // Emit event so SSE clients get notified
+        ideationEvents.emitSessionEvent('session:understanding', session);
 
         return { success: true, data: { updated: true } };
       }

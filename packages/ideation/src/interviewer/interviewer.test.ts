@@ -269,7 +269,7 @@ describe('Tool Executor', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should execute spawn_specialist tool without spawnAgent callback', async () => {
+    it('should fail spawn_specialist tool without spawnAgent callback', async () => {
       const session = await storage.createSession(
         { type: 'human', initial_intent: 'Test' }
       );
@@ -284,9 +284,8 @@ describe('Tool Executor', () => {
         { storage }
       );
 
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('agent_id');
-      expect(result.data).toHaveProperty('name', 'Architect');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('spawnAgent');
     });
 
     it('should execute spawn_specialist tool with spawnAgent callback', async () => {

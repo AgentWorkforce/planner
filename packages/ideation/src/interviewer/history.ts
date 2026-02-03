@@ -23,11 +23,19 @@ export interface ConversationMessage {
 // History Store
 // =============================================================================
 
+/**
+ * Maximum messages to keep in history per session.
+ * Prevents unbounded memory growth for long-running sessions.
+ * 50 messages = ~25 exchanges.
+ */
+const MAX_HISTORY_MESSAGES = 50;
+
 class ConversationHistoryStore {
   private histories: Map<string, ConversationMessage[]> = new Map();
 
   /**
    * Add a message to a channel's history.
+   * Automatically trims to MAX_HISTORY_MESSAGES to prevent unbounded growth.
    */
   addMessage(channelId: string, role: ConversationRole, content: string): void {
     if (!this.histories.has(channelId)) {
@@ -39,6 +47,15 @@ class ConversationHistoryStore {
       content,
       timestamp: new Date().toISOString(),
     });
+
+    // Trim to max size (keep most recent messages)
+    if (history.length > MAX_HISTORY_MESSAGES) {
+      // Remove oldest messages, but always keep pairs (don't split user/assistant)
+      const trimCount = history.length - MAX_HISTORY_MESSAGES;
+      // Ensure we trim an even number to keep message pairs intact
+      const adjustedTrimCount = trimCount % 2 === 0 ? trimCount : trimCount + 1;
+      history.splice(0, adjustedTrimCount);
+    }
   }
 
   /**

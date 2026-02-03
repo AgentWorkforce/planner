@@ -98,23 +98,31 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
 // Mock Planner Client (for testing)
 // =============================================================================
 
-let mockVersionCounter = 1;
-
+/**
+ * Creates a mock planner client for testing.
+ * Each client instance tracks version counters per-plan to avoid cross-contamination.
+ */
 export function createMockPlannerClient(): PlannerClient {
+  // Per-plan version counters to avoid shared state issues
+  const versionCounters = new Map<string, number>();
+
   return {
     async createPlan(_params) {
-      mockVersionCounter = 1;
+      const planId = `plan-${Date.now()}`;
+      versionCounters.set(planId, 1);
       return {
-        plan_id: `plan-${Date.now()}`,
-        version: mockVersionCounter,
+        plan_id: planId,
+        version: 1,
       };
     },
 
     async createVersion(params) {
-      mockVersionCounter++;
+      const currentVersion = versionCounters.get(params.plan_id) ?? 0;
+      const newVersion = currentVersion + 1;
+      versionCounters.set(params.plan_id, newVersion);
       return {
         plan_id: params.plan_id,
-        version: mockVersionCounter,
+        version: newVersion,
       };
     },
 

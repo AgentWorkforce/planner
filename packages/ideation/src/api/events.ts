@@ -53,6 +53,8 @@ class IdeationEventEmitter extends EventEmitter {
       data: session,
       timestamp: new Date().toISOString(),
     };
+    const listenerCount = this.listenerCount('session');
+    console.log(`[ideation-events] Emitting ${type} for session ${session.id}, listener count: ${listenerCount}`);
     this.emit('session', event);
     this.emit(type, event);
   }

@@ -53,10 +53,17 @@ export function computeAggregateConfidence(
 ): AggregateConfidenceResult {
   const breakdown: ConfidenceBreakdown = {};
   const scores: number[] = [];
+  const validValues = Object.keys(CONFIDENCE_VALUES);
 
   for (const [specialistName, observations] of Object.entries(understanding)) {
     // Look for 'confidence' key in freeform observations
     const confidence = observations['confidence'];
+
+    if (confidence === undefined) {
+      // Specialist hasn't reported confidence - log warning
+      console.warn(`[confidence] Specialist "${specialistName}" has no confidence field`);
+      continue;
+    }
 
     if (typeof confidence === 'string') {
       breakdown[specialistName] = confidence;
@@ -65,11 +72,22 @@ export function computeAggregateConfidence(
       const value = CONFIDENCE_VALUES[confidence.toLowerCase()];
       if (value !== undefined) {
         scores.push(value);
+      } else {
+        // Malformed string value - log warning
+        console.warn(
+          `[confidence] Specialist "${specialistName}" has invalid confidence value "${confidence}". ` +
+          `Expected one of: ${validValues.join(', ')}`
+        );
       }
     } else if (typeof confidence === 'number') {
       // Direct numeric confidence (0-100)
       breakdown[specialistName] = String(confidence);
       scores.push(Math.max(0, Math.min(100, confidence)));
+    } else {
+      // Unexpected type
+      console.warn(
+        `[confidence] Specialist "${specialistName}" has confidence of unexpected type: ${typeof confidence}`
+      );
     }
   }
 

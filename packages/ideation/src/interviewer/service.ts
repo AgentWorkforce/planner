@@ -28,6 +28,8 @@ import {
   getRelayMode,
   type ClientState,
 } from '../relay/index.js';
+import { ideationEvents } from '../api/events.js';
+import { createTranscriptMessage } from '../domain/index.js';
 
 // =============================================================================
 // Types
@@ -45,6 +47,80 @@ export interface InterviewerState {
   mockMode: boolean;
   relayConnected: boolean;
 }
+
+// =============================================================================
+// Message Deduplication
+// =============================================================================
+
+/** TTL for message deduplication in milliseconds (30 seconds) */
+const MESSAGE_DEDUP_TTL_MS = 30_000;
+
+/** Max size of deduplication cache to prevent memory leaks */
+const MESSAGE_DEDUP_MAX_SIZE = 100;
+
+/**
+ * Simple message deduplication cache.
+ * Tracks message fingerprints with timestamps for TTL-based cleanup.
+ */
+class MessageDeduplicationCache {
+  private cache = new Map<string, number>();
+
+  /**
+   * Check if message was recently processed. If not, marks it as processed.
+   * @returns true if this is a duplicate, false if it's new
+   */
+  isDuplicate(channelId: string, body: string): boolean {
+    const fingerprint = `${channelId}:${this.simpleHash(body)}`;
+    const now = Date.now();
+
+    // Clean up old entries
+    this.cleanup(now);
+
+    // Check if we've seen this recently
+    if (this.cache.has(fingerprint)) {
+      console.log(`[Interviewer] Duplicate message detected for ${channelId}`);
+      return true;
+    }
+
+    // Mark as seen
+    this.cache.set(fingerprint, now);
+    return false;
+  }
+
+  private cleanup(now: number): void {
+    // Remove expired entries
+    for (const [key, timestamp] of this.cache.entries()) {
+      if (now - timestamp > MESSAGE_DEDUP_TTL_MS) {
+        this.cache.delete(key);
+      }
+    }
+
+    // Enforce max size (remove oldest if too large)
+    if (this.cache.size > MESSAGE_DEDUP_MAX_SIZE) {
+      const entries = [...this.cache.entries()].sort((a, b) => a[1] - b[1]);
+      const toRemove = entries.slice(0, entries.length - MESSAGE_DEDUP_MAX_SIZE);
+      for (const [key] of toRemove) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(16);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+const messageDedup = new MessageDeduplicationCache();
 
 // =============================================================================
 // Interviewer Service
@@ -70,15 +146,21 @@ class InterviewerService {
     // Try to initialize Anthropic client
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (apiKey) {
-      this.state.anthropic = new Anthropic({ apiKey });
+      this.state.anthropic = new Anthropic({
+        apiKey,
+        timeout: 60000, // 60 second timeout
+      });
       this.state.mockMode = false;
+      console.log(`[Interviewer] Anthropic client initialized with API key (${apiKey.substring(0, 10)}...)`);
     } else {
       console.log('[Interviewer] No ANTHROPIC_API_KEY - running in mock mode');
       this.state.mockMode = true;
     }
 
     // Register relay message handler
+    console.log('[Interviewer] Registering relay message handler');
     this.unsubscribeMessage = relayOnMessage(this.handleRelayMessage.bind(this));
+    console.log('[Interviewer] Relay message handler registered');
 
     // Subscribe to relay state changes
     this.unsubscribeStateChange = relayOnStateChange((state: ClientState) => {
@@ -121,6 +203,7 @@ class InterviewerService {
     this.state.relayConnected = false;
     conversationHistory.clearAll();
     specialistQueue.clearAll();
+    messageDedup.clear();
     console.log('[Interviewer] Stopped');
   }
 
@@ -139,6 +222,19 @@ class InterviewerService {
   }
 
   /**
+   * Set the spawnAgent function for spawning specialists.
+   * Called after relay connects to inject the real spawner.
+   */
+  setSpawnAgent(fn: InterviewerDeps['spawnAgent']): void {
+    if (this.deps) {
+      this.deps.spawnAgent = fn;
+      console.log('[Interviewer] spawnAgent function injected');
+    } else {
+      console.warn('[Interviewer] Cannot set spawnAgent: deps not initialized');
+    }
+  }
+
+  /**
    * Check if we should handle a message from a channel.
    */
   shouldHandleMessage(channelId: string, fromAgent?: string): boolean {
@@ -147,6 +243,10 @@ class InterviewerService {
 
     // Don't respond to our own messages
     if (fromAgent === INTERVIEWER_CONFIG.agentId) return false;
+
+    // Don't respond to messages from the server relay (prevents loops)
+    // These messages are from API handlers that already invoke us directly
+    if (fromAgent === 'Relay') return false;
 
     return true;
   }
@@ -164,20 +264,49 @@ class InterviewerService {
     // Extract channel from data
     const channelId = (data?.channel as string) || threadId;
 
-    if (!channelId || !this.shouldHandleMessage(channelId, from)) {
+    console.log(`[Interviewer] handleRelayMessage: from=${from}, channelId=${channelId}, body="${body.substring(0, 50)}..."`);
+
+    if (!channelId) {
+      console.log(`[Interviewer] Skipping: no channelId`);
       return;
     }
 
-    console.log(`[Interviewer] Received message from ${from} in ${channelId}`);
+    if (!this.shouldHandleMessage(channelId, from)) {
+      console.log(`[Interviewer] Skipping: shouldHandleMessage returned false for ${channelId} from ${from}`);
+      return;
+    }
+
+    // Check for duplicate messages (prevents relay loops)
+    if (messageDedup.isDuplicate(channelId, body)) {
+      console.log(`[Interviewer] Skipping duplicate message in ${channelId}`);
+      return;
+    }
+
+    console.log(`[Interviewer] Processing message from ${from} in ${channelId}`);
 
     try {
       const response = await this.handleMessage(channelId, body, from);
 
-      if (response && this.state.relayConnected) {
-        // Send response via relay
-        const sent = sendChannelMessage(channelId, response);
-        if (!sent) {
-          console.warn(`[Interviewer] Failed to send response to ${channelId}`);
+      if (response) {
+        // Store response in DB so frontend can see it
+        const sessionPrefix = extractSessionPrefix(channelId);
+        if (sessionPrefix && this.deps) {
+          const sessions = await this.deps.storage.listSessions({ status: 'active' });
+          const session = sessions.find(s => s.id.startsWith(sessionPrefix));
+          if (session) {
+            const message = createTranscriptMessage('assistant', response);
+            const updatedSession = await this.deps.storage.appendTranscript(session.id, message);
+            // Emit event so SSE clients get notified
+            ideationEvents.emitSessionEvent('session:message', updatedSession);
+          }
+        }
+
+        // Also send via relay for real-time delivery
+        if (this.state.relayConnected) {
+          const sent = sendChannelMessage(channelId, response);
+          if (!sent) {
+            console.warn(`[Interviewer] Failed to send response to ${channelId}`);
+          }
         }
       }
     } catch (error) {
@@ -205,6 +334,9 @@ class InterviewerService {
 
   /**
    * Handle an incoming message.
+   * @param channelId - The channel ID for this session
+   * @param content - The message content
+   * @param fromAgent - Who sent the message. 'api-handler' means the API handler will store messages.
    */
   async handleMessage(
     channelId: string,
@@ -217,7 +349,8 @@ class InterviewerService {
     }
 
     // Check if this is from a specialist
-    if (fromAgent && fromAgent.startsWith('mock-') || fromAgent?.includes('specialist')) {
+    // Note: Uses explicit parentheses to ensure correct precedence
+    if (fromAgent && (fromAgent.startsWith('mock-') || fromAgent.includes('specialist'))) {
       // Queue specialist input, don't respond
       this.handleSpecialistMessage(channelId, content, fromAgent);
       return null;
@@ -240,8 +373,12 @@ class InterviewerService {
     // Add user message to history
     conversationHistory.addMessage(channelId, 'user', content);
 
+    // Determine if API handler is managing message storage
+    // When fromAgent === 'api-handler', the API stores user/assistant messages
+    const skipMessageStorage = fromAgent === 'api-handler';
+
     // Generate response
-    const response = await this.generateResponse(channelId, content, session.id);
+    const response = await this.generateResponse(channelId, content, session.id, skipMessageStorage);
 
     // Add assistant response to history
     if (response) {
@@ -285,11 +422,16 @@ class InterviewerService {
 
   /**
    * Generate a response using LLM or mock.
+   * @param channelId - The channel ID for this session
+   * @param userMessage - The user's message
+   * @param sessionId - The session ID
+   * @param skipMessageStorage - If true, don't store messages (API handler does it)
    */
   async generateResponse(
     channelId: string,
     userMessage: string,
-    sessionId: string
+    sessionId: string,
+    skipMessageStorage = false
   ): Promise<string> {
     if (!this.deps) throw new Error('Interviewer not initialized');
 
@@ -308,21 +450,25 @@ class InterviewerService {
 
     // Mock mode
     if (this.state.mockMode || !this.state.anthropic) {
-      // Record user message
-      await this.executeToolSafe('add_message', {
-        session_id: sessionId,
-        role: 'user',
-        content: userMessage,
-      });
+      // Only record messages if not skipped (i.e., not called from API handler)
+      if (!skipMessageStorage) {
+        await this.executeToolSafe('add_message', {
+          session_id: sessionId,
+          role: 'user',
+          content: userMessage,
+        });
+      }
 
       const response = getMockResponse(userMessage);
 
-      // Record assistant response
-      await this.executeToolSafe('add_message', {
-        session_id: sessionId,
-        role: 'assistant',
-        content: response,
-      });
+      // Only record messages if not skipped
+      if (!skipMessageStorage) {
+        await this.executeToolSafe('add_message', {
+          session_id: sessionId,
+          role: 'assistant',
+          content: response,
+        });
+      }
 
       return response;
     }
@@ -336,47 +482,91 @@ class InterviewerService {
 
     const messages = conversationHistory.getAnthropicMessages(channelId);
 
+    // When called from API handler, filter out add_message tool
+    // The API handler stores messages, so LLM shouldn't duplicate
+    const tools = skipMessageStorage
+      ? INTERVIEWER_TOOLS.filter(t => t.name !== 'add_message')
+      : INTERVIEWER_TOOLS;
+
     try {
+      console.log(`[Interviewer] Calling Anthropic API: model=${LLM_CONFIG.model}, messages=${messages.length}, tools=${tools.length}`);
+      const startTime = Date.now();
       const response = await this.state.anthropic.messages.create({
         model: LLM_CONFIG.model,
         max_tokens: LLM_CONFIG.maxTokens,
         system: fullSystemPrompt,
-        tools: INTERVIEWER_TOOLS,
+        tools,
         messages,
       });
+      console.log(`[Interviewer] Anthropic responded in ${Date.now() - startTime}ms, stop_reason=${response.stop_reason}`);
+      console.log(`[Interviewer] Response content blocks: ${response.content.length}, types: ${response.content.map(b => b.type).join(', ')}`);
 
       // Handle tool use in a loop
       let result = response;
-      while (result.stop_reason === 'tool_use') {
+      let loopCount = 0;
+      const maxLoops = 10; // Safety limit
+
+      while (result.stop_reason === 'tool_use' && loopCount < maxLoops) {
+        loopCount++;
+        console.log(`[Interviewer] Tool use loop iteration ${loopCount}, content types: ${result.content.map(b => b.type).join(', ')}`);
+
         const toolUseBlock = result.content.find(
           (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
         );
 
-        if (!toolUseBlock) break;
+        if (!toolUseBlock) {
+          console.log('[Interviewer] No tool_use block found despite stop_reason=tool_use, breaking loop');
+          console.log(`[Interviewer] Full content: ${JSON.stringify(result.content).substring(0, 500)}`);
+          break;
+        }
 
-        const toolResult = await this.executeToolSafe(toolUseBlock.name, toolUseBlock.input);
+        console.log(`[Interviewer] Tool use requested: ${toolUseBlock.name}, id=${toolUseBlock.id}`);
+        console.log(`[Interviewer] Tool input: ${JSON.stringify(toolUseBlock.input).substring(0, 200)}`);
 
-        // Continue conversation with tool result
-        result = await this.state.anthropic.messages.create({
-          model: LLM_CONFIG.model,
-          max_tokens: LLM_CONFIG.maxTokens,
-          system: fullSystemPrompt,
-          tools: INTERVIEWER_TOOLS,
-          messages: [
-            ...messages,
-            { role: 'assistant', content: result.content },
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'tool_result',
-                  tool_use_id: toolUseBlock.id,
-                  content: JSON.stringify(toolResult),
-                },
-              ],
-            },
-          ],
-        });
+        // Skip add_message tool execution if in API context (shouldn't happen since filtered)
+        if (skipMessageStorage && toolUseBlock.name === 'add_message') {
+          console.log('[Interviewer] Skipping add_message tool in API context');
+          break;
+        }
+
+        try {
+          const toolResult = await this.executeToolSafe(toolUseBlock.name, toolUseBlock.input);
+          console.log(`[Interviewer] Tool ${toolUseBlock.name} result: ${JSON.stringify(toolResult).substring(0, 100)}`);
+
+          // Continue conversation with tool result
+          console.log('[Interviewer] Calling Anthropic API for tool result continuation');
+          const continueStartTime = Date.now();
+          result = await this.state.anthropic.messages.create({
+            model: LLM_CONFIG.model,
+            max_tokens: LLM_CONFIG.maxTokens,
+            system: fullSystemPrompt,
+            tools,
+            messages: [
+              ...messages,
+              { role: 'assistant', content: result.content },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'tool_result',
+                    tool_use_id: toolUseBlock.id,
+                    content: JSON.stringify(toolResult),
+                  },
+                ],
+              },
+            ],
+          });
+          console.log(`[Interviewer] Continuation responded in ${Date.now() - continueStartTime}ms, stop_reason=${result.stop_reason}`);
+          console.log(`[Interviewer] Continuation content types: ${result.content.map(b => b.type).join(', ')}`);
+        } catch (toolError) {
+          const toolErrorMsg = toolError instanceof Error ? toolError.message : String(toolError);
+          console.error(`[Interviewer] Error in tool loop: ${toolErrorMsg}`);
+          if (toolError instanceof Error && toolError.stack) {
+            console.error(`[Interviewer] Tool loop stack: ${toolError.stack.split('\n').slice(0, 5).join('\n')}`);
+          }
+          // Break the loop on error rather than crashing
+          break;
+        }
       }
 
       // Extract text response
@@ -393,8 +583,15 @@ class InterviewerService {
 
       return responseText;
     } catch (error) {
-      console.error('[Interviewer] LLM error:', error);
-      return getMockResponse(userMessage);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.constructor.name : 'Unknown';
+      console.error(`[Interviewer] LLM error (${errorName}): ${errorMessage}`);
+      if (error instanceof Error && error.stack) {
+        console.error(`[Interviewer] Stack trace: ${error.stack.split('\n').slice(0, 3).join('\n')}`);
+      }
+
+      // FAIL LOUDLY - report the actual error
+      return `⚠️ Error: ${errorMessage}`;
     }
   }
 

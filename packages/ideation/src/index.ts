@@ -8,8 +8,9 @@
  */
 
 import type { Router } from 'express';
-import { SQLiteIdeationStorage } from './storage/index.js';
+import { SQLiteIdeationStorage, type IdeationStorage } from './storage/index.js';
 import { createIdeationRouter } from './api/index.js';
+import { initInterviewer, stopInterviewer } from './interviewer/index.js';
 
 // =============================================================================
 // Plugin Interface (for mounting in planner backend)
@@ -27,6 +28,8 @@ export interface IdeationService {
   initialize: () => Promise<void>;
   /** Shutdown service (closes DB connection) */
   shutdown: () => Promise<void>;
+  /** Get storage instance for external use */
+  getStorage: () => IdeationStorage;
 }
 
 /**
@@ -48,8 +51,16 @@ export function createIdeationService(config: IdeationServiceConfig = {}): Ideat
 
   return {
     router,
-    initialize: () => storage.initialize(),
-    shutdown: () => storage.close(),
+    initialize: async () => {
+      await storage.initialize();
+      // Start the Interviewer service with storage access
+      initInterviewer({ storage });
+    },
+    shutdown: async () => {
+      stopInterviewer();
+      await storage.close();
+    },
+    getStorage: () => storage,
   };
 }
 
