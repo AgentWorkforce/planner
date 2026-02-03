@@ -127,7 +127,7 @@
         "name": "cite_document",
         "description": "Retrieve raw document sections by topic or keyword for precise quoting",
         "input": { "query": "string (topic, keyword, or filename)", "max_chunks": "number (default 3)" },
-        "output": { "chunks": [{ "filename": "...", "lines": "L10-L50", "content": "...", "topics": [...] }] }
+        "output": { "chunks": [{ "filename": "...", "lines": "L10-L50", "content": "...", "topics": [] }] }
       },
       "confidence": "forming"
     },
