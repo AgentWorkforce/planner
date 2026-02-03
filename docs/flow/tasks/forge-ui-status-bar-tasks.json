@@ -1,0 +1,427 @@
+{
+  "feature_id": "forge-ui-status-bar",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fsb-s1-task",
+      "step_id": "fsb-s1",
+      "title": "Create useActiveRun hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect.active_run_selection for priority logic",
+            "Review react-router useParams hook"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useActiveRun() returns { activeRun, isLoading, otherRunningCount }",
+            "Priority 1: If URL is /forge/runs/:id, that run is active",
+            "Priority 2: Any run with status='running'",
+            "Priority 3: Most recent run by started_at",
+            "otherRunningCount: number of other running runs (for multi-run indicator)",
+            "SSE subscription for run status changes",
+            "Clears activeRun when run completes/fails/cancels (if not viewing that run)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test priority selection",
+            "Test SSE updates"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s2-task",
+      "step_id": "fsb-s2",
+      "title": "Create StatusBarProgress component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review progress bar patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Circular or mini progress bar",
+            "Task count text: '4/7 tasks'",
+            "Percentage indicator",
+            "Animated fill for running state"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test progress animation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s3-task",
+      "step_id": "fsb-s3",
+      "title": "Create StatusBarAgents component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/StatusBar.tsx (agents section)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Count of active agents",
+            "Up to 5 status dots (green=working, orange=blocked)",
+            "'+N' indicator if more than 5 agents",
+            "Tooltip showing agent names on hover"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with various agent counts"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s4-task",
+      "step_id": "fsb-s4",
+      "title": "Create StatusBarGates component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review gate badge patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Gate icon with count badge",
+            "Warning color when gates pending",
+            "Clickable to open gate approval panel",
+            "Pulsing animation when attention needed"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test badge display",
+            "Test click behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s5-task",
+      "step_id": "fsb-s5",
+      "title": "Create StatusBarTimer component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review timer patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Clock icon with time in HH:MM:SS format",
+            "Updates every second for running runs",
+            "Shows 'Paused' label when run is paused",
+            "Static time for completed runs"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test timer updates",
+            "Test paused state"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s6-task",
+      "step_id": "fsb-s6",
+      "title": "Create ForgeStatusBar component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/StatusBar.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Fixed bottom position, full width",
+            "Sections: Progress | Agents | Gates | Timer",
+            "Run name/goal on left side",
+            "Collapsed state: h-8, minimal info",
+            "Expanded state: h-12, full info",
+            "Toggle collapse via chevron button",
+            "Hidden when no active run",
+            "Multi-run indicator: '+N running' badge when other runs are running"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test collapsed/expanded states",
+            "Test multi-run indicator"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s7-task",
+      "step_id": "fsb-s7",
+      "title": "Implement click to navigate",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review react-router navigation patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Click anywhere on bar navigates to /forge/runs/:activeRunId",
+            "Cursor shows pointer on hover",
+            "Ctrl/Cmd+click opens in new tab",
+            "Does not navigate if clicking on interactive elements (gates button)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test navigation",
+            "Test new tab behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s8-task",
+      "step_id": "fsb-s8",
+      "title": "Add collapse state persistence",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/usePlansViewMode.ts"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Store collapsed state in localStorage",
+            "Key: 'forge.statusBarCollapsed'",
+            "Default to expanded on first visit"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test persistence across sessions"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Manual test"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s9-task",
+      "step_id": "fsb-s9",
+      "title": "Integrate into ForgeLayout",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review ful-s8 ForgeLayout implementation"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ForgeStatusBar rendered at bottom of ForgeLayout",
+            "Main content has bottom padding to avoid overlap",
+            "Bar receives activeRun data from hook"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test integration"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s9"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fsb-s10-task",
+      "step_id": "fsb-s10",
+      "title": "Add questions indicator",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-ui-question-queue feature"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Question icon with count badge",
+            "Red color when blocking questions pending",
+            "Click opens question queue panel"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test badge display",
+            "Test click behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fsb-s10"
+          ]
+        }
+      }
+    }
+  ]
+}

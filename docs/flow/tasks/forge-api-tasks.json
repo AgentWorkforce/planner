@@ -1,0 +1,387 @@
+{
+  "feature_id": "forge-api",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fa-s1-task",
+      "step_id": "fa-s1",
+      "title": "Create API request/response schemas",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/schemas.ts or src/api/handlers/*.ts in planner-core",
+            "Review ForgePlan schema from forge-domain"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "CreateRunRequestSchema: { plan: ForgePlan } or { plan_id, plan_version } to fetch from Planner",
+            "ListRunsQuerySchema: { status?, limit?, offset? }",
+            "RunResponseSchema: { run_id, plan_id, plan_version, status, has_pending_gate, tasks_count, tasks_completed, created_at }",
+            "Export TypeScript types from schemas"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify schemas match API requirements",
+            "Test validation with sample data"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for all schemas"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s2-task",
+      "step_id": "fa-s2",
+      "title": "Create run management handlers",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/plans.ts handler pattern",
+            "Understand createXxxHandlers(storage) factory pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "POST /runs handler: validate ForgePlan, create Run + Tasks, start scheduler, return { run_id, status, tasks_count }",
+            "GET /runs handler: list with status filter, pagination, return [{ run_id, plan_id, status, created_at, tasks_count, tasks_completed }]",
+            "GET /runs/:id handler: full run with all tasks, return { run, tasks: [{ task_id, status, attempts_count }] }",
+            "Error responses match planner-core format: { error: string, code?: string }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all CRUD operations",
+            "Verify error responses are consistent"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for run management endpoints"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s3-task",
+      "step_id": "fa-s3",
+      "title": "Create run control handlers",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/workflow.ts for state transition patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "POST /runs/:id/pause: set run status to 'paused', stop enqueueing new tasks",
+            "POST /runs/:id/resume: set run status to 'running', resume task scheduling",
+            "POST /runs/:id/cancel: set run status to 'cancelled', terminate active agents via spawner.terminate()",
+            "All return updated run object with new status"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test pause/resume/cancel flows",
+            "Verify agent termination on cancel"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for run control"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s4-task",
+      "step_id": "fa-s4",
+      "title": "Create task detail handlers",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/plans.ts:getVersion for nested resource pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /runs/:id/tasks/:taskId: return { task, attempts: [...], artifacts: [...] }",
+            "Attempts include: attempt_number, started_at, ended_at, outcome, error, audit_findings",
+            "Artifacts include: artifact_id, type, reference, metadata"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with tasks having multiple attempts",
+            "Test with tasks having artifacts"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for task detail endpoint"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s5-task",
+      "step_id": "fa-s5",
+      "title": "Create SSE events handler",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/events.ts SSE handler pattern in planner-core"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /runs/:id/events returns SSE stream",
+            "Events: run_status_changed, task_status_changed, gate_reached, agent_progress, question_added, question_answered",
+            "Event format: { event, data: JSON }",
+            "Heartbeat every 30s to keep connection alive",
+            "Support Last-Event-ID for reconnection"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test SSE stream with EventSource",
+            "Verify heartbeat and reconnection"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for SSE endpoint"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s6-task",
+      "step_id": "fa-s6",
+      "title": "Create active agents handler",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/agents.ts merge presence+state pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /agents returns merged view of agent presence and task state",
+            "Response: [{ agent_id, run_id, task_id, status, last_heartbeat, current_task_title }]",
+            "Merges relay.listAgents() presence with storage task info",
+            "Optional filter by run_id"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with active agents",
+            "Test filtering by run_id"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for agents endpoint"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s7-task",
+      "step_id": "fa-s7",
+      "title": "Create router with all endpoints",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/routes.ts router pattern (lines 24-138)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "createForgeRouter(deps) factory function, deps: { storage, queue, spawner, scheduler }",
+            "All run routes mounted under /runs",
+            "Agent routes under /agents",
+            "Health check at /health"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify all routes are mounted correctly",
+            "Test health endpoint"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for router"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s8-task",
+      "step_id": "fa-s8",
+      "title": "Create Express app factory",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/server.ts app factory pattern from planner-core"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "createForgeApp(config) returns configured Express app",
+            "Middleware: cors, json body parser, request logging",
+            "Error handler middleware for consistent error responses",
+            "Configurable port (default 3001)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test app starts correctly",
+            "Verify middleware chain"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for Express app"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fa-s9-task",
+      "step_id": "fa-s9",
+      "title": "Implement run startup sequence",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Understand run creation flow",
+            "Review scheduler.scheduleReadyTasks integration"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "After creating Run + Tasks in DB, call scheduler.scheduleReadyTasks(runId)",
+            "Run status transitions from 'pending' to 'running'",
+            "Emit trajectory event 'run_started'",
+            "Return immediately after scheduling - execution is async"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test run creation triggers scheduling",
+            "Verify async behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: create run -> tasks scheduled"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fa-s9"
+          ]
+        }
+      }
+    }
+  ]
+}

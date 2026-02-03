@@ -1,0 +1,397 @@
+{
+  "feature_id": "forge-gate-handling",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fgh-s1-task",
+      "step_id": "fgh-s1",
+      "title": "Create Gate entity and status types",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review existing domain patterns in src/domain/",
+            "Check forge-domain.json for GateStatus enum definition",
+            "Understand relationship between gates and tasks (1:1)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Create GateStatus type: 'awaiting_approval' | 'approved' | 'rejected'",
+            "Create GateSchema with Zod: { gate_id, task_id, status, approver_role?, decided_by?, decided_at?, comment?, created_at }",
+            "Implement createGate(taskId, approverRole) factory function",
+            "Export types from domain index"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify Zod schema validates correctly",
+            "Ensure gate_id = task_id relationship is enforced",
+            "Check for TypeScript errors"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for createGate factory",
+            "Schema validation tests for all fields"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare implementation to plan step fgh-s1",
+            "Flag any divergence"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s2-task",
+      "step_id": "fgh-s2",
+      "title": "Verify gates table in storage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-storage feature for gates table schema (fs-s2)",
+            "Check existing ForgeStorage interface"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Verify ForgeStorage.createGate() works with gate schema",
+            "Verify ForgeStorage.getGate(taskId) retrieves gate",
+            "Verify ForgeStorage.updateGate() updates status, decided_by, decided_at",
+            "Verify ForgeStorage.listPendingGates() returns awaiting_approval gates"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test CRUD operations with actual SQLite",
+            "Verify indexes exist for performance"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for all storage methods"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s3-task",
+      "step_id": "fgh-s3",
+      "title": "Implement gate detection in task processing",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-task-queue ftq-s7 ForgemasterService onTaskReady callback",
+            "Understand ForgePlan step.gate structure"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "When processing task from queue, check if forgeStep.gate exists",
+            "If gate: create Gate entity, set task status to 'awaiting_approval'",
+            "If no gate: proceed with normal agent spawn",
+            "Emit trajectory event 'gate_reached'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with steps that have gates vs no gates",
+            "Verify correct status transitions"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: task with gate reaches awaiting_approval",
+            "Integration test: task without gate spawns agent"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s4-task",
+      "step_id": "fgh-s4",
+      "title": "Implement scheduling pause on gate",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review Run.has_pending_gate field in forge-domain",
+            "Understand TaskScheduler.scheduleReadyTasks flow"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "When gate reached, set run.has_pending_gate = true via storage.updateRun()",
+            "TaskScheduler.scheduleReadyTasks checks has_pending_gate flag",
+            "If has_pending_gate=true, skip enqueueing new tasks",
+            "In-flight tasks continue execution"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify in-flight tasks not affected",
+            "Verify new tasks not scheduled while gate pending"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Test: gate pending blocks new task scheduling",
+            "Test: in-flight tasks complete normally"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s5-task",
+      "step_id": "fgh-s5",
+      "title": "Create gate approval handler",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/workflow.ts for approval patterns",
+            "Understand scheduler.scheduleReadyTasks integration"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "POST /gates/:taskId/approve updates gate status to 'approved'",
+            "Records decided_by, decided_at, optional comment",
+            "Updates task status to 'completed'",
+            "Clears run.has_pending_gate=false, resumes scheduling",
+            "Calls scheduler.scheduleReadyTasks(runId) to resume",
+            "Emits trajectory event 'gate_approved'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test approval flow end-to-end",
+            "Verify scheduling resumes after approval"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: approve gate -> task completed -> scheduling resumes"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s6-task",
+      "step_id": "fgh-s6",
+      "title": "Create gate rejection handler",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review rejection flow implications",
+            "Understand ChangeRequest integration with Planner"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "POST /gates/:taskId/reject updates gate status to 'rejected'",
+            "Records decided_by, decided_at, required reason",
+            "Updates task status to 'failed' with rejection reason",
+            "Run stays paused (has_pending_gate becomes moot since task failed)",
+            "Emits trajectory event 'gate_rejected'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test rejection flow",
+            "Verify task marked as failed with reason"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: reject gate -> task failed -> run paused"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s7-task",
+      "step_id": "fgh-s7",
+      "title": "Create pending gates query endpoint",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/questions.ts for list pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /gates/pending returns [{ gate_id, task_id, run_id, task_title, approver_role, created_at }]",
+            "Sorted by created_at (oldest first)",
+            "Optional filter by run_id (?run_id=xxx)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with multiple pending gates",
+            "Test filtering by run_id"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API test: list pending gates with and without filter"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s8-task",
+      "step_id": "fgh-s8",
+      "title": "Emit SSE notification on gate reached",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/events/question-events.ts for SSE pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "SSE event 'gate_reached' emitted on /runs/:id/events",
+            "Event payload: { gate_id, task_id, task_title, approver_role }",
+            "Also emit on approval/rejection: 'gate_approved', 'gate_rejected'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test SSE events are emitted correctly",
+            "Verify payload structure"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: SSE client receives gate events"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fgh-s9-task",
+      "step_id": "fgh-s9",
+      "title": "Mount gate routes on API router",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-api fa-s7 createForgeRouter"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Gate routes mounted under /gates on Forge router",
+            "POST /gates/:taskId/approve",
+            "POST /gates/:taskId/reject",
+            "GET /gates/pending"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify routes are accessible",
+            "Test with curl/Postman"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "E2E test: full gate approval flow via API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fgh-s9"
+          ]
+        }
+      }
+    }
+  ]
+}

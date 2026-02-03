@@ -1,0 +1,342 @@
+{
+  "feature_id": "forge-ui-runs-list",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "frl-s0-task",
+      "step_id": "frl-s0",
+      "title": "Define RunListItem type",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect for field requirements",
+            "Understand difference between RunListItem and full Run"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "RunListItem type with fields: run_id, plan_id, plan_goal, status, task_count, completed_count, duration_ms, started_at, ended_at?",
+            "listRuns API returns RunListItem[] not full Run[]",
+            "Type exported from src/types/run.ts alongside Run type"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "TypeScript compilation succeeds"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Type matches API response"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s0"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s1-task",
+      "step_id": "frl-s1",
+      "title": "Create RunCard component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/PlanCard.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "RunCard displays: status badge, plan goal (truncated), task progress (X/Y)",
+            "Duration shown: elapsed time for running, total time for completed",
+            "Status badge with color coding",
+            "Clickable card navigates to /forge/runs/:id",
+            "Hover state with border highlight",
+            "Uses RunListItem type"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test card rendering",
+            "Test navigation on click"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s2-task",
+      "step_id": "frl-s2",
+      "title": "Create StatusFilterTabs component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/TabNavigation.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tabs: All, Running, Completed, Failed, Paused",
+            "Active tab highlighted with accent-cyan underline",
+            "Count badges on each tab",
+            "Tab change updates URL query param"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test tab switching",
+            "Test URL updates"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s3-task",
+      "step_id": "frl-s3",
+      "title": "Create useRuns hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/useAttentionPlans.ts"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useRuns(filter?: { status?: string }) hook",
+            "Returns { runs: RunListItem[], isLoading, error, refetch }",
+            "Calls listRuns API with filter",
+            "Auto-refetches when filter changes"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test hook with various filters"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for hook"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s4-task",
+      "step_id": "frl-s4",
+      "title": "Create useRunningUpdates hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Understand multiple SSE connections pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useRunningUpdates(runIds: string[]) hook",
+            "Subscribes to SSE for each running run",
+            "Returns map of runId -> latest task counts",
+            "Cleans up subscriptions on unmount"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with multiple running runs",
+            "Test cleanup on unmount"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s5-task",
+      "step_id": "frl-s5",
+      "title": "Implement RunsListPage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/pages/PlansPage.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header with title 'Forge Runs' and Import Plan button",
+            "StatusFilterTabs below header",
+            "Grid of RunCards (responsive)",
+            "Loading state shows skeleton cards",
+            "Error state shows ErrorMessage with retry",
+            "Empty state message"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all states: loading, error, empty, data"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection of all states"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s6-task",
+      "step_id": "frl-s6",
+      "title": "Add Import Plan flow",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review cross-service API pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Import Plan button in header",
+            "Click opens modal with plan selector",
+            "Select plan navigates to /forge/preflight/:planId",
+            "Modal fetches plans from Planner API"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test modal opens and closes",
+            "Test plan selection navigation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with Planner API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frl-s7-task",
+      "step_id": "frl-s7",
+      "title": "Add pagination",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review pagination patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Pagination controls at bottom of list",
+            "Page size: 12 runs per page",
+            "Show total count",
+            "URL params for page"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test pagination with many runs"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Pagination tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frl-s7"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+{
+  "feature_id": "forge-user-trajectory",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fut-s1-task",
+      "step_id": "fut-s1",
+      "title": "Define UserTrajectory entity schemas",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/domain/trajectory.ts DecisionEvent pattern",
+            "Review context.architect.data_model for schema requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "UserTrajectoryEventSchema: { event_id, user_id, scope, question_text, selected_option, reasoning?, run_id?, task_id?, timestamp }",
+            "DerivedPreferenceSchema: { preference_id, user_id, scope, category, value, confidence, evidence_count, last_expressed }",
+            "ScopeSchema: z.enum(['global', 'project', 'run'])"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify schemas capture all required fields",
+            "Test validation with sample data"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for all schemas"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s2-task",
+      "step_id": "fut-s2",
+      "title": "Verify user trajectory tables in storage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-storage fs-s6 for table schemas"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Verify ForgeStorage user trajectory event methods: createUserEvent, listUserEvents",
+            "Verify ForgeStorage preference methods: getPreference, upsertPreference, listPreferences",
+            "Verify indexes on (user_id, scope) work efficiently"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test CRUD operations",
+            "Test query performance with indexes"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for storage methods"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s3-task",
+      "step_id": "fut-s3",
+      "title": "Implement trajectory event recording",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/relay/user-trajectory.ts pattern from planner-core"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "recordUserDecision(userId, scope, event) stores event in DB",
+            "Called when question is answered via question queue",
+            "Captures: question text, selected option, reasoning if provided",
+            "Triggers preference derivation analysis"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test recording user decisions",
+            "Verify preference derivation is triggered"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for recordUserDecision"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s4-task",
+      "step_id": "fut-s4",
+      "title": "Implement preference derivation",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review confidence formula and threshold requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "After each decision, analyze for patterns (same category, similar answers)",
+            "Create/update DerivedPreference when pattern detected (3+ similar decisions)",
+            "Confidence formula: min(0.95, 0.5 + 0.15 * evidence_count)",
+            "Categories extracted from question context (e.g., 'database', 'styling', 'testing')"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test preference derivation with repeated decisions",
+            "Verify confidence calculation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for preference derivation"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s5-task",
+      "step_id": "fut-s5",
+      "title": "Implement getUserPreference query",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Understand scope priority: run > project > global"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "getUserPreference(userId, scope, category) returns preference if exists with sufficient confidence",
+            "Scope priority: run > project > global (more specific wins)",
+            "Returns { value, confidence } or null if no preference",
+            "Confidence threshold 0.7 for returning preference"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with preferences at different scopes",
+            "Verify scope priority is respected"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for getUserPreference"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s6-task",
+      "step_id": "fut-s6",
+      "title": "Implement findSimilarQuestions",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/storage/sqlite.ts findSimilarQuestions pattern",
+            "Understand similarity threshold (0.85)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "findSimilarQuestions(userId, scope, text, threshold=0.85) finds matching past answers",
+            "Text similarity using trigram or Levenshtein distance",
+            "Returns [{ question_text, selected_option, reasoning, similarity_score }]",
+            "Ordered by similarity_score descending"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with similar and dissimilar questions",
+            "Verify threshold is respected"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for findSimilarQuestions"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s7-task",
+      "step_id": "fut-s7",
+      "title": "Implement preference override",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Understand override behavior requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "PUT /user/preferences/:category allows preference update",
+            "Override resets evidence_count to 1, sets new value",
+            "Records override as trajectory event for audit"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test preference override",
+            "Verify audit trail"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for preference override"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fut-s8-task",
+      "step_id": "fut-s8",
+      "title": "Create UserTrajectoryService",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review service composition patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "UserTrajectoryService class with all user trajectory methods",
+            "Constructor takes ForgeStorage",
+            "Exported for use by forge-question-queue"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test service integration",
+            "Verify export works for question-queue"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for UserTrajectoryService"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fut-s8"
+          ]
+        }
+      }
+    }
+  ]
+}

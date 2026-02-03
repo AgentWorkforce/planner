@@ -1,0 +1,382 @@
+{
+  "feature_id": "forge-ui-artifacts",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "faf-s1-task",
+      "step_id": "faf-s1",
+      "title": "Create artifacts API module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/ for API patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "getRunArtifacts(runId) returns { artifacts: Artifact[] }",
+            "Artifact type: { artifact_id, task_id, type, reference, metadata, created_at }",
+            "ArtifactType: 'commit' | 'pr' | 'file' | 'deployment' | 'test_result'",
+            "refreshPRStatus(artifactId) returns updated artifact with fresh metadata"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API functions"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for artifacts API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s2-task",
+      "step_id": "faf-s2",
+      "title": "Create ArtifactTypeIcon component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review Lucide icons library"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Maps type to icon: commit -> GitCommitIcon, pr -> GitPullRequestIcon, file -> FileIcon, deployment -> RocketIcon, test_result -> TestTubeIcon",
+            "Size variants: sm, md, lg",
+            "Default icon for unknown types"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all artifact types"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s3-task",
+      "step_id": "faf-s3",
+      "title": "Create ArtifactItem component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review artifact display patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ArtifactTypeIcon on left",
+            "Title/reference as external link (target=_blank)",
+            "Task title as secondary text",
+            "Status badge for PRs (if metadata includes status)",
+            "Copy link button on hover",
+            "Created timestamp (relative: '5m ago')"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all artifact types",
+            "Test link behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s4-task",
+      "step_id": "faf-s4",
+      "title": "Create PRStatusBadge component with stale indicator",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect.pr_status_refresh for stale requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Status values: open (green outline), merged (purple fill), closed (red)",
+            "Small badge with status text",
+            "Reads status from artifact.metadata.status",
+            "Stale indicator: 'Last checked N min ago' tooltip after 5 min",
+            "Optional refresh button on hover when stale"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all status values",
+            "Test stale indicator"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s5-task",
+      "step_id": "faf-s5",
+      "title": "Create ArtifactGroup component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/CollapsibleSection.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header with type icon, name, count",
+            "Collapsible content area",
+            "Default expanded for PRs and deployments",
+            "ArtifactItem for each artifact in group"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test grouping",
+            "Test expand/collapse"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s6-task",
+      "step_id": "faf-s6",
+      "title": "Create ArtifactsPanel component with refresh button",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review panel patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header: 'Artifacts (N)'",
+            "ArtifactGroups for each type present",
+            "Order: PRs first, then deployments, commits, files, test results",
+            "Empty state: 'No artifacts produced yet'",
+            "Refresh button in header to manually refresh all PR statuses",
+            "Loading state on refresh button during refresh"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test panel rendering",
+            "Test refresh functionality"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s7-task",
+      "step_id": "faf-s7",
+      "title": "Integrate into TaskItem expanded view",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review frd-s2 TaskItem implementation"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Artifacts section in TaskItem expanded view",
+            "Shows artifacts for that specific task only",
+            "Hidden if task has no artifacts"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test integration"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s8-task",
+      "step_id": "faf-s8",
+      "title": "Add to run completion summary",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review frd-s8 RunDashboardPage implementation"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ArtifactsPanel shown prominently for completed runs",
+            "Positioned below progress bar on dashboard",
+            "Highlighted section: 'Run Complete - Artifacts Produced'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with completed run"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "faf-s9-task",
+      "step_id": "faf-s9",
+      "title": "Implement SSE-based status updates",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review SSE subscription patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Listen for artifact_updated event in run SSE stream",
+            "Update artifact metadata in local state on event",
+            "Reset stale indicator when fresh status arrives",
+            "Track last_updated timestamp for staleness calculation"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test SSE updates",
+            "Test stale indicator reset"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step faf-s9"
+          ]
+        }
+      }
+    }
+  ]
+}

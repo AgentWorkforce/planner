@@ -1,0 +1,302 @@
+{
+  "feature_id": "forge-ui-agent-cards",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fac-s1-task",
+      "step_id": "fac-s1",
+      "title": "Create agents API module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/ for API patterns",
+            "Review forge-api fa-s6 for agents endpoint"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "getActiveAgents(runId?: string) returns { agents: Agent[] }",
+            "Agent type: { agent_id, run_id, task_id, task_title, owner_role, status, last_message?, last_heartbeat }",
+            "Status enum: 'working', 'blocked', 'idle', 'error'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API functions"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for agents API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fac-s2-task",
+      "step_id": "fac-s2",
+      "title": "Create AgentRoleIcon component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/AgentAvatar.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Maps owner_role to icon: 'backend:Coder' -> CodeIcon, 'frontend:Coder' -> LayoutIcon, 'tester' -> TestTubeIcon, 'reviewer' -> EyeIcon, 'auditor' -> ShieldIcon",
+            "Default icon for unknown roles",
+            "Size variants: sm, md, lg",
+            "Color based on status (working=cyan, blocked=orange, error=red)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all role icons",
+            "Test status colors"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fac-s3-task",
+      "step_id": "fac-s3",
+      "title": "Create AgentCard component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/AgentActivityPopover.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "AgentRoleIcon with working pulse animation",
+            "Agent ID displayed (shortened if long)",
+            "Current task title",
+            "Latest status message (truncated to 2 lines)",
+            "'View Details' button at bottom",
+            "Status dot: green (working), orange (blocked), gray (idle), red (error)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test card rendering",
+            "Test all status states"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fac-s4-task",
+      "step_id": "fac-s4",
+      "title": "Create AgentDetailPanel component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/MessagingSidebar.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Slide-over panel from right side",
+            "Full task context: title, description, acceptance criteria",
+            "Recent messages from agent (last 10)",
+            "Artifacts produced by this agent",
+            "Time elapsed on current task"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test panel open/close",
+            "Test content rendering"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fac-s5-task",
+      "step_id": "fac-s5",
+      "title": "Create useActiveAgents hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/ for hook patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useActiveAgents(runId) returns { agents, isLoading, error }",
+            "Initial fetch via getActiveAgents API",
+            "SSE subscription for agent_progress events",
+            "Updates agent.last_message on progress events",
+            "Removes agent from list on agent_exited event"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test data fetching",
+            "Test SSE updates"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fac-s6-task",
+      "step_id": "fac-s6",
+      "title": "Create ActiveAgentsSection component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/WorkingOnSection.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header: 'Active Agents (N)' with count",
+            "Grid of AgentCards (2 columns)",
+            "Opens AgentDetailPanel on 'View Details' click",
+            "Empty state: 'No agents currently working'",
+            "Loading state: skeleton cards"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test section rendering",
+            "Test panel opening"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fac-s7-task",
+      "step_id": "fac-s7",
+      "title": "Integrate into RunDashboardPage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review frd-s8 RunDashboardPage implementation"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ActiveAgentsSection in right sidebar of RunDashboardPage",
+            "Receives runId from page context",
+            "Panel opens over dashboard content (not inside sidebar)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test integration"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection of dashboard"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fac-s7"
+          ]
+        }
+      }
+    }
+  ]
+}

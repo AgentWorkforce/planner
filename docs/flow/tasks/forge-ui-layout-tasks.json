@@ -1,0 +1,565 @@
+{
+  "feature_id": "forge-ui-layout",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "ful-s1-task",
+      "step_id": "ful-s1",
+      "title": "Create package scaffolding",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/package.json, vite.config.ts, tsconfig.json",
+            "Understand Vite + React + TypeScript + Tailwind CSS 4 setup"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "packages/forge-ui/ directory with package.json (name: @plannr/forge-ui)",
+            "Vite config with React plugin and path aliases (@/ -> src/)",
+            "TypeScript config extending shared tsconfig",
+            "Tailwind CSS 4 config with @config directive in globals.css",
+            "npm run dev starts Vite dev server on port 5174"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify npm run dev starts successfully",
+            "Verify path aliases work"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Dev server runs without errors",
+            "TypeScript compilation succeeds"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s2-task",
+      "step_id": "ful-s2",
+      "title": "Copy and configure design system",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/globals.css",
+            "Review tailwind.config.cjs"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "globals.css with all Mission Control CSS variables",
+            "tailwind.config.cjs with color scales referencing CSS variables",
+            "Font imports for Outfit, Inter, IBM Plex Mono",
+            "Dark theme as default"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify CSS variables are applied",
+            "Verify fonts load correctly"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection of styled components"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s3-task",
+      "step_id": "ful-s3",
+      "title": "Create API client module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/client.ts"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "src/api/client.ts with get<T>, post<T>, put<T>, del<T> functions",
+            "ApiError class with status code and message",
+            "Configurable FORGE_API_BASE (default /forge-api)",
+            "All methods include Content-Type: application/json header"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API client methods",
+            "Verify error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for API client"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s4-task",
+      "step_id": "ful-s4",
+      "title": "Create runs API module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/plans.ts",
+            "Review Forge API endpoints"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "listRuns(filter?: { status?: string }) returns { runs: Run[] }",
+            "getRun(runId) returns { run: Run, tasks: Task[] }",
+            "pauseRun(runId) calls POST /runs/:id/pause",
+            "resumeRun(runId) calls POST /runs/:id/resume",
+            "cancelRun(runId) calls POST /runs/:id/cancel",
+            "TypeScript types for Run, Task, Artifact"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API functions with mock backend"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for runs API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s5-task",
+      "step_id": "ful-s5",
+      "title": "Create TypeScript types",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/types/",
+            "Review docs/flow/features/forge-domain.json"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "src/types/run.ts: RunStatus, Run interface",
+            "src/types/task.ts: TaskStatus, Task, TaskAttempt interfaces",
+            "src/types/artifact.ts: ArtifactType, Artifact interface",
+            "src/types/gate.ts: GateStatus, Gate interface",
+            "src/types/question.ts: BlockingLevel, Question interface",
+            "src/types/index.ts re-exports all types"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "TypeScript compilation succeeds"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Types match forge-domain schemas"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s6-task",
+      "step_id": "ful-s6",
+      "title": "Create SSE hook for run events",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/usePlanEvents.ts"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useRunEvents(runId, enabled, onEvent) hook",
+            "Subscribes to GET /runs/:id/events SSE endpoint",
+            "Handles all event types",
+            "Auto-reconnect on error (max 5 retries, 3s delay)",
+            "Returns { isConnected, error } state",
+            "Support for Last-Event-ID header on reconnection"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test SSE connection",
+            "Test reconnection behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for SSE hook"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s6b-task",
+      "step_id": "ful-s6b",
+      "title": "Create ForgeRunContext provider",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/context/RelayContext.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ForgeRunContext provides { activeRun, tasks, gates, questions, agents }",
+            "ForgeRunProvider wraps app and manages SSE subscription",
+            "useForgeRun() hook for consuming context",
+            "SSE subscription managed once at provider level",
+            "Context updates on SSE events",
+            "Loading and error states exposed via context"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test context provider",
+            "Verify SSE updates flow through"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for context"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s6b"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s7-task",
+      "step_id": "ful-s7",
+      "title": "Create sidebar component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/sidebar/AppSidebar.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ForgeSidebar component using shadcn/ui Sidebar primitives",
+            "Logo/title section: 'Forge' with anvil icon",
+            "Navigation items: Runs, Active, History",
+            "Collapsible/expandable state persisted to localStorage",
+            "Mobile-responsive with drawer behavior"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test sidebar navigation",
+            "Test mobile responsiveness"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection on desktop and mobile"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s8-task",
+      "step_id": "ful-s8",
+      "title": "Create Layout component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/Layout.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ForgeLayout component using SidebarProvider, SidebarInset",
+            "Outlet for React Router nested routes",
+            "Mobile header with hamburger menu",
+            "Main content area with overflow-auto and bottom padding",
+            "ForgeRunProvider wraps content"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test layout rendering",
+            "Test mobile behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s9-task",
+      "step_id": "ful-s9",
+      "title": "Set up React Router",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/App.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "src/App.tsx with BrowserRouter and Routes",
+            "Route /forge -> RunsListPage (index)",
+            "Route /forge/runs/:runId -> RunDashboardPage",
+            "Route /forge/runs/:runId/timeline -> TimelinePage",
+            "Route /forge/preflight/:planId -> PreflightPage",
+            "All routes wrapped in ForgeLayout"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all routes navigate correctly"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Navigation tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s9"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s10-task",
+      "step_id": "ful-s10",
+      "title": "Create placeholder pages",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/pages/"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "RunsListPage with title and 'Coming soon' message",
+            "RunDashboardPage with title and useParams for runId",
+            "TimelinePage with title and useParams for runId",
+            "PreflightPage with title and useParams for planId",
+            "All pages follow consistent layout pattern"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify all pages render"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Page rendering tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s10"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s11-task",
+      "step_id": "ful-s11",
+      "title": "Create loading and error components",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/LoadingSpinner.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "LoadingSpinner component with size variants (sm, md, lg)",
+            "Skeleton component for content placeholders",
+            "ErrorMessage component with retry button option",
+            "EmptyState component with icon, title, description, optional action"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all components render correctly"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s11"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ful-s12-task",
+      "step_id": "ful-s12",
+      "title": "Wire up Vite proxy",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/vite.config.ts"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "vite.config.ts proxy /forge-api to localhost:3001",
+            "WebSocket proxy for SSE connections",
+            "CORS handled by proxy"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API calls through proxy",
+            "Test SSE through proxy"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with running backend"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ful-s12"
+          ]
+        }
+      }
+    }
+  ]
+}
