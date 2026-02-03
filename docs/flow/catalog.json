@@ -149,19 +149,21 @@
   ],
 
   "features": [
-    { "id": "ideation-package", "title": "Ideation Package", "type": "epic", "status": "draft", "priority": "critical", "component": "ideation-core", "design_reference": "docs/flow/features/ideation-package.json" },
-    { "id": "ideation-domain", "title": "Ideation Domain Model", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-package" },
-    { "id": "ideation-storage", "title": "Ideation Storage Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-domain"], "parent": "ideation-package" },
-    { "id": "ideation-api", "title": "Ideation REST API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-storage"], "parent": "ideation-package" },
-    { "id": "ideation-lead", "title": "Interviewer Persistent Agent", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-api"], "parent": "ideation-package" },
-    { "id": "ideation-specialists", "title": "Guardian Specialist Agents", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-lead"], "parent": "ideation-package" },
-    { "id": "ideation-planner-handoff", "title": "Planner Handoff Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-lead", "ideation-specialists"], "parent": "ideation-package" },
+    { "id": "ideation-package", "title": "Ideation Package", "type": "epic", "status": "approved", "priority": "critical", "component": "ideation-core", "design_reference": "docs/flow/features/ideation-package.json" },
+    { "id": "ideation-domain", "title": "Ideation Domain Model", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": [], "parent": "ideation-package" },
+    { "id": "ideation-storage", "title": "Ideation Storage Layer", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["ideation-domain"], "parent": "ideation-package" },
+    { "id": "ideation-api", "title": "Ideation REST API", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-storage"], "parent": "ideation-package" },
+    { "id": "ideation-lead", "title": "Interviewer Persistent Agent", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["ideation-api"], "parent": "ideation-package", "audit_note": "13/14 AC met. Gap: spawnAgent not wired to Interviewer initialization (int005a/int008a steps pending)" },
+    { "id": "ideation-specialists", "title": "Guardian Specialist Agents", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-lead"], "parent": "ideation-package" },
+    { "id": "ideation-planner-handoff", "title": "Planner Handoff Integration", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-lead", "ideation-specialists"], "parent": "ideation-package", "audit_note": "7/8 AC met. Gap: PlannerLead notification not implemented (hnd006 step pending)" },
 
     { "id": "ideation-ui", "title": "Ideation UI Package", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-ui", "dependencies": ["ideation-api"], "design_reference": "docs/flow/features/ideation-ui.json" },
     { "id": "ideation-ui-layout", "title": "Ideation Layout & Navigation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-ui" },
     { "id": "ideation-ui-session-list", "title": "Session List & Management", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
     { "id": "ideation-ui-chat", "title": "Chat Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
     { "id": "ideation-ui-specialists-panel", "title": "Specialists Panel", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-tabs", "title": "Session View Tab Navigation", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-ui-chat", "ideation-ui-specialists-panel"], "parent": "ideation-ui" },
+    { "id": "ideation-concrete-blocks", "title": "Concrete Blocks - User-Validatable Concepts", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"], "parent": "ideation-package", "design_reference": "docs/flow/features/ideation-concrete-blocks.json" },
 
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
     { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
@@ -214,6 +216,8 @@
     { "id": "relay-ai-improvements", "title": "Connect Silent Improvements to Planning Agent", "type": "feature", "status": "approved" },
     { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "approved" },
     { "id": "relay-session-connect", "title": "On-Demand AI Session Connection", "type": "feature", "status": "approved", "audit_note": "All 8 implementation tasks completed - hook, badge, API, tests all implemented" },
+    { "id": "relay-plan-channel-hook", "title": "Plan Channel Creation Hook", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["relay-core", "ui-relay-messaging-backend"], "audit_note": "Implemented: Express middleware intercepts POST /api/plans, calls createPlanChannel + notifyNewPlan. 12 tests." },
+    { "id": "relay-dead-code-cleanup", "title": "Relay Module Dead Code Cleanup", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "component": "planner-core", "note": "Technical debt cleanup - remove ~20 unused exported functions from relay module" },
 
     { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "completed", "audit_note": "All 8 implementation steps complete. SSE endpoint, usePlanEvents hook with auto-reconnect, integrated into PlanEditorPage. 22 tests passing." },
 
@@ -275,6 +279,18 @@
     { "id": "schema-api-endpoints", "title": "API Endpoints for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-db-migration"] },
     { "id": "schema-ui-understanding", "title": "Understanding Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
     { "id": "schema-ui-specification", "title": "Specification Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
-    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding & Specification", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] }
+    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding & Specification", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+
+    { "id": "ideation-documents", "title": "Document Upload & Analysis", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-core", "dependencies": ["ideation-package"], "design_reference": "docs/flow/features/ideation-documents.json" },
+    { "id": "ideation-doc-domain", "title": "Document Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "ideation-documents" },
+    { "id": "ideation-doc-storage", "title": "Document Storage Layer", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-domain"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-api", "title": "Document Upload API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-chunking", "title": "Document Chunking Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-domain"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-analysis", "title": "Chunk Analysis Agents", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-chunking"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-synthesis", "title": "Document Insight Synthesis", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-analysis"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-agent-tool", "title": "cite_document Agent Tool", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage", "ideation-doc-analysis"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-interviewer-integration", "title": "Interviewer Document Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-synthesis", "ideation-doc-agent-tool", "ideation-lead"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-ui-upload", "title": "Document Upload UI", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-api"], "parent": "ideation-documents", "component": "ideation-ui" },
+    { "id": "ideation-doc-ui-progress", "title": "Analysis Progress UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-doc-ui-upload", "ideation-doc-analysis"], "parent": "ideation-documents", "component": "ideation-ui" }
   ]
 }

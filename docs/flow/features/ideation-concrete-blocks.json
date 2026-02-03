@@ -1,0 +1,410 @@
+{
+  "feature_id": "ideation-concrete-blocks",
+  "title": "Concrete Blocks - Crystallized Concepts for User Validation",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Replace the 'observations-only' output of ideation with a dual-output model: Understanding (domain color) + Concrete Blocks (user-validatable mini-specs). Blocks appear in a bento-box treemap UI where size reflects concept maturity. Users validate blocks before planner handoff, solving the 'did you understand me?' problem.",
+    "problem_statement": {
+      "current_state": "Specialists produce freeform observations (patterns, concerns, entities). Users have no clear checkpoint to validate understanding before planning begins. They must either trust the system or read through all observations.",
+      "user_pain": "How do I know the agents understood my idea correctly? Currently I'd need to read a PRD/spec after planning and fine-tune it.",
+      "gap": "Specialist observations are domain-descriptive, not requirements-prescriptive. There's no intermediate artifact users can validate."
+    },
+    "proposed_solution": {
+      "dual_output": {
+        "understanding": "Domain observations, concerns, patterns - the 'color' that informs HOW to plan",
+        "blocks": "Crystallized concepts (features, components, entities, flows) - the 'substance' that informs WHAT to plan"
+      },
+      "user_validation_loop": "Blocks appear as user discusses. User clicks to see mini-spec, approves or refines via chat. Only approved blocks go to planner.",
+      "bento_box_ui": "Treemap-style visualization where block size reflects concept maturity/development"
+    },
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Specialists produce BOTH observations (understanding) AND blocks (concrete concepts)" },
+      { "id": "ac2", "description": "Blocks have freeform types - common suggestions (feature, component, entity, flow, constraint, integration) but agents can use any type that fits (api_endpoint, business_rule, user_persona, edge_case, etc.)" },
+      { "id": "ac3", "description": "Blocks have lifecycle: draft → reviewing → approved → revised" },
+      { "id": "ac4", "description": "Each block has a mini-spec (markdown with summary, user stories, decisions, diagrams)" },
+      { "id": "ac5", "description": "Blocks Panel replaces Specialists Panel in right sidebar" },
+      { "id": "ac6", "description": "Blocks render as bento-box/treemap with size proportional to maturity" },
+      { "id": "ac7", "description": "Clicking a block opens mini-spec detail view (modal or drawer)" },
+      { "id": "ac8", "description": "User can approve block from detail view" },
+      { "id": "ac9", "description": "Understanding tab shows specialist observations (existing functionality, relocated)" },
+      { "id": "ac10", "description": "Planner handoff sends both understanding AND approved blocks" },
+      { "id": "ac11", "description": "PlannerLead converts approved blocks into Steps" }
+    ],
+    "decisions": [
+      { "decision": "Same agents do both", "rationale": "Specialists == Agents. They produce observations AND identify concrete concepts. Not two separate systems." },
+      { "decision": "Bento-box treemap UI", "rationale": "Visual hierarchy shows concept maturity at a glance. Larger blocks = more developed concepts." },
+      { "decision": "Mini-specs not full PRDs", "rationale": "Small, focused documents per concept. User validates incrementally, not by reading a massive spec." },
+      { "decision": "Approval before handoff", "rationale": "Only approved blocks go to planner. User explicitly validates 'yes, this is what I meant'." },
+      { "decision": "Understanding remains freeform", "rationale": "Observations are still domain-descriptive color. Blocks add the prescriptive layer on top." },
+      { "decision": "Block types are freeform", "rationale": "Same philosophy as specialist observations - intelligence lives in agent judgment, not schema constraints. Suggested types are guidance, not limits." }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is a fundamental shift from observations-only to observations+blocks",
+        "Block lifecycle (draft→approved) creates a validation checkpoint",
+        "Treemap visualization requires calculating relative weights",
+        "Mini-specs need structured markdown format",
+        "Planner integration changes: now receives blocks as primary input"
+      ],
+      "patterns": ["Dual-output model", "User validation loop", "Progressive disclosure via treemap"],
+      "concerns": [
+        "Block extraction logic - how do agents know when a concept is 'concrete enough'?",
+        "Size calculation for treemap - what metrics drive 'maturity'?",
+        "Mini-spec format standardization across block types"
+      ],
+      "confidence": "forming"
+    },
+    "designer": {
+      "observations": [
+        "Bento-box treemap is unconventional but scannable",
+        "Block cards need clear type indicators (icons)",
+        "Approval action must be prominent",
+        "Detail view needs structured sections matching mini-spec format"
+      ],
+      "patterns": ["Treemap visualization", "Card-based navigation", "Inline approval"],
+      "concerns": [
+        "Treemap layout algorithm complexity",
+        "Mobile responsiveness for bento-box layout",
+        "Visual differentiation between draft/approved states"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "context": {
+    "current_architecture": {
+      "specialists_panel": "Right sidebar showing specialist cards with observations",
+      "understanding_tab": "Tab in main area showing per-specialist observations",
+      "handoff": "POST /api/plans with goal, context, understanding (freeform)"
+    },
+    "proposed_architecture": {
+      "blocks_panel": "Right sidebar showing bento-box treemap of concrete blocks",
+      "understanding_tab": "Tab in main area showing specialist observations (relocated from panel)",
+      "handoff": "POST /api/plans with goal, context, understanding (color), blocks (approved only)"
+    },
+    "migration_path": "Specialist observations continue to work. Blocks are additive. Treemap can fall back to simple card list."
+  },
+  "design_spec": {
+    "block_schema": {
+      "id": "string (uuid)",
+      "type": "string (freeform - agents choose appropriate taxonomy)",
+      "type_notes": "Suggested types: feature, component, entity, flow, constraint, integration. Agents can use ANY type that fits the concept (e.g., 'api_endpoint', 'business_rule', 'user_persona', 'edge_case'). Intelligence lives in agent judgment, not enum constraints.",
+      "title": "string",
+      "status": "'draft' | 'reviewing' | 'approved' | 'revised'",
+      "maturity": "number (0-100, drives treemap size)",
+      "content": "string (markdown mini-spec)",
+      "source_context": "string (which conversation turns it emerged from)",
+      "specialist": "string (which specialist identified it)",
+      "created_at": "ISO timestamp",
+      "approved_at": "ISO timestamp | null"
+    },
+    "mini_spec_format": {
+      "template": "# {title}\n\n## Summary\n{1-2 sentences}\n\n## User Stories (for features)\n- As a {role}, I can {action}\n\n## Key Decisions\n- {decision}: {rationale}\n\n## Open Questions\n- {question}?\n\n## Diagram (optional)\n```\n{ascii diagram}\n```\n\n## Source\nExtracted from conversation turns {range}",
+      "type_variations": {
+        "note": "These are SUGGESTIONS for common types. Agents adapt the format to fit whatever type they create.",
+        "feature": "User stories, acceptance criteria",
+        "component": "Layout, interactions, states",
+        "entity": "Fields, relationships, constraints",
+        "flow": "Steps, decision points, error cases",
+        "constraint": "Requirements, implications",
+        "integration": "Systems, protocols, data formats",
+        "custom_types": "Agents structure content appropriately - api_endpoint might have routes/methods, business_rule might have conditions/exceptions, etc."
+      }
+    },
+    "bento_box_layout": {
+      "algorithm": "Treemap with squarified layout",
+      "size_metric": "maturity score (0-100)",
+      "min_block_size": "80px x 80px",
+      "max_block_size": "fills available space for single high-maturity block",
+      "spacing": "4px gap between blocks",
+      "aspect_ratio": "Prefer ~1:1 for individual blocks"
+    },
+    "block_card": {
+      "collapsed": {
+        "icon": "Type-specific icon for known types (feature=star, component=box, entity=database, flow=arrows, constraint=lock, integration=plug). Unknown/custom types get generic diamond icon.",
+        "title": "Block title (truncated if needed)",
+        "status_indicator": "Draft=gray, Reviewing=blue, Approved=green border",
+        "maturity_bar": "Thin bar at bottom showing maturity %"
+      },
+      "hover": "Shows full title + maturity percentage",
+      "click": "Opens detail modal/drawer"
+    },
+    "detail_view": {
+      "layout": "Side drawer (default) or modal",
+      "header": "Type icon + Title + Status badge + Approve button",
+      "body": "Rendered mini-spec markdown",
+      "actions": ["Approve", "Mark for revision (returns to chat)", "View source context"],
+      "width": "min(600px, 80vw)"
+    },
+    "panel_layout": {
+      "header": "Session Readiness bar + 'Concepts' title + count",
+      "body": "Bento-box treemap of blocks",
+      "footer": "Approved count / total count",
+      "empty_state": "'Concepts will emerge as you describe your idea'"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core", "ideation-ui"],
+    "phases": [
+      {
+        "phase": "1",
+        "name": "Backend: Block Schema & Storage",
+        "description": "Add block concept to ideation-core"
+      },
+      {
+        "phase": "2",
+        "name": "Backend: Specialist Block Extraction",
+        "description": "Specialists produce blocks alongside observations"
+      },
+      {
+        "phase": "3",
+        "name": "Frontend: Blocks Panel & Treemap",
+        "description": "Replace specialists panel with bento-box blocks view"
+      },
+      {
+        "phase": "4",
+        "name": "Frontend: Block Detail & Approval",
+        "description": "Detail view with mini-spec and approval flow"
+      },
+      {
+        "phase": "5",
+        "name": "Integration: Planner Handoff with Blocks",
+        "description": "Update handoff to include approved blocks"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "blk001",
+        "title": "Define Block schema and Zod types",
+        "scope": "ideation-core",
+        "phase": "1",
+        "description": "Create Block type with all fields (id, type, title, status, maturity, content, etc.)",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BlockSchema Zod type defined with all fields" },
+          { "id": "ac2", "description": "Block.type is freeform string (not enum) - agents choose appropriate taxonomy" },
+          { "id": "ac3", "description": "COMMON_BLOCK_TYPES constant lists suggested types for UI icons/prompts" },
+          { "id": "ac4", "description": "BlockStatus enum: draft, reviewing, approved, revised" },
+          { "id": "ac5", "description": "MiniSpec type for structured content" }
+        ]
+      },
+      {
+        "step_id": "blk002",
+        "title": "Add blocks[] to Session entity",
+        "scope": "ideation-core",
+        "phase": "1",
+        "description": "Extend Session to store blocks alongside understanding",
+        "dependencies": ["blk001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Session.blocks: Block[] added to schema" },
+          { "id": "ac2", "description": "Storage: blocks stored as JSONB array" },
+          { "id": "ac3", "description": "Backward compatible: existing sessions have empty blocks[]" }
+        ]
+      },
+      {
+        "step_id": "blk003",
+        "title": "Create block management API endpoints",
+        "scope": "ideation-core",
+        "phase": "1",
+        "description": "CRUD endpoints for blocks within a session",
+        "dependencies": ["blk002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /api/ideation/sessions/:id/blocks returns all blocks" },
+          { "id": "ac2", "description": "POST /api/ideation/sessions/:id/blocks creates new block" },
+          { "id": "ac3", "description": "PATCH /api/ideation/sessions/:id/blocks/:blockId updates block" },
+          { "id": "ac4", "description": "POST /api/ideation/sessions/:id/blocks/:blockId/approve sets status=approved" },
+          { "id": "ac5", "description": "SSE events emitted for block changes" }
+        ]
+      },
+      {
+        "step_id": "blk004",
+        "title": "Add create_block tool for specialists",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "MCP tool for specialists to create concrete blocks",
+        "dependencies": ["blk003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "create_block: { session_id, type, title, content } creates draft block" },
+          { "id": "ac2", "description": "update_block: { session_id, block_id, maturity?, content? } updates existing" },
+          { "id": "ac3", "description": "Block.specialist set to calling specialist name" },
+          { "id": "ac4", "description": "Block.source_context captured from conversation context" }
+        ]
+      },
+      {
+        "step_id": "blk005",
+        "title": "Update specialist prompts for block extraction",
+        "scope": "ideation-core",
+        "phase": "2",
+        "description": "Enhance specialist prompts to identify and create concrete blocks",
+        "dependencies": ["blk004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Specialist prompts include guidance on when to create blocks" },
+          { "id": "ac2", "description": "Block type mapping: Architect→features/components, DataModeller→entities, Designer→components, etc." },
+          { "id": "ac3", "description": "Maturity scoring guidelines in prompts" },
+          { "id": "ac4", "description": "Mini-spec format template in prompts" }
+        ]
+      },
+      {
+        "step_id": "blk006",
+        "title": "Create useBlocks hook",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "React hook for fetching and subscribing to session blocks",
+        "dependencies": ["blk003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useBlocks(sessionId) returns { blocks, loading, error, approveBlock, refetch }" },
+          { "id": "ac2", "description": "Subscribes to SSE for real-time block updates" },
+          { "id": "ac3", "description": "approveBlock(blockId) calls approve endpoint" }
+        ]
+      },
+      {
+        "step_id": "blk007",
+        "title": "Create BlockCard component",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "Individual block card for treemap cell",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BlockCard({ block, onClick }) renders card with type icon, title, status" },
+          { "id": "ac2", "description": "Visual states: draft (gray), reviewing (blue pulse), approved (green border)" },
+          { "id": "ac3", "description": "Maturity bar at bottom" },
+          { "id": "ac4", "description": "Hover shows full title + maturity %" }
+        ]
+      },
+      {
+        "step_id": "blk008",
+        "title": "Create BentoBoxLayout component",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "Treemap layout algorithm for bento-box visualization",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BentoBoxLayout({ items, renderItem, getWeight }) renders treemap" },
+          { "id": "ac2", "description": "Uses squarified treemap algorithm" },
+          { "id": "ac3", "description": "Respects min/max block sizes" },
+          { "id": "ac4", "description": "Responsive: recalculates on container resize" },
+          { "id": "ac5", "description": "Animates layout changes smoothly" }
+        ]
+      },
+      {
+        "step_id": "blk009",
+        "title": "Create BlocksPanel component",
+        "scope": "ideation-ui",
+        "phase": "3",
+        "description": "Replace SpecialistsPanel with blocks bento-box view",
+        "dependencies": ["blk006", "blk007", "blk008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BlocksPanel({ blocks, onBlockClick, onApprove }) renders panel" },
+          { "id": "ac2", "description": "Header: Session Readiness bar + 'Concepts' title + count badge" },
+          { "id": "ac3", "description": "Body: BentoBoxLayout with BlockCards" },
+          { "id": "ac4", "description": "Footer: 'X of Y approved' status" },
+          { "id": "ac5", "description": "Empty state when no blocks" },
+          { "id": "ac6", "description": "Collapse/expand functionality preserved" }
+        ]
+      },
+      {
+        "step_id": "blk010",
+        "title": "Create BlockDetailDrawer component",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Detail view showing full mini-spec with approval action",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BlockDetailDrawer({ block, open, onClose, onApprove }) renders drawer" },
+          { "id": "ac2", "description": "Header: Type icon + Title + Status badge" },
+          { "id": "ac3", "description": "Body: Rendered markdown mini-spec" },
+          { "id": "ac4", "description": "Actions: Approve button (prominent), View source, Mark for revision" },
+          { "id": "ac5", "description": "Slide-in animation from right" }
+        ]
+      },
+      {
+        "step_id": "blk011",
+        "title": "Integrate BlocksPanel into SessionPage",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Wire up blocks panel and detail drawer",
+        "dependencies": ["blk009", "blk010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionPage uses BlocksPanel instead of SpecialistsPanel in right slot" },
+          { "id": "ac2", "description": "Clicking block opens BlockDetailDrawer" },
+          { "id": "ac3", "description": "Approve action updates block status in real-time" },
+          { "id": "ac4", "description": "Understanding tab continues to show specialist observations" }
+        ]
+      },
+      {
+        "step_id": "blk012",
+        "title": "Relocate specialist observations to Understanding tab",
+        "scope": "ideation-ui",
+        "phase": "4",
+        "description": "Move SpecialistCard grid to Understanding tab (was in sidebar)",
+        "dependencies": ["blk011"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Understanding tab shows SpecialistCard grid (existing functionality)" },
+          { "id": "ac2", "description": "Tab layout: Chat | Understanding (observations) | Docs" },
+          { "id": "ac3", "description": "SessionConfidenceBar moved to Understanding tab header" }
+        ]
+      },
+      {
+        "step_id": "blk013",
+        "title": "Update planner handoff to include blocks",
+        "scope": "ideation-core",
+        "phase": "5",
+        "description": "Extend send-to-planner to include approved blocks",
+        "dependencies": ["blk005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Handoff payload includes blocks[] (approved only)" },
+          { "id": "ac2", "description": "Block content preserved in plan.source.blocks" },
+          { "id": "ac3", "description": "Validation: at least one approved block required for handoff" }
+        ]
+      },
+      {
+        "step_id": "blk014",
+        "title": "Update planner-core to receive blocks",
+        "scope": "planner-core",
+        "phase": "5",
+        "description": "Extend Plan schema and creation to handle blocks from ideation",
+        "dependencies": ["blk013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreatePlanRequest accepts optional blocks[] array" },
+          { "id": "ac2", "description": "Plan.source.blocks stores received blocks" },
+          { "id": "ac3", "description": "PlannerLead prompt includes guidance on converting blocks to steps" }
+        ]
+      },
+      {
+        "step_id": "blk015",
+        "title": "Write integration tests for blocks flow",
+        "scope": "ideation-core",
+        "phase": "5",
+        "description": "End-to-end tests for block creation, approval, and handoff",
+        "dependencies": ["blk014"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test specialist creates block via MCP tool" },
+          { "id": "ac2", "description": "Test block approval updates status" },
+          { "id": "ac3", "description": "Test handoff includes only approved blocks" },
+          { "id": "ac4", "description": "Test planner receives blocks in source" }
+        ]
+      }
+    ]
+  },
+  "notes": "This is a significant evolution of ideation. The key insight: users need a validation checkpoint ('did you understand me?') BEFORE planning begins. Blocks provide focused, validatable artifacts. The bento-box visualization makes concept maturity visible at a glance."
+}

@@ -1,0 +1,176 @@
+{
+  "feature_id": "relay-plan-channel-hook",
+  "title": "Plan Channel Creation Hook",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "implemented_date": "2026-02-01",
+  "dependencies": ["relay-core", "ui-relay-messaging-backend"],
+  "metadata": {
+    "source": "audit",
+    "audit_date": "2026-02-01",
+    "identified_by": "relay-messaging infrastructure gap analysis"
+  },
+
+  "summary": {
+    "goal": "Automatically create relay channels for new plans when POST /api/plans is called, ensuring new plans immediately have messaging capability without requiring server restart",
+    "context": "Currently, relay channels for plans are only created at server startup via syncPlanChannels(). When a new plan is created via POST /api/plans, no channel is created. Users must restart the server for the new plan to get a messaging channel. This breaks the real-time messaging experience and makes new plans appear without chat capability until server restart.",
+    "in_scope": [
+      "Hook createPlanChannel into plan creation flow",
+      "Handle graceful degradation when relay not connected",
+      "Ensure PlannerLead auto-joins new plan channels"
+    ],
+    "out_of_scope": [
+      "Channel deletion on plan deletion (optional cleanup, separate feature)",
+      "Changes to channel naming scheme",
+      "Frontend channel discovery (already handles this via API)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "When POST /api/plans creates a plan, createPlanChannel(planId) is called" },
+      { "id": "ac2", "description": "New plan channels are created even if relay was connected after server started" },
+      { "id": "ac3", "description": "If relay is not connected, plan creation still succeeds (graceful degradation)" },
+      { "id": "ac4", "description": "PlannerLead agent auto-joins newly created plan channels" },
+      { "id": "ac5", "description": "GET /api/channels returns the new plan channel immediately after plan creation" },
+      { "id": "ac6", "description": "Channel creation is logged for debugging" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Planner package (packages/planner) is designed to be standalone with no relay dependency",
+        "Server package (packages/server) has relay integration but mounts planner as a plugin",
+        "createPlanChannel exists in packages/server/src/relay/channels.ts but is not called from plan creation",
+        "syncPlanChannels at startup syncs existing plans but misses newly created ones",
+        "The plan handlers in packages/planner/src/api/handlers/plans.ts have no knowledge of relay",
+        "Need a hook/callback mechanism or middleware to bridge planner events to server relay layer"
+      ],
+      "keywords": ["hook", "middleware", "event-driven", "plugin architecture", "graceful degradation"],
+      "questions": [
+        "Should this be a middleware that wraps the plan creation endpoint?",
+        "Should planner package emit events that server can subscribe to?",
+        "Should server override/wrap the plan creation handler directly?"
+      ],
+      "concerns": [
+        "Coupling between planner (standalone) and server (relay-aware) packages",
+        "Error in channel creation should not fail plan creation",
+        "Need to ensure PlannerLead joins before messages can be sent"
+      ],
+      "references": [
+        "packages/server/src/relay/channels.ts:createPlanChannel",
+        "packages/server/src/relay/channels.ts:syncPlanChannels",
+        "packages/server/src/server.ts:syncPlanChannels call at startup",
+        "packages/planner/src/api/handlers/plans.ts:create handler"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "approach": "Express middleware or response interceptor",
+      "rationale": "Keeps planner package standalone while allowing server to hook into plan creation events",
+      "alternative_considered": "Event emitter in planner package - rejected because it adds relay awareness to standalone package"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "rpch001",
+        "title": "Create plan creation middleware",
+        "scope": "planner-core",
+        "description": "Create middleware in packages/server/src/relay/plan-channel-middleware.ts that intercepts POST /api/plans responses and calls createPlanChannel when a plan is successfully created. The middleware should wrap the response to extract the plan_id from successful responses.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Middleware exports planChannelMiddleware function" },
+          { "id": "ac2", "description": "Middleware only acts on POST /api/plans requests" },
+          { "id": "ac3", "description": "Middleware calls createPlanChannel after successful (201) response" },
+          { "id": "ac4", "description": "Middleware passes through response unchanged to client" },
+          { "id": "ac5", "description": "Errors in channel creation are logged but do not affect response" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "response interceptor middleware",
+            "tech": "Express middleware",
+            "integration_point": "POST /api/plans response"
+          }
+        }
+      },
+      {
+        "step_id": "rpch002",
+        "title": "Mount middleware in server",
+        "scope": "planner-core",
+        "description": "Add the planChannelMiddleware to the Express app in packages/server/src/server.ts before the planner router is mounted. This ensures the middleware can intercept plan creation responses.",
+        "dependencies": ["rpch001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Middleware is imported in server.ts" },
+          { "id": "ac2", "description": "Middleware is mounted before planner router" },
+          { "id": "ac3", "description": "Server starts successfully with middleware" }
+        ]
+      },
+      {
+        "step_id": "rpch003",
+        "title": "Add PlannerLead auto-join for new channels",
+        "scope": "planner-core",
+        "description": "Update createPlanChannel in channels.ts to notify PlannerLead to join the new channel. This can be done by calling a function exported from planner-lead.ts or by having PlannerLead subscribe to channel creation events.",
+        "dependencies": ["rpch001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlannerLead joins new plan channels when they are created" },
+          { "id": "ac2", "description": "If PlannerLead is not running, channel is still created" },
+          { "id": "ac3", "description": "Join is logged for debugging" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "observer/callback",
+            "integration": "createPlanChannel calls plannerLead.joinChannel or emits event"
+          }
+        }
+      },
+      {
+        "step_id": "rpch004",
+        "title": "Add integration tests",
+        "scope": "planner-core",
+        "description": "Create tests in packages/server/src/relay/plan-channel-middleware.test.ts that verify: (1) channel is created when plan is created, (2) graceful degradation when relay disconnected, (3) PlannerLead joins new channels.",
+        "dependencies": ["rpch002", "rpch003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: POST /api/plans creates plan channel" },
+          { "id": "ac2", "description": "Test: Plan creation succeeds even if relay disconnected" },
+          { "id": "ac3", "description": "Test: PlannerLead is notified of new channel" },
+          { "id": "ac4", "description": "All tests pass with npm test" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      { "type": "happy", "description": "POST /api/plans creates plan channel when relay connected" },
+      { "type": "happy", "description": "PlannerLead auto-joins newly created plan channel" },
+      { "type": "happy", "description": "GET /api/channels includes new plan channel immediately after creation" },
+      { "type": "happy", "description": "Messages can be sent to new plan channel without server restart" },
+      { "type": "edge", "description": "Plan creation succeeds when relay not connected (graceful degradation)" },
+      { "type": "edge", "description": "Channel is created when relay reconnects after plan was created while disconnected" },
+      { "type": "edge", "description": "Duplicate channel creation is handled gracefully (idempotent)" },
+      { "type": "error", "description": "Error in createPlanChannel does not fail plan creation" },
+      { "type": "error", "description": "Error in PlannerLead join does not fail channel creation" }
+    ],
+    "data_requirements": [
+      "Test relay daemon or mock relay client",
+      "Test plan data for POST /api/plans"
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Relay Messaging Backend Feature", "path": "docs/flow/features/ui-relay-messaging.json" },
+    { "type": "spec", "title": "Relay Core Infrastructure", "path": "docs/flow/features/relay-core.json" },
+    { "type": "spec", "title": "PlannerLead Service", "path": "docs/flow/features/planner-lead-service.json" }
+  ]
+}

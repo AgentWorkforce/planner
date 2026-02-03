@@ -2,7 +2,7 @@
   "feature_id": "ideation-domain",
   "title": "Ideation Domain Model",
   "type": "feature",
-  "status": "draft",
+  "status": "implemented",
   "priority": "critical",
   "dependencies": [],
   "parent": "ideation-package",

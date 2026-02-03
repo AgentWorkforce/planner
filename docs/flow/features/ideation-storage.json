@@ -2,7 +2,7 @@
   "feature_id": "ideation-storage",
   "title": "Ideation Storage Layer",
   "type": "feature",
-  "status": "draft",
+  "status": "implemented",
   "priority": "critical",
   "dependencies": ["ideation-domain"],
   "parent": "ideation-package",

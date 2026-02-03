@@ -2,12 +2,12 @@
   "feature_id": "ideation-lead",
   "title": "Interviewer Persistent Agent",
   "type": "feature",
-  "status": "draft",
+  "status": "approved",
   "priority": "critical",
   "dependencies": ["ideation-api"],
   "parent": "ideation-package",
   "summary": {
-    "goal": "Build the Interviewer as a persistent RelayClient service that facilitates brainstorming conversations. The Interviewer is a pure facilitator - it never reveals specialists to the user, spawns them lazily as needed, and weaves their insights into the conversation naturally.",
+    "goal": "Build the Interviewer as a persistent RelayClient service that distills raw input into Understanding formatted for planners. The Interviewer facilitates brainstorming to draw out requirements, constraints, and technical implications - transforming vague ideas into crystallized understanding that planners can act on. It never reveals specialists to the user, spawns them lazily, and weaves their insights naturally.",
     "acceptance_criteria": [
       { "id": "ac1", "description": "Interviewer runs as persistent service (not spawn), using RelayClient" },
       { "id": "ac2", "description": "Interviewer listens on #ideation channel and #ideation-{session_id} channels" },
@@ -19,12 +19,29 @@
       { "id": "ac8", "description": "Interviewer receives questions/observations from specialists via Relay and weaves them into its own questions naturally" },
       { "id": "ac9", "description": "Interviewer facilitates without dominating (asks clarifying questions, draws out requirements)" },
       { "id": "ac10", "description": "System prompt defines facilitator personality and lazy spawning strategy" },
-      { "id": "ac11", "description": "Mock mode provides canned responses when ANTHROPIC_API_KEY is missing" }
+      { "id": "ac11", "description": "Mock mode provides canned responses when ANTHROPIC_API_KEY is missing" },
+      { "id": "ac12", "description": "spawnAgent function is wired into Interviewer at initialization (not optional)" },
+      { "id": "ac13", "description": "System prompt emphasizes core purpose: distill input into Understanding that helps planners plan" },
+      { "id": "ac14", "description": "Understanding output is formatted for planners: goals, constraints, requirements, risks, technical implications" }
     ],
     "decisions": [
+      { "decision": "Core purpose: distill input into understanding for planners", "rationale": "Without ideation, planners get raw, unstructured input. Ideation's VALUE is the interpretation layer - transforming chat/docs into goals, constraints, requirements, risks that planners can act on." },
       { "decision": "Lazy specialist spawning", "rationale": "Spawn specialists on-demand based on conversation needs, not all at start. More efficient, allows dynamic specialist types." },
       { "decision": "Never reveal specialists", "rationale": "User sees only the Interviewer. Specialists are invisible infrastructure. Questions/insights are presented as Interviewer's own." },
-      { "decision": "Freeform specialist types", "rationale": "Not limited to 5 predefined roles. Interviewer decides what expertise is needed and spawns appropriate specialist." }
+      { "decision": "Freeform specialist types", "rationale": "Not limited to 5 predefined roles. Interviewer decides what expertise is needed and spawns appropriate specialist." },
+      { "decision": "Understanding formatted for planners", "rationale": "Output should be comprehensive enough that a planner can create a detailed plan without needing the raw transcript. Structure: goals, constraints, requirements, technical implications, risks." }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-01",
+    "result": "partial",
+    "findings": [
+      {
+        "finding": "spawnAgent never wired to Interviewer",
+        "file": "packages/ideation/src/index.ts:55",
+        "detail": "initInterviewer({ storage }) only passes storage - spawnAgent is never provided. spawn_specialist tool always falls back to mock agent IDs.",
+        "action": "Added int005a step to create specialist spawner, updated int008 acceptance criteria"
+      }
     ]
   },
   "plan_implementation": {
@@ -81,9 +98,10 @@
         "dependencies": ["int003"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "executeTool(name, input, storage) dispatches to correct handler" },
+          { "id": "ac1", "description": "executeTool(name, input, deps) dispatches to correct handler" },
           { "id": "ac2", "description": "Returns ToolResult = { success: boolean, data?: unknown, error?: string }" },
-          { "id": "ac3", "description": "getMockToolResult(name, input) returns canned responses for mock mode" }
+          { "id": "ac3", "description": "getMockToolResult(name, input) returns canned responses for mock mode" },
+          { "id": "ac4", "description": "ToolExecutorDeps includes { storage, spawnAgent, plannerClient }" }
         ]
       },
       {
@@ -97,10 +115,26 @@
           { "id": "ac1", "description": "spawnSpecialist(sessionId, name, focus, promptContext?) spawns single specialist on-demand" },
           { "id": "ac2", "description": "Specialist name can be any string (not limited to fixed roles)" },
           { "id": "ac3", "description": "Focus describes what expertise this specialist provides" },
-          { "id": "ac4", "description": "Specialist is spawned via Relay spawn() with session context and focus" },
+          { "id": "ac4", "description": "Specialist is spawned via deps.spawnAgent() with session context and focus" },
           { "id": "ac5", "description": "Specialist joins the session channel automatically" },
           { "id": "ac6", "description": "Returns ActiveSpecialist { name, agent_id, spawned_at, role_hint }" },
           { "id": "ac7", "description": "Session.active_specialists[] is updated with new specialist" }
+        ]
+      },
+      {
+        "step_id": "int005a",
+        "title": "Create specialist spawner function",
+        "scope": "ideation-core",
+        "description": "Create spawnSpecialistAgent function that wraps relay spawn() for specialists, similar to spawnPlanningAgent in packages/server/src/relay/spawner.ts",
+        "dependencies": ["int005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create packages/ideation/src/relay/spawner.ts (or extend existing relay module)" },
+          { "id": "ac2", "description": "spawnSpecialistAgent(sessionId, name, focus, promptContext?) calls relay client.spawn() with specialist system prompt" },
+          { "id": "ac3", "description": "Specialist system prompt includes: session context, focus area, instruction to observe and send insights to session channel" },
+          { "id": "ac4", "description": "Returns agent_id from relay spawn result" },
+          { "id": "ac5", "description": "Handle relay not connected case (throw or return mock ID based on mode)" },
+          { "id": "ac6", "description": "Export createSpecialistSpawner() factory that returns the spawnAgent function signature expected by InterviewerDeps" }
         ]
       },
       {
@@ -135,13 +169,28 @@
         "title": "Create Interviewer service",
         "scope": "ideation-core",
         "description": "Main service file with init/stop lifecycle",
-        "dependencies": ["int007"],
+        "dependencies": ["int007", "int005a"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "initInterviewer(storage) registers message handler via onMessage()" },
+          { "id": "ac1", "description": "initInterviewer({ storage, spawnAgent, plannerClient }) registers message handler via onMessage()" },
           { "id": "ac2", "description": "stopInterviewer() unsubscribes and cleans up" },
           { "id": "ac3", "description": "isInterviewerActive() returns boolean" },
-          { "id": "ac4", "description": "Service emits agent status events (joined, working, idle)" }
+          { "id": "ac4", "description": "Service emits agent status events (joined, working, idle)" },
+          { "id": "ac5", "description": "spawnAgent is REQUIRED (not optional) - throws if not provided" }
+        ]
+      },
+      {
+        "step_id": "int008a",
+        "title": "Wire spawner into service initialization",
+        "scope": "ideation-core",
+        "description": "Update createIdeationService to pass spawnAgent to initInterviewer",
+        "dependencies": ["int008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/ideation/src/index.ts createIdeationService() imports createSpecialistSpawner" },
+          { "id": "ac2", "description": "Creates spawnAgent via createSpecialistSpawner() before calling initInterviewer()" },
+          { "id": "ac3", "description": "initInterviewer({ storage, spawnAgent }) passes the spawner function" },
+          { "id": "ac4", "description": "Test that spawn_specialist tool now calls real relay spawn (not mock) when relay is connected" }
         ]
       },
       {
@@ -149,7 +198,7 @@
         "title": "Implement message handling",
         "scope": "ideation-core",
         "description": "Handle incoming messages and generate responses",
-        "dependencies": ["int008"],
+        "dependencies": ["int008a"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
           { "id": "ac1", "description": "shouldHandleMessage() filters for #ideation and #ideation-* channels" },
@@ -193,11 +242,12 @@
         "dependencies": ["int011"],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
-          { "id": "ac1", "description": "Test tool execution" },
+          { "id": "ac1", "description": "Test tool execution with spawnAgent provided" },
           { "id": "ac2", "description": "Test message filtering" },
           { "id": "ac3", "description": "Test specialist input queue" },
           { "id": "ac4", "description": "Test mock mode responses" },
-          { "id": "ac5", "description": "Test session announcement" }
+          { "id": "ac5", "description": "Test session announcement" },
+          { "id": "ac6", "description": "Test spawn_specialist calls real spawnAgent (not mock fallback) when provided" }
         ]
       }
     ]

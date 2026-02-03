@@ -50,6 +50,7 @@
     "ideation-ui-layout",
     "ideation-ui-session-list",
     "ideation-ui-chat",
-    "ideation-ui-specialists-panel"
+    "ideation-ui-specialists-panel",
+    "ideation-ui-session-tabs"
   ]
 }

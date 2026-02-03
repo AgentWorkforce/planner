@@ -2,7 +2,7 @@
   "feature_id": "ideation-api",
   "title": "Ideation REST API",
   "type": "feature",
-  "status": "draft",
+  "status": "implemented",
   "priority": "high",
   "dependencies": ["ideation-storage"],
   "parent": "ideation-package",
