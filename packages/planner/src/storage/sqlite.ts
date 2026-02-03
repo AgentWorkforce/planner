@@ -67,7 +67,7 @@ interface VersionRow {
   version: number;
   status: string;
   summary_json: string;
-  understanding_json: string;
+  understanding_json: string | null;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -188,7 +188,7 @@ interface PlanWithAttentionRow {
   version: number;
   status: string;
   summary_json: string;
-  understanding_json: string;
+  understanding_json: string | null;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -944,14 +944,16 @@ export class SqliteStorage implements PlanStorage {
   }
 
   private rowToVersion(row: VersionRow, steps: Step[]): PlanVersion {
-    const understanding = JSON.parse(row.understanding_json) as Understanding;
+    const understanding = row.understanding_json
+      ? (JSON.parse(row.understanding_json) as Understanding)
+      : undefined;
     const version: PlanVersion = {
       plan_id: row.plan_id,
       version: row.version,
       status: row.status as PlanStatus,
       summary: JSON.parse(row.summary_json) as Summary,
       steps,
-      understanding: Object.keys(understanding).length > 0 ? understanding : undefined,
+      understanding: understanding && Object.keys(understanding).length > 0 ? understanding : undefined,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
