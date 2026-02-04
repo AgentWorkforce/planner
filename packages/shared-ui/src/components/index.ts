@@ -29,3 +29,33 @@ export {
   type CommandItem,
   type CommandSection,
 } from "./CommandPalette";
+
+// New extracted components
+export {
+  StatusIndicator,
+  StatusDot,
+  type StatusIndicatorProps,
+  type StatusType,
+} from "./StatusIndicator";
+export {
+  ListItem,
+  ListItemGroup,
+  FeedItem,
+  type ListItemProps,
+  type ListItemGroupProps,
+  type FeedItemProps,
+  type ListItemAccent,
+} from "./ListItem";
+export {
+  NotificationBanner,
+  type NotificationBannerProps,
+  type NotificationBannerItem,
+} from "./NotificationBanner";
+export { EntityCard, type EntityCardProps } from "./EntityCard";
+export { Autocomplete, type AutocompleteProps } from "./Autocomplete";
+export {
+  DetailPanel,
+  DetailPanelSection,
+  DetailPanelDivider,
+  type DetailPanelProps,
+} from "./DetailPanel";
