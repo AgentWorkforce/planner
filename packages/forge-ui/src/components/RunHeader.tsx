@@ -65,8 +65,8 @@ export function RunHeader({
 
           {/* Progress bar */}
           <RunProgress
-            completedTasks={run.completed_tasks}
-            totalTasks={run.total_tasks}
+            completedTasks={run.tasks_completed ?? run.completed_tasks ?? 0}
+            totalTasks={run.tasks_count ?? run.total_tasks ?? 0}
             status={run.status}
             elapsedMs={elapsedMs}
           />

@@ -71,10 +71,23 @@ export function useRun(runId: string | null | undefined): UseRunResult {
       if (mountedRef.current) {
         setRun(response);
 
-        // Note: In a real implementation, tasks/gates/agents would come from
-        // additional API calls or be embedded in the run response.
-        // For now, we'll initialize empty and let SSE populate them.
-        // If the API returns these, update here.
+        // Populate tasks from API response if available
+        if (response.tasks && Array.isArray(response.tasks)) {
+          const apiTasks: Task[] = response.tasks.map((t) => ({
+            task_id: t.task_id,
+            run_id: runId,
+            step_id: t.step_id,
+            title: t.step_title,
+            status: t.status as TaskStatus,
+            dependencies: t.dependencies,
+            current_attempt: t.current_attempt || 0,
+            assigned_agent_id: t.agent_id,
+            gate_id: t.gate_id,
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+          }));
+          setTasks(apiTasks);
+        }
       }
     } catch (err) {
       if (mountedRef.current) {
@@ -92,21 +105,23 @@ export function useRun(runId: string | null | undefined): UseRunResult {
     if (!mountedRef.current) return;
 
     switch (event.type) {
-      case 'run_updated':
+      case 'run_status_changed':
         setRun((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
             status: event.data.status as RunStatus,
-            completed_tasks: event.data.completed_tasks,
-            failed_tasks: event.data.failed_tasks,
+            // Update task counts if available
+            completed_tasks: event.data.tasks_completed ?? prev.completed_tasks,
           };
         });
         break;
 
-      case 'task_updated':
+      case 'task_status_changed':
         setTasks((prev) => {
           const taskId = event.data.task_id;
+          if (!taskId) return prev;
+
           const existingIndex = prev.findIndex((t) => t.task_id === taskId);
 
           if (existingIndex >= 0) {
@@ -115,7 +130,7 @@ export function useRun(runId: string | null | undefined): UseRunResult {
             updated[existingIndex] = {
               ...updated[existingIndex],
               status: event.data.status as TaskStatus,
-              assigned_agent_id: event.data.assigned_agent_id,
+              assigned_agent_id: event.data.agent_id,
             };
             return updated;
           }
@@ -126,7 +141,8 @@ export function useRun(runId: string | null | undefined): UseRunResult {
         });
         break;
 
-      case 'gate_updated':
+      case 'gate_reached':
+        // Gate reached means a new gate is waiting for approval
         setGates((prev) => {
           const gateId = event.data.gate_id;
           const existingIndex = prev.findIndex((g) => g.gate_id === gateId);
@@ -135,12 +151,26 @@ export function useRun(runId: string | null | undefined): UseRunResult {
             const updated = [...prev];
             updated[existingIndex] = {
               ...updated[existingIndex],
-              status: event.data.status as GateStatus,
+              status: GateStatus.WAITING,
             };
             return updated;
           }
 
-          return prev;
+          // Add new gate from SSE data
+          const newGate: Gate = {
+            gate_id: gateId,
+            task_id: event.data.task_id || '',
+            run_id: event.run_id,
+            step_id: event.data.step_id || '',
+            status: GateStatus.WAITING,
+            gate_type: 'human_approval',
+            title: event.data.step_title || 'Approval Gate',
+            approver_role: event.data.approver_role,
+            blocked_tasks: [],
+            created_at: event.timestamp,
+            updated_at: event.timestamp,
+          };
+          return [...prev, newGate];
         });
         break;
 

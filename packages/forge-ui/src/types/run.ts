@@ -17,10 +17,15 @@ export interface Run {
   plan_version: number;
   status: RunStatus;
 
-  // Progress tracking
-  total_tasks: number;
-  completed_tasks: number;
-  failed_tasks: number;
+  // Progress tracking (matches forge-core API response)
+  tasks_count: number;
+  tasks_completed: number;
+  has_pending_gate?: boolean;
+
+  // Legacy aliases for backwards compatibility
+  total_tasks?: number;
+  completed_tasks?: number;
+  failed_tasks?: number;
 
   // Timing
   started_at?: string;
@@ -31,9 +36,29 @@ export interface Run {
   // Context
   triggered_by?: string;
   plan_goal?: string;
+  error?: string;
 
   // Metadata
   metadata?: Record<string, unknown>;
+
+  // Tasks (included in RunWithTasksResponse)
+  tasks?: TaskSummaryFromAPI[];
+}
+
+/**
+ * Task summary as returned by the API
+ */
+export interface TaskSummaryFromAPI {
+  task_id: string;
+  step_id: string;
+  step_title: string;
+  status: string;
+  dependencies: string[];
+  current_attempt?: number;
+  agent_id?: string;
+  gate_id?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RunSummary {
@@ -41,10 +66,14 @@ export interface RunSummary {
   plan_id: string;
   plan_goal?: string;
   status: RunStatus;
-  total_tasks: number;
-  completed_tasks: number;
+  tasks_count: number;
+  tasks_completed: number;
+  has_pending_gate?: boolean;
   started_at?: string;
   created_at: string;
+  // Legacy aliases
+  total_tasks?: number;
+  completed_tasks?: number;
 }
 
 export interface RunFilter {

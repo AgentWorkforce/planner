@@ -45,10 +45,10 @@ export function useRunningUpdates(runIds: string[]): UseRunningUpdatesResult {
         try {
           const data = JSON.parse(event.data);
 
-          // Handle run_updated events
-          if (data.type === 'run_updated' && data.data) {
+          // Handle run_status_changed events
+          if (data.type === 'run_status_changed' && data.data) {
             const update: RunUpdate = {
-              completed_tasks: data.data.completed_tasks ?? 0,
+              completed_tasks: data.data.tasks_completed ?? 0,
               failed_tasks: data.data.failed_tasks ?? 0,
               status: data.data.status,
             };

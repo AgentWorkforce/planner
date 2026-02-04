@@ -261,6 +261,55 @@ export function getRunHandler(deps: RunHandlerDeps) {
   };
 }
 
+/**
+ * Creates a handler for GET /runs/counts
+ *
+ * Returns count of runs by status for efficient dashboard filtering.
+ */
+interface RunCounts {
+  all: number;
+  pending: number;
+  running: number;
+  paused: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+}
+
+export function getRunsCountsHandler(deps: RunHandlerDeps) {
+  return (_req: Request, res: Response): void => {
+    try {
+      // Get all runs and count by status
+      const allRuns = deps.storage.listRuns();
+
+      const counts: RunCounts = {
+        all: allRuns.length,
+        pending: 0,
+        running: 0,
+        paused: 0,
+        completed: 0,
+        failed: 0,
+        cancelled: 0,
+      };
+
+      for (const run of allRuns) {
+        const status = run.status;
+        if (status === 'pending') counts.pending++;
+        else if (status === 'running') counts.running++;
+        else if (status === 'paused') counts.paused++;
+        else if (status === 'completed') counts.completed++;
+        else if (status === 'failed') counts.failed++;
+        else if (status === 'cancelled') counts.cancelled++;
+      }
+
+      res.status(200).json({ counts });
+    } catch (err) {
+      console.error('[RunHandler] Error getting run counts:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  };
+}
+
 // ============================================
 // Export handler types
 // ============================================
@@ -268,3 +317,4 @@ export function getRunHandler(deps: RunHandlerDeps) {
 export type CreateRunHandlerFn = ReturnType<typeof createRunHandler>;
 export type ListRunsHandlerFn = ReturnType<typeof listRunsHandler>;
 export type GetRunHandlerFn = ReturnType<typeof getRunHandler>;
+export type GetRunsCountsHandlerFn = ReturnType<typeof getRunsCountsHandler>;

@@ -46,7 +46,7 @@ function sseEventToTimelineEvent(event: ForgeEventUnion): TimelineEvent | null {
   };
 
   switch (event.type) {
-    case 'run_updated':
+    case 'run_status_changed':
       // Map status changes to timeline events
       const status = (event.data as { status?: string }).status;
       if (status === 'completed') {
@@ -61,54 +61,46 @@ function sseEventToTimelineEvent(event: ForgeEventUnion): TimelineEvent | null {
           event_type: 'run_failed',
         };
       }
+      if (status === 'running') {
+        return {
+          ...baseEvent,
+          event_type: 'run_started',
+        };
+      }
       return null;
 
-    case 'task_updated':
-      const taskData = event.data as { task_id: string; status: string };
+    case 'task_status_changed':
+      const taskData = event.data as { task_id?: string; status: string };
+      const taskId = taskData.task_id;
       if (taskData.status === 'running') {
         return {
           ...baseEvent,
           event_type: 'task_started',
-          task_id: taskData.task_id,
+          task_id: taskId,
         };
       }
       if (taskData.status === 'completed') {
         return {
           ...baseEvent,
           event_type: 'task_completed',
-          task_id: taskData.task_id,
+          task_id: taskId,
         };
       }
       if (taskData.status === 'failed') {
         return {
           ...baseEvent,
           event_type: 'task_failed',
-          task_id: taskData.task_id,
+          task_id: taskId,
         };
       }
       return null;
 
-    case 'gate_updated':
-      const gateData = event.data as { gate_id: string; status: string };
-      if (gateData.status === 'pending') {
-        return {
-          ...baseEvent,
-          event_type: 'gate_reached',
-        };
-      }
-      if (gateData.status === 'approved') {
-        return {
-          ...baseEvent,
-          event_type: 'gate_approved',
-        };
-      }
-      if (gateData.status === 'rejected') {
-        return {
-          ...baseEvent,
-          event_type: 'gate_rejected',
-        };
-      }
-      return null;
+    case 'gate_reached':
+      // Gate reached is a specific event, not a status change
+      return {
+        ...baseEvent,
+        event_type: 'gate_reached',
+      };
 
     case 'question_asked':
       return {

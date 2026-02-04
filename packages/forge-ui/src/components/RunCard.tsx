@@ -130,10 +130,12 @@ export function RunCard({ run, className }: RunCardProps) {
     run.status === RunStatus.FAILED ||
     run.status === RunStatus.CANCELLED;
 
-  // Calculate progress percentage
+  // Calculate progress percentage (support both old and new field names)
+  const totalTasks = run.tasks_count ?? run.total_tasks ?? 0;
+  const completedTasks = run.tasks_completed ?? run.completed_tasks ?? 0;
   const progressPercent =
-    run.total_tasks > 0
-      ? Math.round((run.completed_tasks / run.total_tasks) * 100)
+    totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
       : 0;
 
   return (
@@ -165,7 +167,7 @@ export function RunCard({ run, className }: RunCardProps) {
           <div className="mb-2">
             <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
               <span>
-                {run.completed_tasks}/{run.total_tasks} tasks
+                {completedTasks}/{totalTasks} tasks
               </span>
               <span>{progressPercent}%</span>
             </div>

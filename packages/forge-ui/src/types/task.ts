@@ -41,7 +41,9 @@ export interface Task {
 
   // Results
   result?: TaskResult;
-  attempts: TaskAttempt[];
+  attempts?: TaskAttempt[];
+  current_attempt?: number;
+  gate_id?: string;
 
   // Metadata
   metadata?: Record<string, unknown>;

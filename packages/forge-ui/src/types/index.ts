@@ -96,31 +96,53 @@ export interface ForgeEvent {
   data: unknown;
 }
 
-export interface RunUpdatedEvent extends ForgeEvent {
-  type: 'run_updated';
+export interface RunStatusChangedEvent extends ForgeEvent {
+  type: 'run_status_changed';
   data: {
     status: string;
-    completed_tasks: number;
-    failed_tasks: number;
+    event_type: string;
+    timestamp: string;
+    plan_id?: string;
+    goal?: string;
+    duration_ms?: number;
+    tasks_completed?: number;
+    tasks_total?: number;
+    error?: string;
+    reason?: string;
   };
 }
 
-export interface TaskUpdatedEvent extends ForgeEvent {
-  type: 'task_updated';
+export interface TaskStatusChangedEvent extends ForgeEvent {
+  type: 'task_status_changed';
   data: {
-    task_id: string;
+    task_id?: string;
     status: string;
-    assigned_agent_id?: string;
+    event_type: string;
+    timestamp: string;
+    step_id?: string;
+    step_title?: string;
+    agent_id?: string;
+    attempt_number?: number;
+    error?: string;
+    will_retry?: boolean;
   };
 }
 
-export interface GateUpdatedEvent extends ForgeEvent {
-  type: 'gate_updated';
+export interface GateReachedEvent extends ForgeEvent {
+  type: 'gate_reached';
   data: {
     gate_id: string;
-    status: string;
+    task_id?: string;
+    step_id?: string;
+    step_title?: string;
+    approver_role?: string;
   };
 }
+
+// Legacy aliases for backwards compatibility
+export type RunUpdatedEvent = RunStatusChangedEvent;
+export type TaskUpdatedEvent = TaskStatusChangedEvent;
+export type GateUpdatedEvent = GateReachedEvent;
 
 export interface QuestionAskedEvent extends ForgeEvent {
   type: 'question_asked';
@@ -185,9 +207,9 @@ export interface ArtifactUpdatedEvent extends ForgeEvent {
 }
 
 export type ForgeEventUnion =
-  | RunUpdatedEvent
-  | TaskUpdatedEvent
-  | GateUpdatedEvent
+  | RunStatusChangedEvent
+  | TaskStatusChangedEvent
+  | GateReachedEvent
   | QuestionAskedEvent
   | QuestionAddedEvent
   | QuestionAnsweredEvent

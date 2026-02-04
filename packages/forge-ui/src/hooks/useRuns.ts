@@ -86,9 +86,11 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
 /**
  * useRunsCounts - Hook for fetching run counts by status
  *
- * Fetches all runs (without pagination) to calculate status counts.
+ * Uses the dedicated /runs/counts endpoint for efficient counting.
  * Used for the filter tabs count badges.
  */
+import { getRunsCounts } from '@/api/runs';
+
 interface UseRunsCountsResult {
   counts: {
     all: number;
@@ -99,6 +101,7 @@ interface UseRunsCountsResult {
     pending: number;
   };
   isLoading: boolean;
+  refetch: () => Promise<void>;
 }
 
 export function useRunsCounts(): UseRunsCountsResult {
@@ -111,63 +114,43 @@ export function useRunsCounts(): UseRunsCountsResult {
     pending: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    let mounted = true;
+  const fetchCounts = useCallback(async () => {
+    try {
+      const response = await getRunsCounts();
 
-    async function fetchCounts() {
-      try {
-        // Fetch a larger batch to get accurate counts
-        // In production, you'd want a dedicated API endpoint for counts
-        const response = await listRuns({ limit: 1000 });
-
-        if (mounted) {
-          const newCounts = {
-            all: response.total,
-            running: 0,
-            completed: 0,
-            failed: 0,
-            paused: 0,
-            pending: 0,
-          };
-
-          for (const run of response.runs) {
-            switch (run.status) {
-              case 'running':
-                newCounts.running++;
-                break;
-              case 'completed':
-                newCounts.completed++;
-                break;
-              case 'failed':
-                newCounts.failed++;
-                break;
-              case 'paused':
-                newCounts.paused++;
-                break;
-              case 'pending':
-                newCounts.pending++;
-                break;
-            }
-          }
-
-          setCounts(newCounts);
-        }
-      } catch {
-        // Silently fail for counts - not critical
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
+      if (mountedRef.current) {
+        setCounts({
+          all: response.counts.all,
+          running: response.counts.running,
+          completed: response.counts.completed,
+          failed: response.counts.failed,
+          paused: response.counts.paused,
+          pending: response.counts.pending,
+        });
+      }
+    } catch {
+      // Silently fail for counts - not critical
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
       }
     }
+  }, []);
 
+  useEffect(() => {
+    mountedRef.current = true;
     fetchCounts();
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
-  }, []);
+  }, [fetchCounts]);
 
-  return { counts, isLoading };
+  const refetch = useCallback(async () => {
+    await fetchCounts();
+  }, [fetchCounts]);
+
+  return { counts, isLoading, refetch };
 }

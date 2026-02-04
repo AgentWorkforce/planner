@@ -5,6 +5,7 @@ import {
   createRunHandler,
   listRunsHandler,
   getRunHandler,
+  getRunsCountsHandler,
   type ScheduleReadyTasksFn,
 } from '../handlers/runs.js';
 import {
@@ -85,6 +86,8 @@ export function registerRunRoutes(
   // Run CRUD operations
   router.post('/runs', createRunHandler(runHandlerDeps));
   router.get('/runs', listRunsHandler(runHandlerDeps));
+  // Note: /runs/counts must come BEFORE /runs/:id to avoid matching "counts" as an ID
+  router.get('/runs/counts', getRunsCountsHandler(runHandlerDeps));
   router.get('/runs/:id', getRunHandler(runHandlerDeps));
 
   // Run control operations

@@ -32,6 +32,27 @@ import type { ForgeStorage, TrajectoryEventFilter, GuardianEventFilter } from '.
 import { ALL_SCHEMA_STATEMENTS } from './schema.js';
 
 // ============================================
+// Safe JSON Parsing
+// ============================================
+
+/**
+ * Safely parse JSON with a default fallback value.
+ * Logs warning on parse failure but doesn't throw.
+ */
+function safeJsonParse<T>(json: string | null | undefined, defaultValue: T, context?: string): T {
+  if (json === null || json === undefined) {
+    return defaultValue;
+  }
+  try {
+    return JSON.parse(json) as T;
+  } catch (err) {
+    const contextInfo = context ? ` (${context})` : '';
+    console.warn(`[SqliteStorage] Failed to parse JSON${contextInfo}:`, err);
+    return defaultValue;
+  }
+}
+
+// ============================================
 // Row types for database queries
 // ============================================
 
@@ -1652,7 +1673,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       step_id: row.step_id,
       step_title: row.step_title,
       status: row.status as TaskStatus,
-      dependencies: JSON.parse(row.dependencies) as string[],
+      dependencies: safeJsonParse<string[]>(row.dependencies, [], `task ${row.task_id} dependencies`),
       workspace_path: row.workspace_path ?? undefined,
       agent_id: row.agent_id ?? undefined,
       current_attempt: row.current_attempt ?? undefined,
@@ -1673,7 +1694,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       error: row.error ?? undefined,
       agent_id: row.agent_id ?? undefined,
       audit_findings: row.audit_findings
-        ? (JSON.parse(row.audit_findings) as AuditFinding[])
+        ? safeJsonParse<AuditFinding[]>(row.audit_findings, [], `attempt ${row.attempt_id} audit_findings`)
         : undefined,
     };
   }
@@ -1685,7 +1706,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       type: row.type as ArtifactType,
       reference: row.reference,
       metadata: row.metadata
-        ? (JSON.parse(row.metadata) as Record<string, unknown>)
+        ? safeJsonParse<Record<string, unknown>>(row.metadata, {}, `artifact ${row.artifact_id} metadata`)
         : undefined,
       created_at: row.created_at,
     };
@@ -1710,9 +1731,9 @@ export class SqliteForgeStorage implements ForgeStorage {
       run_id: row.run_id,
       run_status: row.run_status as RunStatus,
       has_pending_gate: row.has_pending_gate === 1,
-      tasks_snapshot: JSON.parse(row.tasks_snapshot) as TaskSnapshot[],
-      active_agents: JSON.parse(row.active_agents) as string[],
-      snapshot: JSON.parse(row.snapshot) as Record<string, unknown>,
+      tasks_snapshot: safeJsonParse<TaskSnapshot[]>(row.tasks_snapshot, [], `checkpoint ${row.checkpoint_id} tasks_snapshot`),
+      active_agents: safeJsonParse<string[]>(row.active_agents, [], `checkpoint ${row.checkpoint_id} active_agents`),
+      snapshot: safeJsonParse<Record<string, unknown>>(row.snapshot, {}, `checkpoint ${row.checkpoint_id} snapshot`),
       created_at: row.created_at,
     };
   }
@@ -1723,7 +1744,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       run_id: row.run_id,
       task_id: row.task_id ?? undefined,
       event_type: row.event_type,
-      payload: JSON.parse(row.payload) as Record<string, unknown>,
+      payload: safeJsonParse<Record<string, unknown>>(row.payload, {}, `trajectory event ${row.event_id} payload`),
       timestamp: row.timestamp,
     };
   }
@@ -1735,13 +1756,13 @@ export class SqliteForgeStorage implements ForgeStorage {
       task_id: row.task_id ?? undefined,
       agent_id: row.agent_id,
       text: row.text,
-      options: row.options ? (JSON.parse(row.options) as string[]) : undefined,
+      options: row.options ? safeJsonParse<string[]>(row.options, [], `question ${row.question_id} options`) : undefined,
       blocking_level: row.blocking_level as QuestionBlockingLevel,
       steps_blocked: row.steps_blocked,
       cascade_depth: row.cascade_depth,
       can_use_default: row.can_use_default === 1,
       default_value: row.default_value ?? undefined,
-      subscribers: JSON.parse(row.subscribers) as string[],
+      subscribers: safeJsonParse<string[]>(row.subscribers, [], `question ${row.question_id} subscribers`),
       status: row.status as QuestionStatus,
       answer: row.answer ?? undefined,
       answered_by: row.answered_by ?? undefined,
@@ -1809,8 +1830,8 @@ export class SqliteForgeStorage implements ForgeStorage {
       guardian_type: row.guardian_type as 'Security' | 'Architect' | 'QA' | 'Compliance',
       agent_name: row.agent_name,
       status: row.status as GuardianStatus,
-      shadow_targets: JSON.parse(row.shadow_targets) as string[],
-      speak_on: JSON.parse(row.speak_on) as string[],
+      shadow_targets: safeJsonParse<string[]>(row.shadow_targets, [], `guardian ${row.guardian_id} shadow_targets`),
+      speak_on: safeJsonParse<string[]>(row.speak_on, [], `guardian ${row.guardian_id} speak_on`),
       spawned_at: row.spawned_at,
       stopped_at: row.stopped_at ?? undefined,
       error: row.error ?? undefined,

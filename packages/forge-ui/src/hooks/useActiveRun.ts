@@ -117,14 +117,13 @@ export function useActiveRun(): UseActiveRunResult {
     (event: ForgeEventUnion) => {
       if (!mountedRef.current || !activeRun) return;
 
-      if (event.type === 'run_updated' && event.run_id === activeRun.run_id) {
+      if (event.type === 'run_status_changed' && event.run_id === activeRun.run_id) {
         setActiveRun((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
             status: event.data.status as Run['status'],
-            completed_tasks: event.data.completed_tasks,
-            failed_tasks: event.data.failed_tasks,
+            completed_tasks: event.data.tasks_completed ?? prev.completed_tasks,
             updated_at: event.timestamp,
           };
         });
@@ -194,7 +193,7 @@ export function useActiveRun(): UseActiveRunResult {
         try {
           const data = JSON.parse(event.data) as ForgeEventUnion;
           // Refetch when any run status changes
-          if (data.type === 'run_updated') {
+          if (data.type === 'run_status_changed') {
             fetchActiveRun();
           }
         } catch {

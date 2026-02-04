@@ -63,3 +63,25 @@ export async function cancelRun(runId: string): Promise<Run> {
 export async function retryRun(runId: string): Promise<Run> {
   return post<Run>(`/runs/${runId}/retry`);
 }
+
+/**
+ * Response type for run counts
+ */
+export interface RunCountsResponse {
+  counts: {
+    all: number;
+    pending: number;
+    running: number;
+    paused: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+  };
+}
+
+/**
+ * Get run counts by status
+ */
+export async function getRunsCounts(): Promise<RunCountsResponse> {
+  return get<RunCountsResponse>('/runs/counts');
+}

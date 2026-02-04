@@ -97,27 +97,26 @@ export function ForgeRunProvider({
   // Handle SSE events
   const handleEvent = useCallback((event: ForgeEventUnion) => {
     switch (event.type) {
-      case 'run_updated':
+      case 'run_status_changed':
         setActiveRun((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
             status: event.data.status as Run['status'],
-            completed_tasks: event.data.completed_tasks,
-            failed_tasks: event.data.failed_tasks,
+            completed_tasks: event.data.tasks_completed ?? prev.completed_tasks,
             updated_at: event.timestamp,
           };
         });
         break;
 
-      case 'task_updated':
+      case 'task_status_changed':
         setTasks((prev) =>
           prev.map((task) =>
             task.task_id === event.data.task_id
               ? {
                   ...task,
                   status: event.data.status as TaskStatus,
-                  assigned_agent_id: event.data.assigned_agent_id,
+                  assigned_agent_id: event.data.agent_id,
                   updated_at: event.timestamp,
                 }
               : task
@@ -125,18 +124,35 @@ export function ForgeRunProvider({
         );
         break;
 
-      case 'gate_updated':
-        setGates((prev) =>
-          prev.map((gate) =>
-            gate.gate_id === event.data.gate_id
-              ? {
-                  ...gate,
-                  status: event.data.status as GateStatus,
-                  updated_at: event.timestamp,
-                }
-              : gate
-          )
-        );
+      case 'gate_reached':
+        // Gate reached - add or update the gate
+        setGates((prev) => {
+          const existingIdx = prev.findIndex((g) => g.gate_id === event.data.gate_id);
+          if (existingIdx >= 0) {
+            const updated = [...prev];
+            updated[existingIdx] = {
+              ...updated[existingIdx],
+              status: 'waiting' as GateStatus,
+              updated_at: event.timestamp,
+            };
+            return updated;
+          }
+          // Add new gate
+          const newGate: Gate = {
+            gate_id: event.data.gate_id,
+            task_id: event.data.task_id || '',
+            run_id: event.run_id,
+            step_id: event.data.step_id || '',
+            status: 'waiting' as GateStatus,
+            gate_type: 'human_approval',
+            title: event.data.step_title || 'Approval Gate',
+            approver_role: event.data.approver_role,
+            blocked_tasks: [],
+            created_at: event.timestamp,
+            updated_at: event.timestamp,
+          };
+          return [...prev, newGate];
+        });
         break;
 
       case 'question_asked':

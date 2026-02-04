@@ -239,8 +239,8 @@ export function ForgeStatusBar({
 
         {/* Progress */}
         <StatusBarProgress
-          completedTasks={activeRun.completed_tasks}
-          totalTasks={activeRun.total_tasks}
+          completedTasks={activeRun.tasks_completed ?? activeRun.completed_tasks ?? 0}
+          totalTasks={activeRun.tasks_count ?? activeRun.total_tasks ?? 0}
           status={activeRun.status}
           className="flex-shrink-0"
         />
