@@ -11,8 +11,11 @@ import {
   computeAggregateConfidence,
   getConfidenceLevel,
   createPlannerSend,
+  createBlock,
   type SessionSource,
   type PlannerSendPayload,
+  type Block,
+  type Session,
 } from '../domain/index.js';
 import {
   CreateSessionRequestSchema,
@@ -20,6 +23,9 @@ import {
   AddMessageRequestSchema,
   UpdateUnderstandingRequestSchema,
   SendToPlannerRequestSchema,
+  CreateBlockRequestSchema,
+  UpdateBlockRequestSchema,
+  UpdateSessionRequestSchema,
 } from './schemas.js';
 import { ideationEvents } from './events.js';
 import { sessionChannelId } from '../interviewer/config.js';
@@ -155,6 +161,29 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     }
   }
 
+  async function updateSession(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id ?? '');
+      const parsed = UpdateSessionRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+        return;
+      }
+
+      const session = await storage.updateSession(id, parsed.data);
+
+      ideationEvents.emitSessionEvent('session:updated', session);
+      res.json(session);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+      console.error('Error updating session:', error);
+      res.status(500).json({ error: 'Failed to update session' });
+    }
+  }
+
   // ===========================================================================
   // Message and Understanding (#113)
   // ===========================================================================
@@ -268,12 +297,25 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
         return;
       }
 
-      // Build payload
+      // Get curated blocks to include in handoff
+      const curatedBlocks = existingSession.blocks.filter(b => b.status === 'curated');
+
+      // Build payload with understanding AND curated blocks
+      // Blocks are included in understanding under '_blocks' key for planner AI to use
       const payload: PlannerSendPayload = {
         goal: parsed.data.goal ?? existingSession.source.initial_intent,
         context: parsed.data.context,
         source: { type: 'ideation', session_id: existingSession.id },
-        understanding: existingSession.understanding,
+        understanding: {
+          ...existingSession.understanding,
+          // Include curated blocks as structured data for planner
+          _blocks: {
+            observations: curatedBlocks.map(b => b.content),
+            keywords: curatedBlocks.map(b => b.keyword),
+            // Store full blocks for reference
+            blocks: curatedBlocks,
+          },
+        },
         initiative_id: parsed.data.initiative_id ?? existingSession.initiative_id,
       };
 
@@ -336,6 +378,7 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       }
 
       const send = createPlannerSend(payload, result);
+      // appendPlannerSend updates both planner_sends[] AND handoff tracking fields
       const session = await storage.appendPlannerSend(existingSession.id, send);
 
       ideationEvents.emitSessionEvent('session:planner_send', session);
@@ -397,6 +440,192 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
   }
 
   // ===========================================================================
+  // Block CRUD (#cv2-013)
+  // ===========================================================================
+
+  async function listBlocks(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id ?? '');
+      const session = await storage.getSession(id);
+
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      res.json(session.blocks);
+    } catch (error) {
+      console.error('Error listing blocks:', error);
+      res.status(500).json({ error: 'Failed to list blocks' });
+    }
+  }
+
+  async function createBlockHandler(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id ?? '');
+      const parsed = CreateBlockRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+        return;
+      }
+
+      const session = await storage.getSession(id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const blockData = {
+        type: parsed.data.type,
+        title: parsed.data.title,
+        keyword: parsed.data.keyword,
+        emoji: parsed.data.emoji,
+        content: parsed.data.content,
+        specialist: parsed.data.specialist || 'user',
+        sourceContext: parsed.data.sourceContext || 'user-created',
+      };
+
+      const block = createBlock(blockData);
+
+      // Override confidence if provided
+      if (parsed.data.confidence !== undefined) {
+        block.confidence = parsed.data.confidence;
+      }
+
+      const updatedBlocks = [...session.blocks, block];
+      await storage.updateBlocks(id, updatedBlocks);
+
+      // Emit event for real-time updates
+      const updatedSession = await storage.getSession(id);
+      if (updatedSession) {
+        ideationEvents.emitSessionEvent('session:block_created', updatedSession);
+      }
+
+      res.status(201).json(block);
+    } catch (error) {
+      console.error('Error creating block:', error);
+      res.status(500).json({ error: 'Failed to create block' });
+    }
+  }
+
+  async function updateBlock(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id ?? '');
+      const blockId = String(req.params.blockId ?? '');
+      const parsed = UpdateBlockRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+        return;
+      }
+
+      const session = await storage.getSession(id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const blockIndex = session.blocks.findIndex((b) => b.id === blockId);
+      if (blockIndex === -1) {
+        res.status(404).json({ error: 'Block not found' });
+        return;
+      }
+
+      const updatedBlock = {
+        ...session.blocks[blockIndex]!,
+        ...parsed.data,
+      };
+
+      const updatedBlocks = [...session.blocks];
+      updatedBlocks[blockIndex] = updatedBlock;
+      await storage.updateBlocks(id, updatedBlocks);
+
+      // Emit event for real-time updates
+      const updatedSession = await storage.getSession(id);
+      if (updatedSession) {
+        ideationEvents.emitSessionEvent('session:block_updated', updatedSession);
+      }
+
+      res.json(updatedBlock);
+    } catch (error) {
+      console.error('Error updating block:', error);
+      res.status(500).json({ error: 'Failed to update block' });
+    }
+  }
+
+  async function deleteBlock(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id ?? '');
+      const blockId = String(req.params.blockId ?? '');
+
+      const session = await storage.getSession(id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const blockExists = session.blocks.some((b) => b.id === blockId);
+      if (!blockExists) {
+        res.status(404).json({ error: 'Block not found' });
+        return;
+      }
+
+      const updatedBlocks = session.blocks.filter((b) => b.id !== blockId);
+      await storage.updateBlocks(id, updatedBlocks);
+
+      // Emit event for real-time updates
+      const updatedSession = await storage.getSession(id);
+      if (updatedSession) {
+        ideationEvents.emitSessionEvent('session:block_deleted', updatedSession);
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting block:', error);
+      res.status(500).json({ error: 'Failed to delete block' });
+    }
+  }
+
+  async function curateBlock(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id ?? '');
+      const blockId = String(req.params.blockId ?? '');
+
+      const session = await storage.getSession(id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const blockIndex = session.blocks.findIndex((b) => b.id === blockId);
+      if (blockIndex === -1) {
+        res.status(404).json({ error: 'Block not found' });
+        return;
+      }
+
+      const updatedBlock: Block = {
+        ...session.blocks[blockIndex]!,
+        status: 'curated',
+        curatedAt: new Date().toISOString(),
+      };
+
+      const updatedBlocks = [...session.blocks];
+      updatedBlocks[blockIndex] = updatedBlock;
+      await storage.updateBlocks(id, updatedBlocks);
+
+      // Emit event for real-time updates
+      const updatedSession = await storage.getSession(id);
+      if (updatedSession) {
+        ideationEvents.emitSessionEvent('session:block_curated', updatedSession);
+      }
+
+      res.json(updatedBlock);
+    } catch (error) {
+      console.error('Error curating block:', error);
+      res.status(500).json({ error: 'Failed to curate block' });
+    }
+  }
+
+  // ===========================================================================
   // SSE Events (#116)
   // ===========================================================================
 
@@ -418,7 +647,7 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     // Map backend event types to frontend expected format
     console.log(`[ideation-sse] Client connected for session: ${id || 'all'}`);
 
-    const handler = (event: { session_id: string; type: string; data: { transcript?: unknown[]; understanding?: unknown; status?: string } }) => {
+    const handler = (event: { session_id: string; type: string; data: Session }) => {
       console.log(`[ideation-sse] Received event: type=${event.type}, session_id=${event.session_id}, filtering for=${id || 'all'}`);
 
       // If id is specified, only send events for that session
@@ -448,6 +677,13 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
         }
         case 'session:updated':
           frontendEvent = { type: 'status_changed', status: event.data.status };
+          break;
+        case 'session:block_created':
+        case 'session:block_updated':
+        case 'session:block_deleted':
+        case 'session:block_curated':
+          // For block events, send all blocks (frontend will reconcile)
+          frontendEvent = { type: event.type, blocks: event.data.blocks };
           break;
         default:
           // For other events, send the full data
@@ -482,10 +718,16 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     getSession,
     listSessions,
     abandonSession,
+    updateSession,
     addMessage,
     updateUnderstanding,
     sendToPlanner,
     getConfidence,
+    listBlocks,
+    createBlock: createBlockHandler,
+    updateBlock,
+    deleteBlock,
+    curateBlock,
     subscribeToEvents,
   };
 }

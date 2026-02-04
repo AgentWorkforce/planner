@@ -114,6 +114,72 @@ export const SendToPlannerResponseSchema = z.object({
 export type SendToPlannerResponse = z.infer<typeof SendToPlannerResponseSchema>;
 
 // =============================================================================
+// Block Request Schemas
+// =============================================================================
+
+/**
+ * Request to create a new block.
+ */
+export const CreateBlockRequestSchema = z.object({
+  /** Block type (feature, entity, flow, constraint, etc.) */
+  type: z.string(),
+  /** Human-readable title */
+  title: z.string(),
+  /** Short label for physics block display */
+  keyword: z.string(),
+  /** Visual identifier on block */
+  emoji: z.string(),
+  /** Markdown mini-spec content */
+  content: z.string().optional().default(''),
+  /** Confidence score (0-100) */
+  confidence: z.number().min(0).max(100).optional().default(0),
+  /** Which specialist created this block (optional, defaults to 'user') */
+  specialist: z.string().optional(),
+  /** Conversation turn references (optional, defaults to 'user-created') */
+  sourceContext: z.string().optional(),
+});
+export type CreateBlockRequest = z.infer<typeof CreateBlockRequestSchema>;
+
+/**
+ * Request to update an existing block.
+ * Status can only be set to non-curated values via PATCH.
+ * Use the curate endpoint to set status to 'curated'.
+ */
+export const UpdateBlockRequestSchema = z.object({
+  /** Human-readable title */
+  title: z.string().optional(),
+  /** Short label for physics block display */
+  keyword: z.string().optional(),
+  /** Visual identifier on block */
+  emoji: z.string().optional(),
+  /** Markdown mini-spec content */
+  content: z.string().optional(),
+  /** Confidence score (0-100) */
+  confidence: z.number().min(0).max(100).optional(),
+  /** Lifecycle status (cannot set to 'curated' via PATCH) */
+  status: z.enum(['forming', 'emerging', 'developing', 'ready']).optional(),
+  /** True if user has modified this block */
+  userEdited: z.boolean().optional(),
+  /** Which fields user modified (for highlighting) */
+  userEditedFields: z.array(z.string()).optional(),
+});
+export type UpdateBlockRequest = z.infer<typeof UpdateBlockRequestSchema>;
+
+// =============================================================================
+// Session Update Request Schema
+// =============================================================================
+
+/**
+ * Request to update session fields.
+ * Currently supports updating the title (source.initial_intent).
+ */
+export const UpdateSessionRequestSchema = z.object({
+  /** Update the session title (stored as source.initial_intent) */
+  title: z.string().min(1, 'Title is required').optional(),
+});
+export type UpdateSessionRequest = z.infer<typeof UpdateSessionRequestSchema>;
+
+// =============================================================================
 // Error Response
 // =============================================================================
 
