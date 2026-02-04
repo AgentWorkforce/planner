@@ -19,6 +19,8 @@ export { UsersIcon } from './UsersIcon';
 export { SettingsIcon } from './SettingsIcon';
 export { BoltIcon } from './BoltIcon';
 export { TargetIcon } from './TargetIcon';
+export { SearchIcon } from './SearchIcon';
+export { CommandIcon } from './CommandIcon';
 
 export type { IconProps, IconSize } from './types';
 export { iconSizes } from './types';

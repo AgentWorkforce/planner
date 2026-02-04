@@ -23,3 +23,5 @@ export {
 export { LoadingSpinner } from './LoadingSpinner';
 export { Toggle, toggleVariants } from './toggle';
 export { ToggleGroup, ToggleGroupItem } from './toggle-group';
+export { CommandPalette } from './CommandPalette';
+export { Toaster } from './Toaster';
