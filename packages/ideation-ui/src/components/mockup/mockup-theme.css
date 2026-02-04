@@ -19,6 +19,9 @@
 
   --mockup-accent: #4a7c59;
   --mockup-accent-light: #e8f0eb;
+
+  /* Canvas accent for glow effects (RGB format for alpha blending) */
+  --canvas-accent-rgb: 74, 124, 89; /* #4a7c59 in RGB */
 }
 
 .mockup-root {

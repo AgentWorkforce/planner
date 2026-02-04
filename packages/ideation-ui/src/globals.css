@@ -94,6 +94,18 @@
   --sidebar-accent-foreground: #1a1a2e;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #0099cc;
+
+  /* Canvas Theme - Light (sandy/warm) */
+  --canvas-bg: #f5f0e8;
+  --canvas-bg-subtle: #ebe6de;
+  --canvas-text-primary: #2d2d2d;
+  --canvas-text-muted: #7a7a7a;
+  --block-draft: #e8e4dc;
+  --block-draft-border: #d4cfc5;
+  --block-curated: #ffffff;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #4a7c59;
+  --canvas-accent-light: #e8f0eb;
 }
 
 /**
@@ -174,6 +186,18 @@
     --sidebar-accent-foreground: #f0f0f5;
     --sidebar-border: rgba(255, 255, 255, 0.06);
     --sidebar-ring: #00d9ff;
+
+    /* Canvas Theme - Dark (mission control) */
+    --canvas-bg: #1a1a1a;
+    --canvas-bg-subtle: #242424;
+    --canvas-text-primary: #e5e5e5;
+    --canvas-text-muted: #888888;
+    --block-draft: #2a2a2a;
+    --block-draft-border: #3a3a3a;
+    --block-curated: #1e2a1e;
+    --block-curated-border: #4a7c59;
+    --canvas-accent: #5a9c6a;
+    --canvas-accent-light: #1e2a1e;
   }
 }
 
@@ -243,6 +267,18 @@ html.theme-light {
   --sidebar-accent-foreground: #1a1a2e;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #0099cc;
+
+  /* Canvas Theme - Light (sandy/warm) */
+  --canvas-bg: #f5f0e8;
+  --canvas-bg-subtle: #ebe6de;
+  --canvas-text-primary: #2d2d2d;
+  --canvas-text-muted: #7a7a7a;
+  --block-draft: #e8e4dc;
+  --block-draft-border: #d4cfc5;
+  --block-curated: #ffffff;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #4a7c59;
+  --canvas-accent-light: #e8f0eb;
 }
 
 html.theme-dark {
@@ -307,6 +343,18 @@ html.theme-dark {
   --sidebar-accent-foreground: #f0f0f5;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #00d9ff;
+
+  /* Canvas Theme - Dark (mission control) */
+  --canvas-bg: #1a1a1a;
+  --canvas-bg-subtle: #242424;
+  --canvas-text-primary: #e5e5e5;
+  --canvas-text-muted: #888888;
+  --block-draft: #2a2a2a;
+  --block-draft-border: #3a3a3a;
+  --block-curated: #1e2a1e;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #5a9c6a;
+  --canvas-accent-light: #1e2a1e;
 }
 
 /* ===== Base Styles ===== */
@@ -410,4 +458,34 @@ body {
 
 .animate-bounce-dot-delay-2 {
   animation: bounce-dot 1.4s ease-in-out 0.4s infinite;
+}
+
+/* Block glow effect for ready blocks (90%+ confidence) */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(var(--canvas-accent-rgb, 120 200 80), 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(var(--canvas-accent-rgb, 120 200 80), 0.5);
+  }
+}
+
+.block-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Focus mode entry animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.focus-mode-enter {
+  animation: slide-in 0.3s ease-out;
 }
