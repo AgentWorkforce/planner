@@ -29,3 +29,9 @@ export {
   type CommandItem,
   type CommandSection,
 } from "./CommandPalette";
+export {
+  StatusBar,
+  type StatusBarProps,
+  type AgentStatus,
+  type StatusAction,
+} from "./StatusBar";
