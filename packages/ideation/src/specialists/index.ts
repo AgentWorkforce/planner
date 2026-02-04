@@ -21,6 +21,8 @@ export {
   type UpdateObservationsInput,
   type ReadUnderstandingInput,
   type QueueInsightInput,
+  type CreateBlockInput,
+  type UpdateBlockInput,
   type SpecialistToolInput,
 } from './tools.js';
 

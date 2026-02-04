@@ -137,6 +137,37 @@ export const INTERVIEWER_TOOLS: Anthropic.Tool[] = [
       required: ['session_id', 'name', 'focus'],
     },
   },
+  {
+    name: 'update_synthesis',
+    description: 'Update the AI understanding synthesis for the session. Call this when understanding has evolved significantly to update the idea summary and specialist perspectives shown in the AI Understanding panel.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID',
+        },
+        idea_summary: {
+          type: 'string',
+          description: 'Brief synopsis of the overall idea (2-3 sentences)',
+        },
+        specialist_perspectives: {
+          type: 'object',
+          description: 'Per-specialist synthesized perspectives',
+          additionalProperties: {
+            type: 'object',
+            properties: {
+              take: { type: 'string', description: "Specialist's key take on the idea" },
+              concerns: { type: 'array', items: { type: 'string' }, description: 'Key concerns identified' },
+              confidence: { type: 'string', enum: ['exploring', 'forming', 'confident'], description: 'Confidence level of this specialist' },
+            },
+            required: ['take', 'concerns', 'confidence'],
+          },
+        },
+      },
+      required: ['session_id', 'idea_summary', 'specialist_perspectives'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -177,13 +208,24 @@ export interface SpawnSpecialistInput {
   prompt_context?: string;
 }
 
+export interface UpdateSynthesisInput {
+  session_id: string;
+  idea_summary: string;
+  specialist_perspectives: Record<string, {
+    take: string;
+    concerns: string[];
+    confidence: 'exploring' | 'forming' | 'confident';
+  }>;
+}
+
 export type ToolInput =
   | { name: 'start_session'; input: StartSessionInput }
   | { name: 'read_session'; input: ReadSessionInput }
   | { name: 'add_message'; input: AddMessageInput }
   | { name: 'update_understanding'; input: UpdateUnderstandingInput }
   | { name: 'send_to_planner'; input: SendToPlannerInput }
-  | { name: 'spawn_specialist'; input: SpawnSpecialistInput };
+  | { name: 'spawn_specialist'; input: SpawnSpecialistInput }
+  | { name: 'update_synthesis'; input: UpdateSynthesisInput };
 
 // =============================================================================
 // Tool Result

@@ -269,6 +269,43 @@ describe('Tool Executor', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should execute update_synthesis tool', async () => {
+      const session = await storage.createSession(
+        { type: 'human', initial_intent: 'Build a todo app' }
+      );
+
+      const result = await executeTool(
+        'update_synthesis',
+        {
+          session_id: session.id,
+          idea_summary: 'Building a simple todo list app with React',
+          specialist_perspectives: {
+            Architect: {
+              take: 'Component architecture looks solid',
+              concerns: ['State management needs consideration'],
+              confidence: 'forming',
+            },
+            Designer: {
+              take: 'UI patterns are clear',
+              concerns: ['Accessibility needs attention'],
+              confidence: 'confident',
+            },
+          },
+        },
+        { storage }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toHaveProperty('updated', true);
+
+      // Verify synthesis was stored
+      const updatedSession = await storage.getSession(session.id);
+      expect(updatedSession?.synthesized).toBeDefined();
+      expect(updatedSession?.synthesized?.idea_summary).toBe('Building a simple todo list app with React');
+      expect(updatedSession?.synthesized?.specialist_perspectives?.Architect).toBeDefined();
+      expect(updatedSession?.synthesized?.specialist_perspectives?.Architect.confidence).toBe('forming');
+    });
+
     it('should fail spawn_specialist tool without spawnAgent callback', async () => {
       const session = await storage.createSession(
         { type: 'human', initial_intent: 'Test' }
@@ -333,64 +370,22 @@ describe('Tool Executor', () => {
   });
 
   describe('getMockToolResult', () => {
-    it('should return mock result for start_session', () => {
-      const result = getMockToolResult('start_session', {
-        initial_intent: 'Test',
-      });
+    it('should fail loudly for all tools in mock mode', () => {
+      const tools = [
+        'start_session',
+        'read_session',
+        'add_message',
+        'update_understanding',
+        'spawn_specialist',
+        'send_to_planner',
+      ];
 
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('session_id');
-    });
-
-    it('should return mock result for read_session', () => {
-      const result = getMockToolResult('read_session', {
-        session_id: 'test-id',
-      });
-
-      expect(result.success).toBe(true);
-      // Mock returns session-like object with id field
-      expect(result.data).toHaveProperty('id', 'test-id');
-    });
-
-    it('should return mock result for add_message', () => {
-      const result = getMockToolResult('add_message', {
-        session_id: 'test-id',
-        role: 'user',
-        content: 'Hello',
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    it('should return mock result for update_understanding', () => {
-      const result = getMockToolResult('update_understanding', {
-        session_id: 'test-id',
-        specialist_name: 'technical',
-        observations: {},
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    it('should return mock result for spawn_specialist', () => {
-      const result = getMockToolResult('spawn_specialist', {
-        session_id: 'test-id',
-        name: 'Architect',
-        focus: 'Test',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('agent_id');
-    });
-
-    it('should return mock result for send_to_planner', () => {
-      const result = getMockToolResult('send_to_planner', {
-        session_id: 'test-id',
-        goal: 'Build app',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('plan_id');
+      for (const tool of tools) {
+        const result = getMockToolResult(tool, {});
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Mock mode');
+        expect(result.error).toContain('ANTHROPIC_API_KEY');
+      }
     });
   });
 });

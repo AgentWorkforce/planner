@@ -254,6 +254,86 @@ Add any other fields that capture your understanding.`,
 ]);
 
 // =============================================================================
+// Block Creation Guidance (Shared Across All Specialists)
+// =============================================================================
+
+const BLOCK_CREATION_GUIDANCE = `
+## Creating Blocks
+
+When you identify a concrete concept during the conversation, use the \`create_block\` tool to crystallize it. Blocks represent:
+- **Features**: User-facing capabilities
+- **Entities**: Data models or domain objects
+- **Flows**: User journeys or processes
+- **Constraints**: Technical or business limitations
+- **Integrations**: External system connections
+
+### When to Create a Block
+- You've identified a specific, actionable concept (not vague)
+- The concept has enough detail to describe (not just a mention)
+- It's distinct from existing blocks (don't duplicate)
+
+### CRITICAL: Check Existing Blocks First
+Before creating a new block, ALWAYS use \`list_blocks\` to:
+- Avoid duplicating concepts that already exist
+- Identify blocks that are too granular and should be merged
+- Assess whether existing blocks cover too much and should be split
+
+### Block Content Format (Mini-Spec)
+Write block content as a brief specification:
+\`\`\`
+**What**: One sentence describing the concept
+**Why**: Why this matters to the user/system
+**Details**:
+- Key requirement 1
+- Key requirement 2
+**Considerations**:
+- Technical consideration
+- UX consideration
+\`\`\`
+
+### Confidence Scoring
+Set confidence based on how well-defined the concept is:
+- **0-29% (Forming)**: Vague mention, needs clarification
+- **30-59% (Emerging)**: Basic shape visible, details unclear
+- **60-89% (Developing)**: Clear concept, some details missing
+- **90-100% (Ready)**: Fully specified, ready for curation
+
+### Updating Blocks
+Use \`update_block\` to refine blocks as understanding develops:
+- Increase confidence as details become clearer
+- Update content with new information
+- Status will auto-adjust based on confidence
+
+### Merge/Split Guidance
+
+**When blocks are too granular (MERGE)**:
+If you notice multiple blocks representing related sub-concepts that belong together, suggest merging:
+- Use \`merge_suggestion\` when creating or updating blocks
+- Include block IDs to merge and clear rationale
+- Example: "User Profile" + "User Settings" + "User Preferences" → "User Management"
+
+**When blocks cover too much (SPLIT)**:
+If a block tries to capture multiple distinct concerns, suggest splitting:
+- Use \`split_suggestion\` when creating or updating blocks
+- Describe what the separate concerns are
+- Example: "Authentication & Authorization & Session Management" should split into 3 blocks
+
+**Granularity guideline**: Each block should represent ONE cohesive concept. If you can't describe it in 2-3 sentences without using "and also", it probably needs splitting.
+
+### Keywords and Emojis
+- **Keyword**: 1-3 word label (appears on physics block)
+- **Emoji**: Visual identifier matching the block type
+  - Feature: Use target, star, or sparkle emojis
+  - Entity: Use box, database, or cube emojis
+  - Flow: Use arrow, cycle, or path emojis
+  - Constraint: Use warning, lock, or stop emojis
+  - Integration: Use plug, link, or connection emojis
+  - Idea: Use lightbulb or brain emojis
+  - Security: Use shield or lock emojis
+  - Performance: Use lightning or speed emojis
+`;
+
+// =============================================================================
 // Prompt Builder
 // =============================================================================
 
@@ -292,6 +372,9 @@ ${customContext ? `\nAdditional Context:\n${customContext}` : ''}
 - update_observations: Store your observations (freeform structure)
 - read_understanding: See all specialists' current observations
 - queue_insight: Queue a question/observation/concern for the Interviewer
+- create_block: Create a new block to crystallize a concept
+- update_block: Update an existing block with new information
+- list_blocks: View all blocks in the current session
 
 ## CRITICAL: Confidence Tracking
 You MUST include a 'confidence' field in EVERY update_observations call:
@@ -300,7 +383,7 @@ You MUST include a 'confidence' field in EVERY update_observations call:
 - 'confident': Clear understanding of requirements in your domain
 
 This is REQUIRED. The system tracks aggregate confidence to determine planning readiness.
-`;
+${BLOCK_CREATION_GUIDANCE}`;
 
   return basePrompt + sessionContext;
 }

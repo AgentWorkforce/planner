@@ -71,6 +71,143 @@ export const SPECIALIST_TOOLS: Anthropic.Tool[] = [
       required: ['session_id', 'type', 'content', 'priority'],
     },
   },
+  {
+    name: 'create_block',
+    description: 'Create a crystallized concept block from your analysis. Use when you identify a concrete component, feature, entity, flow, or constraint that should be captured. Check existing blocks first with list_blocks to avoid duplication and assess merge opportunities.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID to create the block in',
+        },
+        type: {
+          type: 'string',
+          description: 'Block type (feature, entity, flow, constraint, integration, etc.)',
+        },
+        title: {
+          type: 'string',
+          description: 'Clear, descriptive title for the block',
+        },
+        keyword: {
+          type: 'string',
+          description: 'Short label (1-3 words) for physics block display',
+        },
+        emoji: {
+          type: 'string',
+          description: 'Visual identifier emoji for the block',
+        },
+        content: {
+          type: 'string',
+          description: 'Markdown mini-spec with details, requirements, and considerations',
+        },
+        confidence: {
+          type: 'number',
+          description: 'Confidence level 0-100 (0-30: forming, 30-60: emerging, 60-90: developing, 90-100: ready)',
+        },
+        merge_suggestion: {
+          type: 'object',
+          description: 'Optional: Suggest merging this block with existing blocks if concepts are too granular',
+          properties: {
+            block_ids: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'IDs of blocks that should be merged together',
+            },
+            rationale: {
+              type: 'string',
+              description: 'Why these blocks should be merged',
+            },
+          },
+          required: ['block_ids', 'rationale'],
+        },
+        split_suggestion: {
+          type: 'object',
+          description: 'Optional: Suggest splitting this block if it covers too many distinct concepts',
+          properties: {
+            rationale: {
+              type: 'string',
+              description: 'Why this block should be split and what the separate concerns are',
+            },
+          },
+          required: ['rationale'],
+        },
+      },
+      required: ['session_id', 'type', 'title', 'keyword', 'emoji', 'content', 'confidence'],
+    },
+  },
+  {
+    name: 'update_block',
+    description: 'Update an existing block with new confidence level, content, or status. Use to refine blocks as understanding develops. Can also suggest merge/split actions.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID containing the block',
+        },
+        block_id: {
+          type: 'string',
+          description: 'The block ID to update',
+        },
+        confidence: {
+          type: 'number',
+          description: 'Updated confidence level 0-100',
+        },
+        content: {
+          type: 'string',
+          description: 'Updated markdown content (replaces existing)',
+        },
+        status: {
+          type: 'string',
+          enum: ['forming', 'emerging', 'developing', 'ready'],
+          description: 'Updated status (cannot be set to curated via this tool)',
+        },
+        merge_suggestion: {
+          type: 'object',
+          description: 'Optional: Suggest merging this block with existing blocks if concepts are too granular',
+          properties: {
+            block_ids: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'IDs of blocks that should be merged together (including this one)',
+            },
+            rationale: {
+              type: 'string',
+              description: 'Why these blocks should be merged',
+            },
+          },
+          required: ['block_ids', 'rationale'],
+        },
+        split_suggestion: {
+          type: 'object',
+          description: 'Optional: Suggest splitting this block if it covers too many distinct concepts',
+          properties: {
+            rationale: {
+              type: 'string',
+              description: 'Why this block should be split and what the separate concerns are',
+            },
+          },
+          required: ['rationale'],
+        },
+      },
+      required: ['session_id', 'block_id'],
+    },
+  },
+  {
+    name: 'list_blocks',
+    description: 'View all blocks in the current session. Use this to check existing blocks before creating new ones, and to assess whether blocks should be merged or split.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID to list blocks from',
+        },
+      },
+      required: ['session_id'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -93,10 +230,49 @@ export interface QueueInsightInput {
   priority: number;
 }
 
+export interface CreateBlockInput {
+  session_id: string;
+  type: string;
+  title: string;
+  keyword: string;
+  emoji: string;
+  content: string;
+  confidence: number;
+  merge_suggestion?: {
+    block_ids: string[];
+    rationale: string;
+  };
+  split_suggestion?: {
+    rationale: string;
+  };
+}
+
+export interface UpdateBlockInput {
+  session_id: string;
+  block_id: string;
+  confidence?: number;
+  content?: string;
+  status?: 'forming' | 'emerging' | 'developing' | 'ready';
+  merge_suggestion?: {
+    block_ids: string[];
+    rationale: string;
+  };
+  split_suggestion?: {
+    rationale: string;
+  };
+}
+
+export interface ListBlocksInput {
+  session_id: string;
+}
+
 export type SpecialistToolInput =
   | { name: 'update_observations'; input: UpdateObservationsInput }
   | { name: 'read_understanding'; input: ReadUnderstandingInput }
-  | { name: 'queue_insight'; input: QueueInsightInput };
+  | { name: 'queue_insight'; input: QueueInsightInput }
+  | { name: 'create_block'; input: CreateBlockInput }
+  | { name: 'update_block'; input: UpdateBlockInput }
+  | { name: 'list_blocks'; input: ListBlocksInput };
 
 // =============================================================================
 // Tool Result
