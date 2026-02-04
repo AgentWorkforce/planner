@@ -1,0 +1,346 @@
+{
+  "feature_id": "forge-durability",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fdu-s1-task",
+      "step_id": "fdu-s1",
+      "title": "Define checkpoint schema",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review checkpoint requirements from acceptance criteria",
+            "Understand what state needs to be captured"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "CheckpointSchema: { checkpoint_id, run_id, run_status, has_pending_gate, tasks_snapshot: JSONB, active_agents: string[], created_at }",
+            "tasks_snapshot includes: all task statuses, current attempts, pending gates",
+            "active_agents lists agent IDs that should be running (agent name pattern)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify schema captures all necessary state",
+            "Test serialization/deserialization"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for checkpoint schema validation"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s2-task",
+      "step_id": "fdu-s2",
+      "title": "Verify checkpoints table in storage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-storage fs-s7 for checkpoints table schema"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Verify ForgeStorage.createCheckpoint() works with checkpoint schema",
+            "Verify ForgeStorage.getLatestCheckpoint(runId) retrieves most recent",
+            "Verify ForgeStorage.listCheckpoints(runId) returns all checkpoints"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test CRUD operations with actual SQLite"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for checkpoint storage methods"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s3-task",
+      "step_id": "fdu-s3",
+      "title": "Implement checkpoint creation",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Identify all checkpoint trigger points",
+            "Review spawner.listActiveAgents() method"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "createCheckpoint(runId) captures current run state",
+            "Called after: task completion, task failure, gate resolution",
+            "Captures: all task statuses, active agents via spawner.listActiveAgents()",
+            "Async, non-blocking (should not slow down main flow)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test checkpoint creation after each trigger",
+            "Verify async behavior doesn't block"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: checkpoint created on task completion"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s4-task",
+      "step_id": "fdu-s4",
+      "title": "Implement run recovery on startup",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review server initialization sequence",
+            "Understand run states that need recovery"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "recoverActiveRuns() called on Forgemaster startup",
+            "Find runs with status 'running' or 'paused' in DB",
+            "For each: load latest checkpoint, verify agent states, resume scheduling",
+            "Log recovery actions for debugging"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test recovery with various run states",
+            "Verify logging is helpful"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: restart server with active runs"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s5-task",
+      "step_id": "fdu-s5",
+      "title": "Implement orphan agent detection",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review relay SDK agent listing capabilities",
+            "Understand grace period requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "detectOrphanAgents() compares expected vs. actual running agents",
+            "Expected: from checkpoint active_agents list",
+            "Actual: call spawner.listActiveAgents() which uses relay SDK agent listing",
+            "Orphans (running but not expected): terminate gracefully",
+            "Missing (expected but not running): mark task for retry"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with orphan agents present",
+            "Verify grace period is respected"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: orphan agents cleaned up correctly"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s6-task",
+      "step_id": "fdu-s6",
+      "title": "Implement health monitoring for stuck agents",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review heartbeat sources: MCP tool calls, relay messages",
+            "Understand stuck threshold configuration"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "trackAgentHeartbeat(agentId, timestamp) updates last seen time",
+            "Heartbeat updated on: report_progress tool calls, relay messages",
+            "detectStuckAgents() finds agents with no activity for N minutes",
+            "Stuck agent: terminate and mark task for retry",
+            "Configurable threshold: FORGE_AGENT_STUCK_THRESHOLD (default 5 min)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test stuck agent detection",
+            "Verify retry happens after termination"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: stuck agent detected and handled"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s7-task",
+      "step_id": "fdu-s7",
+      "title": "Implement graceful shutdown",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review signal handling patterns",
+            "Understand shutdown sequence"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "On SIGTERM: stop accepting new runs, stop enqueueing tasks",
+            "Wait for in-progress tasks to complete (up to timeout)",
+            "After timeout: create checkpoint, terminate agents",
+            "Configurable timeout: FORGE_SHUTDOWN_TIMEOUT (default 60s)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test graceful shutdown with active tasks",
+            "Verify checkpoint created before exit"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Test: send SIGTERM and verify graceful shutdown"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fdu-s8-task",
+      "step_id": "fdu-s8",
+      "title": "Create recovery log endpoint",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review health endpoint patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /health/recovery returns last recovery log",
+            "Log includes: runs recovered, orphans terminated, tasks retried",
+            "Timestamp of last recovery"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test endpoint after recovery",
+            "Verify log structure is useful"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API test: recovery log endpoint"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fdu-s8"
+          ]
+        }
+      }
+    }
+  ]
+}

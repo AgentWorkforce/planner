@@ -1,0 +1,263 @@
+{
+  "feature_id": "forge-retrospective",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fr-s1-task",
+      "step_id": "fr-s1",
+      "title": "Define retrospective schema",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/domain/trajectory.ts for Zod pattern",
+            "Review context.architect.retrospective_format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "RetrospectiveSchema: { summary, approach, decisions: [{ question, chosen, reasoning }], challenges[], learnings[], suggestions[], confidence: number }",
+            "confidence is 0-1 range",
+            "Export type from schema"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify schema covers all required fields",
+            "Test validation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for retrospective schema"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fr-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fr-s2-task",
+      "step_id": "fr-s2",
+      "title": "Create retrospective prompt template",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review RetrospectiveSchema for required fields",
+            "Understand configurability requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Prompt asks agent to reflect on completed task",
+            "Prompt specifies JSON output format matching RetrospectiveSchema",
+            "Template is configurable per project"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test prompt with LLM",
+            "Verify output format"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Manual test: prompt generates valid retrospective"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fr-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fr-s3-task",
+      "step_id": "fr-s3",
+      "title": "Implement retrospective injection after completion with timeout handling",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review report_complete handler in forge-mcp-tools",
+            "Understand relay message sending"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Listen for report_complete MCP tool call",
+            "Before marking agent for release, send retrospective prompt via relay message",
+            "Wait for agent response (timeout: 30 seconds)",
+            "On timeout: store trajectory event 'retrospective_timeout' with reason, task still completes successfully",
+            "retrospective_timeout event includes: task_id, timeout_duration, agent_last_message"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test successful retrospective flow",
+            "Test timeout behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for retrospective injection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fr-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fr-s4-task",
+      "step_id": "fr-s4",
+      "title": "Parse and store retrospective with explicit malformed handling",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review JSON parsing patterns",
+            "Understand error visibility requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Parse JSON from agent response",
+            "Validate against RetrospectiveSchema",
+            "Valid: store as trajectory event type='retrospective_recorded'",
+            "Invalid JSON: store trajectory event 'retrospective_parse_error' with raw_response and parse_error fields",
+            "Invalid schema: store trajectory event 'retrospective_validation_error' with raw_response and validation_errors fields",
+            "All error events visible in timeline and trajectory export"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test valid retrospective parsing",
+            "Test invalid JSON handling",
+            "Test schema validation errors"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for all parsing scenarios"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fr-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fr-s5-task",
+      "step_id": "fr-s5",
+      "title": "Link decisions to record_decision calls",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review decision_recorded event structure",
+            "Understand fuzzy matching requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Query trajectory for decision_recorded events for this task",
+            "Match retrospective decisions by question similarity",
+            "Add event_id references to linked decisions"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test decision linking",
+            "Verify similar questions are matched"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for decision linking"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fr-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fr-s6-task",
+      "step_id": "fr-s6",
+      "title": "Add retrospective to trajectory query API",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-trajectory-capture query handlers"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /runs/:id/trajectory includes retrospective_recorded, retrospective_timeout, and retrospective_*_error events",
+            "GET /runs/:id/tasks/:taskId includes retrospective if available, or error_type if failed",
+            "Export includes formatted retrospective or error details"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test trajectory queries with retrospectives",
+            "Test task endpoint includes retrospective"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for retrospective queries"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fr-s6"
+          ]
+        }
+      }
+    }
+  ]
+}

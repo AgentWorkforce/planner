@@ -1,0 +1,428 @@
+{
+  "feature_id": "forge-ui-gate-approval",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fga-s1-task",
+      "step_id": "fga-s1",
+      "title": "Create gates API module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/ for API patterns",
+            "Review forge-gate-handling feature for API endpoints"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "getPendingGates(runId?: string) returns { gates: Gate[] }",
+            "getGate(taskId) returns gate details with task context",
+            "approveGate(taskId, comment?: string) calls POST /gates/:taskId/approve",
+            "rejectGate(taskId, reason: string) calls POST /gates/:taskId/reject",
+            "Gate type: { gate_id, task_id, run_id, task_title, task_description, approver_role, status, artifacts, created_at }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API functions with mock backend"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for gates API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s2-task",
+      "step_id": "fga-s2",
+      "title": "Create GateCard component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/GateApprovalCard.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Gate icon with warning color",
+            "Task title and approver role",
+            "Time waiting (e.g., 'Waiting 5m')",
+            "Review button to open detail panel"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test card rendering",
+            "Test time display"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s3-task",
+      "step_id": "fga-s3",
+      "title": "Create GateDetailPanel component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/GateApprovalCard.tsx (expanded view)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Modal or slide-over panel",
+            "Task details section: title, description, scope, acceptance criteria",
+            "Verification results if available (from auditor)",
+            "Artifacts section with external links",
+            "Notes textarea for comments",
+            "Approve button (prominent, green)",
+            "Reject button (secondary, red)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test panel open/close",
+            "Test all sections render"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s4-task",
+      "step_id": "fga-s4",
+      "title": "Create GateArtifactsList component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review artifact display patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Groups artifacts by type (PRs, commits, tests, deployments)",
+            "External links open in new tab",
+            "Status badge for PRs (open, merged)",
+            "Copy link button for each artifact"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test artifact grouping",
+            "Test link behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s5-task",
+      "step_id": "fga-s5",
+      "title": "Implement approve flow",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/WorkflowActions.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Approve button calls approveGate(taskId, comment)",
+            "Loading state on button during API call",
+            "Success: close panel, show success toast, update dashboard",
+            "Error: show error toast with message"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test approval flow",
+            "Test error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with backend"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s6-task",
+      "step_id": "fga-s6",
+      "title": "Implement reject flow with confirmation",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review AlertDialog patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Reject button opens confirmation dialog",
+            "Confirmation requires reason text (required field)",
+            "Warning message: 'Rejecting will fail this task and pause the run'",
+            "Confirm calls rejectGate(taskId, reason)",
+            "Success: close dialogs, show toast, update dashboard"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test rejection flow",
+            "Test required reason validation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with backend"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s7-task",
+      "step_id": "fga-s7",
+      "title": "Create usePendingGates hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/ for hook patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "usePendingGates(runId?) returns { gates, count, isLoading, error, refetch }",
+            "SSE subscription for gate_reached, gate_approved, gate_rejected events",
+            "Updates list on gate events",
+            "Provides count for badge display"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test data fetching",
+            "Test SSE updates"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s8-task",
+      "step_id": "fga-s8",
+      "title": "Add gate notification to GateBanner",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review frd-s5 GateBanner implementation"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GateBanner 'Review' button opens GateDetailPanel",
+            "If multiple gates pending, show count and open list first",
+            "Banner updates when gates are approved/rejected"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test banner integration"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s9-task",
+      "step_id": "fga-s9",
+      "title": "Add sound notification",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review audio notification patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Play notification sound when gate_reached event received",
+            "Setting to enable/disable sound (stored in localStorage)",
+            "Setting accessible from status bar or settings"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test sound plays",
+            "Test setting toggle"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Manual test"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s9"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s10-task",
+      "step_id": "fga-s10",
+      "title": "Add pending gates badge to status bar",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-ui-status-bar feature"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Badge shows count of pending gates",
+            "Click opens gate review panel",
+            "Warning color when gates pending",
+            "Hidden when no gates pending"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test badge visibility",
+            "Test click behavior"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with status bar"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s10"
+          ]
+        }
+      }
+    }
+  ]
+}

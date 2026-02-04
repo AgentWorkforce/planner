@@ -1,0 +1,304 @@
+{
+  "feature_id": "forge-guardian-agents",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fga-s1-task",
+      "step_id": "fga-s1",
+      "title": "Define guardian configuration schema",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect for guardian types and speak_on examples",
+            "Review forge-config.yaml structure"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GuardianConfigSchema: { type: 'Security' | 'Architect' | 'QA' | 'Compliance', enabled: bool, shadow_targets: string[], speak_on: string[] }",
+            "speak_on examples: security_concern, credential_exposure, boundary_violation, api_inconsistency, test_coverage_drop",
+            "Loaded from forge-config.yaml guardians section"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test config loading",
+            "Verify validation errors are clear"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for guardian config schema"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s2-task",
+      "step_id": "fga-s2",
+      "title": "Add guardian trajectory table to storage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review project-scoped data requirements",
+            "Understand concern levels"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "CREATE_GUARDIAN_TRAJECTORIES_TABLE: event_id PK, project_id, guardian_type, observation, concern_level, recommendation, timestamp",
+            "concern_level: 'info' | 'warning' | 'critical'",
+            "Index on (project_id, guardian_type) for efficient queries",
+            "ForgeStorage methods: createGuardianEvent, listGuardianEvents(projectId, guardianType)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test table creation and queries",
+            "Verify index performance"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for guardian storage"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s3-task",
+      "step_id": "fga-s3",
+      "title": "Implement guardian spawning",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review Relay SDK shadow agent documentation",
+            "Understand shadowOf capability"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "spawnGuardian(type, config, projectId) spawns persistent guardian agent",
+            "Guardian uses relay shadowOf capability to observe workers",
+            "Guardian receives accumulated trajectory from previous runs via storage",
+            "Guardian name pattern: guardian-{type}-{projectId}"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test guardian spawn",
+            "Verify shadow observation works"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for guardian spawning"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s4-task",
+      "step_id": "fga-s4",
+      "title": "Implement speak_on trigger system",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review event filtering patterns",
+            "Understand intervention options"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Guardian receives filtered events matching speak_on triggers",
+            "Non-matching events observed but not actioned",
+            "Guardian can intervene by sending message to worker or alerting human",
+            "Intervention recorded in both run trajectory and guardian trajectory"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test trigger filtering",
+            "Test intervention recording"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for speak_on system"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s5-task",
+      "step_id": "fga-s5",
+      "title": "Implement guardian retrospective",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review run completion triggers",
+            "Understand retrospective format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "On run completion, prompt active guardians for retrospective",
+            "Retrospective summarizes observations, concerns raised, recommendations",
+            "Retrospective stored in guardian trajectory for future reference",
+            "Optional: send retrospective to human for review"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test retrospective generation",
+            "Verify storage and optional notification"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for guardian retrospective"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s6-task",
+      "step_id": "fga-s6",
+      "title": "Implement predefined guardian types",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/relay/prompts/planning-agent.ts for prompt patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Security guardian: monitors for credential exposure, injection risks, auth issues",
+            "Architect guardian: monitors for boundary violations, pattern inconsistencies",
+            "QA guardian: monitors for test coverage, quality regressions",
+            "Each type has specific speak_on defaults and prompt template"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test each guardian type",
+            "Verify prompts are effective"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for guardian types"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fga-s7-task",
+      "step_id": "fga-s7",
+      "title": "Create guardian management API",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-api router integration"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "GET /guardians lists active guardians for project",
+            "GET /guardians/:type/trajectory returns guardian trajectory",
+            "POST /guardians/:type/spawn spawns guardian for project",
+            "POST /guardians/:type/stop stops guardian"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all API endpoints",
+            "Verify proper error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for guardian management"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fga-s7"
+          ]
+        }
+      }
+    }
+  ]
+}
