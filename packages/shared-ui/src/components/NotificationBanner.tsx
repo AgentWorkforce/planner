@@ -9,15 +9,20 @@ import {
   ChevronRightIcon,
 } from "../icons";
 
+/**
+ * Banner variants using semantic CSS variables for theme compatibility.
+ * Consuming apps can override via CSS variables:
+ * --color-info, --color-warning, --color-error, --color-success (and -light variants)
+ */
 const bannerVariants = cva(
   "relative rounded-lg border p-4",
   {
     variants: {
       variant: {
-        info: "bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-300",
-        warning: "bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-300",
-        error: "bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-300",
-        success: "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-300",
+        info: "bg-[var(--color-info-light,rgba(59,130,246,0.1))] border-[var(--color-info,#3b82f6)]/20 text-[var(--color-info,#3b82f6)]",
+        warning: "bg-[var(--color-warning-light,rgba(234,179,8,0.1))] border-[var(--color-warning,#eab308)]/20 text-[var(--color-warning,#eab308)]",
+        error: "bg-[var(--color-error-light,rgba(239,68,68,0.1))] border-[var(--color-error,#ef4444)]/20 text-[var(--color-error,#ef4444)]",
+        success: "bg-[var(--color-success-light,rgba(34,197,94,0.1))] border-[var(--color-success,#22c55e)]/20 text-[var(--color-success,#22c55e)]",
       },
     },
     defaultVariants: {

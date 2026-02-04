@@ -42,12 +42,16 @@ const listItemVariants = cva(
 
 export type ListItemAccent = "primary" | "success" | "warning" | "error" | "info" | "muted";
 
+/**
+ * Accent colors using semantic CSS variables for theme compatibility.
+ * Consuming apps can override via CSS variables with fallbacks to Tailwind colors.
+ */
 const accentColors: Record<ListItemAccent, string> = {
   primary: "bg-primary",
-  success: "bg-green-500",
-  warning: "bg-yellow-500",
-  error: "bg-red-500",
-  info: "bg-blue-500",
+  success: "bg-[var(--color-success,#22c55e)]",
+  warning: "bg-[var(--color-warning,#eab308)]",
+  error: "bg-[var(--color-error,#ef4444)]",
+  info: "bg-[var(--color-info,#3b82f6)]",
   muted: "bg-muted-foreground",
 };
 

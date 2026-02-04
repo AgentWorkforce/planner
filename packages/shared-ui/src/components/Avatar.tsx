@@ -41,11 +41,17 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+/**
+ * Status colors using semantic CSS variables for theme compatibility.
+ * Consuming apps should define these variables:
+ * --color-status-online, --color-status-offline, --color-status-busy, --color-status-away
+ * Falls back to Tailwind colors if variables are not defined.
+ */
 const statusColors = {
-  online: "bg-green-500",
-  offline: "bg-gray-400",
-  busy: "bg-red-500",
-  away: "bg-yellow-500",
+  online: "bg-[var(--color-status-online,#22c55e)]",
+  offline: "bg-[var(--color-status-offline,#9ca3af)]",
+  busy: "bg-[var(--color-status-busy,#ef4444)]",
+  away: "bg-[var(--color-status-away,#eab308)]",
 };
 
 /**

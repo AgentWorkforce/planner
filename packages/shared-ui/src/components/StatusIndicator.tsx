@@ -2,6 +2,11 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../utils/cn";
 import { CheckCircleIcon, XCircleIcon, AlertTriangleIcon, InfoIcon } from "../icons";
 
+/**
+ * StatusIndicator variants using semantic CSS variables for theme compatibility.
+ * Consuming apps can override colors via CSS variables:
+ * --color-success, --color-error, --color-warning, --color-info, --color-pending
+ */
 const statusIndicatorVariants = cva(
   "inline-flex items-center justify-center rounded-full",
   {
@@ -17,11 +22,11 @@ const statusIndicatorVariants = cva(
         lg: "",
       },
       status: {
-        success: "bg-green-500 text-green-500",
-        error: "bg-red-500 text-red-500",
-        warning: "bg-yellow-500 text-yellow-500",
-        info: "bg-blue-500 text-blue-500",
-        pending: "bg-gray-400 text-gray-400",
+        success: "bg-[var(--color-success,#22c55e)] text-[var(--color-success,#22c55e)]",
+        error: "bg-[var(--color-error,#ef4444)] text-[var(--color-error,#ef4444)]",
+        warning: "bg-[var(--color-warning,#eab308)] text-[var(--color-warning,#eab308)]",
+        info: "bg-[var(--color-info,#3b82f6)] text-[var(--color-info,#3b82f6)]",
+        pending: "bg-[var(--color-pending,#9ca3af)] text-[var(--color-pending,#9ca3af)]",
         active: "bg-primary text-primary",
       },
       animated: {
@@ -38,12 +43,12 @@ const statusIndicatorVariants = cva(
       { variant: "icon", size: "sm", className: "w-4 h-4" },
       { variant: "icon", size: "md", className: "w-5 h-5" },
       { variant: "icon", size: "lg", className: "w-6 h-6" },
-      // Badge colors - need different bg for readability
-      { variant: "badge", status: "success", className: "bg-green-500/10 text-green-600" },
-      { variant: "badge", status: "error", className: "bg-red-500/10 text-red-600" },
-      { variant: "badge", status: "warning", className: "bg-yellow-500/10 text-yellow-600" },
-      { variant: "badge", status: "info", className: "bg-blue-500/10 text-blue-600" },
-      { variant: "badge", status: "pending", className: "bg-gray-500/10 text-gray-600" },
+      // Badge colors - use semantic variables with light backgrounds
+      { variant: "badge", status: "success", className: "bg-[var(--color-success-light,rgba(34,197,94,0.1))] text-[var(--color-success,#22c55e)]" },
+      { variant: "badge", status: "error", className: "bg-[var(--color-error-light,rgba(239,68,68,0.1))] text-[var(--color-error,#ef4444)]" },
+      { variant: "badge", status: "warning", className: "bg-[var(--color-warning-light,rgba(234,179,8,0.1))] text-[var(--color-warning,#eab308)]" },
+      { variant: "badge", status: "info", className: "bg-[var(--color-info-light,rgba(59,130,246,0.1))] text-[var(--color-info,#3b82f6)]" },
+      { variant: "badge", status: "pending", className: "bg-[var(--color-pending-light,rgba(156,163,175,0.1))] text-[var(--color-pending,#9ca3af)]" },
       { variant: "badge", status: "active", className: "bg-primary/10 text-primary" },
     ],
     defaultVariants: {

@@ -4,7 +4,7 @@ export { ConfirmationDialog, type ConfirmationDialogProps } from "./Confirmation
 export { Modal, type ModalProps } from "./Modal";
 export { Badge, type BadgeProps } from "./Badge";
 export { Avatar, type AvatarProps } from "./Avatar";
-export { Tabs, type TabsProps, type Tab } from "./Tabs";
+export { Tabs, TabPanel, type TabsProps, type TabPanelProps, type Tab } from "./Tabs";
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { SearchInput, type SearchInputProps } from "./SearchInput";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
