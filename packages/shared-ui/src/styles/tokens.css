@@ -167,6 +167,86 @@
   --shadow-glow-green: 0 0 20px rgba(0, 184, 148, 0.2);
 }
 
+/* ===== Shadcn/ui Compatibility Aliases ===== */
+/*
+ * These aliases map shadcn naming conventions to Mission Control tokens.
+ * This allows shared-ui components to work in any Tailwind app.
+ */
+:root,
+.theme-dark,
+[data-theme="dark"] {
+  /* Background aliases */
+  --background: var(--color-bg-primary);
+  --foreground: var(--color-text-primary);
+  --muted: var(--color-bg-tertiary);
+  --muted-foreground: var(--color-text-muted);
+  --card: var(--color-bg-card);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-bg-elevated);
+  --popover-foreground: var(--color-text-primary);
+
+  /* Primary accent */
+  --primary: var(--color-accent-cyan);
+  --primary-foreground: var(--color-text-inverse);
+
+  /* Secondary */
+  --secondary: var(--color-bg-secondary);
+  --secondary-foreground: var(--color-text-secondary);
+
+  /* Destructive */
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-text-inverse);
+
+  /* Border & Input */
+  --border: var(--color-border-default);
+  --input: var(--color-border-default);
+  --ring: var(--color-accent-cyan);
+
+  /* Accent (for shadcn accent variant) */
+  --accent: var(--color-bg-hover);
+  --accent-foreground: var(--color-text-primary);
+
+  /* Radius */
+  --radius: 6px;
+}
+
+.theme-light,
+[data-theme="light"] {
+  /* Background aliases */
+  --background: var(--color-bg-primary);
+  --foreground: var(--color-text-primary);
+  --muted: var(--color-bg-tertiary);
+  --muted-foreground: var(--color-text-muted);
+  --card: var(--color-bg-card);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-bg-elevated);
+  --popover-foreground: var(--color-text-primary);
+
+  /* Primary accent */
+  --primary: var(--color-accent-cyan);
+  --primary-foreground: var(--color-text-inverse);
+
+  /* Secondary */
+  --secondary: var(--color-bg-secondary);
+  --secondary-foreground: var(--color-text-secondary);
+
+  /* Destructive */
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-text-inverse);
+
+  /* Border & Input */
+  --border: var(--color-border-default);
+  --input: var(--color-border-default);
+  --ring: var(--color-accent-cyan);
+
+  /* Accent */
+  --accent: var(--color-bg-hover);
+  --accent-foreground: var(--color-text-primary);
+
+  /* Radius */
+  --radius: 6px;
+}
+
 /* ===== System Preference Support ===== */
 @media (prefers-color-scheme: light) {
   :root:not(.theme-dark):not([data-theme="dark"]) {

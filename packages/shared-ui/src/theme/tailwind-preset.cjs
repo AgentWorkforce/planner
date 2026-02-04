@@ -17,7 +17,51 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Mission Control Theme - CSS Variable References
+        // ===== Shadcn/ui Compatible Colors =====
+        // These work with standard shadcn components
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        card: {
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
+        },
+        popover: {
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
+        },
+        primary: {
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
+        },
+        muted: {
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
+          // Mission Control neon accents
+          cyan: 'var(--color-accent-cyan)',
+          orange: 'var(--color-accent-orange)',
+          purple: 'var(--color-accent-purple)',
+          green: 'var(--color-accent-green)',
+          hover: 'var(--color-accent-hover)',
+          light: 'var(--color-accent-light)',
+        },
+        destructive: {
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
+        },
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+
+        // ===== Mission Control Extended Palette =====
+        // Background depth system
         bg: {
           deep: 'var(--color-bg-deep)',
           primary: 'var(--color-bg-primary)',
@@ -28,28 +72,13 @@ module.exports = {
           hover: 'var(--color-bg-hover)',
           active: 'var(--color-bg-active)',
         },
+        // Text hierarchy
         text: {
           primary: 'var(--color-text-primary)',
           secondary: 'var(--color-text-secondary)',
           muted: 'var(--color-text-muted)',
           dim: 'var(--color-text-dim)',
           inverse: 'var(--color-text-inverse)',
-        },
-        border: {
-          DEFAULT: 'var(--color-border-default)',
-          subtle: 'var(--color-border-subtle)',
-          light: 'var(--color-border-light)',
-          medium: 'var(--color-border-medium)',
-        },
-        // Neon Accent Colors
-        accent: {
-          DEFAULT: 'var(--color-accent-cyan)',
-          cyan: 'var(--color-accent-cyan)',
-          orange: 'var(--color-accent-orange)',
-          purple: 'var(--color-accent-purple)',
-          green: 'var(--color-accent-green)',
-          hover: 'var(--color-accent-hover)',
-          light: 'var(--color-accent-light)',
         },
         // Status Colors
         success: {
@@ -70,10 +99,22 @@ module.exports = {
         },
         // Sidebar
         sidebar: {
+          DEFAULT: 'var(--color-sidebar-bg)',
           bg: 'var(--color-sidebar-bg)',
           border: 'var(--color-sidebar-border)',
           hover: 'var(--color-sidebar-hover)',
+          foreground: 'var(--color-text-primary)',
+          primary: 'var(--color-accent-cyan)',
+          'primary-foreground': 'var(--color-text-inverse)',
+          accent: 'var(--color-bg-hover)',
+          'accent-foreground': 'var(--color-text-primary)',
+          ring: 'var(--color-accent-cyan)',
         },
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
         display: ['Outfit', 'sans-serif'],
