@@ -8,16 +8,25 @@ import { ChatMessageList } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { LoadingSpinner } from '@/components/ui';
+import { MessageSquare } from 'lucide-react';
 
 interface SessionChatViewProps {
   sessionId: string;
+  /** Optional block ID for contextual chat mode */
+  focusedBlockId?: string;
+  /** Optional block data for display in context banner */
+  focusedBlock?: {
+    id: string;
+    emoji: string;
+    keyword: string;
+  };
 }
 
-export function SessionChatView({ sessionId }: SessionChatViewProps) {
+export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: SessionChatViewProps) {
   const { session, loading, error, refetch } = useSession(sessionId);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const { send, sending } = useSendMessage(sessionId);
+  const { send, sending } = useSendMessage(sessionId, focusedBlockId);
 
   // Handle real-time transcript updates
   const handleTranscriptUpdate = useCallback((messages: TranscriptMessage[]) => {
@@ -105,9 +114,45 @@ export function SessionChatView({ sessionId }: SessionChatViewProps) {
     );
   }
 
+  // Determine the placeholder based on mode and session status
+  const getPlaceholder = () => {
+    if (session.status === 'abandoned') {
+      return 'This session has been abandoned';
+    }
+    if (focusedBlockId && focusedBlock) {
+      return `Ask about "${focusedBlock.keyword}"...`;
+    }
+    return 'Type your message...';
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <ChatHeader session={session} />
+      {/* Show ChatHeader only when NOT in focus mode */}
+      {!focusedBlockId && <ChatHeader session={session} />}
+
+      {/* Context Banner for Focus Mode */}
+      {focusedBlockId && focusedBlock && (
+        <div className="flex items-center justify-between px-4 py-3 bg-accent-cyan/10 border-b border-accent-cyan/20">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-accent-cyan" />
+            <span className="text-sm text-text-primary font-medium">
+              Contextual Chat
+            </span>
+            <span className="text-xs text-text-muted">•</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-base" aria-hidden="true">
+                {focusedBlock.emoji}
+              </span>
+              <span className="text-sm text-text-muted">
+                {focusedBlock.keyword}
+              </span>
+            </div>
+          </div>
+          <div className="text-xs text-text-muted">
+            Messages are scoped to this block
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto relative">
         <ChatMessageList messages={transcript} />
@@ -121,11 +166,7 @@ export function SessionChatView({ sessionId }: SessionChatViewProps) {
       <ChatInput
         onSend={handleSend}
         disabled={sending || session.status === 'abandoned'}
-        placeholder={
-          session.status === 'abandoned'
-            ? 'This session has been abandoned'
-            : 'Type your message...'
-        }
+        placeholder={getPlaceholder()}
       />
     </div>
   );

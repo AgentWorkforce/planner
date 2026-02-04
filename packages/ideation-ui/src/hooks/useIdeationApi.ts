@@ -6,6 +6,7 @@ const API_BASE_URL = '/api/ideation';
 export interface Session {
   id: string;
   status: 'active' | 'abandoned';
+  initiative_id?: string; // Optional initiative grouping
   source: {
     type: 'human' | 'intake';
     initial_intent: string;
@@ -18,6 +19,7 @@ export interface Session {
     plan_id: string;
     understanding_snapshot: Record<string, unknown>;
   }>;
+  blocks?: Array<{ id: string }>;
 }
 
 export interface TranscriptMessage {
@@ -104,13 +106,27 @@ export function useIdeationApi() {
     }
   }, []);
 
-  const sendMessage = useCallback(async (sessionId: string, content: string): Promise<TranscriptMessage | null> => {
+  const sendMessage = useCallback(async (
+    sessionId: string,
+    content: string,
+    blockContext?: string
+  ): Promise<TranscriptMessage | null> => {
     setLoading(true);
     setError(null);
     try {
+      const body: { role: string; content: string; block_context?: string } = {
+        role: 'user',
+        content,
+      };
+
+      // Include block context if provided
+      if (blockContext) {
+        body.block_context = blockContext;
+      }
+
       const result = await fetchJson<TranscriptMessage>(`${API_BASE_URL}/sessions/${sessionId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ role: 'user', content }),
+        body: JSON.stringify(body),
       });
       return result;
     } catch (err) {

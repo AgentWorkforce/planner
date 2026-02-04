@@ -38,7 +38,7 @@ export function ChatHeader({ session }: ChatHeaderProps) {
       const result = await api.sendToPlanner(session.id);
       if (result?.plan_id) {
         // Optionally navigate to the plan or show success
-        navigate(`/session/${session.id}`);
+        navigate(`/ideation/session/${session.id}`);
       }
     } finally {
       setIsSending(false);
