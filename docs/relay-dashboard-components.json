@@ -1,0 +1,905 @@
+{
+  "summary": {
+    "totalComponents": 62,
+    "byCategory": {
+      "GENERALIZED": 18,
+      "DOMAIN_SPECIFIC": 24,
+      "SPECIALIZED": 20
+    },
+    "uiLibraryUsage": {
+      "radixUi": false,
+      "shadcn": false,
+      "lucideReact": false,
+      "tailwindCss": true,
+      "customThemeProvider": true,
+      "inlineSvgIcons": true
+    },
+    "averageReusabilityScore": 3.2
+  },
+  "components": [
+    {
+      "name": "Pagination",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Pagination.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Highly reusable pagination component with ellipsis handling, customizable visible pages, and clean prop interface",
+      "props": ["currentPage", "totalPages", "onPageChange", "maxVisiblePages"],
+      "linesOfCode": 85
+    },
+    {
+      "name": "ConfirmationDialog",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ConfirmationDialog.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Generic confirmation modal with danger/primary variants, escape key handling, focus management, and processing state",
+      "props": ["isOpen", "onClose", "onConfirm", "title", "message", "confirmText", "cancelText", "variant", "isProcessing"],
+      "linesOfCode": 120
+    },
+    {
+      "name": "ThemeProvider",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ThemeProvider.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Theme context provider with light/dark/system modes, localStorage persistence, and system preference detection. Includes ThemeToggle component and useTheme hook",
+      "exports": ["ThemeProvider", "ThemeToggle", "useTheme"],
+      "linesOfCode": 150
+    },
+    {
+      "name": "NotificationToast",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/NotificationToast.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 4,
+      "description": "Toast notification system with info/success/warning/error/message types, auto-dismiss, and useToasts hook. Exports CSS styles string",
+      "exports": ["NotificationToast", "ToastContainer", "useToasts", "toastStyles"],
+      "props": ["toast", "onDismiss"],
+      "linesOfCode": 280
+    },
+    {
+      "name": "useDebounce",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/hooks/useDebounce.ts",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Simple debounce hook for values with configurable delay, useful for search inputs and rapid-change scenarios",
+      "linesOfCode": 30
+    },
+    {
+      "name": "TypingIndicator",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/TypingIndicator.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 4,
+      "description": "Animated typing indicator with avatar support, shows multiple users typing with animation",
+      "props": ["typingUsers"],
+      "linesOfCode": 90
+    },
+    {
+      "name": "ThinkingIndicator",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ThinkingIndicator.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 4,
+      "description": "Processing/thinking animation with elapsed time display, pulse animation, exports CSS styles",
+      "exports": ["ThinkingIndicator", "thinkingIndicatorStyles"],
+      "props": ["agentName", "startTime", "className"],
+      "linesOfCode": 85
+    },
+    {
+      "name": "CommandPalette",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/CommandPalette.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react", "react-router-dom"],
+      "reusabilityScore": 4,
+      "description": "VS Code-style command palette with fuzzy search, keyboard navigation, sections, and extensible command system. Has domain-specific extensions for task assignment and agent selection",
+      "props": ["isOpen", "onClose", "onSelect", "sections", "placeholder"],
+      "linesOfCode": 800,
+      "notes": "Core palette logic is reusable; task/agent modes are domain-specific"
+    },
+    {
+      "name": "EmptyState",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/EmptyState.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Generic empty state component with icon, title, description, and optional action button",
+      "props": ["icon", "title", "description", "action", "actionLabel"],
+      "linesOfCode": 45
+    },
+    {
+      "name": "LoadingSpinner",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/LoadingSpinner.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Simple loading spinner with size variants",
+      "props": ["size", "className"],
+      "linesOfCode": 35
+    },
+    {
+      "name": "ErrorBoundary",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ErrorBoundary.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "React error boundary with fallback UI and error reporting",
+      "linesOfCode": 60
+    },
+    {
+      "name": "Tooltip",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Tooltip.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Simple tooltip component with position variants",
+      "props": ["content", "position", "children"],
+      "linesOfCode": 75
+    },
+    {
+      "name": "Modal",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Modal.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Generic modal wrapper with backdrop, escape handling, and focus trap",
+      "props": ["isOpen", "onClose", "children", "title", "size"],
+      "linesOfCode": 95
+    },
+    {
+      "name": "Dropdown",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Dropdown.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Generic dropdown menu with keyboard navigation",
+      "props": ["trigger", "items", "onSelect", "align"],
+      "linesOfCode": 110
+    },
+    {
+      "name": "Badge",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Badge.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Status badge with color variants",
+      "props": ["variant", "children", "size"],
+      "linesOfCode": 40
+    },
+    {
+      "name": "Avatar",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Avatar.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "User/agent avatar with initials fallback and status indicator",
+      "props": ["name", "imageUrl", "size", "status"],
+      "linesOfCode": 55
+    },
+    {
+      "name": "Tabs",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Tabs.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Tab navigation component with controlled/uncontrolled modes",
+      "props": ["tabs", "activeTab", "onChange"],
+      "linesOfCode": 65
+    },
+    {
+      "name": "SearchInput",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/SearchInput.tsx",
+      "category": "GENERALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 5,
+      "description": "Search input with icon, clear button, and debounce support",
+      "props": ["value", "onChange", "placeholder", "debounceMs"],
+      "linesOfCode": 70
+    },
+    {
+      "name": "AgentCard",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/AgentCard.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react", "lib/colors"],
+      "reusabilityScore": 3,
+      "description": "Agent display card with status indicators, color coding, action menu. Uses getAgentColor, getAgentInitials from lib/colors",
+      "props": ["agent", "isSelected", "onSelect", "onAction"],
+      "linesOfCode": 590,
+      "notes": "Useful across agent-relay ecosystem, not general purpose"
+    },
+    {
+      "name": "MessageList",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/MessageList.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Message display with threading, auto-scroll, attachments, and lightbox. Agent-specific message rendering",
+      "props": ["messages", "onReply", "onReact", "threadView"],
+      "linesOfCode": 640
+    },
+    {
+      "name": "MessageComposer",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/MessageComposer.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Message input with attachments, mentions, and send handling. Agent-relay specific mention system",
+      "props": ["onSend", "placeholder", "disabled", "replyTo"],
+      "linesOfCode": 350
+    },
+    {
+      "name": "SpawnModal",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/SpawnModal.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Modal for spawning new agents with model selection, CLI options, and configuration",
+      "props": ["isOpen", "onClose", "onSpawn", "parentAgent"],
+      "linesOfCode": 420
+    },
+    {
+      "name": "TrajectoryViewer",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/TrajectoryViewer.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Agent action history timeline with tool calls, messages, and state changes. Trajectory-specific rendering",
+      "props": ["trajectory", "agentId", "onStepClick"],
+      "linesOfCode": 550
+    },
+    {
+      "name": "AgentStatusBadge",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/AgentStatusBadge.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Badge showing agent status (active, idle, thinking, error) with appropriate colors",
+      "props": ["status", "size"],
+      "linesOfCode": 50
+    },
+    {
+      "name": "ChannelList",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ChannelList.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "List of channels with unread counts, selection state, and create button",
+      "props": ["channels", "activeChannel", "onSelect", "onCreate"],
+      "linesOfCode": 180
+    },
+    {
+      "name": "AgentList",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/AgentList.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "List of agents with status, filtering, and selection",
+      "props": ["agents", "selectedAgent", "onSelect", "filter"],
+      "linesOfCode": 220
+    },
+    {
+      "name": "TaskCard",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/TaskCard.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Task display card with status, assignee, and progress",
+      "props": ["task", "onStatusChange", "onAssign"],
+      "linesOfCode": 160
+    },
+    {
+      "name": "TaskList",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/TaskList.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "List of tasks with filtering, sorting, and bulk actions",
+      "props": ["tasks", "onTaskAction", "filters"],
+      "linesOfCode": 280
+    },
+    {
+      "name": "ProjectCard",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ProjectCard.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Project display card with agent count, status, and actions",
+      "props": ["project", "onSelect", "onAction"],
+      "linesOfCode": 140
+    },
+    {
+      "name": "AgentTreeView",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/AgentTreeView.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Hierarchical view of agent parent-child relationships",
+      "props": ["agents", "rootAgent", "onSelect"],
+      "linesOfCode": 320
+    },
+    {
+      "name": "ConnectionStatus",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ConnectionStatus.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "WebSocket connection status indicator with reconnect button",
+      "props": ["status", "onReconnect"],
+      "linesOfCode": 80
+    },
+    {
+      "name": "MessageBubble",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/MessageBubble.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Individual message bubble with sender info, timestamp, reactions",
+      "props": ["message", "isOwn", "onReact", "onReply"],
+      "linesOfCode": 200
+    },
+    {
+      "name": "AgentColorDot",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/AgentColorDot.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react", "lib/colors"],
+      "reusabilityScore": 3,
+      "description": "Colored dot for agent identification, uses shared color algorithm",
+      "props": ["agentName", "size"],
+      "linesOfCode": 30
+    },
+    {
+      "name": "ToolCallDisplay",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ToolCallDisplay.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Display for tool/function calls with input/output, collapsible",
+      "props": ["toolCall", "expanded", "onToggle"],
+      "linesOfCode": 180
+    },
+    {
+      "name": "RunStatusIndicator",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/RunStatusIndicator.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Status indicator for agent runs with progress",
+      "props": ["status", "progress", "error"],
+      "linesOfCode": 90
+    },
+    {
+      "name": "TokenUsageDisplay",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/TokenUsageDisplay.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Token usage metrics display with bar chart",
+      "props": ["usage", "limit", "showDetails"],
+      "linesOfCode": 110
+    },
+    {
+      "name": "CostDisplay",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/CostDisplay.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Cost/billing amount display with formatting",
+      "props": ["amount", "currency", "period"],
+      "linesOfCode": 45
+    },
+    {
+      "name": "ModelSelector",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ModelSelector.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Dropdown for selecting AI model with capabilities info",
+      "props": ["models", "selected", "onChange"],
+      "linesOfCode": 130
+    },
+    {
+      "name": "BridgeStatus",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/BridgeStatus.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Status display for cross-project bridge connections",
+      "props": ["bridges", "onConnect", "onDisconnect"],
+      "linesOfCode": 160
+    },
+    {
+      "name": "TeamMemberCard",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/TeamMemberCard.tsx",
+      "category": "DOMAIN_SPECIFIC",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Team member display with role and permissions",
+      "props": ["member", "onEdit", "onRemove"],
+      "linesOfCode": 120
+    },
+    {
+      "name": "Sidebar",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/layout/Sidebar.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react", "react-router-dom"],
+      "reusabilityScore": 1,
+      "description": "Main navigation sidebar with channels, agents, projects, team tabs. Highly app-specific with complex state management",
+      "linesOfCode": 930,
+      "notes": "Too complex and app-specific for extraction"
+    },
+    {
+      "name": "Header",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/layout/Header.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react", "react-router-dom"],
+      "reusabilityScore": 2,
+      "description": "Top navigation header with search, user menu, notifications. App-specific context and routing",
+      "linesOfCode": 280
+    },
+    {
+      "name": "MainLayout",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/layout/MainLayout.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react", "react-router-dom"],
+      "reusabilityScore": 2,
+      "description": "Main app layout wrapper with sidebar, header, content area",
+      "linesOfCode": 120
+    },
+    {
+      "name": "Logo",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/Logo.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 1,
+      "description": "Brand logo components (Logo, LogoIcon, LogoHero) - brand-specific",
+      "exports": ["Logo", "LogoIcon", "LogoHero"],
+      "linesOfCode": 85
+    },
+    {
+      "name": "BillingPanel",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/BillingPanel.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 1,
+      "description": "Billing/subscription management panel with plans, payment methods, invoices. Very app-specific billing flow",
+      "linesOfCode": 680
+    },
+    {
+      "name": "SettingsPage",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/settings/SettingsPage.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react", "react-router-dom"],
+      "reusabilityScore": 1,
+      "description": "Full-page settings with tabs for profile, team, billing, integrations",
+      "linesOfCode": 450
+    },
+    {
+      "name": "ProfileSettings",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/settings/ProfileSettings.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "User profile settings form",
+      "linesOfCode": 220
+    },
+    {
+      "name": "TeamSettings",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/settings/TeamSettings.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Team management settings with member list, invites",
+      "linesOfCode": 340
+    },
+    {
+      "name": "IntegrationSettings",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/settings/IntegrationSettings.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Third-party integration settings (GitHub, Slack, etc.)",
+      "linesOfCode": 280
+    },
+    {
+      "name": "NotificationSettings",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/settings/NotificationSettings.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Notification preference settings",
+      "linesOfCode": 180
+    },
+    {
+      "name": "OnboardingFlow",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/OnboardingFlow.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react", "react-router-dom"],
+      "reusabilityScore": 1,
+      "description": "New user onboarding wizard with multiple steps",
+      "linesOfCode": 520
+    },
+    {
+      "name": "WelcomeScreen",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/WelcomeScreen.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 1,
+      "description": "Initial welcome screen with getting started guide",
+      "linesOfCode": 180
+    },
+    {
+      "name": "DashboardOverview",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/DashboardOverview.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 1,
+      "description": "Main dashboard overview with stats, recent activity",
+      "linesOfCode": 380
+    },
+    {
+      "name": "ActivityFeed",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ActivityFeed.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Activity feed showing recent events across the system",
+      "linesOfCode": 240
+    },
+    {
+      "name": "QuickActions",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/QuickActions.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Quick action buttons for common operations",
+      "linesOfCode": 120
+    },
+    {
+      "name": "StatsCard",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/StatsCard.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 3,
+      "description": "Dashboard stat card with label, value, trend",
+      "props": ["label", "value", "trend", "icon"],
+      "linesOfCode": 70
+    },
+    {
+      "name": "UsageChart",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/UsageChart.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "Usage/analytics chart component",
+      "linesOfCode": 200
+    },
+    {
+      "name": "ApiKeyManager",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/ApiKeyManager.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "API key creation and management interface",
+      "linesOfCode": 260
+    },
+    {
+      "name": "InvoiceList",
+      "path": "/tmp/relay-dashboard/packages/dashboard/src/components/InvoiceList.tsx",
+      "category": "SPECIALIZED",
+      "dependencies": ["react"],
+      "reusabilityScore": 2,
+      "description": "List of billing invoices with download",
+      "linesOfCode": 150
+    }
+  ],
+  "patterns": {
+    "duplicatedIcons": {
+      "description": "Multiple components define the same SVG icons inline. These should be extracted to a shared icons package.",
+      "examples": [
+        {
+          "iconName": "SearchIcon",
+          "foundIn": ["CommandPalette.tsx", "Sidebar.tsx", "Header.tsx", "SearchInput.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "CloseIcon / XIcon",
+          "foundIn": ["ConfirmationDialog.tsx", "Modal.tsx", "CommandPalette.tsx", "NotificationToast.tsx", "SpawnModal.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "SettingsIcon / GearIcon",
+          "foundIn": ["Sidebar.tsx", "Header.tsx", "AgentCard.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "ChevronIcon (left/right/down)",
+          "foundIn": ["Pagination.tsx", "Dropdown.tsx", "Sidebar.tsx", "CommandPalette.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "CheckIcon",
+          "foundIn": ["NotificationToast.tsx", "Dropdown.tsx", "TaskCard.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "PlusIcon",
+          "foundIn": ["Sidebar.tsx", "ChannelList.tsx", "AgentList.tsx", "QuickActions.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "TrashIcon / DeleteIcon",
+          "foundIn": ["AgentCard.tsx", "TaskCard.tsx", "ApiKeyManager.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        },
+        {
+          "iconName": "EditIcon / PencilIcon",
+          "foundIn": ["AgentCard.tsx", "TaskCard.tsx", "ProfileSettings.tsx"],
+          "recommendation": "Extract to shared Icon component"
+        }
+      ],
+      "totalDuplicatedIcons": 15,
+      "estimatedSavings": "~500 lines of code"
+    },
+    "similarComponents": [
+      {
+        "pattern": "Card components",
+        "components": ["AgentCard", "TaskCard", "ProjectCard", "StatsCard", "TeamMemberCard"],
+        "similarity": 0.75,
+        "recommendation": "Extract base Card component with slots for header, body, footer, actions"
+      },
+      {
+        "pattern": "List components",
+        "components": ["ChannelList", "AgentList", "TaskList", "InvoiceList"],
+        "similarity": 0.7,
+        "recommendation": "Extract base List component with item renderer, empty state, loading state"
+      },
+      {
+        "pattern": "Settings sections",
+        "components": ["ProfileSettings", "TeamSettings", "IntegrationSettings", "NotificationSettings"],
+        "similarity": 0.8,
+        "recommendation": "Extract SettingsSection component with form layout pattern"
+      },
+      {
+        "pattern": "Status indicators",
+        "components": ["AgentStatusBadge", "ConnectionStatus", "RunStatusIndicator"],
+        "similarity": 0.65,
+        "recommendation": "Extract base StatusIndicator with color/icon mapping"
+      },
+      {
+        "pattern": "Modal/Dialog components",
+        "components": ["Modal", "ConfirmationDialog", "SpawnModal"],
+        "similarity": 0.7,
+        "recommendation": "Modal is already base; ensure SpawnModal uses it"
+      }
+    ],
+    "commonStyling": {
+      "themeVariables": [
+        "--color-bg-primary",
+        "--color-bg-secondary",
+        "--color-bg-tertiary",
+        "--color-text-primary",
+        "--color-text-secondary",
+        "--color-text-muted",
+        "--color-border",
+        "--color-accent",
+        "--color-success",
+        "--color-warning",
+        "--color-error"
+      ],
+      "tailwindPatterns": [
+        "rounded-lg for cards/modals",
+        "rounded-full for badges/avatars",
+        "transition-all duration-200 for animations",
+        "focus:ring-2 focus:ring-offset-2 for focus states",
+        "hover:bg-opacity-80 for hover states"
+      ],
+      "cssExports": [
+        "NotificationToast exports toastStyles",
+        "ThinkingIndicator exports thinkingIndicatorStyles",
+        "BillingPanel exports billingStyles"
+      ]
+    },
+    "hookPatterns": [
+      {
+        "name": "useDebounce",
+        "location": "hooks/useDebounce.ts",
+        "usage": "Search inputs, filtering",
+        "reusable": true
+      },
+      {
+        "name": "useToasts",
+        "location": "NotificationToast.tsx",
+        "usage": "Toast notification management",
+        "reusable": true,
+        "recommendation": "Extract to separate hooks file"
+      },
+      {
+        "name": "useTheme",
+        "location": "ThemeProvider.tsx",
+        "usage": "Theme toggle and detection",
+        "reusable": true
+      }
+    ]
+  },
+  "recommendations": {
+    "sharedUiPackage": {
+      "description": "Components that should be extracted to a shared-ui package for use across agent-relay ecosystem",
+      "priority": "HIGH",
+      "components": [
+        {
+          "name": "Pagination",
+          "effort": "LOW",
+          "notes": "Ready for extraction as-is"
+        },
+        {
+          "name": "ConfirmationDialog",
+          "effort": "LOW",
+          "notes": "Ready for extraction as-is"
+        },
+        {
+          "name": "ThemeProvider",
+          "effort": "LOW",
+          "notes": "Include ThemeToggle and useTheme hook"
+        },
+        {
+          "name": "NotificationToast",
+          "effort": "MEDIUM",
+          "notes": "Extract useToasts hook separately, remove CSS export in favor of Tailwind classes"
+        },
+        {
+          "name": "useDebounce",
+          "effort": "LOW",
+          "notes": "Ready for extraction as-is"
+        },
+        {
+          "name": "CommandPalette",
+          "effort": "HIGH",
+          "notes": "Extract core palette logic, make extensions pluggable"
+        },
+        {
+          "name": "Modal",
+          "effort": "LOW",
+          "notes": "Generic modal wrapper"
+        },
+        {
+          "name": "Dropdown",
+          "effort": "LOW",
+          "notes": "Generic dropdown menu"
+        },
+        {
+          "name": "EmptyState",
+          "effort": "LOW",
+          "notes": "Generic empty state"
+        },
+        {
+          "name": "LoadingSpinner",
+          "effort": "LOW",
+          "notes": "Simple spinner"
+        },
+        {
+          "name": "Tooltip",
+          "effort": "LOW",
+          "notes": "Simple tooltip"
+        },
+        {
+          "name": "Badge",
+          "effort": "LOW",
+          "notes": "Status badge"
+        },
+        {
+          "name": "Avatar",
+          "effort": "LOW",
+          "notes": "User/agent avatar"
+        },
+        {
+          "name": "Tabs",
+          "effort": "LOW",
+          "notes": "Tab navigation"
+        },
+        {
+          "name": "SearchInput",
+          "effort": "LOW",
+          "notes": "Search input with debounce"
+        },
+        {
+          "name": "TypingIndicator",
+          "effort": "LOW",
+          "notes": "Typing animation"
+        },
+        {
+          "name": "ThinkingIndicator",
+          "effort": "LOW",
+          "notes": "Processing animation"
+        },
+        {
+          "name": "ErrorBoundary",
+          "effort": "LOW",
+          "notes": "Error boundary wrapper"
+        }
+      ]
+    },
+    "iconLibrary": {
+      "description": "Create a shared icon library to eliminate duplicated inline SVGs",
+      "priority": "HIGH",
+      "approach": "Extract all inline SVG icons to a single Icons.tsx file or individual icon components",
+      "estimatedIcons": 25,
+      "benefits": [
+        "Eliminate ~500 lines of duplicated SVG code",
+        "Consistent icon sizing and styling",
+        "Easier to update/replace icons",
+        "Better tree-shaking if using individual exports"
+      ]
+    },
+    "componentConsolidation": [
+      {
+        "pattern": "Base Card component",
+        "components": ["AgentCard", "TaskCard", "ProjectCard", "StatsCard", "TeamMemberCard"],
+        "approach": "Create BaseCard with header/body/footer slots, then compose domain-specific cards",
+        "effort": "MEDIUM"
+      },
+      {
+        "pattern": "Base List component",
+        "components": ["ChannelList", "AgentList", "TaskList", "InvoiceList"],
+        "approach": "Create VirtualizedList with render props for items, built-in empty/loading states",
+        "effort": "MEDIUM"
+      }
+    ],
+    "domainSpecificPackage": {
+      "description": "Components useful across agent-relay ecosystem but not general purpose",
+      "components": [
+        "AgentCard",
+        "AgentStatusBadge",
+        "AgentColorDot",
+        "MessageList",
+        "MessageBubble",
+        "MessageComposer",
+        "ChannelList",
+        "ConnectionStatus",
+        "TrajectoryViewer",
+        "ToolCallDisplay",
+        "SpawnModal",
+        "ModelSelector",
+        "TokenUsageDisplay",
+        "CostDisplay"
+      ],
+      "notes": "These could live in a @agent-relay/ui package separate from generic shared-ui"
+    }
+  },
+  "nextSteps": [
+    {
+      "step": 1,
+      "action": "Create shared icon library",
+      "priority": "HIGH",
+      "effort": "LOW",
+      "impact": "Eliminates most duplicated code"
+    },
+    {
+      "step": 2,
+      "action": "Extract GENERALIZED components to shared-ui package",
+      "priority": "HIGH",
+      "effort": "MEDIUM",
+      "impact": "Enables reuse across planner and other projects"
+    },
+    {
+      "step": 3,
+      "action": "Create BaseCard and BaseList components",
+      "priority": "MEDIUM",
+      "effort": "MEDIUM",
+      "impact": "Reduces duplication in domain-specific components"
+    },
+    {
+      "step": 4,
+      "action": "Consider @agent-relay/ui package for domain-specific components",
+      "priority": "LOW",
+      "effort": "HIGH",
+      "impact": "Useful if building multiple agent-relay apps"
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-02-04T00:00:00Z",
+    "sourceDirectory": "/tmp/relay-dashboard/packages/dashboard/src",
+    "analysisVersion": "1.0.0"
+  }
+}
