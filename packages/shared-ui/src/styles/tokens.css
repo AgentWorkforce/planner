@@ -1,0 +1,228 @@
+/**
+ * Mission Control Design System - Design Tokens
+ *
+ * Extracted from relay-dashboard for cross-app consistency.
+ * These CSS variables define the core visual language.
+ *
+ * Usage:
+ * 1. Import this file in your app's globals.css
+ * 2. Use ThemeProvider to handle theme switching
+ * 3. Reference tokens via var(--color-*) or Tailwind classes
+ */
+
+/* ===== Dark Theme (Default) - Mission Control Deep Space ===== */
+:root,
+.theme-dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Background Colors - Layered depth system */
+  --color-bg-deep: #0a0a0f;       /* Deepest background, page level */
+  --color-bg-primary: #0d0d14;    /* Primary content background */
+  --color-bg-secondary: #12121c;  /* Secondary sections */
+  --color-bg-tertiary: #181824;   /* Tertiary/nested content */
+  --color-bg-card: #1a1a28;       /* Card surfaces */
+  --color-bg-elevated: #202030;   /* Elevated elements (popovers, modals) */
+  --color-bg-hover: rgba(255, 255, 255, 0.04);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+
+  /* Text Colors - Contrast hierarchy */
+  --color-text-primary: #f0f0f5;   /* Primary content */
+  --color-text-secondary: #a0a0b0; /* Secondary/supporting text */
+  --color-text-muted: #606070;     /* De-emphasized text */
+  --color-text-dim: #404050;       /* Disabled/placeholder text */
+  --color-text-inverse: #0a0a0f;   /* Text on light backgrounds */
+
+  /* Border Colors - Subtle boundaries */
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-light: rgba(255, 255, 255, 0.1);
+  --color-border-medium: rgba(255, 255, 255, 0.15);
+
+  /* Accent Colors - Neon palette */
+  --color-accent-cyan: #00d9ff;    /* Primary accent (default) */
+  --color-accent-orange: #ff6b35;  /* Secondary accent */
+  --color-accent-purple: #a855f7;  /* Tertiary accent */
+  --color-accent-green: #00ffc8;   /* Success/positive accent */
+  --color-accent-hover: #00b8d9;   /* Accent hover state */
+  --color-accent-light: rgba(0, 217, 255, 0.15);
+
+  /* Status Colors - Semantic feedback */
+  --color-success: #00ffc8;
+  --color-success-light: rgba(0, 255, 200, 0.15);
+  --color-warning: #ff6b35;
+  --color-warning-light: rgba(255, 107, 53, 0.15);
+  --color-error: #ff4757;
+  --color-error-light: rgba(255, 71, 87, 0.15);
+  --color-info: #00d9ff;
+  --color-info-light: rgba(0, 217, 255, 0.15);
+  --color-pending: #9ca3af;
+  --color-pending-light: rgba(156, 163, 175, 0.15);
+
+  /* Avatar/Presence Status Colors */
+  --color-status-online: #00ffc8;
+  --color-status-offline: #606070;
+  --color-status-busy: #ff4757;
+  --color-status-away: #ff6b35;
+
+  /* Sidebar Colors */
+  --color-sidebar-bg: #0d0d14;
+  --color-sidebar-border: rgba(255, 255, 255, 0.08);
+  --color-sidebar-hover: rgba(255, 255, 255, 0.06);
+
+  /* UI Feedback */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+  --selection-bg: rgba(0, 217, 255, 0.15);
+  --selection-color: #00d9ff;
+  --focus-color: #00d9ff;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 10px 15px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 70px rgba(0, 0, 0, 0.7);
+  --shadow-glow-cyan: 0 0 20px rgba(0, 217, 255, 0.3);
+  --shadow-glow-orange: 0 0 20px rgba(255, 107, 53, 0.3);
+  --shadow-glow-purple: 0 0 20px rgba(168, 85, 247, 0.3);
+  --shadow-glow-green: 0 0 20px rgba(0, 255, 200, 0.3);
+}
+
+/* ===== Light Theme ===== */
+.theme-light,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Background Colors */
+  --color-bg-deep: #f8f9fa;
+  --color-bg-primary: #f0f2f5;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f5f6f8;
+  --color-bg-card: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  --color-bg-active: rgba(0, 0, 0, 0.08);
+
+  /* Text Colors */
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #4a4a5a;
+  --color-text-muted: #6a6a7a;
+  --color-text-dim: #8a8a9a;
+  --color-text-inverse: #ffffff;
+
+  /* Border Colors */
+  --color-border-default: rgba(0, 0, 0, 0.1);
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+  --color-border-light: rgba(0, 0, 0, 0.1);
+  --color-border-medium: rgba(0, 0, 0, 0.15);
+
+  /* Accent Colors - Adjusted for light backgrounds */
+  --color-accent-cyan: #0099cc;
+  --color-accent-orange: #e55a2b;
+  --color-accent-purple: #8b44d9;
+  --color-accent-green: #00b894;
+  --color-accent-hover: #007aa3;
+  --color-accent-light: rgba(0, 153, 204, 0.12);
+
+  /* Status Colors */
+  --color-success: #00b894;
+  --color-success-light: rgba(0, 184, 148, 0.12);
+  --color-warning: #e55a2b;
+  --color-warning-light: rgba(229, 90, 43, 0.12);
+  --color-error: #e53935;
+  --color-error-light: rgba(229, 57, 53, 0.12);
+  --color-info: #0099cc;
+  --color-info-light: rgba(0, 153, 204, 0.12);
+  --color-pending: #9ca3af;
+  --color-pending-light: rgba(156, 163, 175, 0.12);
+
+  /* Avatar/Presence Status Colors */
+  --color-status-online: #00b894;
+  --color-status-offline: #8a8a9a;
+  --color-status-busy: #e53935;
+  --color-status-away: #e55a2b;
+
+  /* Sidebar Colors */
+  --color-sidebar-bg: #f0f2f5;
+  --color-sidebar-border: rgba(0, 0, 0, 0.08);
+  --color-sidebar-hover: rgba(0, 0, 0, 0.06);
+
+  /* UI Feedback */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+  --selection-bg: rgba(0, 153, 204, 0.2);
+  --selection-color: #0099cc;
+  --focus-color: #0099cc;
+
+  /* Shadows - Lighter for light theme */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 16px 70px rgba(0, 0, 0, 0.25);
+  --shadow-glow-cyan: 0 0 20px rgba(0, 153, 204, 0.2);
+  --shadow-glow-orange: 0 0 20px rgba(229, 90, 43, 0.2);
+  --shadow-glow-purple: 0 0 20px rgba(139, 68, 217, 0.2);
+  --shadow-glow-green: 0 0 20px rgba(0, 184, 148, 0.2);
+}
+
+/* ===== System Preference Support ===== */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark):not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --color-bg-deep: #f8f9fa;
+    --color-bg-primary: #f0f2f5;
+    --color-bg-secondary: #ffffff;
+    --color-bg-tertiary: #f5f6f8;
+    --color-bg-card: #ffffff;
+    --color-bg-elevated: #ffffff;
+    --color-bg-hover: rgba(0, 0, 0, 0.04);
+    --color-bg-active: rgba(0, 0, 0, 0.08);
+
+    --color-text-primary: #1a1a2e;
+    --color-text-secondary: #4a4a5a;
+    --color-text-muted: #6a6a7a;
+    --color-text-dim: #8a8a9a;
+    --color-text-inverse: #ffffff;
+
+    --color-border-default: rgba(0, 0, 0, 0.1);
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-border-light: rgba(0, 0, 0, 0.1);
+    --color-border-medium: rgba(0, 0, 0, 0.15);
+
+    --color-accent-cyan: #0099cc;
+    --color-accent-orange: #e55a2b;
+    --color-accent-purple: #8b44d9;
+    --color-accent-green: #00b894;
+    --color-accent-hover: #007aa3;
+    --color-accent-light: rgba(0, 153, 204, 0.12);
+
+    --color-success: #00b894;
+    --color-success-light: rgba(0, 184, 148, 0.12);
+    --color-warning: #e55a2b;
+    --color-warning-light: rgba(229, 90, 43, 0.12);
+    --color-error: #e53935;
+    --color-error-light: rgba(229, 57, 53, 0.12);
+    --color-info: #0099cc;
+    --color-info-light: rgba(0, 153, 204, 0.12);
+    --color-pending: #9ca3af;
+    --color-pending-light: rgba(156, 163, 175, 0.12);
+
+    --color-status-online: #00b894;
+    --color-status-offline: #8a8a9a;
+    --color-status-busy: #e53935;
+    --color-status-away: #e55a2b;
+
+    --color-sidebar-bg: #f0f2f5;
+    --color-sidebar-border: rgba(0, 0, 0, 0.08);
+    --color-sidebar-hover: rgba(0, 0, 0, 0.06);
+
+    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+    --selection-bg: rgba(0, 153, 204, 0.2);
+    --selection-color: #0099cc;
+    --focus-color: #0099cc;
+  }
+}
