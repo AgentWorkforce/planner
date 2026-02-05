@@ -20,11 +20,40 @@ export interface PlanVersionResult {
   }>;
 }
 
+export interface PlanStep {
+  step_id: string;
+  title: string;
+  description?: string;
+  scope?: string;
+  owner_role?: string;
+  dependencies?: string[];
+}
+
 export class PlannerClient {
   private readonly baseUrl: string;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+  }
+
+  /**
+   * Update plan with steps. Creates a new version with the provided steps.
+   * Only works on draft versions.
+   * Returns the new version number.
+   */
+  async updatePlanSteps(planId: string, steps: PlanStep[]): Promise<{ version: number }> {
+    const res = await fetch(`${this.baseUrl}/api/plans/${planId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ steps }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Planner updatePlanSteps failed: ${res.status} ${await res.text()}`);
+    }
+
+    const data = await res.json() as { version: { version: number } };
+    return { version: data.version.version };
   }
 
   async createPlan(goal: string): Promise<CreatePlanResult> {
@@ -94,5 +123,33 @@ export class PlannerClient {
     // Planner returns { version, plan_ref, dot_summary, ... }
     const data = await res.json() as { plan_ref: string };
     return { plan_ref: data.plan_ref };
+  }
+
+  async getLatestVersion(planId: string): Promise<PlanVersionResult> {
+    const res = await fetch(`${this.baseUrl}/api/plans/${planId}`);
+    if (!res.ok) {
+      throw new Error(`getLatestVersion failed: ${res.status} ${await res.text()}`);
+    }
+    const data = (await res.json()) as { plan: unknown; version: PlanVersionResult };
+    return data.version;
+  }
+
+  async waitForSteps(
+    planId: string,
+    options?: { timeout_ms?: number; poll_interval_ms?: number }
+  ): Promise<PlanVersionResult> {
+    const timeout = options?.timeout_ms ?? 90_000;
+    const interval = options?.poll_interval_ms ?? 3_000;
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+      const latest = await this.getLatestVersion(planId);
+      if (latest && latest.steps.length > 0) {
+        return latest;
+      }
+      await new Promise((r) => setTimeout(r, interval));
+    }
+
+    throw new Error(`PlannerLead did not generate steps within ${timeout / 1000}s`);
   }
 }

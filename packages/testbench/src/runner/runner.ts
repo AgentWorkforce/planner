@@ -3,10 +3,46 @@ import type { Scenario } from '../scenarios/schema.js';
 import type { TestbenchConfig } from '../config/schema.js';
 import type { RunResult, RunOptions } from './types.js';
 import { WorkspaceManager } from '../workspace/manager.js';
-import { PlannerClient } from '../clients/planner.js';
+import { PlannerClient, type PlanStep, type PlanVersionResult } from '../clients/planner.js';
 import { ForgeClient, type ForgePlan } from '../clients/forge.js';
 import { TunerClient } from '../clients/tuner.js';
 import { VerificationRouter } from '../verification/router.js';
+
+/**
+ * Generate simple test steps from a scenario.
+ * In test mode, these provide structure for the forge task DAG
+ * without needing AI-generated plans.
+ */
+function generateTestSteps(scenario: Scenario): PlanStep[] {
+  const stepCount = scenario.expected?.step_count?.max ?? 2;
+  const steps: PlanStep[] = [];
+
+  if (stepCount <= 1) {
+    steps.push({
+      step_id: randomUUID(),
+      title: 'Implement solution',
+      description: scenario.goal,
+      owner_role: 'Coder',
+    });
+  } else {
+    const implId = randomUUID();
+    steps.push({
+      step_id: implId,
+      title: 'Implement solution',
+      description: scenario.goal,
+      owner_role: 'Coder',
+    });
+    steps.push({
+      step_id: randomUUID(),
+      title: 'Verify implementation',
+      description: `Verify the solution meets requirements: ${scenario.goal}`,
+      owner_role: 'Reviewer',
+      dependencies: [implId],
+    });
+  }
+
+  return steps;
+}
 
 export class ScenarioRunner {
   private readonly config: TestbenchConfig;
@@ -36,24 +72,43 @@ export class ScenarioRunner {
       // 1. Create isolated workspace
       workspacePath = options?.workspace_path ?? await this.workspace.create(scenario.id);
 
-      // 2. Create plan via Planner
+      // 2. Create plan via Planner (starts with empty steps)
       const plan = await this.planner.createPlan(scenario.goal);
 
-      // 3. Get plan details for metrics
-      const planVersion = await this.planner.getPlanVersion(plan.plan_id, plan.version);
+      // 3. Generate steps: AI mode waits for PlannerLead, synthetic mode uses hardcoded steps
+      let activeVersion: number;
+      let planVersion: PlanVersionResult;
+
+      if (scenario.planning_mode === 'ai') {
+        // AI mode: wait for PlannerLead to generate steps via add_step tool
+        console.log('  Waiting for PlannerLead to generate steps...');
+        planVersion = await this.planner.waitForSteps(plan.plan_id, {
+          timeout_ms: 90_000,
+        });
+        activeVersion = planVersion.version;
+        console.log(`  PlannerLead generated ${planVersion.steps.length} steps (version ${activeVersion})`);
+      } else {
+        // Synthetic mode: generate hardcoded test steps (current behavior)
+        const testSteps = generateTestSteps(scenario);
+        const updated = await this.planner.updatePlanSteps(plan.plan_id, testSteps);
+        activeVersion = updated.version;
+        planVersion = await this.planner.getPlanVersion(plan.plan_id, activeVersion);
+      }
+
+      // 4. Calculate plan metrics
       const stepCount = planVersion.steps.length;
       const stepsWithComplexity = planVersion.steps.filter((s) => s.complexity_estimate?.score !== undefined);
       const avgComplexity = stepsWithComplexity.length > 0
         ? stepsWithComplexity.reduce((sum, s) => sum + s.complexity_estimate!.score, 0) / stepsWithComplexity.length
         : 0;
 
-      // 4. Auto-approve and publish
+      // 5. Auto-approve and publish
       if (this.config.auto_approve_plans) {
-        await this.planner.approvePlan(plan.plan_id, plan.version);
+        await this.planner.approvePlan(plan.plan_id, activeVersion);
       }
-      const { plan_ref } = await this.planner.publishPlan(plan.plan_id, plan.version);
+      const { plan_ref } = await this.planner.publishPlan(plan.plan_id, activeVersion);
 
-      // 5. Construct ForgePlan from plan version data and send to Forge
+      // 6. Construct ForgePlan from plan version data and send to Forge
       const forgePlan: ForgePlan = {
         plan_id: planVersion.plan_id,
         version: planVersion.version,
@@ -71,16 +126,16 @@ export class ScenarioRunner {
 
       const forgeRun = await this.forge.createRun(forgePlan, workspacePath);
 
-      // 6. Poll until complete
+      // 7. Poll until complete
       const timeoutMs = (options?.timeout_minutes ?? this.config.default_timeout_minutes) * 60 * 1000;
       const runStatus = await this.forge.pollUntilComplete(forgeRun.run_id, { timeout_ms: timeoutMs });
 
       const forgeSuccess = runStatus.status === 'completed';
 
-      // 7. Run verification
+      // 8. Run verification
       const verificationResult = await this.verifier.verify(scenario.verification, workspacePath);
 
-      // 8. Collect outcomes from Tuner (best effort)
+      // 9. Collect outcomes from Tuner (best effort)
       let actualTokens: number | undefined;
       let actualCost: number | undefined;
 
@@ -104,7 +159,7 @@ export class ScenarioRunner {
         started_at: startedAt,
         completed_at: completedAt,
         plan_id: plan.plan_id,
-        plan_version: plan.version,
+        plan_version: activeVersion,
         plan_step_count: stepCount,
         estimated_complexity: avgComplexity > 0 ? avgComplexity : undefined,
         actual_time_seconds: actualTimeSeconds,
@@ -126,11 +181,8 @@ export class ScenarioRunner {
         mock: false,
       };
     } finally {
-      // 9. Cleanup workspace (respect cleanup_on_success / cleanup_on_failure config)
+      // 10. Cleanup workspace (respect cleanup_on_success / cleanup_on_failure config)
       if (workspacePath && !options?.workspace_path) {
-        // We don't know success/failure here reliably, but the config
-        // defaults have cleanup_on_success=true, cleanup_on_failure=false.
-        // For now, always attempt cleanup — the workspace manager handles idempotency.
         if (this.config.cleanup_on_success || this.config.cleanup_on_failure) {
           await this.workspace.cleanup(workspacePath).catch(() => {});
         }
