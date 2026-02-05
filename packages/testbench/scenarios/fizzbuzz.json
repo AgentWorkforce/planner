@@ -1,0 +1,20 @@
+{
+  "id": "fizzbuzz",
+  "name": "FizzBuzz CLI",
+  "difficulty": "trivial",
+  "goal": "Create a CLI program that prints numbers from 1 to 100. For multiples of 3, print 'Fizz' instead. For multiples of 5, print 'Buzz'. For multiples of both 3 and 5, print 'FizzBuzz'.",
+  "expected": {
+    "language_tier": "s",
+    "complexity_level": "trivial",
+    "step_count": { "min": 1, "max": 3 },
+    "time_minutes": { "min": 1, "max": 5 }
+  },
+  "verification": {
+    "type": "script",
+    "commands": ["node index.js"],
+    "expect_output": "FizzBuzz",
+    "expect_exit_code": 0,
+    "timeout_seconds": 30
+  },
+  "tags": ["trivial", "baseline"]
+}
