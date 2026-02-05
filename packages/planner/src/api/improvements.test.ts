@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
-import { SqliteStorage } from '../storage/sqlite.js';
+import { SqliteStorage } from '../storage/index.js';
 import type { PlanStorage } from '../storage/interface.js';
 import type { PlanVersion } from '../domain/plan.js';
 import { createImprovement, type ImprovementType } from '../domain/improvement.js';
