@@ -15,9 +15,9 @@ import {
   extractSessionPrefix,
   LLM_CONFIG,
 } from './config.js';
-import { getInterviewerPrompt, getWelcomeMessage, getMockResponse } from './prompt.js';
+import { getInterviewerPrompt, getWelcomeMessage } from './prompt.js';
 import { INTERVIEWER_TOOLS, type ToolResult } from './tools.js';
-import { executeTool, getMockToolResult, type ToolExecutorDeps } from './tool-executor.js';
+import { executeTool, type ToolExecutorDeps } from './tool-executor.js';
 import { conversationHistory } from './history.js';
 import { specialistQueue, formatPendingInsights } from './specialist-queue.js';
 import {
@@ -43,8 +43,7 @@ export interface InterviewerDeps {
 
 export interface InterviewerState {
   isActive: boolean;
-  anthropic: Anthropic | null;
-  mockMode: boolean;
+  anthropic: Anthropic;
   relayConnected: boolean;
 }
 
@@ -127,35 +126,36 @@ const messageDedup = new MessageDeduplicationCache();
 // =============================================================================
 
 class InterviewerService {
-  private state: InterviewerState = {
-    isActive: false,
-    anthropic: null,
-    mockMode: true,
-    relayConnected: false,
-  };
+  private state: InterviewerState | null = null;
   private deps: InterviewerDeps | null = null;
   private unsubscribeMessage: (() => void) | null = null;
   private unsubscribeStateChange: (() => void) | null = null;
 
   /**
    * Initialize the Interviewer service.
+   * Requires ANTHROPIC_API_KEY environment variable.
    */
   init(deps: InterviewerDeps): void {
     this.deps = deps;
 
-    // Try to initialize Anthropic client
+    // Require API key - no mock mode
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      this.state.anthropic = new Anthropic({
+    if (!apiKey) {
+      throw new Error(
+        '[Interviewer] ANTHROPIC_API_KEY is required. ' +
+        'Set it in your .env file to enable AI-powered brainstorming.'
+      );
+    }
+
+    this.state = {
+      isActive: false,
+      anthropic: new Anthropic({
         apiKey,
         timeout: 60000, // 60 second timeout
-      });
-      this.state.mockMode = false;
-      console.log(`[Interviewer] Anthropic client initialized with API key (${apiKey.substring(0, 10)}...)`);
-    } else {
-      console.log('[Interviewer] No ANTHROPIC_API_KEY - running in mock mode');
-      this.state.mockMode = true;
-    }
+      }),
+      relayConnected: false,
+    };
+    console.log(`[Interviewer] Anthropic client initialized with API key (${apiKey.substring(0, 10)}...)`);
 
     // Register relay message handler
     console.log('[Interviewer] Registering relay message handler');
@@ -177,7 +177,7 @@ class InterviewerService {
     this.state.relayConnected = relayIsConnected();
 
     this.state.isActive = true;
-    console.log(`[Interviewer] Initialized (mock=${this.state.mockMode}, relay=${getRelayMode()})`);
+    console.log(`[Interviewer] Initialized (relay=${getRelayMode()})`);
 
     // Announce if relay is already connected
     if (this.state.relayConnected) {
@@ -199,8 +199,10 @@ class InterviewerService {
       this.unsubscribeStateChange = null;
     }
 
-    this.state.isActive = false;
-    this.state.relayConnected = false;
+    if (this.state) {
+      this.state.isActive = false;
+      this.state.relayConnected = false;
+    }
     conversationHistory.clearAll();
     specialistQueue.clearAll();
     messageDedup.clear();
@@ -211,14 +213,7 @@ class InterviewerService {
    * Check if the Interviewer is active.
    */
   isActive(): boolean {
-    return this.state.isActive;
-  }
-
-  /**
-   * Check if running in mock mode.
-   */
-  isMockMode(): boolean {
-    return this.state.mockMode;
+    return this.state?.isActive ?? false;
   }
 
   /**
@@ -302,7 +297,7 @@ class InterviewerService {
         }
 
         // Also send via relay for real-time delivery
-        if (this.state.relayConnected) {
+        if (this.state?.relayConnected) {
           const sent = sendChannelMessage(channelId, response);
           if (!sent) {
             console.warn(`[Interviewer] Failed to send response to ${channelId}`);
@@ -318,13 +313,11 @@ class InterviewerService {
    * Send startup announcement to #ideation channel.
    */
   private announceStartup(): void {
-    if (!this.state.relayConnected) {
+    if (!this.state?.relayConnected) {
       return;
     }
 
-    const announcement = this.state.mockMode
-      ? 'Interviewer online (mock mode). Set ANTHROPIC_API_KEY for AI-powered brainstorming.'
-      : 'Interviewer online. Ready to facilitate your brainstorming sessions!';
+    const announcement = 'Interviewer online. Ready to facilitate your brainstorming sessions!';
 
     const sent = sendChannelMessage(IDEATION_CHANNEL, announcement);
     if (sent) {
@@ -421,7 +414,7 @@ class InterviewerService {
   }
 
   /**
-   * Generate a response using LLM or mock.
+   * Generate a response using the LLM.
    * @param channelId - The channel ID for this session
    * @param userMessage - The user's message
    * @param sessionId - The session ID
@@ -434,6 +427,7 @@ class InterviewerService {
     skipMessageStorage = false
   ): Promise<string> {
     if (!this.deps) throw new Error('Interviewer not initialized');
+    if (!this.state) throw new Error('Interviewer state not initialized');
 
     // Get session for context
     const session = await this.deps.storage.getSession(sessionId);
@@ -448,32 +442,7 @@ class InterviewerService {
       activeSpecialists,
     };
 
-    // Mock mode
-    if (this.state.mockMode || !this.state.anthropic) {
-      // Only record messages if not skipped (i.e., not called from API handler)
-      if (!skipMessageStorage) {
-        await this.executeToolSafe('add_message', {
-          session_id: sessionId,
-          role: 'user',
-          content: userMessage,
-        });
-      }
-
-      const response = getMockResponse(userMessage);
-
-      // Only record messages if not skipped
-      if (!skipMessageStorage) {
-        await this.executeToolSafe('add_message', {
-          session_id: sessionId,
-          role: 'assistant',
-          content: response,
-        });
-      }
-
-      return response;
-    }
-
-    // Real LLM mode
+    // Build system prompt
     const systemPrompt = getInterviewerPrompt(promptContext);
     const pendingInsightText = formatPendingInsights(sessionId.slice(0, 8));
     const fullSystemPrompt = pendingInsightText
@@ -504,7 +473,9 @@ class InterviewerService {
       // Handle tool use in a loop
       let result = response;
       let loopCount = 0;
+      let alreadyActiveCount = 0;
       const maxLoops = 10; // Safety limit
+      const maxAlreadyActive = 2; // Break if we keep trying to spawn already-active specialists
 
       while (result.stop_reason === 'tool_use' && loopCount < maxLoops) {
         loopCount++;
@@ -532,6 +503,18 @@ class InterviewerService {
         try {
           const toolResult = await this.executeToolSafe(toolUseBlock.name, toolUseBlock.input);
           console.log(`[Interviewer] Tool ${toolUseBlock.name} result: ${JSON.stringify(toolResult).substring(0, 100)}`);
+
+          // Track already_active responses and break if stuck in a loop
+          if (toolUseBlock.name === 'spawn_specialist' && toolResult?.data?.already_active) {
+            alreadyActiveCount++;
+            console.log(`[Interviewer] Specialist already active (count: ${alreadyActiveCount}/${maxAlreadyActive})`);
+            if (alreadyActiveCount >= maxAlreadyActive) {
+              console.log('[Interviewer] Breaking tool loop - too many already_active responses');
+              break;
+            }
+          } else {
+            alreadyActiveCount = 0; // Reset on successful tool use
+          }
 
           // Continue conversation with tool result
           console.log('[Interviewer] Calling Anthropic API for tool result continuation');
@@ -570,11 +553,35 @@ class InterviewerService {
       }
 
       // Extract text response
-      const textBlock = result.content.find(
+      let textBlock = result.content.find(
         (block): block is Anthropic.TextBlock => block.type === 'text'
       );
 
-      const responseText = textBlock?.text ?? "I'm not sure how to respond to that.";
+      // Check if text is actually an XML-style tool invocation (model quirk)
+      const isXmlToolInvocation = (text: string | undefined) =>
+        text && (text.includes('<invoke name=') || text.includes('<function_call>'));
+
+      // If no text response OR text is an XML tool invocation, retry without tools
+      if (!textBlock?.text || isXmlToolInvocation(textBlock.text)) {
+        const reason = !textBlock?.text ? 'No text in response' : 'Text contains XML tool invocation';
+        console.log(`[Interviewer] ${reason}, making final call without tools`);
+        // Use original messages WITHOUT the tool_use response (avoid tool_use/tool_result mismatch)
+        const finalResult = await this.state.anthropic.messages.create({
+          model: LLM_CONFIG.model,
+          max_tokens: LLM_CONFIG.maxTokens,
+          system: fullSystemPrompt + '\n\nIMPORTANT: You have already used tools to spawn specialists and update understanding. Now respond CONVERSATIONALLY to the user. Do NOT output XML, tool invocations, or function calls. Just speak naturally.',
+          messages, // Original messages without the tool-heavy response
+        });
+
+        textBlock = finalResult.content.find(
+          (block): block is Anthropic.TextBlock => block.type === 'text'
+        );
+      }
+
+      if (!textBlock?.text) {
+        throw new Error('[Interviewer] LLM returned no text response');
+      }
+      const responseText = textBlock.text;
 
       // Clear used insights
       while (specialistQueue.getNextInput(sessionId.slice(0, 8))) {
@@ -603,10 +610,6 @@ class InterviewerService {
       return { success: false, error: 'Interviewer not initialized' };
     }
 
-    if (this.state.mockMode) {
-      return getMockToolResult(name, input);
-    }
-
     const toolDeps: ToolExecutorDeps = {
       storage: this.deps.storage,
       spawnAgent: this.deps.spawnAgent,
@@ -618,9 +621,13 @@ class InterviewerService {
 
   /**
    * Send a welcome message when a new session starts.
+   * Note: The welcome message is NOT added to conversation history because:
+   * 1. It's a one-time greeting, not part of the conversation context
+   * 2. Anthropic API requires conversations to start with a 'user' message
+   * 3. Including it would cause the first user message to fail
    */
   async notifyNewSession(sessionId: string, initialIntent: string): Promise<void> {
-    if (!this.state.relayConnected) {
+    if (!this.state?.relayConnected) {
       console.log('[Interviewer] Cannot send welcome: relay not connected');
       return;
     }
@@ -629,11 +636,10 @@ class InterviewerService {
     const welcome = getWelcomeMessage(initialIntent);
 
     const sent = sendChannelMessage(channelId, welcome);
-    if (sent) {
-      conversationHistory.addMessage(channelId, 'assistant', welcome);
-    } else {
+    if (!sent) {
       console.warn(`[Interviewer] Failed to send welcome message to ${channelId}`);
     }
+    // Note: Intentionally NOT adding to conversationHistory to maintain valid message sequence
   }
 }
 

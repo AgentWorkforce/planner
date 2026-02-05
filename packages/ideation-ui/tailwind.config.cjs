@@ -5,6 +5,13 @@ module.exports = {
   ],
   darkMode: 'class',
   theme: {
+    screens: {
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
         // Mission Control Theme - CSS Variable References
@@ -60,6 +67,21 @@ module.exports = {
           bg: 'var(--color-sidebar-bg)',
           border: 'var(--color-sidebar-border)',
           hover: 'var(--color-sidebar-hover)',
+        },
+        // Canvas Theme
+        canvas: {
+          bg: 'var(--canvas-bg)',
+          'bg-subtle': 'var(--canvas-bg-subtle)',
+          'text-primary': 'var(--canvas-text-primary)',
+          'text-muted': 'var(--canvas-text-muted)',
+          accent: 'var(--canvas-accent)',
+          'accent-light': 'var(--canvas-accent-light)',
+        },
+        block: {
+          draft: 'var(--block-draft)',
+          'draft-border': 'var(--block-draft-border)',
+          curated: 'var(--block-curated)',
+          'curated-border': 'var(--block-curated-border)',
         },
       },
       fontFamily: {

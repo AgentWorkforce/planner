@@ -14,6 +14,7 @@
  */
 @custom-variant dark (&:is(.dark *));
 @config "../tailwind.config.cjs";
+@plugin "@tailwindcss/typography";
 
 /* ===== Theme System - CSS Variables ===== */
 
@@ -94,6 +95,18 @@
   --sidebar-accent-foreground: #1a1a2e;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #0099cc;
+
+  /* Canvas Theme - Light (sandy/warm) */
+  --canvas-bg: #f5f0e8;
+  --canvas-bg-subtle: #ebe6de;
+  --canvas-text-primary: #2d2d2d;
+  --canvas-text-muted: #7a7a7a;
+  --block-draft: #fbf8f2;
+  --block-draft-border: #e3ddd3;
+  --block-curated: #fbf8f2;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #4a7c59;
+  --canvas-accent-light: #e8f0eb;
 }
 
 /**
@@ -174,6 +187,18 @@
     --sidebar-accent-foreground: #f0f0f5;
     --sidebar-border: rgba(255, 255, 255, 0.06);
     --sidebar-ring: #00d9ff;
+
+    /* Canvas Theme - Dark (mission control) */
+    --canvas-bg: #1a1a1a;
+    --canvas-bg-subtle: #242424;
+    --canvas-text-primary: #e5e5e5;
+    --canvas-text-muted: #888888;
+    --block-draft: #2d2a24;
+    --block-draft-border: #3d3830;
+    --block-curated: #2d2a24;
+    --block-curated-border: #4a7c59;
+    --canvas-accent: #5a9c6a;
+    --canvas-accent-light: #1e2a1e;
   }
 }
 
@@ -243,6 +268,18 @@ html.theme-light {
   --sidebar-accent-foreground: #1a1a2e;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #0099cc;
+
+  /* Canvas Theme - Light (sandy/warm) */
+  --canvas-bg: #f5f0e8;
+  --canvas-bg-subtle: #ebe6de;
+  --canvas-text-primary: #2d2d2d;
+  --canvas-text-muted: #7a7a7a;
+  --block-draft: #fbf8f2;
+  --block-draft-border: #e3ddd3;
+  --block-curated: #fbf8f2;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #4a7c59;
+  --canvas-accent-light: #e8f0eb;
 }
 
 html.theme-dark {
@@ -307,6 +344,18 @@ html.theme-dark {
   --sidebar-accent-foreground: #f0f0f5;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #00d9ff;
+
+  /* Canvas Theme - Dark (mission control) */
+  --canvas-bg: #1a1a1a;
+  --canvas-bg-subtle: #242424;
+  --canvas-text-primary: #e5e5e5;
+  --canvas-text-muted: #888888;
+  --block-draft: #2d2a24;
+  --block-draft-border: #3d3830;
+  --block-curated: #2d2a24;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #5a9c6a;
+  --canvas-accent-light: #1e2a1e;
 }
 
 /* ===== Base Styles ===== */
@@ -410,4 +459,53 @@ body {
 
 .animate-bounce-dot-delay-2 {
   animation: bounce-dot 1.4s ease-in-out 0.4s infinite;
+}
+
+/* Block glow effect for ready blocks (90%+ confidence) */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(var(--canvas-accent-rgb, 120 200 80), 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(var(--canvas-accent-rgb, 120 200 80), 0.5);
+  }
+}
+
+.block-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Focus mode entry animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.focus-mode-enter {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* Typography plugin - canvas theme overrides */
+.prose-canvas {
+  --tw-prose-body: var(--canvas-text-primary);
+  --tw-prose-headings: var(--canvas-text-primary);
+  --tw-prose-lead: var(--canvas-text-muted);
+  --tw-prose-links: var(--canvas-accent);
+  --tw-prose-bold: var(--canvas-text-primary);
+  --tw-prose-counters: var(--canvas-text-muted);
+  --tw-prose-bullets: var(--canvas-text-muted);
+  --tw-prose-hr: var(--block-draft-border);
+  --tw-prose-quotes: var(--canvas-text-muted);
+  --tw-prose-quote-borders: var(--canvas-accent);
+  --tw-prose-code: var(--canvas-text-primary);
+  --tw-prose-pre-code: var(--canvas-text-primary);
+  --tw-prose-pre-bg: var(--block-draft);
+  --tw-prose-th-borders: var(--block-draft-border);
+  --tw-prose-td-borders: var(--block-draft-border);
 }

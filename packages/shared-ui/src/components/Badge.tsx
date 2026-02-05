@@ -2,6 +2,10 @@ import React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../utils/cn";
 
+/**
+ * Badge variants using semantic CSS variables for theme compatibility.
+ * Success/warning use CSS variables with fallbacks to Tailwind colors.
+ */
 const badgeVariants = cva(
   "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
   {
@@ -9,8 +13,8 @@ const badgeVariants = cva(
       variant: {
         default: "bg-primary/10 text-primary",
         secondary: "bg-secondary text-secondary-foreground",
-        success: "bg-green-500/10 text-green-500",
-        warning: "bg-yellow-500/10 text-yellow-500",
+        success: "bg-[var(--color-success-light,rgba(34,197,94,0.1))] text-[var(--color-success,#22c55e)]",
+        warning: "bg-[var(--color-warning-light,rgba(234,179,8,0.1))] text-[var(--color-warning,#eab308)]",
         destructive: "bg-destructive/10 text-destructive",
         outline: "border border-border text-muted-foreground",
       },

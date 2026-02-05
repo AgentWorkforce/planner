@@ -31,7 +31,7 @@ export function NewSessionModal({ open, onOpenChange }: NewSessionModalProps) {
       if (session) {
         onOpenChange(false);
         setIntent('');
-        navigate(`/session/${session.id}`);
+        navigate(`/ideation/session/${session.id}`);
       }
     } finally {
       setIsSubmitting(false);

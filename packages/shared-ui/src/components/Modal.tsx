@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { cn } from "../utils/cn";
 import { CloseIcon } from "../icons";
 
@@ -21,6 +21,10 @@ export interface ModalProps {
   closeOnEscape?: boolean;
   /** Additional CSS classes for the modal content */
   className?: string;
+  /** Initial element to focus (query selector) */
+  initialFocus?: string;
+  /** Return focus to this element on close */
+  returnFocusRef?: React.RefObject<HTMLElement>;
 }
 
 const sizeClasses = {
@@ -31,8 +35,11 @@ const sizeClasses = {
   full: "max-w-[90vw] max-h-[90vh]",
 };
 
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
- * Modal component with backdrop, focus trap, and keyboard handling.
+ * Modal component with backdrop, proper focus trap, and keyboard handling.
  */
 export function Modal({
   isOpen,
@@ -44,29 +51,95 @@ export function Modal({
   closeOnBackdropClick = true,
   closeOnEscape = true,
   className,
+  initialFocus,
+  returnFocusRef,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  // Handle escape key
+  // Get all focusable elements within the modal
+  const getFocusableElements = useCallback(() => {
+    if (!modalRef.current) return [];
+    return Array.from(
+      modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+    ).filter((el) => el.offsetParent !== null);
+  }, []);
+
+  // Handle keyboard events including Tab trap and Escape
   useEffect(() => {
-    if (!isOpen || !closeOnEscape) return;
+    if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && closeOnEscape) {
+        e.preventDefault();
         onClose();
+        return;
+      }
+
+      // Focus trap with Tab key
+      if (e.key === "Tab") {
+        const focusableElements = getFocusableElements();
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          // Shift + Tab: if on first element, go to last
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          // Tab: if on last element, go to first
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, closeOnEscape, onClose]);
+  }, [isOpen, closeOnEscape, onClose, getFocusableElements]);
 
-  // Focus trap - focus modal when opened
+  // Focus management on open/close
   useEffect(() => {
-    if (isOpen && modalRef.current) {
-      modalRef.current.focus();
+    if (isOpen) {
+      // Store current active element to restore later
+      previousActiveElement.current = document.activeElement as HTMLElement;
+
+      // Focus initial element or first focusable element
+      requestAnimationFrame(() => {
+        if (!modalRef.current) return;
+
+        if (initialFocus) {
+          const initialElement = modalRef.current.querySelector<HTMLElement>(initialFocus);
+          if (initialElement) {
+            initialElement.focus();
+            return;
+          }
+        }
+
+        const focusableElements = getFocusableElements();
+        if (focusableElements.length > 0) {
+          focusableElements[0].focus();
+        } else {
+          modalRef.current.focus();
+        }
+      });
+    } else {
+      // Restore focus when modal closes
+      const elementToFocus = returnFocusRef?.current || previousActiveElement.current;
+      if (elementToFocus && typeof elementToFocus.focus === "function") {
+        elementToFocus.focus();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialFocus, returnFocusRef, getFocusableElements]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {

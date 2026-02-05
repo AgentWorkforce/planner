@@ -156,7 +156,7 @@ function MessageItem({ message, isOwn, showAvatar }: MessageItemProps) {
 
           {/* Message content */}
           <div className="text-sm text-text-primary whitespace-pre-wrap break-words">
-            {message.body}
+            {message.content}
           </div>
         </div>
       </div>

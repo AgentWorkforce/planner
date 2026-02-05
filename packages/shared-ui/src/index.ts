@@ -13,5 +13,8 @@ export * from "./icons";
 // Hooks
 export * from "./hooks";
 
+// Theme & Design Tokens
+export * from "./theme";
+
 // Utils
 export { cn } from "./utils/cn";

@@ -37,6 +37,7 @@ describe('SQLiteIdeationStorage', () => {
       expect(session.understanding).toEqual({});
       expect(session.active_specialists).toEqual([]);
       expect(session.planner_sends).toEqual([]);
+      expect(session.blocks).toEqual([]);
       expect(session.created_at).toBeDefined();
       expect(session.updated_at).toBeDefined();
     });
@@ -121,6 +122,23 @@ describe('SQLiteIdeationStorage', () => {
     it('throws when updating non-existent session', async () => {
       await expect(
         storage.updateSessionStatus('non-existent', 'abandoned')
+      ).rejects.toThrow('Session not found');
+    });
+
+    it('updates session title', async () => {
+      const source: SessionSource = { type: 'human', initial_intent: 'Original Title' };
+      const session = await storage.createSession(source);
+
+      await new Promise(r => setTimeout(r, 10));
+
+      const updated = await storage.updateSession(session.id, { title: 'Updated Title' });
+      expect(updated.source.initial_intent).toBe('Updated Title');
+      expect(updated.updated_at).not.toBe(session.updated_at);
+    });
+
+    it('throws when updating non-existent session with title', async () => {
+      await expect(
+        storage.updateSession('non-existent', { title: 'Test' })
       ).rejects.toThrow('Session not found');
     });
   });
@@ -361,6 +379,82 @@ describe('SQLiteIdeationStorage', () => {
         concerns: ['auth', 'rate-limiting'],
       });
       expect(recorded?.payload.initiative_id).toBe('init-123');
+    });
+  });
+
+  // ==========================================================================
+  // Block Operations
+  // ==========================================================================
+
+  describe('Block Operations', () => {
+    it('creates a session with empty blocks array', async () => {
+      const source: SessionSource = { type: 'human', initial_intent: 'Build a todo app' };
+      const session = await storage.createSession(source);
+
+      expect(session.blocks).toEqual([]);
+    });
+
+    it('updates blocks array', async () => {
+      const source: SessionSource = { type: 'human', initial_intent: 'Build a todo app' };
+      const session = await storage.createSession(source);
+
+      const blocks = [
+        {
+          id: 'block-1',
+          type: 'feature',
+          title: 'User Authentication',
+          keyword: 'Auth',
+          emoji: '🔐',
+          status: 'forming' as const,
+          confidence: 60,
+          content: '# User Auth\n\nBasic login/logout',
+          userEdits: [],
+          specialist: 'Security',
+          sourceContext: 'Turn 1',
+          createdAt: new Date().toISOString(),
+          curatedAt: null,
+          sources: [],
+          userEdited: false,
+        },
+      ];
+
+      const updated = await storage.updateBlocks(session.id, blocks);
+
+      expect(updated.blocks).toHaveLength(1);
+      expect(updated.blocks[0]?.id).toBe('block-1');
+      expect(updated.blocks[0]?.title).toBe('User Authentication');
+      expect(updated.blocks[0]?.specialist).toBe('Security');
+    });
+
+    it('retrieves blocks after update', async () => {
+      const source: SessionSource = { type: 'human', initial_intent: 'Build a todo app' };
+      const session = await storage.createSession(source);
+
+      const blocks = [
+        {
+          id: 'block-1',
+          type: 'feature',
+          title: 'User Authentication',
+          keyword: 'Auth',
+          emoji: '🔐',
+          status: 'forming' as const,
+          confidence: 60,
+          content: '# User Auth\n\nBasic login/logout',
+          userEdits: [],
+          specialist: 'Security',
+          sourceContext: 'Turn 1',
+          createdAt: new Date().toISOString(),
+          curatedAt: null,
+          sources: [],
+          userEdited: false,
+        },
+      ];
+
+      await storage.updateBlocks(session.id, blocks);
+      const retrieved = await storage.getSession(session.id);
+
+      expect(retrieved?.blocks).toHaveLength(1);
+      expect(retrieved?.blocks[0]?.id).toBe('block-1');
     });
   });
 });

@@ -18,7 +18,6 @@ export {
 export {
   getInterviewerPrompt,
   getWelcomeMessage,
-  getMockResponse,
   type InterviewerPromptContext,
 } from './prompt.js';
 
@@ -38,7 +37,6 @@ export {
 // Tool Executor
 export {
   executeTool,
-  getMockToolResult,
   type ToolExecutorDeps,
 } from './tool-executor.js';
 

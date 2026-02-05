@@ -271,6 +271,474 @@ describe('Tool Executor', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Unknown tool');
     });
+
+    it('should execute create_block', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Add a transcript message to establish turn context
+      await storage.appendTranscript(session.id, {
+        role: 'user',
+        content: 'I need authentication',
+        timestamp: new Date().toISOString(),
+      });
+
+      const result = await executeSpecialistTool(
+        'Security',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'User Authentication',
+          keyword: 'Auth',
+          emoji: '🔐',
+          content: '## Authentication Feature\n\nOAuth 2.0 implementation with JWT tokens.',
+          confidence: 75,
+        },
+        { storage }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toBeDefined();
+      const block = (result.data as { block: { id: string; title: string; specialist: string; confidence: number; status: string } }).block;
+      expect(block.id).toBeDefined();
+      expect(block.title).toBe('User Authentication');
+      expect(block.specialist).toBe('Security');
+      expect(block.confidence).toBe(75);
+      expect(block.status).toBe('developing'); // 75 confidence -> developing
+
+      // Verify block was added to session
+      const updated = await storage.getSession(session.id);
+      expect(updated?.blocks).toHaveLength(1);
+      expect(updated?.blocks[0]?.id).toBe(block.id);
+    });
+
+    it('should normalize confidence values in create_block', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Test confidence clamping
+      const result = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'entity',
+          title: 'User Model',
+          keyword: 'User',
+          emoji: '👤',
+          content: 'User entity with profile data',
+          confidence: 150, // Over 100
+        },
+        { storage }
+      );
+
+      expect(result.success).toBe(true);
+      const block = (result.data as { block: { confidence: number; status: string } }).block;
+      expect(block.confidence).toBe(100);
+      expect(block.status).toBe('ready'); // 100 confidence -> ready
+    });
+
+    it('should set correct status based on confidence', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Test forming status (0-29)
+      const result1 = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'Block 1',
+          keyword: 'B1',
+          emoji: '📦',
+          content: 'Test',
+          confidence: 20,
+        },
+        { storage }
+      );
+      expect((result1.data as { block: { status: string } }).block.status).toBe('forming');
+
+      // Test emerging status (30-59)
+      const result2 = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'Block 2',
+          keyword: 'B2',
+          emoji: '📦',
+          content: 'Test',
+          confidence: 45,
+        },
+        { storage }
+      );
+      expect((result2.data as { block: { status: string } }).block.status).toBe('emerging');
+
+      // Test developing status (60-89)
+      const result3 = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'Block 3',
+          keyword: 'B3',
+          emoji: '📦',
+          content: 'Test',
+          confidence: 75,
+        },
+        { storage }
+      );
+      expect((result3.data as { block: { status: string } }).block.status).toBe('developing');
+
+      // Test ready status (90+)
+      const result4 = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'Block 4',
+          keyword: 'B4',
+          emoji: '📦',
+          content: 'Test',
+          confidence: 95,
+        },
+        { storage }
+      );
+      expect((result4.data as { block: { status: string } }).block.status).toBe('ready');
+    });
+
+    it('should execute update_block with confidence update', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a block first
+      const createResult = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'User Authentication',
+          keyword: 'Auth',
+          emoji: '🔐',
+          content: 'Initial auth design',
+          confidence: 25,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string; status: string } }).block.id;
+      expect((createResult.data as { block: { status: string } }).block.status).toBe('forming');
+
+      // Update confidence
+      const updateResult = await executeSpecialistTool(
+        'Architect',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          confidence: 75,
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(true);
+      const updatedBlock = (updateResult.data as { block: { confidence: number; status: string } }).block;
+      expect(updatedBlock.confidence).toBe(75);
+      expect(updatedBlock.status).toBe('developing'); // Auto-adjusted based on confidence
+    });
+
+    it('should execute update_block with content update', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a block
+      const createResult = await executeSpecialistTool(
+        'Security',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'Auth',
+          keyword: 'Auth',
+          emoji: '🔐',
+          content: 'Initial content',
+          confidence: 50,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string } }).block.id;
+
+      // Update content
+      const newContent = '## Updated Auth Design\n\nOAuth 2.0 with PKCE flow';
+      const updateResult = await executeSpecialistTool(
+        'Security',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          content: newContent,
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(true);
+      const updatedBlock = (updateResult.data as { block: { content: string } }).block;
+      expect(updatedBlock.content).toBe(newContent);
+    });
+
+    it('should execute update_block with valid status transition', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a forming block
+      const createResult = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'entity',
+          title: 'User',
+          keyword: 'User',
+          emoji: '👤',
+          content: 'User entity',
+          confidence: 20,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string; status: string } }).block.id;
+      expect((createResult.data as { block: { status: string } }).block.status).toBe('forming');
+
+      // Transition forming → emerging
+      const updateResult = await executeSpecialistTool(
+        'Architect',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          status: 'emerging',
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(true);
+      expect((updateResult.data as { block: { status: string } }).block.status).toBe('emerging');
+    });
+
+    it('should reject invalid status transition (skip stage)', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a forming block
+      const createResult = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'feature',
+          title: 'Feature',
+          keyword: 'Feat',
+          emoji: '✨',
+          content: 'Test',
+          confidence: 15,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string } }).block.id;
+
+      // Try to skip from forming → developing (invalid)
+      const updateResult = await executeSpecialistTool(
+        'Architect',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          status: 'developing',
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(false);
+      expect(updateResult.error).toContain('Invalid status transition');
+      expect(updateResult.error).toContain('forming → developing');
+    });
+
+    it('should auto-adjust status when confidence changes', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a forming block (low confidence)
+      const createResult = await executeSpecialistTool(
+        'Designer',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'flow',
+          title: 'Onboarding',
+          keyword: 'Onboard',
+          emoji: '🚀',
+          content: 'User onboarding flow',
+          confidence: 10,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string } }).block.id;
+
+      // Update confidence to trigger auto-status adjustment
+      const updateResult = await executeSpecialistTool(
+        'Designer',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          confidence: 95,
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(true);
+      const updatedBlock = (updateResult.data as { block: { confidence: number; status: string } }).block;
+      expect(updatedBlock.confidence).toBe(95);
+      expect(updatedBlock.status).toBe('ready'); // Auto-adjusted
+    });
+
+    it('should allow explicit status to override auto-adjustment', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a forming block
+      const createResult = await executeSpecialistTool(
+        'QA',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'constraint',
+          title: 'Test Coverage',
+          keyword: 'Tests',
+          emoji: '🧪',
+          content: 'Test requirements',
+          confidence: 25,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string } }).block.id;
+
+      // Update both confidence and status explicitly
+      const updateResult = await executeSpecialistTool(
+        'QA',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          confidence: 45, // Would normally trigger "emerging"
+          status: 'emerging', // Explicit status
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(true);
+      const updatedBlock = (updateResult.data as { block: { confidence: number; status: string } }).block;
+      expect(updatedBlock.confidence).toBe(45);
+      expect(updatedBlock.status).toBe('emerging'); // Uses explicit status
+    });
+
+    it('should normalize confidence values in update_block', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      // Create a block
+      const createResult = await executeSpecialistTool(
+        'Architect',
+        'create_block',
+        {
+          session_id: session.id,
+          type: 'entity',
+          title: 'Entity',
+          keyword: 'Ent',
+          emoji: '📊',
+          content: 'Test',
+          confidence: 50,
+        },
+        { storage }
+      );
+      const blockId = (createResult.data as { block: { id: string } }).block.id;
+
+      // Update with out-of-range confidence
+      const updateResult = await executeSpecialistTool(
+        'Architect',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: blockId,
+          confidence: 150, // Over 100
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(true);
+      expect((updateResult.data as { block: { confidence: number } }).block.confidence).toBe(100);
+    });
+
+    it('should return error for non-existent block', async () => {
+      const session = await storage.createSession({
+        type: 'human',
+        initial_intent: 'Test',
+      });
+
+      const updateResult = await executeSpecialistTool(
+        'Architect',
+        'update_block',
+        {
+          session_id: session.id,
+          block_id: 'non-existent-block',
+          confidence: 50,
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(false);
+      expect(updateResult.error).toContain('Block not found');
+    });
+
+    it('should return error for update_block with non-existent session', async () => {
+      const updateResult = await executeSpecialistTool(
+        'Architect',
+        'update_block',
+        {
+          session_id: 'non-existent-session',
+          block_id: 'some-block',
+          confidence: 50,
+        },
+        { storage }
+      );
+
+      expect(updateResult.success).toBe(false);
+      expect(updateResult.error).toContain('Session not found');
+    });
   });
 
   describe('getMockSpecialistToolResult', () => {

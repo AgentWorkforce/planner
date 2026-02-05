@@ -3,9 +3,15 @@ import { IdeationLayout, Sidebar } from '@/components/layout';
 import { HomePage } from '@/pages/HomePage';
 import { SessionPage } from '@/pages/SessionPage';
 import { MockupPage } from '@/pages/MockupPage';
+import { CanvasPage } from '@/pages/CanvasPage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { usePanelState } from '@/hooks/usePanelState';
 import { useUnderstanding } from '@/hooks/useUnderstanding';
+import { useSessions } from '@/hooks/useSessions';
+import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { SpecialistsPanel } from '@/components/specialists';
+import { CommandPalette } from '@/components/ui/CommandPalette';
+import { Toaster } from '@/components/ui/Toaster';
 import { ChevronIcon } from '@/components/icons';
 
 // Component that provides the specialists panel for the current session
@@ -59,10 +65,61 @@ function EmptyPanel({ isCollapsed, onTogglePanel }: { isCollapsed: boolean; onTo
 export function App() {
   const { isCollapsed, togglePanel } = usePanelState();
   const location = useLocation();
+  const { sessions } = useSessions();
+
+  // Command palette
+  const commandPalette = useCommandPalette({ sessions });
 
   // Mockup page bypasses IdeationLayout
   if (location.pathname === '/mockup') {
     return <MockupPage />;
+  }
+
+  // New dashboard and canvas pages bypass old IdeationLayout (they have their own layouts)
+  if (location.pathname === '/' || location.pathname === '/ideation') {
+    return (
+      <>
+        <DashboardPage />
+        <CommandPalette
+          isOpen={commandPalette.isOpen}
+          query={commandPalette.query}
+          onQueryChange={commandPalette.setQuery}
+          selectedIndex={commandPalette.selectedIndex}
+          groupedActions={commandPalette.groupedActions}
+          onClose={commandPalette.close}
+          onExecuteAction={commandPalette.executeAction}
+          onSelectNext={commandPalette.selectNext}
+          onSelectPrevious={commandPalette.selectPrevious}
+          onExecuteSelected={commandPalette.executeSelected}
+        />
+        <Toaster />
+      </>
+    );
+  }
+
+  // Canvas page bypasses IdeationLayout (full-screen immersive experience)
+  if (location.pathname.includes('/canvas') || location.pathname.startsWith('/ideation/session/')) {
+    return (
+      <>
+        <Routes>
+          <Route path="/session/:id/canvas" element={<CanvasPage />} />
+          <Route path="/ideation/session/:id" element={<CanvasPage />} />
+        </Routes>
+        <CommandPalette
+          isOpen={commandPalette.isOpen}
+          query={commandPalette.query}
+          onQueryChange={commandPalette.setQuery}
+          selectedIndex={commandPalette.selectedIndex}
+          groupedActions={commandPalette.groupedActions}
+          onClose={commandPalette.close}
+          onExecuteAction={commandPalette.executeAction}
+          onSelectNext={commandPalette.selectNext}
+          onSelectPrevious={commandPalette.selectPrevious}
+          onExecuteSelected={commandPalette.executeSelected}
+        />
+        <Toaster />
+      </>
+    );
   }
 
   // Check if we're on a session page
@@ -81,16 +138,36 @@ export function App() {
   );
 
   return (
-    <IdeationLayout
-      sidebar={<Sidebar />}
-      panel={panel}
-      panelCollapsed={isCollapsed}
-      onTogglePanel={togglePanel}
-    >
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/session/:id/*" element={<SessionPage />} />
-      </Routes>
-    </IdeationLayout>
+    <>
+      <IdeationLayout
+        sidebar={<Sidebar />}
+        panel={panel}
+        panelCollapsed={isCollapsed}
+        onTogglePanel={togglePanel}
+      >
+        <Routes>
+          {/* Legacy routes using old IdeationLayout - CLEANUP: Remove these */}
+          <Route path="/legacy" element={<HomePage />} />
+          <Route path="/session/:id/*" element={<SessionPage />} />
+        </Routes>
+      </IdeationLayout>
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        isOpen={commandPalette.isOpen}
+        query={commandPalette.query}
+        onQueryChange={commandPalette.setQuery}
+        selectedIndex={commandPalette.selectedIndex}
+        groupedActions={commandPalette.groupedActions}
+        onClose={commandPalette.close}
+        onExecuteAction={commandPalette.executeAction}
+        onSelectNext={commandPalette.selectNext}
+        onSelectPrevious={commandPalette.selectPrevious}
+        onExecuteSelected={commandPalette.executeSelected}
+      />
+
+      {/* Global Toast Notifications */}
+      <Toaster />
+    </>
   );
 }

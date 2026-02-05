@@ -130,6 +130,26 @@
       {
         "id": "ac25",
         "description": "Both light mode (sandy/warm) and dark mode (mission control) themes supported from start"
+      },
+      {
+        "id": "ac26",
+        "description": "Un-curate action: curated blocks can be moved back to physics area (curation is reversible state, not permanent)"
+      },
+      {
+        "id": "ac27",
+        "description": "Modified-since-handoff banner: when reopening a session that was handed off, show banner if session.updated_at > session.lastHandoffAt"
+      },
+      {
+        "id": "ac28",
+        "description": "Block schema includes v3-prep fields: sources[] (empty array), userEdited (boolean), userEditedFields[] (optional), mergedFrom[] (optional), splitFrom (optional)"
+      },
+      {
+        "id": "ac29",
+        "description": "Session schema includes handoff tracking: lastHandoffAt, lastHandoffPlanId, lastHandoffVersionId (all optional)"
+      },
+      {
+        "id": "ac30",
+        "description": "Specialist prompts include guidance for block merge/split suggestions when blocks overlap or become overloaded"
       }
     ],
     "decisions": [
@@ -166,8 +186,8 @@
         "rationale": "User may want to remove blocks AI misunderstood or that are no longer relevant"
       },
       {
-        "decision": "StatusBar as shared package",
-        "rationale": "@plannr/ui-agent-status-bar reusable across Ideation, Planner, Forge"
+        "decision": "StatusBar in existing shared-ui package",
+        "rationale": "Add StatusBar to packages/shared-ui (not create separate package). Shared-ui already has Avatar, Badge, ThinkingIndicator that StatusBar can compose."
       },
       {
         "decision": "Cross-session deduplication by Planner",
@@ -184,6 +204,22 @@
       {
         "decision": "HTML divs for block rendering",
         "rationale": "Canvas element can't render rich content; positioned divs allow markdown, emoji, styled text"
+      },
+      {
+        "decision": "V3-prep schema fields in v2",
+        "rationale": "Add empty/false fields now while greenfield to avoid painful migrations later. sources[], userEdited, mergedFrom, splitFrom on Block; lastHandoffAt/PlanId/VersionId on Session."
+      },
+      {
+        "decision": "Curation is reversible",
+        "rationale": "Un-curate action lets users move blocks back to physics area. Curated is a state, not permanent commitment. Prevents forced delete-and-recreate workflow."
+      },
+      {
+        "decision": "Modified-since-handoff tracking",
+        "rationale": "Simple date comparison (updated_at > lastHandoffAt) enables 'did I send old version?' banner without full versioning system."
+      },
+      {
+        "decision": "Block merge/split as prompt guidance",
+        "rationale": "Zero schema change needed. Specialists can suggest merging overlapping blocks or splitting overloaded ones via natural language."
       }
     ]
   },
@@ -197,7 +233,13 @@
         "Session dashboard reuses physics engine with different block semantics (sessions vs concepts)",
         "Navigator agent is same codebase as Interviewer with different context/prompts",
         "StatusBar package creates cross-app dependency - need clean interface",
-        "Gravity wells for Initiatives require physics force field implementation"
+        "Gravity wells for Initiatives require physics force field implementation",
+        "V3-prep: Add sources[], userEdited, mergedFrom, splitFrom to Block now (empty defaults) to avoid migration",
+        "V3-prep: Add lastHandoffAt/PlanId/VersionId to Session for modified-since-handoff tracking",
+        "V3-prep: Un-curate action makes curation reversible - curated is state, not permanent",
+        "V3-prep: Block merge/split as prompt guidance only (no schema change needed)",
+        "Session.synthesized stores Interviewer-generated summaries for AI Understanding panel (idea_summary, specialist_perspectives)",
+        "Handoff convenience fields (lastHandoffAt, etc.) mirror planner_sends[-1] for quick banner logic"
       ],
       "patterns": [
         "Physics simulation",
@@ -282,7 +324,28 @@
       "specialist": "string (which specialist created it)",
       "sourceContext": "string (conversation turn references)",
       "createdAt": "ISO timestamp",
-      "curatedAt": "ISO timestamp | null"
+      "curatedAt": "ISO timestamp | null",
+      "_v3_prep_fields": {
+        "sources": "BlockSource[] (empty array now, doc ingestion populates later)",
+        "userEdited": "boolean (true if user touched this block)",
+        "userEditedFields": "string[] | undefined (which fields user modified, for highlighting)",
+        "mergedFrom": "string[] | undefined (block IDs if this was merged from others)",
+        "splitFrom": "string | undefined (block ID if this was split from another)"
+      }
+    },
+    "block_source_schema": {
+      "source_id": "string (future: asset ID)",
+      "source_type": "'document' | 'image' | 'conversation'",
+      "reference": "string | undefined (line range, turn ID, etc.)"
+    },
+    "session_schema_additions": {
+      "lastHandoffAt": "ISO timestamp | undefined (most recent handoff, mirrors planner_sends[-1].sent_at)",
+      "lastHandoffPlanId": "string | undefined (plan UUID, mirrors planner_sends[-1].result.plan_id)",
+      "lastHandoffVersionId": "number | undefined (plan version, mirrors planner_sends[-1].result.plan_version)",
+      "synthesized": {
+        "idea_summary": "string | undefined (AI-generated synopsis, updated by Interviewer)",
+        "specialist_perspectives": "Record<string, { take: string, concerns: string[], confidence: 'exploring' | 'forming' | 'confident' }> | undefined"
+      }
     },
     "user_edit_schema": {
       "id": "string (uuid)",
@@ -354,7 +417,8 @@
       "deep_insight_mode": "Expand specialist card to see raw <object>:<keys>:<fields> understanding data (future)"
     },
     "status_bar_component": {
-      "package": "@plannr/ui-agent-status-bar",
+      "package": "packages/shared-ui",
+      "note": "Add StatusBar component to existing shared-ui package (alongside Avatar, Badge, etc.)",
       "interface": {
         "StatusBarProps": {
           "agents": "AgentStatus[]",
@@ -375,6 +439,12 @@
           "onClick": "() => void"
         }
       },
+      "existing_components_to_reuse": [
+        "Avatar (with status indicator)",
+        "Badge (for confidence badges)",
+        "ThinkingIndicator (for thinking state)",
+        "CommandPalette (for session switching)"
+      ],
       "shared_across": [
         "Ideation",
         "Planner",
@@ -395,7 +465,7 @@
       "block_visibility_threshold": {
         "default": 30,
         "type": "number",
-        "description": "Minimum confidence to show block"
+        "description": "Minimum confidence for block to be interactive. Below threshold = tiny dot (forming), at/above = clickable block. Adjusts the dot↔block cutoff."
       },
       "theme": {
         "default": "system",
@@ -1149,9 +1219,10 @@
         "step_id": "cv2-022",
         "title": "Phase 3 integration test",
         "scope": "ideation-ui",
-        "description": "Verify block integration with real backend data.",
+        "description": "Verify block integration with real backend data including specialist block creation.",
         "dependencies": [
-          "cv2-021"
+          "cv2-021",
+          "cv2-017"
         ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
@@ -1204,7 +1275,7 @@
         "step_id": "cv2-024",
         "title": "Create BlockDetailPanel component",
         "scope": "ideation-ui",
-        "description": "Detail panel showing block mini-spec with editable markdown, Close and Curate buttons.",
+        "description": "Detail panel showing block mini-spec with editable markdown, Close, Curate, and Delete buttons.",
         "dependencies": [
           "cv2-023"
         ],
@@ -1225,10 +1296,15 @@
           {
             "id": "ac4",
             "description": "Curate ✓ button triggers curation"
+          },
+          {
+            "id": "ac5",
+            "description": "Delete button removes block (with confirmation dialog)"
           }
         ],
         "maps_to_feature_ac": [
-          "ac6"
+          "ac6",
+          "ac15"
         ]
       },
       {
@@ -1467,9 +1543,10 @@
         "step_id": "cv2-033",
         "title": "Update planner handoff to include blocks",
         "scope": "ideation-core",
-        "description": "Extend send-to-planner to include curated blocks and selected un-curated blocks.",
+        "description": "Extend send-to-planner to include curated blocks and selected un-curated blocks. Sets session handoff tracking fields (lastHandoffAt, lastHandoffPlanId, lastHandoffVersionId) on successful handoff.",
         "dependencies": [
-          "cv2-013"
+          "cv2-013",
+          "cv2-055"
         ],
         "owner_role": "backend:Coder",
         "acceptance_criteria": [
@@ -1520,19 +1597,24 @@
         "step_id": "cv2-035",
         "title": "Create IdeaSummarySection component",
         "scope": "ideation-ui",
-        "description": "Section showing AI-generated synopsis of the overall idea.",
+        "description": "Section showing AI-generated synopsis of the overall idea. Displays session.synthesized.idea_summary generated by Interviewer.",
         "dependencies": [
-          "cv2-034"
+          "cv2-034",
+          "cv2-060"
         ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
           {
             "id": "ac1",
-            "description": "Displays idea summary text from session"
+            "description": "Displays session.synthesized.idea_summary"
           },
           {
             "id": "ac2",
             "description": "Styled as quote/callout block"
+          },
+          {
+            "id": "ac3",
+            "description": "Shows placeholder if synthesis not yet generated"
           }
         ],
         "maps_to_feature_ac": [
@@ -1570,9 +1652,10 @@
         "step_id": "cv2-037",
         "title": "Create SpecialistPerspectiveCard component",
         "scope": "ideation-ui",
-        "description": "Card showing specialist's synthesized 'take' on the idea.",
+        "description": "Card showing specialist's synthesized 'take' on the idea. Displays session.synthesized.specialist_perspectives[name] generated by Interviewer.",
         "dependencies": [
-          "cv2-034"
+          "cv2-034",
+          "cv2-060"
         ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
@@ -1582,15 +1665,15 @@
           },
           {
             "id": "ac2",
-            "description": "Synthesized perspective as natural language (not bullet points)"
+            "description": "Displays synthesized.specialist_perspectives[name].take as natural language"
           },
           {
             "id": "ac3",
-            "description": "Key concerns/questions section"
+            "description": "Key concerns from synthesized.specialist_perspectives[name].concerns[]"
           },
           {
             "id": "ac4",
-            "description": "Confidence badge (exploring/forming/confident)"
+            "description": "Confidence badge from synthesized.specialist_perspectives[name].confidence"
           }
         ],
         "maps_to_feature_ac": [
@@ -1634,7 +1717,7 @@
         "step_id": "cv2-039",
         "title": "Add specialist presence indicators to header",
         "scope": "ideation-ui",
-        "description": "Subtle specialist avatars in header showing active/idle state.",
+        "description": "Initial basic specialist avatars in header showing active/idle state. This provides the UI pattern; cv2-048 later upgrades to use the shared StatusBar component.",
         "dependencies": [
           "cv2-002"
         ],
@@ -1878,15 +1961,15 @@
       },
       {
         "step_id": "cv2-047",
-        "title": "Create @plannr/ui-agent-status-bar package",
+        "title": "Add StatusBar component to shared-ui package",
         "scope": "shared-ui",
-        "description": "Shared StatusBar component package for use across Ideation, Planner, Forge.",
+        "description": "Add StatusBar component to existing packages/shared-ui (alongside Avatar, Badge, etc.). Composes existing Avatar and Badge components for agent display.",
         "dependencies": [],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
           {
             "id": "ac1",
-            "description": "Package exports StatusBar component"
+            "description": "StatusBar component added to packages/shared-ui/src/components/"
           },
           {
             "id": "ac2",
@@ -1902,12 +1985,21 @@
           },
           {
             "id": "ac5",
-            "description": "Package published to internal registry or monorepo"
+            "description": "StatusBar composes existing Avatar component for agent display"
+          },
+          {
+            "id": "ac6",
+            "description": "StatusBar exported from packages/shared-ui/src/index.ts"
           }
         ],
         "maps_to_feature_ac": [
           "ac17"
-        ]
+        ],
+        "specification": {
+          "note": "Use existing shared-ui package rather than creating new @plannr/ui-agent-status-bar package",
+          "reuses": ["Avatar", "Badge", "ThinkingIndicator"],
+          "path": "packages/shared-ui/src/components/StatusBar.tsx"
+        }
       },
       {
         "step_id": "cv2-048",
@@ -2032,6 +2124,193 @@
         ]
       },
       {
+        "step_id": "cv2-054",
+        "title": "Add v3-prep fields to Block schema",
+        "scope": "ideation-core",
+        "description": "Extend Block Zod schema with sources[], userEdited, userEditedFields, mergedFrom, splitFrom fields. All optional/empty defaults.",
+        "dependencies": [
+          "cv2-011"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Block.sources: BlockSource[] with default empty array"
+          },
+          {
+            "id": "ac2",
+            "description": "Block.userEdited: boolean with default false"
+          },
+          {
+            "id": "ac3",
+            "description": "Block.userEditedFields: string[] | undefined"
+          },
+          {
+            "id": "ac4",
+            "description": "Block.mergedFrom: string[] | undefined"
+          },
+          {
+            "id": "ac5",
+            "description": "Block.splitFrom: string | undefined"
+          },
+          {
+            "id": "ac6",
+            "description": "BlockSource schema: source_id, source_type, reference"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac28"
+        ]
+      },
+      {
+        "step_id": "cv2-055",
+        "title": "Add handoff tracking fields to Session schema",
+        "scope": "ideation-core",
+        "description": "Extend Session Zod schema with lastHandoffAt, lastHandoffPlanId, lastHandoffVersionId convenience fields. These mirror the last entry in planner_sends[] for quick access without array traversal. Both are set on successful handoff.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Session.lastHandoffAt: string | undefined (ISO timestamp)"
+          },
+          {
+            "id": "ac2",
+            "description": "Session.lastHandoffPlanId: string | undefined (plan UUID)"
+          },
+          {
+            "id": "ac3",
+            "description": "Session.lastHandoffVersionId: number | undefined (plan version)"
+          },
+          {
+            "id": "ac4",
+            "description": "Handoff API sets these fields when sending to planner"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac29"
+        ]
+      },
+      {
+        "step_id": "cv2-056",
+        "title": "Implement un-curate action",
+        "scope": "ideation-ui",
+        "description": "Add un-curate button to curated blocks that moves them back to physics area.",
+        "dependencies": [
+          "cv2-006",
+          "cv2-018"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Curated block card has un-curate action (icon or context menu)"
+          },
+          {
+            "id": "ac2",
+            "description": "Un-curate calls PATCH /blocks/:id with status='ready'"
+          },
+          {
+            "id": "ac3",
+            "description": "Block animates back to physics area"
+          },
+          {
+            "id": "ac4",
+            "description": "curatedAt field cleared on un-curate"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac26"
+        ]
+      },
+      {
+        "step_id": "cv2-057",
+        "title": "Implement modified-since-handoff banner",
+        "scope": "ideation-ui",
+        "description": "Show banner when session.updated_at > session.lastHandoffAt indicating changes since last handoff.",
+        "dependencies": [
+          "cv2-055"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Banner appears when session has lastHandoffAt and updated_at > lastHandoffAt"
+          },
+          {
+            "id": "ac2",
+            "description": "Banner text: 'Modified since last handoff on {date}'"
+          },
+          {
+            "id": "ac3",
+            "description": "Banner has 'Send updates to Planner' CTA"
+          },
+          {
+            "id": "ac4",
+            "description": "Banner dismissable"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac27"
+        ]
+      },
+      {
+        "step_id": "cv2-058",
+        "title": "Add merge/split guidance to specialist prompts",
+        "scope": "ideation-core",
+        "description": "Update specialist prompts with guidance on when to suggest merging overlapping blocks or splitting overloaded ones.",
+        "dependencies": [
+          "cv2-017"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Prompts include: 'If you notice blocks with overlapping scope, suggest merging them'"
+          },
+          {
+            "id": "ac2",
+            "description": "Prompts include: 'If a block is trying to cover too many concepts, suggest splitting it'"
+          },
+          {
+            "id": "ac3",
+            "description": "Suggestions made via chat message to user, not automatic action"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac30"
+        ]
+      },
+      {
+        "step_id": "cv2-059",
+        "title": "Track userEdited on block content changes",
+        "scope": "ideation-ui",
+        "description": "When user edits block content in focus mode, set userEdited=true and populate userEditedFields.",
+        "dependencies": [
+          "cv2-054",
+          "cv2-025"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "User edit sets block.userEdited = true"
+          },
+          {
+            "id": "ac2",
+            "description": "Changed field names added to userEditedFields[]"
+          },
+          {
+            "id": "ac3",
+            "description": "User-edited blocks have subtle visual indicator"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac28",
+          "ac7"
+        ]
+      },
+      {
         "step_id": "cv2-052",
         "title": "Mobile responsive foundations",
         "scope": "ideation-ui",
@@ -2062,12 +2341,15 @@
         "step_id": "cv2-053",
         "title": "Final integration tests",
         "scope": "ideation-ui",
-        "description": "End-to-end testing of complete canvas flow.",
+        "description": "End-to-end testing of complete canvas flow including v3-prep features.",
         "dependencies": [
           "cv2-048",
           "cv2-049",
           "cv2-050",
-          "cv2-051"
+          "cv2-051",
+          "cv2-056",
+          "cv2-057",
+          "cv2-059"
         ],
         "owner_role": "frontend:Coder",
         "acceptance_criteria": [
@@ -2087,6 +2369,41 @@
             "id": "ac4",
             "description": "All themes render correctly"
           }
+        ]
+      },
+      {
+        "step_id": "cv2-060",
+        "title": "Interviewer synthesizes AI understanding",
+        "scope": "ideation-core",
+        "description": "Interviewer distills AI understanding (its own + specialists) into synthesized summaries. Updates periodically as conversation progresses, not on every change. Produces: idea_summary (overall synopsis), specialist_perspectives[] (natural language takes per specialist).",
+        "dependencies": [
+          "cv2-017"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Session stores synthesized.idea_summary: string (AI-generated synopsis)"
+          },
+          {
+            "id": "ac2",
+            "description": "Session stores synthesized.specialist_perspectives: { [specialist]: { take: string, concerns: string[], confidence: string } }"
+          },
+          {
+            "id": "ac3",
+            "description": "Interviewer prompt includes synthesis instructions"
+          },
+          {
+            "id": "ac4",
+            "description": "Synthesis updates when understanding changes significantly (not every message)"
+          },
+          {
+            "id": "ac5",
+            "description": "MCP tool update_synthesis allows Interviewer to set synthesized content"
+          }
+        ],
+        "maps_to_feature_ac": [
+          "ac10"
         ]
       }
     ]
@@ -2151,6 +2468,16 @@
       "acceptance_criteria": [
         "ac23",
         "ac25"
+      ]
+    },
+    "v3_schema_prep": {
+      "description": "Schema and UX additions preparing for v3 features (re-ideation, assets, planner loop)",
+      "acceptance_criteria": [
+        "ac26",
+        "ac27",
+        "ac28",
+        "ac29",
+        "ac30"
       ]
     }
   },

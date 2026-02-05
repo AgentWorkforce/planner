@@ -41,9 +41,14 @@ export interface RelayMessage {
   from: string;
   fromName: string;
   entityType: RelayEntityType;
-  channel?: string;
-  body: string;
+  channelId?: string;
+  content: string;
   timestamp: string;
+  /** Optional threading support */
+  threadId?: string;
+  /** Read state for current user */
+  isRead?: boolean;
+  /** Arbitrary metadata (QA payloads, etc.) */
   data?: Record<string, unknown>;
 }
 
@@ -89,9 +94,9 @@ export interface UseRelayConnectionResult {
   /** Leave a channel */
   leaveChannel: (channelId: string) => void;
   /** Send message to a channel */
-  sendChannelMessage: (channelId: string, body: string, data?: Record<string, unknown>) => void;
+  sendChannelMessage: (channelId: string, content: string, data?: Record<string, unknown>) => void;
   /** Send direct message to an entity */
-  sendDirectMessage: (to: string, body: string, data?: Record<string, unknown>) => void;
+  sendDirectMessage: (to: string, content: string, data?: Record<string, unknown>) => void;
   /** Subscribe to incoming messages */
   onMessage: (handler: (message: RelayMessage) => void) => () => void;
   /** Subscribe to channel messages */
@@ -135,7 +140,7 @@ export interface UseChannelMessagesResult {
   /** Error message */
   error: string | null;
   /** Send a message */
-  send: (body: string, data?: Record<string, unknown>) => void;
+  send: (content: string, data?: Record<string, unknown>) => void;
   /** Clear messages */
   clear: () => void;
 }

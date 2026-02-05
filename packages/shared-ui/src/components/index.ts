@@ -3,8 +3,8 @@ export { Pagination, type PaginationProps } from "./Pagination";
 export { ConfirmationDialog, type ConfirmationDialogProps } from "./ConfirmationDialog";
 export { Modal, type ModalProps } from "./Modal";
 export { Badge, type BadgeProps } from "./Badge";
-export { Avatar, type AvatarProps } from "./Avatar";
-export { Tabs, type TabsProps, type Tab } from "./Tabs";
+export { Avatar, type AvatarProps, type EntityType } from "./Avatar";
+export { Tabs, TabPanel, type TabsProps, type TabPanelProps, type Tab } from "./Tabs";
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { SearchInput, type SearchInputProps } from "./SearchInput";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
@@ -29,3 +29,55 @@ export {
   type CommandItem,
   type CommandSection,
 } from "./CommandPalette";
+
+
+// New extracted components
+export {
+  StatusIndicator,
+  StatusDot,
+  type StatusIndicatorProps,
+  type StatusType,
+} from "./StatusIndicator";
+export {
+  ListItem,
+  ListItemGroup,
+  FeedItem,
+  type ListItemProps,
+  type ListItemGroupProps,
+  type FeedItemProps,
+  type ListItemAccent,
+} from "./ListItem";
+export {
+  NotificationBanner,
+  type NotificationBannerProps,
+  type NotificationBannerItem,
+} from "./NotificationBanner";
+export { EntityCard, type EntityCardProps } from "./EntityCard";
+export { Autocomplete, type AutocompleteProps } from "./Autocomplete";
+export {
+  DetailPanel,
+  DetailPanelSection,
+  DetailPanelDivider,
+  type DetailPanelProps,
+} from "./DetailPanel";
+export {
+  StatusBar,
+  type StatusBarProps,
+  type AgentStatus,
+  type StatusAction,
+} from "./StatusBar";
+
+// Messaging components
+export {
+  DateSeparator,
+  MessageBubble,
+  MessageList,
+  MessageInput,
+  type DateSeparatorProps,
+  type MessageBubbleProps,
+  type Message,
+  type MessageListProps,
+  type MessageInputProps,
+  type MessageStatus,
+  type ThreadMetadata,
+} from "./messaging";

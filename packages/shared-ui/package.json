@@ -18,10 +18,27 @@
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
       "import": "./dist/hooks/index.js"
-    }
+    },
+    "./theme": {
+      "types": "./dist/theme/index.d.ts",
+      "import": "./dist/theme/index.js"
+    },
+    "./theme/tokens": {
+      "types": "./dist/theme/tokens.d.ts",
+      "import": "./dist/theme/tokens.js"
+    },
+    "./theme/tailwind-preset": {
+      "require": "./src/theme/tailwind-preset.cjs"
+    },
+    "./styles": "./src/styles/index.css",
+    "./styles/tokens.css": "./src/styles/tokens.css",
+    "./styles/base.css": "./src/styles/base.css",
+    "./styles/typography.css": "./src/styles/typography.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/styles",
+    "src/theme/tailwind-preset.cjs"
   ],
   "scripts": {
     "build": "tsc",

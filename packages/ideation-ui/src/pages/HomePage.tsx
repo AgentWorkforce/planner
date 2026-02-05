@@ -1,3 +1,5 @@
+// CLEANUP: This page is deprecated. Remove after confirming DashboardPage works.
+// Accessible at /legacy for comparison, then delete this file.
 import { BrainIcon } from '@/components/icons';
 
 export function HomePage() {

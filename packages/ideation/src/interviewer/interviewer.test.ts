@@ -17,14 +17,12 @@ import {
 import {
   getInterviewerPrompt,
   getWelcomeMessage,
-  getMockResponse,
 } from './prompt.js';
 import {
   INTERVIEWER_TOOLS,
 } from './tools.js';
 import {
   executeTool,
-  getMockToolResult,
 } from './tool-executor.js';
 import {
   conversationHistory,
@@ -150,13 +148,6 @@ describe('Prompt', () => {
     });
   });
 
-  describe('getMockResponse', () => {
-    it('should generate mock response for user message', () => {
-      const response = getMockResponse('I want to build a web app');
-      expect(typeof response).toBe('string');
-      expect(response.length).toBeGreaterThan(0);
-    });
-  });
 });
 
 // =============================================================================
@@ -269,6 +260,43 @@ describe('Tool Executor', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should execute update_synthesis tool', async () => {
+      const session = await storage.createSession(
+        { type: 'human', initial_intent: 'Build a todo app' }
+      );
+
+      const result = await executeTool(
+        'update_synthesis',
+        {
+          session_id: session.id,
+          idea_summary: 'Building a simple todo list app with React',
+          specialist_perspectives: {
+            Architect: {
+              take: 'Component architecture looks solid',
+              concerns: ['State management needs consideration'],
+              confidence: 'forming',
+            },
+            Designer: {
+              take: 'UI patterns are clear',
+              concerns: ['Accessibility needs attention'],
+              confidence: 'confident',
+            },
+          },
+        },
+        { storage }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toHaveProperty('updated', true);
+
+      // Verify synthesis was stored
+      const updatedSession = await storage.getSession(session.id);
+      expect(updatedSession?.synthesized).toBeDefined();
+      expect(updatedSession?.synthesized?.idea_summary).toBe('Building a simple todo list app with React');
+      expect(updatedSession?.synthesized?.specialist_perspectives?.Architect).toBeDefined();
+      expect(updatedSession?.synthesized?.specialist_perspectives?.Architect.confidence).toBe('forming');
+    });
+
     it('should fail spawn_specialist tool without spawnAgent callback', async () => {
       const session = await storage.createSession(
         { type: 'human', initial_intent: 'Test' }
@@ -332,67 +360,6 @@ describe('Tool Executor', () => {
     });
   });
 
-  describe('getMockToolResult', () => {
-    it('should return mock result for start_session', () => {
-      const result = getMockToolResult('start_session', {
-        initial_intent: 'Test',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('session_id');
-    });
-
-    it('should return mock result for read_session', () => {
-      const result = getMockToolResult('read_session', {
-        session_id: 'test-id',
-      });
-
-      expect(result.success).toBe(true);
-      // Mock returns session-like object with id field
-      expect(result.data).toHaveProperty('id', 'test-id');
-    });
-
-    it('should return mock result for add_message', () => {
-      const result = getMockToolResult('add_message', {
-        session_id: 'test-id',
-        role: 'user',
-        content: 'Hello',
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    it('should return mock result for update_understanding', () => {
-      const result = getMockToolResult('update_understanding', {
-        session_id: 'test-id',
-        specialist_name: 'technical',
-        observations: {},
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    it('should return mock result for spawn_specialist', () => {
-      const result = getMockToolResult('spawn_specialist', {
-        session_id: 'test-id',
-        name: 'Architect',
-        focus: 'Test',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('agent_id');
-    });
-
-    it('should return mock result for send_to_planner', () => {
-      const result = getMockToolResult('send_to_planner', {
-        session_id: 'test-id',
-        goal: 'Build app',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data).toHaveProperty('plan_id');
-    });
-  });
 });
 
 // =============================================================================
@@ -438,6 +405,19 @@ describe('Conversation History', () => {
       conversationHistory.addMessage('test-channel', 'assistant', 'Hi!');
 
       const messages = conversationHistory.getAnthropicMessages('test-channel');
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toEqual({ role: 'user', content: 'Hello' });
+      expect(messages[1]).toEqual({ role: 'assistant', content: 'Hi!' });
+    });
+
+    it('should skip initial assistant message (Anthropic requires user-first)', () => {
+      // This can happen if welcome message was incorrectly added to history
+      conversationHistory.addMessage('test-channel', 'assistant', 'Welcome!');
+      conversationHistory.addMessage('test-channel', 'user', 'Hello');
+      conversationHistory.addMessage('test-channel', 'assistant', 'Hi!');
+
+      const messages = conversationHistory.getAnthropicMessages('test-channel');
+      // Should skip the first assistant message
       expect(messages).toHaveLength(2);
       expect(messages[0]).toEqual({ role: 'user', content: 'Hello' });
       expect(messages[1]).toEqual({ role: 'assistant', content: 'Hi!' });
@@ -605,17 +585,8 @@ describe('Interviewer Service', () => {
       expect(response).toBeNull();
     });
 
-    it('should process messages on ideation channel (mock mode)', async () => {
-      // Without ANTHROPIC_API_KEY, should use mock mode
-      const response = await interviewer.handleMessage(
-        '#ideation',
-        'I want to build a todo app',
-        'user123'
-      );
-
-      // In mock mode, returns a response (may be string or object)
-      expect(response).toBeDefined();
-    });
+    // Note: Mock mode tests removed. The Interviewer now requires ANTHROPIC_API_KEY.
+    // LLM-dependent tests should mock the Anthropic API or be run as integration tests.
 
     it('should track sessions per channel', async () => {
       // Create a session
@@ -695,36 +666,10 @@ describe('Integration', () => {
     await storage.close();
   });
 
-  it('should complete full ideation flow in mock mode', async () => {
-    // 1. Create session
-    const session = await storage.createSession({
-      type: 'human',
-      initial_intent: 'Build a task management app',
-    });
-
-    const channelId = sessionChannelId(session.id);
-
-    // 2. User sends message
-    const response = await interviewer.handleMessage(
-      channelId,
-      'I want it to have priorities and due dates',
-      'user123'
-    );
-
-    expect(response).toBeDefined();
-
-    // 3. Check conversation history
-    const history = conversationHistory.getHistory(channelId);
-    expect(history.length).toBeGreaterThanOrEqual(1);
-
-    // 4. Simulate understanding update
-    await storage.updateUnderstanding(session.id, 'technical', {
-      features: ['priorities', 'due dates'],
-      confidence: 'forming',
-    });
-
-    // 5. Check session has understanding
-    const updated = await storage.getSession(session.id);
-    expect(updated?.understanding.technical).toBeDefined();
+  // Note: This test was designed for mock mode which has been removed.
+  // Full ideation flow integration tests should be run with actual LLM API.
+  it.skip('should complete full ideation flow (requires LLM)', async () => {
+    // This test requires ANTHROPIC_API_KEY to be set and would make real API calls.
+    // It has been skipped to prevent accidental API charges in CI.
   });
 });
