@@ -131,5 +131,16 @@ export function createIdeationRouter(storage: IdeationStorage): Router {
   router.get('/sessions/:id/events', handlers.subscribeToEvents);
   router.get('/events', handlers.subscribeToEvents);
 
+  // ===========================================================================
+  // Navigator Routes
+  // ===========================================================================
+
+  /**
+   * POST /navigator/chat - Send message to Navigator agent
+   * Body: { message: string }
+   * Response: { response: string }
+   */
+  router.post('/navigator/chat', handlers.navigatorChat);
+
   return router;
 }

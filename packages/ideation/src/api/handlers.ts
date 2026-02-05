@@ -33,6 +33,7 @@ import { interviewer } from '../interviewer/service.js';
 import { specialistQueue } from '../interviewer/specialist-queue.js';
 import { conversationHistory } from '../interviewer/history.js';
 import { sendChannelMessage, isConnected as isRelayConnected } from '../relay/index.js';
+import { navigatorService, isNavigatorActive } from '../navigator/index.js';
 
 // =============================================================================
 // Planner Client Interface
@@ -713,6 +714,36 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     });
   }
 
+  // ===========================================================================
+  // Navigator Chat (#cv2-045)
+  // ===========================================================================
+
+  async function navigatorChat(req: Request, res: Response): Promise<void> {
+    try {
+      const { message } = req.body;
+
+      if (!message || typeof message !== 'string') {
+        res.status(400).json({ error: 'Message is required' });
+        return;
+      }
+
+      if (!isNavigatorActive()) {
+        res.status(503).json({
+          error: 'Navigator not available',
+          message: 'Navigator service is not initialized. Check ANTHROPIC_API_KEY.',
+        });
+        return;
+      }
+
+      const response = await navigatorService.generateResponse(message);
+      res.json({ response });
+    } catch (error) {
+      console.error('Error in Navigator chat:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ error: 'Navigator error', message: errorMessage });
+    }
+  }
+
   return {
     createSession,
     getSession,
@@ -729,5 +760,6 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     deleteBlock,
     curateBlock,
     subscribeToEvents,
+    navigatorChat,
   };
 }

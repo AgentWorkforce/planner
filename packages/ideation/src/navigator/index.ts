@@ -28,3 +28,12 @@ export {
   type RecommendActionResult,
   type StartNewSessionResult,
 } from './tools.js';
+
+// Service
+export {
+  navigatorService,
+  initNavigator,
+  stopNavigator,
+  isNavigatorActive,
+  type NavigatorDeps,
+} from './service.js';
