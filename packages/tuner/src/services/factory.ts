@@ -12,6 +12,8 @@ import { DriftDetector } from './drift-detector.js';
 import { ModelSelector } from './model-selector.js';
 import { StabilityControls } from './stability-controls.js';
 import { ConfigWriter } from './config-writer.js';
+import { IdeationBaselineService } from './ideation-baseline-service.js';
+import type { PlanQualitySignal } from '../domain/outcome.js';
 
 /**
  * All Tuner service instances.
@@ -24,6 +26,7 @@ export interface TunerServices {
   selector: ModelSelector;
   stability: StabilityControls;
   config: ConfigWriter;
+  ideationBaseline: IdeationBaselineService;
 }
 
 /**
@@ -44,6 +47,7 @@ export function createTunerServices(dbPath: string): TunerServices {
   // Create services (order matters for dependencies)
   const collector = new OutcomeCollector(storage);
   const baseline = new BaselineService(storage);
+  const ideationBaseline = new IdeationBaselineService(storage);
   const stability = new StabilityControls(storage);
 
   // Get initial config (or use defaults)
@@ -52,10 +56,10 @@ export function createTunerServices(dbPath: string): TunerServices {
 
   const selector = new ModelSelector(storage, forgeConfig);
   const drift = new DriftDetector(storage, baseline);
-  const config = new ConfigWriter(storage, stability, selector, baseline);
+  const config = new ConfigWriter(storage, stability, selector, baseline, ideationBaseline);
 
   // Wire event handlers
-  wireEventHandlers(collector, baseline, selector, drift);
+  wireEventHandlers(collector, baseline, selector, drift, ideationBaseline);
 
   return {
     storage,
@@ -65,6 +69,7 @@ export function createTunerServices(dbPath: string): TunerServices {
     selector,
     stability,
     config,
+    ideationBaseline,
   };
 }
 
@@ -75,7 +80,8 @@ function wireEventHandlers(
   collector: OutcomeCollector,
   baseline: BaselineService,
   selector: ModelSelector,
-  drift: DriftDetector
+  drift: DriftDetector,
+  ideationBaseline: IdeationBaselineService
 ): void {
   // When a task outcome is received:
   collector.on('task_outcome_received', (outcome) => {
@@ -110,6 +116,21 @@ function wireEventHandlers(
       console.log(`[Tuner] Run ${outcome.run_id} completed: ${outcome.outcome} (${outcome.tasks_succeeded}/${outcome.tasks_total} tasks)`);
     } catch (error) {
       console.error('[Tuner] Error processing run outcome:', error);
+    }
+  });
+
+  // When a plan quality signal is received:
+  collector.on('plan_quality_signal_received', (signal: PlanQualitySignal) => {
+    try {
+      // Skip learning for test signals
+      if (signal.source === 'test') {
+        return;
+      }
+
+      // Update ideation baseline from plan quality signal
+      ideationBaseline.updateBaseline(signal);
+    } catch (error) {
+      console.error('[Tuner] Error updating ideation baseline:', error);
     }
   });
 }
