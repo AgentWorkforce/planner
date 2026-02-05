@@ -139,7 +139,7 @@ export function CuratedBlocksColumn({
 
   return (
     <div className={cn('flex flex-col gap-2 p-3 overflow-y-auto', className)}>
-      <h3 className="text-sm font-medium text-muted-foreground mb-2">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)] mb-2">
         Curated ({curatedBlocks.length})
       </h3>
       {curatedBlocks.map((block) => (

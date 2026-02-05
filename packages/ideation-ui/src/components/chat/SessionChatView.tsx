@@ -3,7 +3,6 @@ import { useSession } from '@/hooks/useSession';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
-import { ChatHeader } from './ChatHeader';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -127,9 +126,6 @@ export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: Ses
 
   return (
     <div className="flex flex-col h-full">
-      {/* Show ChatHeader only when NOT in focus mode */}
-      {!focusedBlockId && <ChatHeader session={session} />}
-
       {/* Context Banner for Focus Mode */}
       {focusedBlockId && focusedBlock && (
         <div className="flex items-center justify-between px-4 py-3 bg-accent-cyan/10 border-b border-accent-cyan/20">

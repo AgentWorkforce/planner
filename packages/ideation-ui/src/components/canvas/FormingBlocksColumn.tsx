@@ -119,39 +119,50 @@ export function FormingBlocksColumn({
     });
   }, [isMobile, filteredBlocks, addBody, removeBody, bodies, isReady]);
 
+  const header = (
+    <div className="p-4">
+      <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)]">
+        Forming ({filteredBlocks.length})
+      </h2>
+    </div>
+  );
+
   // Mobile: Simple list layout
   if (isMobile) {
     return (
       <div
-        className={cn('w-full overflow-y-auto bg-[var(--canvas-bg)] p-3', className)}
+        className={cn('w-full h-full flex flex-col overflow-hidden bg-[var(--canvas-bg)]', className)}
       >
-        <div className="space-y-3">
-          {filteredBlocks.length === 0 ? (
-            <div className="text-center text-text-muted text-sm py-8">
-              No forming blocks yet
-            </div>
-          ) : (
-            filteredBlocks.map((block) => {
-              const contentLength = block.content?.length || 0;
-              const size = getBlockSize(block.confidence, contentLength);
+        {header}
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="space-y-3">
+            {filteredBlocks.length === 0 ? (
+              <div className="text-center text-[var(--canvas-text-muted)] text-sm py-8">
+                No forming blocks yet
+              </div>
+            ) : (
+              filteredBlocks.map((block) => {
+                const contentLength = block.content?.length || 0;
+                const size = getBlockSize(block.confidence, contentLength);
 
-              return (
-                <div
-                  key={block.id}
-                  className="relative"
-                  style={{ minHeight: `${size + 16}px` }}
-                >
-                  <PhysicsBlock
-                    block={block}
-                    position={{ x: size / 2 + 8, y: size / 2 + 8 }}
-                    size={size}
-                    onClick={() => onBlockClick?.(block.id)}
-                    onDragEnd={() => onBlockDragEnd?.(block.id)}
-                  />
-                </div>
-              );
-            })
-          )}
+                return (
+                  <div
+                    key={block.id}
+                    className="relative"
+                    style={{ minHeight: `${size + 16}px` }}
+                  >
+                    <PhysicsBlock
+                      block={block}
+                      position={{ x: size / 2 + 8, y: size / 2 + 8 }}
+                      size={size}
+                      onClick={() => onBlockClick?.(block.id)}
+                      onDragEnd={() => onBlockDragEnd?.(block.id)}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     );
@@ -159,26 +170,29 @@ export function FormingBlocksColumn({
 
   // Desktop: Physics simulation
   return (
-    <div
-      ref={containerRef}
-      className={cn('relative w-full h-full overflow-hidden bg-[var(--canvas-bg)]', className)}
-    >
-      {filteredBlocks.map((block) => {
-        const position = bodies.get(block.id) || { x: 0, y: 0, angle: 0, radius: 0 };
-        const contentLength = block.content?.length || 0;
-        const size = getBlockSize(block.confidence, contentLength);
+    <div className={cn('h-full flex flex-col overflow-hidden bg-[var(--canvas-bg)]', className)}>
+      {header}
+      <div
+        ref={containerRef}
+        className="relative flex-1 overflow-hidden"
+      >
+        {filteredBlocks.map((block) => {
+          const position = bodies.get(block.id) || { x: 0, y: 0, angle: 0, radius: 0 };
+          const contentLength = block.content?.length || 0;
+          const size = getBlockSize(block.confidence, contentLength);
 
-        return (
-          <PhysicsBlock
-            key={block.id}
-            block={block}
-            position={{ x: position.x, y: position.y }}
-            size={size}
-            onClick={() => onBlockClick?.(block.id)}
-            onDragEnd={() => onBlockDragEnd?.(block.id)}
-          />
-        );
-      })}
+          return (
+            <PhysicsBlock
+              key={block.id}
+              block={block}
+              position={{ x: position.x, y: position.y }}
+              size={size}
+              onClick={() => onBlockClick?.(block.id)}
+              onDragEnd={() => onBlockDragEnd?.(block.id)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
