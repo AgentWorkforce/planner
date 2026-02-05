@@ -1,0 +1,75 @@
+{
+  "feature_id": "trajectory-interviewer-write",
+  "title": "Interviewer Trajectory Recording",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["trajectory-service", "ideation-lead"],
+  "parent": "trajectory-integration",
+  "component": "ideation-core",
+
+  "summary": {
+    "goal": "Interviewer records trajectory during ideation sessions and completes with retrospective on send-to-planner.",
+    "acceptance_criteria": [
+      { "id": "int-ac1", "description": "Trajectory started on first message in session with intent as title" },
+      { "id": "int-ac2", "description": "Tool calls recorded (spawn_specialist, update_understanding)" },
+      { "id": "int-ac3", "description": "Specialist insights recorded as findings" },
+      { "id": "int-ac4", "description": "Key decisions recorded with reasoning and alternatives" },
+      { "id": "int-ac5", "description": "Trajectory completed with retrospective on send-to-planner" },
+      { "id": "int-ac6", "description": "trajectory_id stored on plan source metadata for downstream lookup" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Trajectory lifecycle: first message → send-to-planner",
+        "Need to track trajectory object across generateResponse calls",
+        "Plan source metadata links ideation trajectory to plan"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["ideation-core"],
+    "steps": [
+      {
+        "step_id": "intw001",
+        "title": "Add trajectory state to Interviewer service",
+        "scope": "ideation-core",
+        "description": "Track current trajectory per session in interviewer/service.ts"
+      },
+      {
+        "step_id": "intw002",
+        "title": "Start trajectory on first message",
+        "scope": "ideation-core",
+        "description": "Call startTrajectory() in generateResponse when no active trajectory"
+      },
+      {
+        "step_id": "intw003",
+        "title": "Record tool calls and findings",
+        "scope": "ideation-core",
+        "description": "Hook into tool execution to record events"
+      },
+      {
+        "step_id": "intw004",
+        "title": "Record decisions",
+        "scope": "ideation-core",
+        "description": "Record key decisions (spawn specialist, approach choices)"
+      },
+      {
+        "step_id": "intw005",
+        "title": "Complete trajectory on send-to-planner",
+        "scope": "ideation-core",
+        "description": "In handlers.ts, complete trajectory before plan creation"
+      },
+      {
+        "step_id": "intw006",
+        "title": "Store trajectory_id in plan source",
+        "scope": "ideation-core",
+        "description": "Include trajectory_id in plan source metadata for PlannerLead lookup"
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "feature_id": "trajectory-forge-read",
+  "title": "Forge Workers Read Planning Context",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["trajectory-service", "trajectory-planner-read-write"],
+  "parent": "trajectory-integration",
+  "component": "forge-core",
+
+  "summary": {
+    "goal": "Forge workers receive planning retrospective as prompt context to understand why each step exists.",
+    "acceptance_criteria": [
+      { "id": "frg-ac1", "description": "buildTaskPrompt looks up planning trajectory via plan_id" },
+      { "id": "frg-ac2", "description": "Planning retrospective injected into worker prompt after step description" },
+      { "id": "frg-ac3", "description": "Worker prompt includes: goal, approach, key decisions, challenges, confidence" },
+      { "id": "frg-ac4", "description": "Graceful handling if no planning trajectory exists" }
+    ],
+    "note": "No write changes to forge - TrajectoryCapture (SQLite+SSE) remains untouched for execution monitoring"
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Read-only integration - forge TrajectoryCapture stays separate",
+        "Context helps workers understand WHY the step exists",
+        "Plan_id is the lookup key via findBySource('planner', planId)"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "frgr001",
+        "title": "Import trajectory service functions",
+        "scope": "forge-core",
+        "description": "Import findBySource, formatRetrospectiveAsContext in forge-spawner.ts"
+      },
+      {
+        "step_id": "frgr002",
+        "title": "Look up planning trajectory",
+        "scope": "forge-core",
+        "description": "In buildTaskPrompt, look up trajectory via plan_id"
+      },
+      {
+        "step_id": "frgr003",
+        "title": "Inject planning context into prompt",
+        "scope": "forge-core",
+        "description": "Add Planning Context section after step details"
+      },
+      {
+        "step_id": "frgr004",
+        "title": "Handle missing trajectory gracefully",
+        "scope": "forge-core",
+        "description": "Prompt works without context section if no trajectory found"
+      }
+    ]
+  }
+}
