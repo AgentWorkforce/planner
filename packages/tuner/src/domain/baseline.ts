@@ -127,3 +127,63 @@ export function createModelBaseline(
     last_updated: new Date().toISOString(),
   };
 }
+
+// ============================================================================
+// Ideation Baseline
+// ============================================================================
+
+/**
+ * Ideation baseline for session quality metrics.
+ * Used for drift detection and learning.
+ */
+export const IdeationBaselineSchema = z.object({
+  pattern: z.string(), // e.g., 'session_quality' for v1
+  // Means (EMA-smoothed)
+  mean_questions_per_plan: z.number().default(0),
+  mean_versions_per_plan: z.number().default(1),
+  mean_block_utilization: z.number().min(0).max(1).default(0),
+  mean_conversation_turns: z.number().default(0),
+  mean_time_to_approval_ms: z.number().default(0),
+  // Welford's online variance (M2 values)
+  m2_questions: z.number().default(0),
+  m2_versions: z.number().default(0),
+  m2_block_utilization: z.number().default(0),
+  m2_conversation_turns: z.number().default(0),
+  m2_time_to_approval: z.number().default(0),
+  // Approval metrics (Thompson sampling)
+  alpha: z.number().default(1), // Prior: Beta(1,1) = uniform
+  beta: z.number().default(1),
+  approval_rate: z.number().min(0).max(1).default(0),
+  // Specialist tracking
+  specialist_contribution_rates: z.record(z.string(), z.number()).default({}),
+  // Metadata
+  sample_count: z.number().int().default(0),
+  last_updated: z.string().datetime(),
+});
+
+export type IdeationBaseline = z.infer<typeof IdeationBaselineSchema>;
+
+/**
+ * Create a new ideation baseline.
+ */
+export function createIdeationBaseline(pattern: string): IdeationBaseline {
+  return {
+    pattern,
+    mean_questions_per_plan: 0,
+    mean_versions_per_plan: 1,
+    mean_block_utilization: 0,
+    mean_conversation_turns: 0,
+    mean_time_to_approval_ms: 0,
+    m2_questions: 0,
+    m2_versions: 0,
+    m2_block_utilization: 0,
+    m2_conversation_turns: 0,
+    m2_time_to_approval: 0,
+    alpha: 1,
+    beta: 1,
+    approval_rate: 0,
+    specialist_contribution_rates: {},
+    sample_count: 0,
+    last_updated: new Date().toISOString(),
+  };
+}

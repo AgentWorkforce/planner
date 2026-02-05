@@ -83,7 +83,7 @@ export interface StabilityCheckContext {
   lastChangedAt?: Date;
 
   /** Parameter type being changed */
-  parameterType: 'model_selection' | 'budget' | 'retry';
+  parameterType: 'model_selection' | 'budget' | 'retry' | 'ideation_model' | 'ideation_confidence' | 'ideation_spawning' | 'ideation_readiness';
 
   /** Current probability (for hysteresis check) */
   currentProbability?: number;

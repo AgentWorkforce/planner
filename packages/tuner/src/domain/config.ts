@@ -178,3 +178,59 @@ export const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
   version: 1,
   updated_at: new Date().toISOString(),
 };
+
+// ============================================================================
+// IdeationConfig
+// ============================================================================
+
+export const IdeationConfigSchema = z.object({
+  interviewer: z.object({
+    model: z.string().default('claude-sonnet-4-20250514'),
+    max_tokens: z.number().int().default(4096),
+    temperature: z.number().min(0).max(1).default(0.7),
+  }),
+  specialist_spawning: z.object({
+    early_spawn_keywords: z.array(z.string()).default([]),
+    min_confidence_to_spawn: z.number().min(0).max(100).default(60),
+    max_specialists: z.number().int().default(5),
+    deprioritized_specialists: z.array(z.string()).default([]),
+  }),
+  confidence_calibration: z.object({
+    uncertain_below: z.number().min(0).max(100).default(40),
+    confident_above: z.number().min(0).max(100).default(80),
+  }),
+  readiness_advisory: z.object({
+    min_conversation_turns: z.number().int().default(3),
+    min_specialist_coverage: z.number().min(0).max(1).default(0.5),
+    block_threshold: z.number().int().default(2),
+  }),
+  version: z.number().int(),
+  updated_at: z.string().datetime(),
+});
+
+export type IdeationConfig = z.infer<typeof IdeationConfigSchema>;
+
+export const DEFAULT_IDEATION_CONFIG: IdeationConfig = {
+  interviewer: {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    temperature: 0.7,
+  },
+  specialist_spawning: {
+    early_spawn_keywords: [],
+    min_confidence_to_spawn: 60,
+    max_specialists: 5,
+    deprioritized_specialists: [],
+  },
+  confidence_calibration: {
+    uncertain_below: 40,
+    confident_above: 80,
+  },
+  readiness_advisory: {
+    min_conversation_turns: 3,
+    min_specialist_coverage: 0.5,
+    block_threshold: 2,
+  },
+  version: 0,
+  updated_at: new Date().toISOString(),
+};
