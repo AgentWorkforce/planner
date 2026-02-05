@@ -1,11 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, type RenderOptions } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RoleContextCard } from '../RoleContextCard';
+import { ToastProvider } from '@/contexts/ToastContext';
+
+// Wrapper that provides required context
+const AllProviders = ({ children }: { children: React.ReactNode }) => (
+  <ToastProvider>{children}</ToastProvider>
+);
+
+const renderWithProviders = (ui: React.ReactElement, options?: Omit<RenderOptions, 'wrapper'>) =>
+  render(ui, { wrapper: AllProviders, ...options });
 
 describe('RoleContextCard', () => {
   it('renders role name and icon in header', () => {
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="designer"
         context={{ library: 'shadcn/ui' }}
@@ -19,7 +28,7 @@ describe('RoleContextCard', () => {
   });
 
   it('renders context fields using KeyValueEditor', () => {
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="architect"
         context={{ tech_stack: 'TypeScript', storage: 'SQLite' }}
@@ -29,16 +38,15 @@ describe('RoleContextCard', () => {
       />
     );
 
-    // When not editable, keys are rendered as text in divs
+    // When not editable, keys and values are rendered as text spans
     expect(screen.getByText('tech_stack')).toBeInTheDocument();
     expect(screen.getByText('storage')).toBeInTheDocument();
-    // Values are in textareas
-    expect(screen.getByDisplayValue('TypeScript')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('SQLite')).toBeInTheDocument();
+    expect(screen.getByText('TypeScript')).toBeInTheDocument();
+    expect(screen.getByText('SQLite')).toBeInTheDocument();
   });
 
   it('shows empty state when context is empty and not editable', () => {
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="tester"
         context={{}}
@@ -52,7 +60,7 @@ describe('RoleContextCard', () => {
   });
 
   it('shows "Add field" CTA when context is empty and editable', () => {
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="security"
         context={{}}
@@ -67,7 +75,7 @@ describe('RoleContextCard', () => {
   });
 
   it('shows delete button when editable', () => {
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="modeler"
         context={{}}
@@ -81,7 +89,7 @@ describe('RoleContextCard', () => {
   });
 
   it('hides delete button when not editable', () => {
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="modeler"
         context={{}}
@@ -101,7 +109,7 @@ describe('RoleContextCard', () => {
     // Mock window.confirm to return true
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="designer"
         context={{}}
@@ -129,7 +137,7 @@ describe('RoleContextCard', () => {
     // Mock window.confirm to return false
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
 
-    render(
+    renderWithProviders(
       <RoleContextCard
         role="designer"
         context={{}}
@@ -149,7 +157,7 @@ describe('RoleContextCard', () => {
   });
 
   it('passes field hints to KeyValueEditor for known roles', () => {
-    const { container } = render(
+    renderWithProviders(
       <RoleContextCard
         role="designer"
         context={{ library: '' }}
@@ -159,12 +167,13 @@ describe('RoleContextCard', () => {
       />
     );
 
-    // KeyValueEditor should show field hints (checking for hint text presence)
-    expect(container.textContent).toContain('Component library');
+    // KeyValueEditor shows field hints as title attributes on key elements
+    const keyElement = screen.getByText('library');
+    expect(keyElement).toHaveAttribute('title', 'Component library (e.g., shadcn/ui)');
   });
 
   it('uses generic SettingsIcon for unknown roles', () => {
-    const { container } = render(
+    const { container } = renderWithProviders(
       <RoleContextCard
         role="custom_role"
         context={{}}

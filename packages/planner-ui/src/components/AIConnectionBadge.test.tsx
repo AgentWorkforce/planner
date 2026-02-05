@@ -12,17 +12,19 @@ describe('AIConnectionBadge', () => {
     });
 
     it('shows "AI Connected" when status is connected', () => {
-      render(<AIConnectionBadge status="connected" />);
+      const { container } = render(<AIConnectionBadge status="connected" />);
 
       expect(screen.getByText('AI Connected')).toBeInTheDocument();
-      expect(screen.getByText('✓')).toBeInTheDocument();
+      // Uses CheckIcon SVG instead of text character
+      expect(container.querySelector('svg')).toBeInTheDocument();
     });
 
     it('shows "Demo Mode" when status is demo', () => {
-      render(<AIConnectionBadge status="demo" />);
+      const { container } = render(<AIConnectionBadge status="demo" />);
 
       expect(screen.getByText('Demo Mode')).toBeInTheDocument();
-      expect(screen.getByText('○')).toBeInTheDocument();
+      // Uses styled span as indicator instead of text character
+      expect(container.querySelector('.rounded-full')).toBeInTheDocument();
     });
 
     it('shows "Connecting..." when isConnecting is true', () => {
@@ -199,28 +201,28 @@ describe('AIConnectionBadge', () => {
   describe('CSS classes', () => {
     it('applies correct class for connected status', () => {
       const { container } = render(<AIConnectionBadge status="connected" />);
-
-      expect(container.querySelector('.ai-connection-badge--connected')).toBeInTheDocument();
+      // Connected status uses success colors
+      expect(container.querySelector('.text-success')).toBeInTheDocument();
     });
 
     it('applies correct class for demo status', () => {
       const { container } = render(<AIConnectionBadge status="demo" />);
-
-      expect(container.querySelector('.ai-connection-badge--demo')).toBeInTheDocument();
+      // Demo status uses muted text color
+      expect(container.querySelector('.text-text-muted')).toBeInTheDocument();
     });
 
     it('applies correct class for loading status', () => {
       const { container } = render(<AIConnectionBadge status="loading" />);
-
-      expect(container.querySelector('.ai-connection-badge--loading')).toBeInTheDocument();
+      // Loading status uses cyan accent color
+      expect(container.querySelector('.text-accent-cyan')).toBeInTheDocument();
     });
 
     it('applies connecting class when isConnecting', () => {
       const { container } = render(
         <AIConnectionBadge status="demo" isConnecting={true} />
       );
-
-      expect(container.querySelector('.connecting')).toBeInTheDocument();
+      // Connecting state uses cyan accent (same as loading)
+      expect(container.querySelector('.text-accent-cyan')).toBeInTheDocument();
     });
   });
 });
