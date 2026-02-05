@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { StepSchema } from '../domain/step.js';
 import { PlanStatusSchema } from '../domain/status.js';
 import { PlanSourceSchema, UnderstandingSchema } from '../domain/plan.js';
+import { DecompositionConfigSchema } from '../domain/decomposition-config.js';
 
 /**
  * Request schema for creating a new plan.
@@ -17,6 +18,8 @@ export const CreatePlanRequestSchema = z.object({
   source: PlanSourceSchema.optional(),
   /** Understanding from ideation session */
   understanding: UnderstandingSchema.optional(),
+  /** DOT Framework: Decomposition limits and thresholds */
+  decomposition_config: DecompositionConfigSchema.optional(),
 });
 
 export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;
@@ -60,6 +63,8 @@ export const UpdatePlanRequestSchema = z.object({
   steps: z.array(StepSchema).optional(),
   /** Update the initiative association */
   initiative_id: z.string().uuid().optional().nullable(),
+  /** DOT Framework: Decomposition limits and thresholds */
+  decomposition_config: DecompositionConfigSchema.optional(),
 });
 
 export type UpdatePlanRequest = z.infer<typeof UpdatePlanRequestSchema>;
@@ -87,6 +92,8 @@ export const CreateVersionRequestSchema = z.object({
   goal: z.string().min(1).optional(),
   context: z.string().optional(),
   steps: z.array(StepSchema).optional(),
+  /** DOT Framework: Decomposition limits and thresholds */
+  decomposition_config: DecompositionConfigSchema.optional(),
 });
 
 export type CreateVersionRequest = z.infer<typeof CreateVersionRequestSchema>;

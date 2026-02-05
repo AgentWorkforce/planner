@@ -121,16 +121,19 @@ export function createRunHandler(deps: RunHandlerDeps) {
         return;
       }
 
+      // Extract workspace_path from request
+      const workspacePath = body.workspace_path;
+
       // Create run and tasks in a transaction
       const { run, tasks } = deps.storage.transaction(() => {
         // Create the run
-        const newRun = createRun(plan);
+        const newRun = createRun(plan, { workspacePath });
         const savedRun = deps.storage.createRun(newRun);
 
-        // Create tasks from plan steps
+        // Create tasks from plan steps (propagate workspace_path to all tasks)
         const createdTasks: Task[] = [];
         for (const step of plan.steps) {
-          const task = createTask(savedRun.run_id, step);
+          const task = createTask(savedRun.run_id, step, workspacePath);
           const savedTask = deps.storage.createTask(task);
           createdTasks.push(savedTask);
         }

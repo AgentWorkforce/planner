@@ -1,3 +1,7 @@
+import type { TrajectoryCapture } from './trajectory-capture.js';
+import type { Task, BudgetsConfig } from '../domain/types.js';
+import { DEFAULT_EXECUTION_POLICY } from '../domain/types.js';
+
 /**
  * Configuration for the health monitor
  */
@@ -288,4 +292,314 @@ export class HealthMonitor {
       config: this.getConfig(),
     };
   }
+}
+
+// ============================================
+// Task Timeout Manager (DOT Framework)
+// ============================================
+
+/**
+ * Information about a tracked task timeout
+ */
+export interface TaskTimeoutInfo {
+  taskId: string;
+  runId: string;
+  agentId?: string;
+  startedAt: Date;
+  timeoutMs: number;
+  timeoutAt: Date;
+}
+
+/**
+ * Result of a timeout check
+ */
+export interface TimeoutCheckResult {
+  taskId: string;
+  isTimedOut: boolean;
+  elapsedMs: number;
+  remainingMs: number;
+}
+
+/**
+ * Callback invoked when a task times out
+ */
+export type OnTaskTimeoutCallback = (info: TaskTimeoutInfo) => void | Promise<void>;
+
+/**
+ * Function to signal agent for graceful shutdown
+ */
+export type SignalAgentShutdownFn = (agentId: string, reason: string) => Promise<void>;
+
+/**
+ * Function to fail a task with timeout
+ */
+export type FailTaskWithTimeoutFn = (taskId: string, runId: string) => Promise<void>;
+
+/**
+ * TaskTimeoutManager enforces per-task timeouts from ExecutionPolicy.
+ *
+ * Features:
+ * - Tracks task start times and calculates timeouts
+ * - Periodic check for timed-out tasks
+ * - Signals agents for graceful shutdown
+ * - Captures timeout events in trajectory
+ *
+ * Research basis: METR 2025 - P(success) ~= (0.5)^(T/50min)
+ * Default 5 minute timeout optimizes success probability.
+ */
+export class TaskTimeoutManager {
+  private trackedTasks: Map<string, TaskTimeoutInfo> = new Map();
+  private checkInterval: ReturnType<typeof setInterval> | null = null;
+  private isRunning = false;
+  private checkIntervalMs: number;
+  private defaultTimeoutMs: number;
+  private trajectoryCapture: TrajectoryCapture | null;
+  private onTimeoutCallbacks: OnTaskTimeoutCallback[] = [];
+  private signalAgentShutdown: SignalAgentShutdownFn | null;
+  private failTaskWithTimeout: FailTaskWithTimeoutFn | null;
+
+  constructor(options?: {
+    /** Interval between timeout checks (default: 10s) */
+    checkIntervalMs?: number;
+    /** Default timeout from BudgetsConfig (default: 300s = 5min) */
+    defaultTimeoutMs?: number;
+    /** Trajectory capture for observability */
+    trajectoryCapture?: TrajectoryCapture;
+    /** Function to signal agent for shutdown */
+    signalAgentShutdown?: SignalAgentShutdownFn;
+    /** Function to fail a task */
+    failTaskWithTimeout?: FailTaskWithTimeoutFn;
+  }) {
+    this.checkIntervalMs = options?.checkIntervalMs ?? 10000; // 10 seconds
+    this.defaultTimeoutMs = options?.defaultTimeoutMs ??
+      (DEFAULT_EXECUTION_POLICY.budgets.per_task_time_seconds * 1000);
+    this.trajectoryCapture = options?.trajectoryCapture ?? null;
+    this.signalAgentShutdown = options?.signalAgentShutdown ?? null;
+    this.failTaskWithTimeout = options?.failTaskWithTimeout ?? null;
+  }
+
+  /**
+   * Starts the timeout monitoring loop.
+   */
+  start(): void {
+    if (this.isRunning) {
+      console.warn('[TaskTimeoutManager] Already running');
+      return;
+    }
+
+    console.log(
+      `[TaskTimeoutManager] Starting timeout checks (interval: ${this.checkIntervalMs}ms, ` +
+      `default timeout: ${this.defaultTimeoutMs}ms)`
+    );
+
+    this.isRunning = true;
+    this.checkInterval = setInterval(() => {
+      this.runTimeoutCheck();
+    }, this.checkIntervalMs);
+  }
+
+  /**
+   * Stops the timeout monitoring loop.
+   */
+  stop(): void {
+    if (!this.isRunning) {
+      return;
+    }
+
+    console.log('[TaskTimeoutManager] Stopping timeout checks');
+
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+
+    this.isRunning = false;
+  }
+
+  /**
+   * Tracks a task for timeout enforcement.
+   *
+   * @param task - The task to track
+   * @param runId - Run the task belongs to
+   * @param budgets - Optional budget config (uses default if not provided)
+   */
+  trackTask(task: Task, runId: string, budgets?: BudgetsConfig): void {
+    const timeoutMs = budgets?.per_task_time_seconds
+      ? budgets.per_task_time_seconds * 1000
+      : this.defaultTimeoutMs;
+
+    const now = new Date();
+    const info: TaskTimeoutInfo = {
+      taskId: task.task_id,
+      runId,
+      agentId: task.agent_id,
+      startedAt: now,
+      timeoutMs,
+      timeoutAt: new Date(now.getTime() + timeoutMs),
+    };
+
+    this.trackedTasks.set(task.task_id, info);
+  }
+
+  /**
+   * Removes a task from tracking (e.g., when completed).
+   */
+  untrackTask(taskId: string): void {
+    this.trackedTasks.delete(taskId);
+  }
+
+  /**
+   * Registers a callback for task timeouts.
+   */
+  onTimeout(callback: OnTaskTimeoutCallback): void {
+    this.onTimeoutCallbacks.push(callback);
+  }
+
+  /**
+   * Checks if a specific task has timed out.
+   */
+  checkTaskTimeout(taskId: string): TimeoutCheckResult | null {
+    const info = this.trackedTasks.get(taskId);
+    if (!info) {
+      return null;
+    }
+
+    const now = Date.now();
+    const elapsedMs = now - info.startedAt.getTime();
+    const remainingMs = Math.max(0, info.timeoutMs - elapsedMs);
+
+    return {
+      taskId,
+      isTimedOut: elapsedMs >= info.timeoutMs,
+      elapsedMs,
+      remainingMs,
+    };
+  }
+
+  /**
+   * Runs a timeout check on all tracked tasks.
+   */
+  async runTimeoutCheck(): Promise<void> {
+    const now = Date.now();
+    const timedOutTasks: TaskTimeoutInfo[] = [];
+
+    this.trackedTasks.forEach((info) => {
+      if (now >= info.timeoutAt.getTime()) {
+        timedOutTasks.push(info);
+      }
+    });
+
+    // Handle each timed-out task
+    for (const info of timedOutTasks) {
+      await this.handleTimeout(info);
+    }
+  }
+
+  /**
+   * Handles a single task timeout.
+   */
+  private async handleTimeout(info: TaskTimeoutInfo): Promise<void> {
+    console.warn(
+      `[TaskTimeoutManager] Task ${info.taskId} timed out after ${info.timeoutMs}ms`
+    );
+
+    // Remove from tracking first to avoid duplicate processing
+    this.trackedTasks.delete(info.taskId);
+
+    // Capture trajectory event
+    if (this.trajectoryCapture) {
+      this.trajectoryCapture.capture(
+        info.runId,
+        'task_timeout' as any,
+        {
+          task_id: info.taskId,
+          agent_id: info.agentId,
+          timeout_ms: info.timeoutMs,
+          started_at: info.startedAt.toISOString(),
+        },
+        info.taskId
+      );
+    }
+
+    // Signal agent for graceful shutdown
+    if (info.agentId && this.signalAgentShutdown) {
+      try {
+        await this.signalAgentShutdown(info.agentId, 'Task timeout exceeded');
+      } catch (error) {
+        console.error(
+          `[TaskTimeoutManager] Failed to signal agent ${info.agentId} for shutdown:`,
+          error
+        );
+      }
+    }
+
+    // Fail the task with timeout outcome
+    if (this.failTaskWithTimeout) {
+      try {
+        await this.failTaskWithTimeout(info.taskId, info.runId);
+      } catch (error) {
+        console.error(
+          `[TaskTimeoutManager] Failed to fail task ${info.taskId}:`,
+          error
+        );
+      }
+    }
+
+    // Notify callbacks
+    for (const callback of this.onTimeoutCallbacks) {
+      try {
+        await callback(info);
+      } catch (error) {
+        console.error('[TaskTimeoutManager] Error in onTimeout callback:', error);
+      }
+    }
+  }
+
+  /**
+   * Gets all tracked tasks with their timeout status.
+   */
+  getAllTaskTimeouts(): TimeoutCheckResult[] {
+    const results: TimeoutCheckResult[] = [];
+    this.trackedTasks.forEach((_, taskId) => {
+      const result = this.checkTaskTimeout(taskId);
+      if (result) {
+        results.push(result);
+      }
+    });
+    return results;
+  }
+
+  /**
+   * Gets the number of tracked tasks.
+   */
+  getTrackedCount(): number {
+    return this.trackedTasks.size;
+  }
+
+  /**
+   * Clears all tracked tasks.
+   */
+  clearAll(): void {
+    this.trackedTasks.clear();
+  }
+
+  /**
+   * Updates the default timeout.
+   */
+  setDefaultTimeout(timeoutMs: number): void {
+    this.defaultTimeoutMs = timeoutMs;
+  }
+}
+
+/**
+ * Factory function to create TaskTimeoutManager.
+ */
+export function createTaskTimeoutManager(options?: {
+  checkIntervalMs?: number;
+  defaultTimeoutMs?: number;
+  trajectoryCapture?: TrajectoryCapture;
+  signalAgentShutdown?: SignalAgentShutdownFn;
+  failTaskWithTimeout?: FailTaskWithTimeoutFn;
+}): TaskTimeoutManager {
+  return new TaskTimeoutManager(options);
 }

@@ -16,6 +16,7 @@ import type {
   GuardianConcernLevel,
   ActiveGuardian,
   GuardianStatus,
+  TaskExecutionMetric,
 } from '../domain/types.js';
 import type {
   UserTrajectoryEvent,
@@ -479,6 +480,59 @@ export interface ForgeStorage {
    * Deletes a preference
    */
   deletePreference(preferenceId: string): boolean;
+
+  // ============================================
+  // Task Execution Metrics (DOT Framework)
+  // ============================================
+
+  /**
+   * Saves a task execution metric
+   */
+  saveTaskMetric(metric: TaskExecutionMetric): TaskExecutionMetric;
+
+  /**
+   * Gets task metrics for a run
+   */
+  getTaskMetrics(runId: string): TaskExecutionMetric[];
+
+  /**
+   * Gets task metrics by model for analysis
+   */
+  getTaskMetricsByModel(modelId: string): TaskExecutionMetric[];
+
+  // ============================================
+  // Run Budgets (DOT Framework)
+  // ============================================
+
+  /**
+   * Budget state for a run
+   */
+  initRunBudget(
+    runId: string,
+    tokensAllowed?: number,
+    costAllowedUsd?: number
+  ): void;
+
+  /**
+   * Updates run budget usage atomically
+   */
+  updateRunBudget(
+    runId: string,
+    tokensUsed: number,
+    costUsed: number
+  ): void;
+
+  /**
+   * Gets run budget state
+   */
+  getRunBudget(
+    runId: string
+  ): {
+    tokens_used: number;
+    tokens_allowed: number | null;
+    cost_used_usd: number;
+    cost_allowed_usd: number | null;
+  } | null;
 
   // ============================================
   // Transaction support

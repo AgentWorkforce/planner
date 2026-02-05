@@ -1,0 +1,26 @@
+{
+  "id": "todo-cli",
+  "name": "Todo CLI",
+  "difficulty": "simple",
+  "goal": "Create a CLI todo list application with these commands: 'add <task>' to add a new todo, 'list' to display all todos with their status, 'done <index>' to mark a todo as complete, 'delete <index>' to remove a todo. Store todos in a local JSON file. Display todos with checkmarks for completed items.",
+  "expected": {
+    "language_tier": "s",
+    "complexity_level": "simple",
+    "step_count": { "min": 3, "max": 8 },
+    "time_minutes": { "min": 5, "max": 20 }
+  },
+  "verification": {
+    "type": "script",
+    "commands": [
+      "node index.js add 'Buy milk'",
+      "node index.js add 'Walk dog'",
+      "node index.js list",
+      "node index.js done 1",
+      "node index.js list"
+    ],
+    "expect_output": "Buy milk",
+    "expect_exit_code": 0,
+    "timeout_seconds": 30
+  },
+  "tags": ["simple", "crud"]
+}

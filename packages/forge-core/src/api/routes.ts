@@ -12,6 +12,7 @@ import { registerTrajectoryRoutes } from './routes/trajectory.js';
 import { registerQuestionRoutes, type RegisterQuestionRoutesOptions } from './routes/questions.js';
 import { registerUserTrajectoryRoutes } from './routes/user-trajectory.js';
 import { registerGuardianRoutes } from './routes/guardians.js';
+import { registerMCPRoutes } from './routes/mcp.js';
 import type { GetAgentPresenceFn } from './handlers/agents.js';
 import type { TerminateActiveAgentsFn } from './handlers/run-control.js';
 import type { HealthCheckResponse } from './schemas.js';
@@ -209,6 +210,13 @@ export function createForgeRouter(
   // Guardian routes (if guardian service provided)
   if (deps.guardianService) {
     registerGuardianRoutes(router, deps.guardianService);
+  }
+
+  // MCP tool routes (if trajectory capture provided — needed for tool context)
+  if (deps.trajectoryCapture) {
+    registerMCPRoutes(router, deps.storage, {
+      trajectoryCapture: deps.trajectoryCapture,
+    });
   }
 
   return router;

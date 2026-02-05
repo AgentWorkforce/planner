@@ -13,6 +13,14 @@ import {
   ListPlansQuerySchema,
   CreateVersionRequestSchema,
 } from '../schemas.js';
+import {
+  enrichPlanVersionForCreate,
+  enrichPlanVersionForUpdate,
+} from '../middleware/dot-enrichment.js';
+import {
+  validatePlanDOTSync,
+  mergeValidationIntoResponse,
+} from '../middleware/dot-validation.js';
 
 /** Default organization slug for MVP (single-org mode) */
 const DEFAULT_ORG_SLUG = 'default';
@@ -63,8 +71,19 @@ export function createPlanHandlers(storage: PlanStorage) {
         }
         storage.createPlan(plan);
 
-        // Create initial draft version with optional understanding
-        const version = createPlanVersion(plan.plan_id, body.goal, body.context, body.understanding);
+        // Create initial draft version with optional understanding and decomposition config
+        let version = createPlanVersion(plan.plan_id, body.goal, {
+          context: body.context,
+          understanding: body.understanding,
+          decomposition_config: body.decomposition_config,
+        });
+
+        // DOT Framework: Enrich steps with language tier and complexity estimate
+        version = enrichPlanVersionForCreate(version);
+
+        // DOT Framework: Validate and collect warnings
+        const validation = validatePlanDOTSync(version);
+
         storage.createVersion(version);
 
         // Log if AI assist was requested but not available
@@ -72,12 +91,14 @@ export function createPlanHandlers(storage: PlanStorage) {
           console.log(`[plans] AI assist requested for plan ${plan.plan_id} but running in standalone mode`);
         }
 
-        res.status(201).json({
+        const response = {
           plan,
           version,
           // No agent in standalone mode
           agent: undefined,
-        });
+        };
+
+        res.status(201).json(mergeValidationIntoResponse(response, validation));
       } catch (err) {
         next(err);
       }
@@ -257,7 +278,7 @@ export function createPlanHandlers(storage: PlanStorage) {
         }
 
         // Check if there are version-level updates
-        const hasVersionUpdates = body.goal !== undefined || body.context !== undefined || body.steps !== undefined;
+        const hasVersionUpdates = body.goal !== undefined || body.context !== undefined || body.steps !== undefined || body.decomposition_config !== undefined;
 
         if (hasVersionUpdates) {
           // Version updates require draft status
@@ -266,7 +287,7 @@ export function createPlanHandlers(storage: PlanStorage) {
           }
 
           // Create updated version (new version number)
-          const newVersion = createVersionFrom(latestVersion);
+          let newVersion = createVersionFrom(latestVersion);
           if (body.goal !== undefined) {
             newVersion.summary.goal = body.goal;
           }
@@ -276,13 +297,27 @@ export function createPlanHandlers(storage: PlanStorage) {
           if (body.steps !== undefined) {
             newVersion.steps = body.steps;
           }
+          if (body.decomposition_config !== undefined) {
+            newVersion.decomposition_config = body.decomposition_config;
+          }
+
+          // DOT Framework: Enrich new/modified steps with language tier and complexity estimate
+          newVersion = enrichPlanVersionForUpdate(newVersion, latestVersion.steps);
+
+          // DOT Framework: Validate and collect warnings
+          const validation = validatePlanDOTSync(newVersion);
+
+          // Check for validation errors (block save if errors)
+          if (!validation.valid) {
+            throw badRequest(`DOT validation failed: ${validation.errors.join('; ')}`);
+          }
 
           storage.createVersion(newVersion);
 
-          res.json({
+          res.json(mergeValidationIntoResponse({
             plan: updatedPlan,
             version: newVersion,
-          });
+          }, validation));
         } else {
           // Only plan-level updates, return existing version
           res.json({
@@ -362,7 +397,7 @@ export function createPlanHandlers(storage: PlanStorage) {
         }
 
         // Create new version from latest
-        const newVersion = createVersionFrom(latestVersion);
+        let newVersion = createVersionFrom(latestVersion);
         if (body.goal !== undefined) {
           newVersion.summary.goal = body.goal;
         }
@@ -372,10 +407,22 @@ export function createPlanHandlers(storage: PlanStorage) {
         if (body.steps !== undefined) {
           newVersion.steps = body.steps;
         }
+        if (body.decomposition_config !== undefined) {
+          newVersion.decomposition_config = body.decomposition_config;
+        }
+
+        // DOT Framework: Enrich new/modified steps
+        newVersion = enrichPlanVersionForUpdate(newVersion, latestVersion.steps);
+
+        // DOT Framework: Validate
+        const validation = validatePlanDOTSync(newVersion);
+        if (!validation.valid) {
+          throw badRequest(`DOT validation failed: ${validation.errors.join('; ')}`);
+        }
 
         storage.createVersion(newVersion);
 
-        res.status(201).json({ version: newVersion });
+        res.status(201).json(mergeValidationIntoResponse({ version: newVersion }, validation));
       } catch (err) {
         next(err);
       }

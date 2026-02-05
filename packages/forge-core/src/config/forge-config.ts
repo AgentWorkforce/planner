@@ -3,6 +3,20 @@ import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
 
 /**
+ * Model types for DOT Framework model routing.
+ * Research basis: SWE-bench - Opus 80.9%, Sonnet 64.8%, Haiku 60.6%
+ */
+export const ModelType = {
+  Haiku: 'haiku',
+  Sonnet: 'sonnet',
+  Opus: 'opus',
+} as const;
+
+export type ModelType = (typeof ModelType)[keyof typeof ModelType];
+
+export const ModelTypeSchema = z.enum(['haiku', 'sonnet', 'opus']);
+
+/**
  * CLI configuration for a role.
  * Maps an owner_role to the CLI command, optional timeout, and audit flag.
  */
@@ -13,9 +27,39 @@ export const CliConfigSchema = z.object({
   timeout: z.number().int().positive().optional(),
   /** Whether to run an audit step after task completion */
   audit: z.boolean().optional(),
+  /** Model to use (haiku, sonnet, opus) - DOT Framework */
+  model: ModelTypeSchema.optional(),
 });
 
 export type CliConfig = z.infer<typeof CliConfigSchema>;
+
+/**
+ * Model routing rule for complexity-based model selection.
+ * DOT Framework: Maps task conditions to appropriate models.
+ */
+export const ModelRoutingRuleSchema = z.object({
+  /** Condition to match (complexity level or keyword) */
+  condition: z.enum(['trivial', 'simple', 'moderate', 'complex', 'architecture', 'default']),
+  /** Model to use when condition matches */
+  model: ModelTypeSchema,
+  /** Optional complexity score threshold (0-1) */
+  complexity_threshold: z.number().min(0).max(1).optional(),
+});
+
+export type ModelRoutingRule = z.infer<typeof ModelRoutingRuleSchema>;
+
+/**
+ * Default model routing rules based on research.
+ * Research basis: SWE-bench - Haiku 3.7x cost efficient for simple tasks
+ */
+export const DEFAULT_MODEL_ROUTING_RULES: ModelRoutingRule[] = [
+  { condition: 'trivial', model: 'haiku' },
+  { condition: 'simple', model: 'haiku', complexity_threshold: 0.3 },
+  { condition: 'moderate', model: 'sonnet', complexity_threshold: 0.5 },
+  { condition: 'complex', model: 'sonnet', complexity_threshold: 0.7 },
+  { condition: 'architecture', model: 'opus' },
+  { condition: 'default', model: 'sonnet' },
+];
 
 /**
  * Repository configuration for a scope.

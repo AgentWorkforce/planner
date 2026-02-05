@@ -1,6 +1,8 @@
 import type { ForgeStorage } from '../storage/interface.js';
-import type { Checkpoint, Run, Task, TaskSnapshot } from '../domain/types.js';
-import { RunStatus, TaskStatus } from '../domain/types.js';
+import type { Checkpoint, Run, Task, TaskSnapshot, RetryConfig, ExecutionPolicy } from '../domain/types.js';
+import { RunStatus, TaskStatus, RecoveryStrategy } from '../domain/types.js';
+import type { TrajectoryCapture } from './trajectory-capture.js';
+import type { GateService } from './gate-service.js';
 
 /**
  * Result of orphan agent detection
@@ -287,4 +289,344 @@ export function setGlobalRecoveryService(service: RecoveryService | null): void 
 
 export function getRecoveryLog(): RecoveryLog | null {
   return globalRecoveryService?.getRecoveryLog() ?? null;
+}
+
+// ============================================
+// Task Failure Handler (DOT Framework Retry Ladder)
+// ============================================
+
+/**
+ * Context about a task failure for recovery decision making
+ */
+export interface TaskFailureContext {
+  /** The failed task */
+  task: Task;
+  /** Run the task belongs to */
+  runId: string;
+  /** Current attempt number (1-indexed) */
+  attemptNumber: number;
+  /** Error message from the failure */
+  errorMessage?: string;
+  /** Confidence score reported by agent (if any) */
+  confidence?: number;
+  /** Previous failure contexts for this task (for Reflexion pattern) */
+  previousFailures?: TaskFailureContext[];
+}
+
+/**
+ * Result of handling a task failure
+ */
+export interface TaskFailureResult {
+  /** Strategy that was applied */
+  strategy: RecoveryStrategy;
+  /** Whether execution should continue */
+  shouldContinue: boolean;
+  /** Delay before next action (ms) */
+  delayMs?: number;
+  /** Message for the retry (includes failure context if Revise strategy) */
+  retryMessage?: string;
+  /** Gate ID if escalated to human */
+  gateId?: string;
+}
+
+/**
+ * TaskFailureHandler implements the DOT Framework retry ladder.
+ *
+ * Strategy progression:
+ * 1. Revise (retry with failure context) - attempts 1-2
+ * 2. Retry (simple retry) - attempt 3
+ * 3. Escalate (human gate) - after max retries
+ *
+ * Research basis: Reflexion 2023 - Self-correction with failure analysis +20-30% improvement
+ */
+export class TaskFailureHandler {
+  private storage: ForgeStorage;
+  private trajectoryCapture: TrajectoryCapture | null;
+  private gateService: GateService | null;
+  private retryTaskFn: RetryTaskFn;
+
+  constructor(
+    storage: ForgeStorage,
+    retryTaskFn: RetryTaskFn,
+    options?: {
+      trajectoryCapture?: TrajectoryCapture;
+      gateService?: GateService;
+    }
+  ) {
+    this.storage = storage;
+    this.retryTaskFn = retryTaskFn;
+    this.trajectoryCapture = options?.trajectoryCapture ?? null;
+    this.gateService = options?.gateService ?? null;
+  }
+
+  /**
+   * Handles a task failure by selecting and applying the appropriate recovery strategy.
+   *
+   * @param context - Information about the failure
+   * @param config - Retry configuration from ExecutionPolicy
+   * @returns Result indicating what action was taken
+   */
+  async handleTaskFailure(
+    context: TaskFailureContext,
+    config?: RetryConfig
+  ): Promise<TaskFailureResult> {
+    // Get config with defaults
+    const maxRetries = config?.max_retries_per_task ?? 3;
+    const backoff = config?.backoff ?? 'exponential';
+    const backoffBase = config?.backoff_base_seconds ?? 30;
+    const includeFailureAnalysis = config?.include_failure_analysis ?? true;
+
+    // Determine strategy based on attempt number and configuration
+    const strategy = this.selectStrategy(context, maxRetries, includeFailureAnalysis);
+
+    // Emit trajectory event for observability
+    if (this.trajectoryCapture) {
+      this.trajectoryCapture.capture(
+        context.runId,
+        'recovery_strategy_selected',
+        {
+          task_id: context.task.task_id,
+          attempt_number: context.attemptNumber,
+          strategy,
+          error_message: context.errorMessage,
+          confidence: context.confidence,
+        },
+        context.task.task_id
+      );
+    }
+
+    // Apply strategy
+    switch (strategy) {
+      case RecoveryStrategy.Revise:
+        return this.applyRevise(context, backoff, backoffBase);
+
+      case RecoveryStrategy.Retry:
+        return this.applyRetry(context, backoff, backoffBase);
+
+      case RecoveryStrategy.Escalate:
+        return this.applyEscalate(context);
+
+      case RecoveryStrategy.Skip:
+        return this.applySkip(context);
+
+      default:
+        // Default to escalate for unknown strategies
+        return this.applyEscalate(context);
+    }
+  }
+
+  /**
+   * Selects the appropriate recovery strategy based on context.
+   */
+  private selectStrategy(
+    context: TaskFailureContext,
+    maxRetries: number,
+    includeFailureAnalysis: boolean
+  ): RecoveryStrategy {
+    // If max retries exceeded, escalate to human
+    if (context.attemptNumber >= maxRetries) {
+      return RecoveryStrategy.Escalate;
+    }
+
+    // If failure analysis enabled and we have error context, use Revise
+    if (includeFailureAnalysis && context.errorMessage) {
+      return RecoveryStrategy.Revise;
+    }
+
+    // Otherwise simple retry
+    return RecoveryStrategy.Retry;
+  }
+
+  /**
+   * Applies the Revise strategy (Reflexion pattern).
+   * Includes failure context in the retry prompt for self-correction.
+   */
+  private async applyRevise(
+    context: TaskFailureContext,
+    backoff: 'none' | 'linear' | 'exponential',
+    backoffBase: number
+  ): Promise<TaskFailureResult> {
+    const delayMs = this.calculateBackoffDelay(context.attemptNumber, backoff, backoffBase);
+
+    // Build retry message with failure context
+    const retryMessage = this.buildReviseMessage(context);
+
+    // Schedule retry after delay
+    if (delayMs > 0) {
+      await this.delay(delayMs);
+    }
+
+    try {
+      await this.retryTaskFn(context.task.task_id);
+    } catch (error) {
+      console.error(`[TaskFailureHandler] Failed to retry task ${context.task.task_id}:`, error);
+    }
+
+    return {
+      strategy: RecoveryStrategy.Revise,
+      shouldContinue: true,
+      delayMs,
+      retryMessage,
+    };
+  }
+
+  /**
+   * Applies simple retry without failure context.
+   */
+  private async applyRetry(
+    context: TaskFailureContext,
+    backoff: 'none' | 'linear' | 'exponential',
+    backoffBase: number
+  ): Promise<TaskFailureResult> {
+    const delayMs = this.calculateBackoffDelay(context.attemptNumber, backoff, backoffBase);
+
+    if (delayMs > 0) {
+      await this.delay(delayMs);
+    }
+
+    try {
+      await this.retryTaskFn(context.task.task_id);
+    } catch (error) {
+      console.error(`[TaskFailureHandler] Failed to retry task ${context.task.task_id}:`, error);
+    }
+
+    return {
+      strategy: RecoveryStrategy.Retry,
+      shouldContinue: true,
+      delayMs,
+    };
+  }
+
+  /**
+   * Applies escalation to human via gate.
+   */
+  private async applyEscalate(context: TaskFailureContext): Promise<TaskFailureResult> {
+    let gateId: string | undefined;
+
+    if (this.gateService) {
+      // Create escalation gate (implementation depends on GateService API)
+      console.log(
+        `[TaskFailureHandler] Escalating task ${context.task.task_id} to human after ${context.attemptNumber} attempts`
+      );
+      // Note: Gate creation would happen here
+      // gateId = await this.gateService.createEscalationGate(context.task.task_id, context.errorMessage);
+    } else {
+      console.warn(
+        `[TaskFailureHandler] GateService not available for escalation of task ${context.task.task_id}`
+      );
+    }
+
+    // Emit escalation event
+    if (this.trajectoryCapture) {
+      this.trajectoryCapture.capture(
+        context.runId,
+        'task_escalated',
+        {
+          task_id: context.task.task_id,
+          attempt_number: context.attemptNumber,
+          error_message: context.errorMessage,
+          gate_id: gateId,
+        },
+        context.task.task_id
+      );
+    }
+
+    return {
+      strategy: RecoveryStrategy.Escalate,
+      shouldContinue: false, // Wait for human
+      gateId,
+    };
+  }
+
+  /**
+   * Applies skip strategy (continue without completing this task).
+   */
+  private async applySkip(context: TaskFailureContext): Promise<TaskFailureResult> {
+    console.log(`[TaskFailureHandler] Skipping task ${context.task.task_id}`);
+
+    // Emit skip event
+    if (this.trajectoryCapture) {
+      this.trajectoryCapture.capture(
+        context.runId,
+        'task_skipped',
+        {
+          task_id: context.task.task_id,
+          reason: 'recovery_skip',
+          error_message: context.errorMessage,
+        },
+        context.task.task_id
+      );
+    }
+
+    return {
+      strategy: RecoveryStrategy.Skip,
+      shouldContinue: true,
+    };
+  }
+
+  /**
+   * Calculates backoff delay in milliseconds.
+   */
+  private calculateBackoffDelay(
+    attemptNumber: number,
+    backoff: 'none' | 'linear' | 'exponential',
+    backoffBase: number
+  ): number {
+    switch (backoff) {
+      case 'none':
+        return 0;
+      case 'linear':
+        return attemptNumber * backoffBase * 1000;
+      case 'exponential':
+        return Math.pow(2, attemptNumber - 1) * backoffBase * 1000;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Builds a retry message that includes failure context (Reflexion pattern).
+   */
+  private buildReviseMessage(context: TaskFailureContext): string {
+    const lines = [
+      `Task "${context.task.step_title}" failed on attempt ${context.attemptNumber}.`,
+    ];
+
+    if (context.errorMessage) {
+      lines.push(`Error: ${context.errorMessage}`);
+    }
+
+    if (context.previousFailures && context.previousFailures.length > 0) {
+      lines.push('Previous attempts:');
+      for (const prev of context.previousFailures) {
+        lines.push(`  - Attempt ${prev.attemptNumber}: ${prev.errorMessage || 'Unknown error'}`);
+      }
+    }
+
+    lines.push('');
+    lines.push('Please analyze what went wrong and try a different approach.');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Simple delay helper.
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+}
+
+/**
+ * Factory function to create TaskFailureHandler.
+ */
+export function createTaskFailureHandler(
+  storage: ForgeStorage,
+  retryTaskFn: RetryTaskFn,
+  options?: {
+    trajectoryCapture?: TrajectoryCapture;
+    gateService?: GateService;
+  }
+): TaskFailureHandler {
+  return new TaskFailureHandler(storage, retryTaskFn, options);
 }

@@ -10,6 +10,8 @@ export {
   RecoveryService,
   setGlobalRecoveryService,
   getRecoveryLog,
+  TaskFailureHandler,
+  createTaskFailureHandler,
   type OrphanDetectionResult,
   type RunRecoveryAction,
   type RecoveryLog,
@@ -17,14 +19,32 @@ export {
   type TerminateAgentFn,
   type RetryTaskFn,
   type RecoveryServiceConfig,
+  type TaskFailureContext,
+  type TaskFailureResult,
 } from './recovery.js';
+
+// Confidence handler (DOT Framework)
+export {
+  ConfidenceHandler,
+  createConfidenceHandler,
+  ConfidenceAction,
+  type ConfidenceCheckResult,
+  type CheckConfidenceOptions,
+} from './confidence-handler.js';
 
 // Health monitoring
 export {
   HealthMonitor,
+  TaskTimeoutManager,
+  createTaskTimeoutManager,
   type HealthMonitorConfig,
   type AgentHealthInfo,
   type OnStuckAgentsCallback,
+  type TaskTimeoutInfo,
+  type TimeoutCheckResult,
+  type OnTaskTimeoutCallback,
+  type SignalAgentShutdownFn,
+  type FailTaskWithTimeoutFn,
 } from './health-monitor.js';
 
 // Shutdown handling
@@ -139,3 +159,82 @@ export {
   type InjectRetrospectiveOptions,
   type RetrospectiveServiceEvents,
 } from './retrospective-service.js';
+
+// Budget service (DOT Framework)
+export {
+  BudgetService,
+  createBudgetService,
+  type TaskUsage,
+  type BudgetRemaining,
+  type BudgetWarningLevel,
+  type BudgetCheckResult,
+} from './budget-service.js';
+
+// Task queue service (DOT Framework parallelism)
+export {
+  TaskQueue,
+  createTaskQueue,
+  type QueuedTask,
+  type QueueStats,
+} from './task-queue.js';
+
+// Run service (DOT Framework integration)
+export {
+  RunService,
+  createRunService,
+  type RunServiceConfig,
+  type TaskDispatchDecision,
+  type TaskWithModel,
+  type TaskCompletionResult,
+  type TaskOutcomeEmission,
+  type RunOutcomeEmission,
+  type OutcomeEmitter,
+} from './run-service.js';
+
+// Model selector (DOT Framework model routing)
+export {
+  ModelSelector,
+  createModelSelector,
+  type ModelSelectionContext,
+  type ModelSelectionResult,
+} from './model-selector.js';
+
+// Artifact validator (DOT Framework dependency validation)
+export {
+  ArtifactValidator,
+  createArtifactValidator,
+  type ArtifactAvailability,
+  type ArtifactValidationResult,
+} from './artifact-validator.js';
+
+// Config refresh service (DOT Framework Tuner integration)
+export {
+  ConfigRefreshService,
+  createConfigRefreshService,
+  type ConfigRefreshConfig,
+  type TunerForgeConfig,
+  type OnConfigChangeCallback,
+} from './config-refresh.js';
+
+// Test executor (testbench mock execution)
+export {
+  TestExecutor,
+  createTestExecutor,
+  type TestExecutorConfig,
+} from './test-executor.js';
+
+// Agent spawner types (DI for agent lifecycle)
+export type {
+  SpawnTaskOptions,
+  SpawnTaskResult,
+  SpawnTaskFn,
+  IsSpawnerAvailableFn,
+  ForgeExecutionMode,
+} from './agent-spawner.js';
+
+// Orchestrator (real execution via RunService)
+export {
+  Orchestrator,
+  createOrchestrator,
+  type OrchestratorConfig,
+} from './orchestrator.js';

@@ -550,7 +550,7 @@ function handleCreatePlan(
   const plan = createPlan(orgId);
   storage.createPlan(plan);
 
-  const version = createPlanVersion(plan.plan_id, goal, context);
+  const version = createPlanVersion(plan.plan_id, goal, { context });
   storage.createVersion(version);
 
   return success({ plan, version });

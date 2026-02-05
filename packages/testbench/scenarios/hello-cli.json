@@ -1,0 +1,20 @@
+{
+  "id": "hello-cli",
+  "name": "Hello CLI",
+  "difficulty": "trivial",
+  "goal": "Create a CLI program that takes a name as the first command-line argument and prints 'Hello, <name>!' to stdout. If no name is provided, print 'Hello, World!'.",
+  "expected": {
+    "language_tier": "s",
+    "complexity_level": "trivial",
+    "step_count": { "min": 1, "max": 3 },
+    "time_minutes": { "min": 1, "max": 5 }
+  },
+  "verification": {
+    "type": "script",
+    "commands": ["node index.js Alice"],
+    "expect_output": "Hello, Alice!",
+    "expect_exit_code": 0,
+    "timeout_seconds": 30
+  },
+  "tags": ["trivial", "baseline"]
+}

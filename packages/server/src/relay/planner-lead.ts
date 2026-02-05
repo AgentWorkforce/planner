@@ -691,8 +691,8 @@ export async function notifyNewPlan(
 
   // Synthesize a "new plan" prompt to trigger PlannerLead's response
   const prompt = context
-    ? `A new plan has been created with goal: "${goal}". Context: ${context}. Please review this plan and suggest 3-4 initial steps to help achieve this goal.`
-    : `A new plan has been created with goal: "${goal}". Please review this plan and suggest 3-4 initial steps to help achieve this goal.`;
+    ? `A new plan has been created with goal: "${goal}". Context: ${context}. Please add 3-4 initial steps to achieve this goal using the add_step tool. For each step, provide a clear title and description.`
+    : `A new plan has been created with goal: "${goal}". Please add 3-4 initial steps to achieve this goal using the add_step tool. For each step, provide a clear title and description.`;
 
   // Generate response using the AI
   const planIdPrefix = planId.slice(0, 8);

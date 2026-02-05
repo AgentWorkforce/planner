@@ -18,10 +18,12 @@ import type {
   WorkspaceCleanup,
   AuditFinding,
   AttemptOutcome,
+  AcceptanceCriterion,
   GuardianEvent,
   GuardianConcernLevel,
   ActiveGuardian,
   GuardianStatus,
+  TaskExecutionMetric,
 } from '../domain/types.js';
 import type {
   UserTrajectoryEvent,
@@ -29,7 +31,7 @@ import type {
   DerivedPreference,
 } from '../domain/user-trajectory.js';
 import type { ForgeStorage, TrajectoryEventFilter, GuardianEventFilter } from './interface.js';
-import { ALL_SCHEMA_STATEMENTS } from './schema.js';
+import { ALL_SCHEMA_STATEMENTS, MIGRATION_STATEMENTS } from './schema.js';
 
 // ============================================
 // Safe JSON Parsing
@@ -62,6 +64,7 @@ interface RunRow {
   plan_version: number;
   status: string;
   has_pending_gate: number;
+  workspace_path: string | null;
   started_at: string | null;
   completed_at: string | null;
   error: string | null;
@@ -77,6 +80,10 @@ interface TaskRow {
   step_title: string;
   status: string;
   dependencies: string;
+  scope: string | null;
+  owner_role: string | null;
+  step_description: string | null;
+  acceptance_criteria: string | null;
   workspace_path: string | null;
   agent_id: string | null;
   current_attempt: number | null;
@@ -221,6 +228,29 @@ interface DerivedPreferenceRow {
   updated_at: string;
 }
 
+interface TaskExecutionMetricRow {
+  metric_id: string;
+  task_id: string;
+  run_id: string;
+  model_id: string | null;
+  complexity_score: number | null;
+  duration_ms: number | null;
+  tokens_used: number | null;
+  cost_usd: number | null;
+  outcome: string | null;
+  confidence: number | null;
+  created_at: string;
+}
+
+interface RunBudgetRow {
+  run_id: string;
+  tokens_allowed: number | null;
+  tokens_used: number;
+  cost_allowed_usd: number | null;
+  cost_used_usd: number;
+  updated_at: string;
+}
+
 // ============================================
 // SQLite Storage Implementation
 // ============================================
@@ -242,6 +272,19 @@ export class SqliteForgeStorage implements ForgeStorage {
    * Initialize database schema.
    */
   private initialize(): void {
+    // Run migrations first so existing tables get new columns
+    // before any indexes reference them.
+    for (const migration of MIGRATION_STATEMENTS) {
+      try {
+        this.db.exec(migration);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('duplicate column') && !msg.includes('no such table')) {
+          throw err;
+        }
+      }
+    }
+
     for (const statement of ALL_SCHEMA_STATEMENTS) {
       this.db.exec(statement);
     }
@@ -254,11 +297,11 @@ export class SqliteForgeStorage implements ForgeStorage {
   createRun(run: Run): Run {
     const stmt = this.db.prepare(`
       INSERT INTO runs (
-        run_id, plan_id, plan_version, status, has_pending_gate,
+        run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
         started_at, completed_at, error, document, created_at, updated_at
       )
       VALUES (
-        @run_id, @plan_id, @plan_version, @status, @has_pending_gate,
+        @run_id, @plan_id, @plan_version, @status, @has_pending_gate, @workspace_path,
         @started_at, @completed_at, @error, @document, @created_at, @updated_at
       )
     `);
@@ -268,6 +311,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       plan_version: run.plan_version,
       status: run.status,
       has_pending_gate: run.has_pending_gate ? 1 : 0,
+      workspace_path: run.workspace_path ?? null,
       started_at: run.started_at ?? null,
       completed_at: run.completed_at ?? null,
       error: run.error ?? null,
@@ -280,7 +324,7 @@ export class SqliteForgeStorage implements ForgeStorage {
 
   getRun(runId: string): Run | null {
     const stmt = this.db.prepare<string, RunRow>(`
-      SELECT run_id, plan_id, plan_version, status, has_pending_gate,
+      SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
              started_at, completed_at, error, document, created_at, updated_at
       FROM runs
       WHERE run_id = ?
@@ -336,7 +380,7 @@ export class SqliteForgeStorage implements ForgeStorage {
 
   listRuns(status?: RunStatus): Run[] {
     let sql = `
-      SELECT run_id, plan_id, plan_version, status, has_pending_gate,
+      SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
              started_at, completed_at, error, document, created_at, updated_at
       FROM runs
     `;
@@ -356,7 +400,7 @@ export class SqliteForgeStorage implements ForgeStorage {
 
   getActiveRuns(): Run[] {
     const stmt = this.db.prepare<[], RunRow>(`
-      SELECT run_id, plan_id, plan_version, status, has_pending_gate,
+      SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
              started_at, completed_at, error, document, created_at, updated_at
       FROM runs
       WHERE status IN ('running', 'paused')
@@ -374,10 +418,12 @@ export class SqliteForgeStorage implements ForgeStorage {
     const stmt = this.db.prepare(`
       INSERT INTO tasks (
         task_id, run_id, step_id, step_title, status, dependencies,
+        scope, owner_role, step_description, acceptance_criteria,
         workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       )
       VALUES (
         @task_id, @run_id, @step_id, @step_title, @status, @dependencies,
+        @scope, @owner_role, @step_description, @acceptance_criteria,
         @workspace_path, @agent_id, @current_attempt, @gate_id, @created_at, @updated_at
       )
     `);
@@ -388,6 +434,10 @@ export class SqliteForgeStorage implements ForgeStorage {
       step_title: task.step_title,
       status: task.status,
       dependencies: JSON.stringify(task.dependencies),
+      scope: task.scope ?? null,
+      owner_role: task.owner_role ?? null,
+      step_description: task.step_description ?? null,
+      acceptance_criteria: task.acceptance_criteria ? JSON.stringify(task.acceptance_criteria) : null,
       workspace_path: task.workspace_path ?? null,
       agent_id: task.agent_id ?? null,
       current_attempt: task.current_attempt ?? null,
@@ -401,6 +451,7 @@ export class SqliteForgeStorage implements ForgeStorage {
   getTask(taskId: string): Task | null {
     const stmt = this.db.prepare<string, TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
+             scope, owner_role, step_description, acceptance_criteria,
              workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE task_id = ?
@@ -418,6 +469,14 @@ export class SqliteForgeStorage implements ForgeStorage {
     if (updates.status !== undefined) {
       fields.push('status = @status');
       values.status = updates.status;
+    }
+    if (updates.scope !== undefined) {
+      fields.push('scope = @scope');
+      values.scope = updates.scope ?? null;
+    }
+    if (updates.owner_role !== undefined) {
+      fields.push('owner_role = @owner_role');
+      values.owner_role = updates.owner_role ?? null;
     }
     if (updates.workspace_path !== undefined) {
       fields.push('workspace_path = @workspace_path');
@@ -457,6 +516,7 @@ export class SqliteForgeStorage implements ForgeStorage {
   listTasksByRun(runId: string): Task[] {
     const stmt = this.db.prepare<string, TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
+             scope, owner_role, step_description, acceptance_criteria,
              workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE run_id = ?
@@ -492,6 +552,7 @@ export class SqliteForgeStorage implements ForgeStorage {
   getTaskByStepId(runId: string, stepId: string): Task | null {
     const stmt = this.db.prepare<[string, string], TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
+             scope, owner_role, step_description, acceptance_criteria,
              workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE run_id = ? AND step_id = ?
@@ -1658,6 +1719,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       plan_version: row.plan_version,
       status: row.status as RunStatus,
       has_pending_gate: row.has_pending_gate === 1,
+      workspace_path: row.workspace_path ?? undefined,
       started_at: row.started_at ?? undefined,
       completed_at: row.completed_at ?? undefined,
       error: row.error ?? undefined,
@@ -1674,6 +1736,12 @@ export class SqliteForgeStorage implements ForgeStorage {
       step_title: row.step_title,
       status: row.status as TaskStatus,
       dependencies: safeJsonParse<string[]>(row.dependencies, [], `task ${row.task_id} dependencies`),
+      scope: row.scope ?? undefined,
+      owner_role: row.owner_role ?? undefined,
+      step_description: row.step_description ?? undefined,
+      acceptance_criteria: row.acceptance_criteria
+        ? safeJsonParse<AcceptanceCriterion[]>(row.acceptance_criteria, [], `task ${row.task_id} acceptance_criteria`)
+        : undefined,
       workspace_path: row.workspace_path ?? undefined,
       agent_id: row.agent_id ?? undefined,
       current_attempt: row.current_attempt ?? undefined,
@@ -1835,6 +1903,145 @@ export class SqliteForgeStorage implements ForgeStorage {
       spawned_at: row.spawned_at,
       stopped_at: row.stopped_at ?? undefined,
       error: row.error ?? undefined,
+    };
+  }
+
+  // ============================================
+  // Task Execution Metrics (DOT Framework)
+  // ============================================
+
+  saveTaskMetric(metric: TaskExecutionMetric): TaskExecutionMetric {
+    const stmt = this.db.prepare(`
+      INSERT INTO task_execution_metrics (
+        metric_id, task_id, run_id, model_id, complexity_score,
+        duration_ms, tokens_used, cost_usd, outcome, confidence, created_at
+      )
+      VALUES (
+        @metric_id, @task_id, @run_id, @model_id, @complexity_score,
+        @duration_ms, @tokens_used, @cost_usd, @outcome, @confidence, @created_at
+      )
+    `);
+    stmt.run({
+      metric_id: metric.metric_id,
+      task_id: metric.task_id,
+      run_id: metric.run_id,
+      model_id: metric.model_id ?? null,
+      complexity_score: metric.complexity_score ?? null,
+      duration_ms: metric.duration_ms ?? null,
+      tokens_used: metric.tokens_used ?? null,
+      cost_usd: metric.cost_usd ?? null,
+      outcome: metric.outcome ?? null,
+      confidence: metric.confidence ?? null,
+      created_at: metric.created_at,
+    });
+    return metric;
+  }
+
+  getTaskMetrics(runId: string): TaskExecutionMetric[] {
+    const stmt = this.db.prepare<string, TaskExecutionMetricRow>(`
+      SELECT metric_id, task_id, run_id, model_id, complexity_score,
+             duration_ms, tokens_used, cost_usd, outcome, confidence, created_at
+      FROM task_execution_metrics
+      WHERE run_id = ?
+      ORDER BY created_at ASC
+    `);
+    const rows = stmt.all(runId);
+    return rows.map((row) => this.rowToTaskExecutionMetric(row));
+  }
+
+  getTaskMetricsByModel(modelId: string): TaskExecutionMetric[] {
+    const stmt = this.db.prepare<string, TaskExecutionMetricRow>(`
+      SELECT metric_id, task_id, run_id, model_id, complexity_score,
+             duration_ms, tokens_used, cost_usd, outcome, confidence, created_at
+      FROM task_execution_metrics
+      WHERE model_id = ?
+      ORDER BY created_at ASC
+    `);
+    const rows = stmt.all(modelId);
+    return rows.map((row) => this.rowToTaskExecutionMetric(row));
+  }
+
+  private rowToTaskExecutionMetric(row: TaskExecutionMetricRow): TaskExecutionMetric {
+    return {
+      metric_id: row.metric_id,
+      task_id: row.task_id,
+      run_id: row.run_id,
+      model_id: row.model_id ?? undefined,
+      complexity_score: row.complexity_score ?? undefined,
+      duration_ms: row.duration_ms ?? undefined,
+      tokens_used: row.tokens_used ?? undefined,
+      cost_usd: row.cost_usd ?? undefined,
+      outcome: row.outcome as AttemptOutcome | undefined,
+      confidence: row.confidence ?? undefined,
+      created_at: row.created_at,
+    };
+  }
+
+  // ============================================
+  // Run Budgets (DOT Framework)
+  // ============================================
+
+  initRunBudget(
+    runId: string,
+    tokensAllowed?: number,
+    costAllowedUsd?: number
+  ): void {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      INSERT INTO run_budgets (
+        run_id, tokens_allowed, tokens_used, cost_allowed_usd, cost_used_usd, updated_at
+      )
+      VALUES (
+        @run_id, @tokens_allowed, 0, @cost_allowed_usd, 0, @updated_at
+      )
+    `);
+    stmt.run({
+      run_id: runId,
+      tokens_allowed: tokensAllowed ?? null,
+      cost_allowed_usd: costAllowedUsd ?? null,
+      updated_at: now,
+    });
+  }
+
+  updateRunBudget(
+    runId: string,
+    tokensUsed: number,
+    costUsed: number
+  ): void {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      UPDATE run_budgets
+      SET tokens_used = tokens_used + @tokens_used,
+          cost_used_usd = cost_used_usd + @cost_used,
+          updated_at = @updated_at
+      WHERE run_id = @run_id
+    `);
+    stmt.run({
+      run_id: runId,
+      tokens_used: tokensUsed,
+      cost_used: costUsed,
+      updated_at: now,
+    });
+  }
+
+  getRunBudget(runId: string): {
+    tokens_used: number;
+    tokens_allowed: number | null;
+    cost_used_usd: number;
+    cost_allowed_usd: number | null;
+  } | null {
+    const stmt = this.db.prepare<string, RunBudgetRow>(`
+      SELECT run_id, tokens_allowed, tokens_used, cost_allowed_usd, cost_used_usd, updated_at
+      FROM run_budgets
+      WHERE run_id = ?
+    `);
+    const row = stmt.get(runId);
+    if (!row) return null;
+    return {
+      tokens_used: row.tokens_used,
+      tokens_allowed: row.tokens_allowed,
+      cost_used_usd: row.cost_used_usd,
+      cost_allowed_usd: row.cost_allowed_usd,
     };
   }
 }

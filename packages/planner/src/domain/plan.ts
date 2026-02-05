@@ -3,6 +3,7 @@ import { PlanStatusSchema, PlanStatus } from './status.js';
 import { SummarySchema, type Summary } from './summary.js';
 import { StepSchema } from './step.js';
 import { ApprovalInfoSchema } from './workflow.js';
+import { DecompositionConfigSchema, type DecompositionConfig } from './decomposition-config.js';
 
 /**
  * PlanSource tracks where a plan originated from.
@@ -55,6 +56,8 @@ export const PlanVersionSchema = z.object({
   submitted_at: z.string().datetime().optional(),
   approval_info: ApprovalInfoSchema.optional(),
   change_request_id: z.string().uuid().optional(),
+  /** DOT Framework: Decomposition limits and thresholds for this plan */
+  decomposition_config: DecompositionConfigSchema.optional(),
   metadata: z.record(z.unknown()).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
@@ -83,18 +86,27 @@ export function createPlan(
 }
 
 /**
+ * Options for creating a PlanVersion
+ */
+export interface CreatePlanVersionOptions {
+  context?: string;
+  understanding?: Understanding;
+  /** DOT Framework: Decomposition configuration */
+  decomposition_config?: DecompositionConfig;
+}
+
+/**
  * Creates a new PlanVersion in draft status
  */
 export function createPlanVersion(
   plan_id: string,
   goal: string,
-  context?: string,
-  understanding?: Understanding
+  options?: CreatePlanVersionOptions
 ): PlanVersion {
   const now = new Date().toISOString();
   const summary: Summary = { goal };
-  if (context !== undefined) {
-    summary.context = context;
+  if (options?.context !== undefined) {
+    summary.context = options.context;
   }
 
   const version: PlanVersion = {
@@ -103,7 +115,8 @@ export function createPlanVersion(
     status: PlanStatus.Draft,
     summary,
     steps: [],
-    understanding,
+    understanding: options?.understanding,
+    decomposition_config: options?.decomposition_config,
     created_at: now,
     updated_at: now,
   };

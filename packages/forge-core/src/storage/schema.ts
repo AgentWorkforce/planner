@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS runs (
   plan_version INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'paused', 'completed', 'failed', 'cancelled')),
   has_pending_gate INTEGER NOT NULL DEFAULT 0,
+  workspace_path TEXT,
   started_at TEXT,
   completed_at TEXT,
   error TEXT,
@@ -69,7 +70,11 @@ CREATE TABLE IF NOT EXISTS tasks (
   step_title TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'queued', 'running', 'auditing', 'awaiting_approval', 'completed', 'failed', 'blocked')),
   dependencies TEXT NOT NULL DEFAULT '[]',
+  scope TEXT,
+  owner_role TEXT,
   workspace_path TEXT,
+  step_description TEXT,
+  acceptance_criteria TEXT,
   agent_id TEXT,
   current_attempt INTEGER,
   gate_id TEXT,
@@ -523,6 +528,78 @@ CREATE INDEX IF NOT EXISTS idx_user_preferences_confidence ON user_preferences(u
 `;
 
 // ============================================
+// Task Execution Metrics Table (DOT Framework)
+// ============================================
+
+/**
+ * SQL to create the task_execution_metrics table.
+ * Stores detailed execution metrics for each task completion.
+ * Used for Tuner learning and analytics.
+ *
+ * DOT Framework addition for tracking:
+ * - Model performance per complexity level
+ * - Token/cost efficiency
+ * - Success rates by language tier
+ */
+export const CREATE_TASK_EXECUTION_METRICS_TABLE = `
+CREATE TABLE IF NOT EXISTS task_execution_metrics (
+  metric_id TEXT PRIMARY KEY NOT NULL,
+  task_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  model_id TEXT,
+  complexity_score REAL,
+  duration_ms INTEGER,
+  tokens_used INTEGER,
+  cost_usd REAL,
+  outcome TEXT CHECK (outcome IN ('success', 'failure', 'timeout', 'cancelled')),
+  confidence REAL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for time-series queries by run.
+ */
+export const CREATE_TASK_METRICS_RUN_TIMESTAMP_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_task_metrics_run_timestamp ON task_execution_metrics(run_id, created_at DESC)
+`;
+
+/**
+ * Index for model performance analysis.
+ */
+export const CREATE_TASK_METRICS_MODEL_OUTCOME_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_task_metrics_model_outcome ON task_execution_metrics(model_id, outcome)
+`;
+
+// ============================================
+// Run Budgets Table (DOT Framework)
+// ============================================
+
+/**
+ * SQL to create the run_budgets table.
+ * Tracks budget consumption per run.
+ * One row per run, updated as tasks consume resources.
+ *
+ * DOT Framework addition for:
+ * - Budget enforcement
+ * - Cost tracking
+ * - Resource monitoring
+ */
+export const CREATE_RUN_BUDGETS_TABLE = `
+CREATE TABLE IF NOT EXISTS run_budgets (
+  run_id TEXT PRIMARY KEY NOT NULL,
+  tokens_allowed INTEGER,
+  tokens_used INTEGER NOT NULL DEFAULT 0,
+  cost_allowed_usd REAL,
+  cost_used_usd REAL NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+)
+`;
+
+// ============================================
 // All Schema Statements
 // ============================================
 
@@ -574,4 +651,22 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_USER_PREFERENCES_TABLE,
   CREATE_USER_PREFERENCES_LOOKUP_INDEX,
   CREATE_USER_PREFERENCES_CONFIDENCE_INDEX,
+  // DOT Framework - Task metrics and budgets
+  CREATE_TASK_EXECUTION_METRICS_TABLE,
+  CREATE_TASK_METRICS_RUN_TIMESTAMP_INDEX,
+  CREATE_TASK_METRICS_MODEL_OUTCOME_INDEX,
+  CREATE_RUN_BUDGETS_TABLE,
+];
+
+/**
+ * Migration statements for existing databases.
+ * ALTER TABLE ADD COLUMN doesn't support IF NOT EXISTS in SQLite,
+ * so callers must catch "duplicate column" errors.
+ */
+export const MIGRATION_STATEMENTS = [
+  `ALTER TABLE tasks ADD COLUMN scope TEXT`,
+  `ALTER TABLE tasks ADD COLUMN owner_role TEXT`,
+  `ALTER TABLE runs ADD COLUMN workspace_path TEXT`,
+  `ALTER TABLE tasks ADD COLUMN step_description TEXT`,
+  `ALTER TABLE tasks ADD COLUMN acceptance_criteria TEXT`,
 ];

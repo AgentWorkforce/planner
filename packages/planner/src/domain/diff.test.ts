@@ -63,7 +63,7 @@ describe('createVersionFrom', () => {
 
   it('should copy summary', () => {
     const planId = '123e4567-e89b-12d3-a456-426614174000';
-    const v1 = createPlanVersion(planId, 'Test goal', 'Test context');
+    const v1 = createPlanVersion(planId, 'Test goal', { context: 'Test context' });
     const v2 = createVersionFrom(v1);
 
     expect(v2.summary.goal).toBe('Test goal');

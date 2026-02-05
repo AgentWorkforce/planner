@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { AcceptanceCriterionSchema, type AcceptanceCriterion } from './criterion.js';
 import { GateSchema, type Gate } from './gate.js';
+import { ComplexityEstimateSchema, type ComplexityEstimate } from './complexity.js';
+import { LanguageTierSchema, type LanguageTier } from './language-tier.js';
+import { TaskContractSchema, type TaskContract } from './contract.js';
 
 /**
  * Step is the atomic unit of work within a plan.
@@ -13,6 +16,9 @@ import { GateSchema, type Gate } from './gate.js';
  * - acceptance_criteria: conditions for completion
  * - gate: optional human approval checkpoint
  * - sub_plan_id: reference to another PlanVersion for nested complexity
+ * - complexity_estimate: DOT Framework - computed complexity for the step (optional)
+ * - language_tier: DOT Framework - detected programming language tier (optional)
+ * - contract: DOT Framework - input/output contract for the step (optional)
  */
 export const StepSchema = z.object({
   step_id: z.string().min(1, 'Step id is required'),
@@ -24,6 +30,12 @@ export const StepSchema = z.object({
   acceptance_criteria: z.array(AcceptanceCriterionSchema).optional(),
   gate: GateSchema.optional(),
   sub_plan_id: z.string().uuid().optional(),
+  /** DOT Framework: Computed complexity estimate for the step */
+  complexity_estimate: ComplexityEstimateSchema.optional(),
+  /** DOT Framework: Detected programming language tier */
+  language_tier: LanguageTierSchema.optional(),
+  /** DOT Framework: Input/output contract for the step */
+  contract: TaskContractSchema.optional(),
 });
 
 export type Step = z.infer<typeof StepSchema>;
@@ -36,6 +48,12 @@ export interface CreateStepOptions {
   acceptance_criteria?: AcceptanceCriterion[];
   gate?: Gate;
   sub_plan_id?: string;
+  /** DOT Framework: Pre-computed complexity estimate */
+  complexity_estimate?: ComplexityEstimate;
+  /** DOT Framework: Detected language tier */
+  language_tier?: LanguageTier;
+  /** DOT Framework: Task contract */
+  contract?: TaskContract;
 }
 
 /**
@@ -56,6 +74,12 @@ export function createStep(title: string, options: CreateStepOptions = {}): Step
   }
   if (options.gate !== undefined) step.gate = options.gate;
   if (options.sub_plan_id !== undefined) step.sub_plan_id = options.sub_plan_id;
+  // DOT Framework fields
+  if (options.complexity_estimate !== undefined) {
+    step.complexity_estimate = options.complexity_estimate;
+  }
+  if (options.language_tier !== undefined) step.language_tier = options.language_tier;
+  if (options.contract !== undefined) step.contract = options.contract;
 
   return StepSchema.parse(step);
 }

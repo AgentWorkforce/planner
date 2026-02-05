@@ -31,6 +31,7 @@ BACKEND_PID_FILE="$PROJECT_DIR/.dev-backend.pid"
 FRONTEND_PID_FILE="$PROJECT_DIR/.dev-frontend.pid"
 IDEATION_FRONTEND_PID_FILE="$PROJECT_DIR/.dev-ideation-frontend.pid"
 FORGE_FRONTEND_PID_FILE="$PROJECT_DIR/.dev-forge-frontend.pid"
+TUNER_PID_FILE="$PROJECT_DIR/.dev-tuner.pid"
 
 # Check if a process is running
 is_running() {
@@ -221,6 +222,35 @@ start_forge_frontend() {
     return 1
 }
 
+# Start tuner service
+start_tuner() {
+    stop_process "$TUNER_PID_FILE" "tuner"
+
+    # Check if port 4002 is in use (tuner default port)
+    if lsof -i :4002 >/dev/null 2>&1; then
+        warn "Port 4002 already in use, attempting to free..."
+        lsof -ti :4002 | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+
+    log "Starting tuner service..."
+    npm run start --prefix "$PROJECT_DIR/packages/tuner" > "$PROJECT_DIR/.dev-tuner.log" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$TUNER_PID_FILE"
+
+    # Wait for server to be ready
+    for i in {1..30}; do
+        if curl -s http://localhost:4002/health >/dev/null 2>&1; then
+            success "Tuner service running at http://localhost:4002"
+            return 0
+        fi
+        sleep 1
+    done
+
+    error "Tuner failed to start. Check $PROJECT_DIR/.dev-tuner.log"
+    return 1
+}
+
 # Show status
 show_status() {
     echo ""
@@ -282,6 +312,18 @@ show_status() {
         warn "Forge UI: not running"
     fi
 
+    # Tuner service status
+    if [ -f "$TUNER_PID_FILE" ]; then
+        local pid=$(cat "$TUNER_PID_FILE")
+        if is_running "$pid" && curl -s http://localhost:4002/health >/dev/null 2>&1; then
+            success "Tuner: running (PID: $pid) at http://localhost:4002"
+        else
+            warn "Tuner: not running"
+        fi
+    else
+        warn "Tuner: not running"
+    fi
+
     echo ""
 }
 
@@ -292,6 +334,7 @@ case "${1:-start}" in
         echo ""
         start_relay
         start_backend
+        start_tuner
         start_frontend
         start_ideation_frontend
         start_forge_frontend
@@ -300,6 +343,7 @@ case "${1:-start}" in
         echo ""
         log "Logs:"
         log "  Backend:           tail -f $PROJECT_DIR/.dev-backend.log"
+        log "  Tuner:             tail -f $PROJECT_DIR/.dev-tuner.log"
         log "  Planner UI:        tail -f $PROJECT_DIR/.dev-frontend.log"
         log "  Ideation UI:       tail -f $PROJECT_DIR/.dev-ideation-frontend.log"
         log "  Forge UI:          tail -f $PROJECT_DIR/.dev-forge-frontend.log"
@@ -310,6 +354,7 @@ case "${1:-start}" in
         stop_process "$FORGE_FRONTEND_PID_FILE" "forge-frontend"
         stop_process "$IDEATION_FRONTEND_PID_FILE" "ideation-frontend"
         stop_process "$FRONTEND_PID_FILE" "frontend"
+        stop_process "$TUNER_PID_FILE" "tuner"
         stop_process "$BACKEND_PID_FILE" "backend"
         stop_relay
         success "Development environment stopped"
@@ -367,10 +412,20 @@ case "${1:-start}" in
             *) log "Usage: $0 forge [start|stop|restart|logs]" ;;
         esac
         ;;
+    tuner)
+        case "${2:-start}" in
+            start) start_tuner ;;
+            stop) stop_process "$TUNER_PID_FILE" "tuner" ;;
+            restart) stop_process "$TUNER_PID_FILE" "tuner"; sleep 1; start_tuner ;;
+            logs) tail -f "$PROJECT_DIR/.dev-tuner.log" ;;
+            *) log "Usage: $0 tuner [start|stop|restart|logs]" ;;
+        esac
+        ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}"
         echo "       $0 relay {start|stop|restart}"
         echo "       $0 backend {start|stop|restart|logs}"
+        echo "       $0 tuner {start|stop|restart|logs}"
         echo "       $0 frontend {start|stop|restart|logs}"
         echo "       $0 ideation {start|stop|restart|logs}"
         echo "       $0 forge {start|stop|restart|logs}"

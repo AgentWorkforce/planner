@@ -23,6 +23,10 @@ export const CreateRunRequestSchema = z
      * Plan version (required if plan_id is provided)
      */
     plan_version: z.number().int().positive().optional(),
+    /**
+     * Workspace directory for agent execution (propagated to all tasks)
+     */
+    workspace_path: z.string().optional(),
   })
   .refine((data) => data.plan || (data.plan_id && data.plan_version), {
     message: 'Either plan must be provided, or both plan_id and plan_version must be specified',
