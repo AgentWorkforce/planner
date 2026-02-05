@@ -83,7 +83,7 @@ function toArtifactDetail(artifact: Artifact): ArtifactDetail {
 export function getTaskDetailHandler(deps: TaskHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const { id: runId, taskId } = req.params;
+      const { id: runId, taskId } = req.params as { id: string; taskId: string };
 
       if (!runId) {
         res.status(400).json({ error: 'Run ID is required' });
@@ -145,7 +145,7 @@ export function getTaskDetailHandler(deps: TaskHandlerDeps) {
 export function getTaskRetrospectiveHandler(deps: TaskHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const { id: runId, taskId } = req.params;
+      const { id: runId, taskId } = req.params as { id: string; taskId: string };
 
       if (!runId) {
         res.status(400).json({ error: 'Run ID is required' });

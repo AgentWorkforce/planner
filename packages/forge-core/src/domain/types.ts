@@ -253,6 +253,126 @@ export const ForgePlanSchema = z.object({
 export type ForgePlan = z.infer<typeof ForgePlanSchema>;
 
 // ============================================
+// Execution Policy (DOT Framework)
+// ============================================
+
+/**
+ * Budget configuration for execution limits
+ * Research basis: METR 2025 - P(success) ~= (0.5)^(T/50min)
+ */
+export const BudgetsConfigSchema = z.object({
+  /** Maximum time per task in seconds (default: 300 = 5 minutes) */
+  per_task_time_seconds: z.number().int().positive().default(300),
+  /** Maximum tokens per task (default: 100000) */
+  per_task_token_limit: z.number().int().positive().default(100000),
+  /** Maximum total cost for the entire run in USD (default: 10.0) */
+  total_cost_limit_usd: z.number().positive().default(10.0),
+});
+
+export type BudgetsConfig = z.infer<typeof BudgetsConfigSchema>;
+
+/**
+ * Retry configuration for failure recovery
+ * Research basis: Reflexion 2023 - Self-correction with failure analysis +20-30% improvement
+ */
+export const RetryConfigSchema = z.object({
+  /** Maximum retry attempts per task (default: 3) */
+  max_retries_per_task: z.number().int().min(0).default(3),
+  /** Backoff strategy (default: exponential) */
+  backoff: z.enum(['none', 'linear', 'exponential']).default('exponential'),
+  /** Base seconds for backoff calculation (default: 30) */
+  backoff_base_seconds: z.number().positive().default(30),
+  /** Include failure context in retry prompt (default: true) */
+  include_failure_analysis: z.boolean().default(true),
+});
+
+export type RetryConfig = z.infer<typeof RetryConfigSchema>;
+
+/**
+ * Recovery strategy for task failures.
+ * Research basis: Reflexion 2023 - Self-correction with failure analysis +20-30% improvement
+ */
+export enum RecoveryStrategy {
+  /** Simple retry without context */
+  Retry = 'retry',
+  /** Retry with failure context included in prompt (Reflexion pattern) */
+  Revise = 'revise',
+  /** Rollback to last known good state */
+  Rollback = 'rollback',
+  /** Create alternative execution path */
+  Branch = 'branch',
+  /** Escalate to human via gate */
+  Escalate = 'escalate',
+  /** Skip the task and continue */
+  Skip = 'skip',
+}
+
+export const RecoveryStrategySchema = z.nativeEnum(RecoveryStrategy);
+
+/**
+ * Parallelism configuration for concurrent task execution
+ */
+export const ParallelismConfigSchema = z.object({
+  /** Maximum concurrent tasks across run (default: 5) */
+  max_concurrent_tasks: z.number().int().positive().default(5),
+  /** Maximum concurrent tasks per scope (optional) */
+  max_concurrent_per_scope: z.number().int().positive().optional(),
+  /** Prefer sequential execution within same scope (default: false) */
+  prefer_sequential_in_scope: z.boolean().default(false),
+});
+
+export type ParallelismConfig = z.infer<typeof ParallelismConfigSchema>;
+
+/**
+ * Replan configuration for cascade failure handling
+ */
+export const ReplanConfigSchema = z.object({
+  /** Trigger replan on cascade failure (default: false) */
+  on_cascade_failure: z.boolean().default(false),
+  /** Number of blocked tasks before triggering replan (default: 3) */
+  threshold_blocked_tasks: z.number().int().positive().default(3),
+});
+
+export type ReplanConfig = z.infer<typeof ReplanConfigSchema>;
+
+/**
+ * Confidence threshold configuration for control flow
+ * Research basis: Multi-Agent Taxonomy 2025 - 98% of silent failures detectable with validation
+ */
+export const ConfidenceConfigSchema = z.object({
+  /** Confidence below this triggers immediate failure (default: 0.3) */
+  escalation_threshold: z.number().min(0).max(1).default(0.3),
+  /** Confidence below this triggers review/clarification (default: 0.5) */
+  review_threshold: z.number().min(0).max(1).default(0.5),
+});
+
+export type ConfidenceConfig = z.infer<typeof ConfidenceConfigSchema>;
+
+/**
+ * ExecutionPolicy controls all DOT Framework knobs for a run.
+ * All fields are optional with sensible defaults to maintain backward compatibility.
+ */
+export const ExecutionPolicySchema = z.object({
+  /** Budget limits (time, tokens, cost) */
+  budgets: BudgetsConfigSchema.default({}),
+  /** Retry strategy configuration */
+  retry: RetryConfigSchema.default({}),
+  /** Parallelism limits */
+  parallelism: ParallelismConfigSchema.default({}),
+  /** Replan triggers */
+  replan: ReplanConfigSchema.default({}),
+  /** Confidence thresholds */
+  confidence: ConfidenceConfigSchema.default({}),
+});
+
+export type ExecutionPolicy = z.infer<typeof ExecutionPolicySchema>;
+
+/**
+ * Default execution policy with research-backed values
+ */
+export const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = ExecutionPolicySchema.parse({});
+
+// ============================================
 // Run Entity
 // ============================================
 
@@ -262,6 +382,8 @@ export const RunSchema = z.object({
   plan_version: z.number().int().positive(),
   status: RunStatusSchema,
   has_pending_gate: z.boolean(),
+  /** DOT Framework execution policy (optional for backward compatibility) */
+  execution_policy: ExecutionPolicySchema.optional(),
   started_at: z.string().datetime().optional(),
   completed_at: z.string().datetime().optional(),
   error: z.string().optional(),
@@ -275,6 +397,21 @@ export type Run = z.infer<typeof RunSchema>;
 // Task Entity
 // ============================================
 
+/**
+ * Reference to an artifact expected or produced by a task.
+ * Used for artifact-based dependency validation.
+ */
+export const ArtifactReferenceSchema = z.object({
+  /** Artifact type (file, code_change, test_result, etc.) */
+  type: ArtifactTypeSchema,
+  /** Reference path or identifier (e.g., file path, function name) */
+  reference: z.string().min(1),
+  /** Whether this artifact is required (true) or optional (false) */
+  required: z.boolean().optional().default(true),
+});
+
+export type ArtifactReference = z.infer<typeof ArtifactReferenceSchema>;
+
 export const TaskSchema = z.object({
   task_id: z.string().uuid(),
   run_id: z.string().uuid(),
@@ -282,10 +419,16 @@ export const TaskSchema = z.object({
   step_title: z.string().min(1),
   status: TaskStatusSchema,
   dependencies: z.array(z.string()),
+  /** Scope from plan step (for parallelism control) */
+  scope: z.string().optional(),
   workspace_path: z.string().optional(),
   agent_id: z.string().optional(),
   current_attempt: z.number().int().optional(),
   gate_id: z.string().uuid().optional(),
+  /** Artifacts this task expects/requires as input (for dependency validation) */
+  input_artifacts: z.array(ArtifactReferenceSchema).optional(),
+  /** Artifacts this task produces as output (for dependency validation) */
+  output_artifacts: z.array(ArtifactReferenceSchema).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -540,9 +683,17 @@ export type ActiveGuardian = z.infer<typeof ActiveGuardianSchema>;
 // ============================================
 
 /**
+ * Options for creating a Run
+ */
+export interface CreateRunOptions {
+  /** Optional execution policy for DOT Framework knobs */
+  executionPolicy?: ExecutionPolicy;
+}
+
+/**
  * Creates a new Run from a ForgePlan
  */
-export function createRun(forgePlan: ForgePlan): Run {
+export function createRun(forgePlan: ForgePlan, options?: CreateRunOptions): Run {
   const now = new Date().toISOString();
   const run: Run = {
     run_id: crypto.randomUUID(),
@@ -550,6 +701,7 @@ export function createRun(forgePlan: ForgePlan): Run {
     plan_version: forgePlan.version,
     status: RunStatus.Pending,
     has_pending_gate: false,
+    execution_policy: options?.executionPolicy,
     created_at: now,
     updated_at: now,
   };
@@ -879,6 +1031,79 @@ export function createActiveGuardian(
     spawned_at: now,
   };
   return ActiveGuardianSchema.parse(guardian);
+}
+
+// ============================================
+// Task Execution Metric (DOT Framework)
+// ============================================
+
+/**
+ * Detailed execution metrics for a task completion.
+ * Used for Tuner learning and analytics.
+ */
+export const TaskExecutionMetricSchema = z.object({
+  /** Unique identifier */
+  metric_id: z.string().uuid(),
+  /** Task this metric is for */
+  task_id: z.string().uuid(),
+  /** Run the task belongs to */
+  run_id: z.string().uuid(),
+  /** Model used for execution (haiku, sonnet, opus) */
+  model_id: z.string().optional(),
+  /** Complexity score from Planner (if available) */
+  complexity_score: z.number().optional(),
+  /** Duration in milliseconds */
+  duration_ms: z.number().int().optional(),
+  /** Tokens consumed */
+  tokens_used: z.number().int().optional(),
+  /** Cost in USD */
+  cost_usd: z.number().optional(),
+  /** Execution outcome */
+  outcome: AttemptOutcomeSchema.optional(),
+  /** Confidence reported by agent */
+  confidence: z.number().min(0).max(1).optional(),
+  /** When the metric was recorded */
+  created_at: z.string().datetime(),
+});
+
+export type TaskExecutionMetric = z.infer<typeof TaskExecutionMetricSchema>;
+
+/**
+ * Options for creating a task execution metric
+ */
+export interface CreateTaskExecutionMetricOptions {
+  taskId: string;
+  runId: string;
+  modelId?: string;
+  complexityScore?: number;
+  durationMs?: number;
+  tokensUsed?: number;
+  costUsd?: number;
+  outcome?: AttemptOutcome;
+  confidence?: number;
+}
+
+/**
+ * Creates a new TaskExecutionMetric
+ */
+export function createTaskExecutionMetric(
+  options: CreateTaskExecutionMetricOptions
+): TaskExecutionMetric {
+  const now = new Date().toISOString();
+  const metric: TaskExecutionMetric = {
+    metric_id: crypto.randomUUID(),
+    task_id: options.taskId,
+    run_id: options.runId,
+    model_id: options.modelId,
+    complexity_score: options.complexityScore,
+    duration_ms: options.durationMs,
+    tokens_used: options.tokensUsed,
+    cost_usd: options.costUsd,
+    outcome: options.outcome,
+    confidence: options.confidence,
+    created_at: now,
+  };
+  return TaskExecutionMetricSchema.parse(metric);
 }
 
 // ============================================

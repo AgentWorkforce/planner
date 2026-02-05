@@ -523,6 +523,78 @@ CREATE INDEX IF NOT EXISTS idx_user_preferences_confidence ON user_preferences(u
 `;
 
 // ============================================
+// Task Execution Metrics Table (DOT Framework)
+// ============================================
+
+/**
+ * SQL to create the task_execution_metrics table.
+ * Stores detailed execution metrics for each task completion.
+ * Used for Tuner learning and analytics.
+ *
+ * DOT Framework addition for tracking:
+ * - Model performance per complexity level
+ * - Token/cost efficiency
+ * - Success rates by language tier
+ */
+export const CREATE_TASK_EXECUTION_METRICS_TABLE = `
+CREATE TABLE IF NOT EXISTS task_execution_metrics (
+  metric_id TEXT PRIMARY KEY NOT NULL,
+  task_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  model_id TEXT,
+  complexity_score REAL,
+  duration_ms INTEGER,
+  tokens_used INTEGER,
+  cost_usd REAL,
+  outcome TEXT CHECK (outcome IN ('success', 'failure', 'timeout', 'cancelled')),
+  confidence REAL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for time-series queries by run.
+ */
+export const CREATE_TASK_METRICS_RUN_TIMESTAMP_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_task_metrics_run_timestamp ON task_execution_metrics(run_id, created_at DESC)
+`;
+
+/**
+ * Index for model performance analysis.
+ */
+export const CREATE_TASK_METRICS_MODEL_OUTCOME_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_task_metrics_model_outcome ON task_execution_metrics(model_id, outcome)
+`;
+
+// ============================================
+// Run Budgets Table (DOT Framework)
+// ============================================
+
+/**
+ * SQL to create the run_budgets table.
+ * Tracks budget consumption per run.
+ * One row per run, updated as tasks consume resources.
+ *
+ * DOT Framework addition for:
+ * - Budget enforcement
+ * - Cost tracking
+ * - Resource monitoring
+ */
+export const CREATE_RUN_BUDGETS_TABLE = `
+CREATE TABLE IF NOT EXISTS run_budgets (
+  run_id TEXT PRIMARY KEY NOT NULL,
+  tokens_allowed INTEGER,
+  tokens_used INTEGER NOT NULL DEFAULT 0,
+  cost_allowed_usd REAL,
+  cost_used_usd REAL NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+)
+`;
+
+// ============================================
 // All Schema Statements
 // ============================================
 
@@ -574,4 +646,9 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_USER_PREFERENCES_TABLE,
   CREATE_USER_PREFERENCES_LOOKUP_INDEX,
   CREATE_USER_PREFERENCES_CONFIDENCE_INDEX,
+  // DOT Framework - Task metrics and budgets
+  CREATE_TASK_EXECUTION_METRICS_TABLE,
+  CREATE_TASK_METRICS_RUN_TIMESTAMP_INDEX,
+  CREATE_TASK_METRICS_MODEL_OUTCOME_INDEX,
+  CREATE_RUN_BUDGETS_TABLE,
 ];

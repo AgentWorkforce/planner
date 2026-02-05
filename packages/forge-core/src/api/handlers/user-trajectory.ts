@@ -110,7 +110,7 @@ export function createUserTrajectoryHandlers(service: UserTrajectoryService) {
      */
     getPreference: (req: Request, res: Response) => {
       try {
-        const { category } = req.params;
+        const { category } = req.params as { category: string };
         const query = req.query as unknown as GetPreferenceQuery;
 
         if (!query.user_id) {
@@ -151,7 +151,7 @@ export function createUserTrajectoryHandlers(service: UserTrajectoryService) {
      */
     overridePreference: (req: Request, res: Response) => {
       try {
-        const { category } = req.params;
+        const { category } = req.params as { category: string };
         const query = req.query as unknown as {
           user_id: string;
           scope: UserTrajectoryScope;
@@ -212,7 +212,7 @@ export function createUserTrajectoryHandlers(service: UserTrajectoryService) {
      */
     deletePreference: (req: Request, res: Response) => {
       try {
-        const { preferenceId } = req.params;
+        const { preferenceId } = req.params as { preferenceId: string };
 
         if (!preferenceId) {
           res.status(400).json({ error: 'Missing required path parameter: preferenceId' });

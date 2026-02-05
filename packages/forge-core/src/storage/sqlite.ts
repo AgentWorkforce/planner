@@ -22,6 +22,7 @@ import type {
   GuardianConcernLevel,
   ActiveGuardian,
   GuardianStatus,
+  TaskExecutionMetric,
 } from '../domain/types.js';
 import type {
   UserTrajectoryEvent,
@@ -218,6 +219,29 @@ interface DerivedPreferenceRow {
   last_expressed: string;
   is_override: number;
   created_at: string;
+  updated_at: string;
+}
+
+interface TaskExecutionMetricRow {
+  metric_id: string;
+  task_id: string;
+  run_id: string;
+  model_id: string | null;
+  complexity_score: number | null;
+  duration_ms: number | null;
+  tokens_used: number | null;
+  cost_usd: number | null;
+  outcome: string | null;
+  confidence: number | null;
+  created_at: string;
+}
+
+interface RunBudgetRow {
+  run_id: string;
+  tokens_allowed: number | null;
+  tokens_used: number;
+  cost_allowed_usd: number | null;
+  cost_used_usd: number;
   updated_at: string;
 }
 
@@ -1835,6 +1859,145 @@ export class SqliteForgeStorage implements ForgeStorage {
       spawned_at: row.spawned_at,
       stopped_at: row.stopped_at ?? undefined,
       error: row.error ?? undefined,
+    };
+  }
+
+  // ============================================
+  // Task Execution Metrics (DOT Framework)
+  // ============================================
+
+  saveTaskMetric(metric: TaskExecutionMetric): TaskExecutionMetric {
+    const stmt = this.db.prepare(`
+      INSERT INTO task_execution_metrics (
+        metric_id, task_id, run_id, model_id, complexity_score,
+        duration_ms, tokens_used, cost_usd, outcome, confidence, created_at
+      )
+      VALUES (
+        @metric_id, @task_id, @run_id, @model_id, @complexity_score,
+        @duration_ms, @tokens_used, @cost_usd, @outcome, @confidence, @created_at
+      )
+    `);
+    stmt.run({
+      metric_id: metric.metric_id,
+      task_id: metric.task_id,
+      run_id: metric.run_id,
+      model_id: metric.model_id ?? null,
+      complexity_score: metric.complexity_score ?? null,
+      duration_ms: metric.duration_ms ?? null,
+      tokens_used: metric.tokens_used ?? null,
+      cost_usd: metric.cost_usd ?? null,
+      outcome: metric.outcome ?? null,
+      confidence: metric.confidence ?? null,
+      created_at: metric.created_at,
+    });
+    return metric;
+  }
+
+  getTaskMetrics(runId: string): TaskExecutionMetric[] {
+    const stmt = this.db.prepare<string, TaskExecutionMetricRow>(`
+      SELECT metric_id, task_id, run_id, model_id, complexity_score,
+             duration_ms, tokens_used, cost_usd, outcome, confidence, created_at
+      FROM task_execution_metrics
+      WHERE run_id = ?
+      ORDER BY created_at ASC
+    `);
+    const rows = stmt.all(runId);
+    return rows.map((row) => this.rowToTaskExecutionMetric(row));
+  }
+
+  getTaskMetricsByModel(modelId: string): TaskExecutionMetric[] {
+    const stmt = this.db.prepare<string, TaskExecutionMetricRow>(`
+      SELECT metric_id, task_id, run_id, model_id, complexity_score,
+             duration_ms, tokens_used, cost_usd, outcome, confidence, created_at
+      FROM task_execution_metrics
+      WHERE model_id = ?
+      ORDER BY created_at ASC
+    `);
+    const rows = stmt.all(modelId);
+    return rows.map((row) => this.rowToTaskExecutionMetric(row));
+  }
+
+  private rowToTaskExecutionMetric(row: TaskExecutionMetricRow): TaskExecutionMetric {
+    return {
+      metric_id: row.metric_id,
+      task_id: row.task_id,
+      run_id: row.run_id,
+      model_id: row.model_id ?? undefined,
+      complexity_score: row.complexity_score ?? undefined,
+      duration_ms: row.duration_ms ?? undefined,
+      tokens_used: row.tokens_used ?? undefined,
+      cost_usd: row.cost_usd ?? undefined,
+      outcome: row.outcome as AttemptOutcome | undefined,
+      confidence: row.confidence ?? undefined,
+      created_at: row.created_at,
+    };
+  }
+
+  // ============================================
+  // Run Budgets (DOT Framework)
+  // ============================================
+
+  initRunBudget(
+    runId: string,
+    tokensAllowed?: number,
+    costAllowedUsd?: number
+  ): void {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      INSERT INTO run_budgets (
+        run_id, tokens_allowed, tokens_used, cost_allowed_usd, cost_used_usd, updated_at
+      )
+      VALUES (
+        @run_id, @tokens_allowed, 0, @cost_allowed_usd, 0, @updated_at
+      )
+    `);
+    stmt.run({
+      run_id: runId,
+      tokens_allowed: tokensAllowed ?? null,
+      cost_allowed_usd: costAllowedUsd ?? null,
+      updated_at: now,
+    });
+  }
+
+  updateRunBudget(
+    runId: string,
+    tokensUsed: number,
+    costUsed: number
+  ): void {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      UPDATE run_budgets
+      SET tokens_used = tokens_used + @tokens_used,
+          cost_used_usd = cost_used_usd + @cost_used,
+          updated_at = @updated_at
+      WHERE run_id = @run_id
+    `);
+    stmt.run({
+      run_id: runId,
+      tokens_used: tokensUsed,
+      cost_used: costUsed,
+      updated_at: now,
+    });
+  }
+
+  getRunBudget(runId: string): {
+    tokens_used: number;
+    tokens_allowed: number | null;
+    cost_used_usd: number;
+    cost_allowed_usd: number | null;
+  } | null {
+    const stmt = this.db.prepare<string, RunBudgetRow>(`
+      SELECT run_id, tokens_allowed, tokens_used, cost_allowed_usd, cost_used_usd, updated_at
+      FROM run_budgets
+      WHERE run_id = ?
+    `);
+    const row = stmt.get(runId);
+    if (!row) return null;
+    return {
+      tokens_used: row.tokens_used,
+      tokens_allowed: row.tokens_allowed,
+      cost_used_usd: row.cost_used_usd,
+      cost_allowed_usd: row.cost_allowed_usd,
     };
   }
 }
