@@ -40,6 +40,7 @@ export const ScenarioSchema = z.object({
   expected: ExpectedSchema.optional(),
   verification: VerificationSchema,
   tags: z.array(z.string()).optional(),
+  planning_mode: z.enum(['synthetic', 'ai']).default('synthetic'),
 });
 
 export type Scenario = z.infer<typeof ScenarioSchema>;
