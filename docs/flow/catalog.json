@@ -145,6 +145,27 @@
       "tech": ["TypeScript", "React"],
       "path": "packages/planner-ui/",
       "description": "Frontend application for plan creation, editing, approval workflow, and execution visibility"
+    },
+    {
+      "id": "tuner",
+      "name": "Tuner",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/tuner/",
+      "description": "Adaptive learning loop that observes Forge outcomes, builds baselines, detects drift, and learns optimal model selection via Thompson sampling. CLI-only, no UI."
+    },
+    {
+      "id": "forge-core",
+      "name": "Forge Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/forge-core/",
+      "description": "Orchestration engine for plan execution with budget enforcement, model selection, recovery strategies, and Tuner integration. Executes plans from Planner with observability via Trajectories."
+    },
+    {
+      "id": "testbench",
+      "name": "Testbench",
+      "tech": ["TypeScript", "Node.js", "commander", "Zod"],
+      "path": "packages/testbench/",
+      "description": "End-to-end pipeline testing for Planner → Forge → Tuner. Runs predefined scenarios, collects metrics, supports training mode for Tuner learning. CLI-only."
     }
   ],
 
@@ -167,8 +188,8 @@
     { "id": "ideation-canvas-v2", "title": "Ideation Canvas - Physics-Based Blocks", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-specialists", "ideation-domain", "ideation-api"], "parent": "ideation-package", "design_reference": "docs/design/ideation-canvas-ux.md", "note": "Supersedes ideation-concrete-blocks. Physics canvas, three-column layout, focus mode, dashboard with Navigator." },
 
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
-    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
-    { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved" },
+    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment", "dot-planner-enhancements"] },
+    { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved", "extended_by": ["dot-planner-enhancements"] },
     { "id": "domain-versioning", "title": "Versioning and Diffs", "type": "feature", "status": "approved" },
 
     { "id": "storage", "title": "Storage Layer", "type": "epic", "status": "approved" },
@@ -292,6 +313,56 @@
     { "id": "ideation-doc-agent-tool", "title": "cite_document Agent Tool", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage", "ideation-doc-analysis"], "parent": "ideation-documents" },
     { "id": "ideation-doc-interviewer-integration", "title": "Interviewer Document Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-synthesis", "ideation-doc-agent-tool", "ideation-lead"], "parent": "ideation-documents" },
     { "id": "ideation-doc-ui-upload", "title": "Document Upload UI", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-api"], "parent": "ideation-documents", "component": "ideation-ui" },
-    { "id": "ideation-doc-ui-progress", "title": "Analysis Progress UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-doc-ui-upload", "ideation-doc-analysis"], "parent": "ideation-documents", "component": "ideation-ui" }
+    { "id": "ideation-doc-ui-progress", "title": "Analysis Progress UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-doc-ui-upload", "ideation-doc-analysis"], "parent": "ideation-documents", "component": "ideation-ui" },
+
+    { "id": "tuner-package", "title": "Tuner Package", "type": "epic", "status": "approved", "priority": "high", "component": "tuner", "design_reference": "docs/flow/features/tuner-package.json" },
+    { "id": "tuner-domain", "title": "Tuner Domain Model", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "tuner-package" },
+    { "id": "tuner-storage", "title": "Tuner Storage Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tuner-domain"], "parent": "tuner-package" },
+    { "id": "tuner-api", "title": "Tuner REST API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-storage"], "parent": "tuner-package" },
+    { "id": "tuner-outcome-collector", "title": "Outcome Collector Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tuner-storage"], "parent": "tuner-package" },
+    { "id": "tuner-baseline-service", "title": "Baseline Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-outcome-collector"], "parent": "tuner-package" },
+    { "id": "tuner-drift-detector", "title": "Drift Detector Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-baseline-service"], "parent": "tuner-package" },
+    { "id": "tuner-model-selector", "title": "Model Selector (Thompson Sampling)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-outcome-collector"], "parent": "tuner-package" },
+    { "id": "tuner-stability-controls", "title": "Stability Controls", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-model-selector"], "parent": "tuner-package", "note": "Burn-in, min samples, rate limiting, hysteresis, CI checks to prevent flapping" },
+    { "id": "tuner-config-writer", "title": "Config Writer Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-baseline-service", "tuner-model-selector", "tuner-stability-controls"], "parent": "tuner-package" },
+    { "id": "tuner-cli", "title": "Tuner CLI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tuner-api"], "parent": "tuner-package" },
+    { "id": "tuner-forge-integration", "title": "Forge Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tuner-api", "tuner-outcome-collector"], "parent": "tuner-package", "note": "Forge reads config, emits outcomes" },
+    { "id": "tuner-planner-integration", "title": "Planner Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tuner-api", "tuner-config-writer"], "parent": "tuner-package", "note": "Planner reads decomposition config" },
+
+    { "id": "forge-dot-enhancements", "title": "Forge DOT Framework Enhancements", "type": "epic", "status": "draft", "priority": "critical", "component": "forge-core", "design_reference": "docs/flow/features/forge-dot-enhancements.json", "note": "Budget enforcement, model routing, retry ladder, confidence handling, parallelism, Tuner integration" },
+    { "id": "forge-execution-policy", "title": "Execution Policy Schema", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-budget-enforcement", "title": "Budget Enforcement Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-retry-ladder", "title": "Recovery Strategy Ladder", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-confidence-handling", "title": "Confidence Threshold Handling", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-parallelism-control", "title": "Parallelism Control Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-model-routing", "title": "Model Routing Rules", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-dependency-resolution", "title": "Dependency Resolution Enhancement", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-tuner-integration", "title": "Forge Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-execution-policy", "tuner-api", "tuner-outcome-collector"], "parent": "forge-dot-enhancements", "component": "forge-core", "note": "Reads config from Tuner, emits outcomes for learning" },
+    { "id": "forge-timeout-enforcement", "title": "Timeout Enforcement", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-execution-metrics", "title": "Task Execution Metrics Storage", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+
+    { "id": "dot-planner-enhancements", "title": "DOT Framework - Planner Enhancements", "type": "epic", "status": "draft", "priority": "critical", "component": "planner-core", "design_reference": "docs/flow/features/dot-planner-enhancements.json", "note": "Complexity estimation, language tier detection, step/depth limits, acceptance criteria generation, Tuner integration", "dependencies": ["tuner-package"] },
+    { "id": "planner-complexity-estimator", "title": "Complexity Estimator Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-language-detector", "title": "Language/Domain Tier Detector", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-limits-enforcer", "title": "Step & Depth Limits Enforcer", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["planner-tuner-integration"], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-contract-validator", "title": "Task Contract Validator", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-tuner-integration", "title": "Planner Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tuner-api", "tuner-config-writer"], "parent": "dot-planner-enhancements", "component": "planner-core", "note": "Read PlannerConfig from Tuner for complexity weights and decomposition limits" },
+
+    { "id": "planner-guardrails", "title": "Planning-Time Guardrails", "type": "epic", "status": "backlog", "priority": "medium", "component": "planner-core", "note": "Catches missing requirements BEFORE execution (security, testing, scope). Separate from Tuner which measures AFTER execution. See docs/architecture/02-decomposition-planner.md" },
+    { "id": "guardrails-schema", "title": "Guardrail Schema & Types", "type": "feature", "status": "backlog", "priority": "high", "dependencies": [], "parent": "planner-guardrails", "component": "planner-core" },
+    { "id": "guardrails-security", "title": "Security Guardrails", "type": "feature", "status": "backlog", "priority": "high", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "No auth on API, secrets in code, encryption missing" },
+    { "id": "guardrails-testing", "title": "Testing Guardrails", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "No tests for critical path, missing integration tests" },
+    { "id": "guardrails-scope", "title": "Scope Guardrails", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "Large blast radius, production data changes, many repos" },
+    { "id": "guardrails-approval-integration", "title": "Guardrails Approval Workflow Integration", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "Wire guardrails into plan approval flow" },
+
+    { "id": "testbench", "title": "End-to-End Pipeline Testbench", "type": "epic", "status": "draft", "priority": "high", "component": "testbench", "design_reference": "docs/flow/features/testbench.json", "dependencies": ["tuner-package", "forge-dot-enhancements", "dot-planner-enhancements"], "note": "Automated E2E testing of Planner → Forge → Tuner pipeline with scenario library and training mode" },
+    { "id": "testbench-core", "title": "Testbench Core Infrastructure", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-scenarios", "title": "Scenario Definition & Library", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-core"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-runner", "title": "Scenario Runner", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-core", "testbench-scenarios"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-verification", "title": "Verification Strategies", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-mock", "title": "Mock Execution Mode", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-metrics", "title": "Metrics Collection & Analysis", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-cli", "title": "CLI Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-runner", "testbench-verification", "testbench-metrics"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-reporting", "title": "Results Reporting", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["testbench-metrics", "testbench-cli"], "parent": "testbench", "component": "testbench" }
   ]
 }

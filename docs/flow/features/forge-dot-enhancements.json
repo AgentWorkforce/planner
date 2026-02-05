@@ -1,0 +1,1028 @@
+{
+  "feature_id": "forge-dot-enhancements",
+  "title": "Forge DOT Framework Enhancements",
+  "type": "change_request",
+  "status": "draft",
+  "priority": "critical",
+  "component": "forge-core",
+  "created_at": "2026-02-04",
+  "change_driver": "DOT Framework integration (Decomposition, Orchestration, Trajectories) with Tuner adaptive learning loop",
+
+  "summary": {
+    "goal": "Enhance Forge to support the DOT Framework by adding budget enforcement, model routing, retry ladder, confidence handling, parallelism limits, dependency resolution, and Tuner integration for adaptive learning.",
+    "background": "The DOT Framework (docs/architecture/03-orchestration-forge.md, docs/forge-knobs-analysis.md) identifies missing orchestration capabilities that compound when combined: execution budgets, recovery strategies, model selection, and confidence-based control flow. Tuner (packages/tuner/) provides the adaptive learning loop that observes outcomes and optimizes these knobs over time.",
+    "impact_scope": [
+      "packages/forge-core/src/config/ - ExecutionPolicy config schema",
+      "packages/forge-core/src/domain/types.ts - TaskOutcome, enhanced types",
+      "packages/forge-core/src/storage/ - New tables for budgets, metrics",
+      "packages/forge-core/src/services/ - Budget, parallelism, recovery services",
+      "packages/forge-core/src/api/ - Endpoints for Tuner integration",
+      "packages/forge-core/src/mcp/ - New tools for agents"
+    ]
+  },
+
+  "current_state": {
+    "analysis": {
+      "strengths": [
+        "Run/Task state machine with clear status transitions",
+        "Checkpointing for durability (fire-and-forget async snapshots)",
+        "Human gates for approval workflow",
+        "Questions with blocking levels and priority scoring",
+        "Guardian observers (Security, Architect, QA, Compliance)",
+        "Recovery service with orphan detection and retry on restart",
+        "Retrospectives with confidence capture"
+      ],
+      "gaps": [
+        "No execution budgets (token/time/cost tracking)",
+        "No model selection logic (static CLI config only)",
+        "Limited recovery (only retry, no rollback/branch/escalate)",
+        "No parallelism control (all ready tasks execute immediately)",
+        "Confidence captured but unused in control flow",
+        "No outcome emission for Tuner learning"
+      ],
+      "references": [
+        "docs/forge-knobs-analysis.md - Detailed gap analysis",
+        "docs/architecture/03-orchestration-forge.md - Research-backed recommendations",
+        "docs/dot-optimization-roadmap.md - Phased implementation strategy"
+      ]
+    }
+  },
+
+  "changes_required": [
+    {
+      "id": "cr01",
+      "category": "new_feature",
+      "title": "ExecutionPolicy Schema",
+      "description": "Add ExecutionPolicy type to control budgets, retry, parallelism, and replan triggers per run",
+      "acceptance_criteria": [
+        { "id": "cr01-a", "description": "ExecutionPolicy has budgets: { per_task_time_seconds, per_task_token_limit, total_cost_limit_usd }" },
+        { "id": "cr01-b", "description": "ExecutionPolicy has retry: { max_retries_per_task, backoff, backoff_base_seconds, include_failure_analysis }" },
+        { "id": "cr01-c", "description": "ExecutionPolicy has parallelism: { max_concurrent_tasks, prefer_sequential_in_scope }" },
+        { "id": "cr01-d", "description": "ExecutionPolicy has replan: { on_cascade_failure, threshold_blocked_tasks }" },
+        { "id": "cr01-e", "description": "ExecutionPolicy has confidence: { escalation_threshold, review_threshold }" },
+        { "id": "cr01-f", "description": "Run entity extended with execution_policy field" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/config/forge-config.ts",
+        "packages/forge-core/src/domain/types.ts"
+      ],
+      "research_basis": "METR 2025: P(success) ~= (0.5)^(T/50min) - 5min per task budget recommended"
+    },
+    {
+      "id": "cr02",
+      "category": "new_feature",
+      "title": "Budget Enforcement Service",
+      "description": "Track and enforce token/time/cost budgets per task and per run",
+      "acceptance_criteria": [
+        { "id": "cr02-a", "description": "BudgetService tracks tokens_used, cost_usd, time_seconds per task" },
+        { "id": "cr02-b", "description": "run_budgets table stores budget state with tokens_allowed, tokens_used, cost_allowed, cost_used" },
+        { "id": "cr02-c", "description": "Budget exhaustion triggers configured action (pause, abort, or warn)" },
+        { "id": "cr02-d", "description": "checkBudget(task_id) returns { ok, remaining, warning_level }" },
+        { "id": "cr02-e", "description": "Budget updates emit trajectory events for observability" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/budget-service.ts (new)",
+        "packages/forge-core/src/storage/schema.ts",
+        "packages/forge-core/src/storage/sqlite.ts"
+      ],
+      "research_basis": "Research shows 36% silent failure rate without validation - budget tracking helps detect runaway tasks"
+    },
+    {
+      "id": "cr03",
+      "category": "enhancement",
+      "title": "Retry Ladder (Recovery Strategies)",
+      "description": "Extend recovery beyond simple retry to include revise, rollback, branch, escalate",
+      "acceptance_criteria": [
+        { "id": "cr03-a", "description": "RecoveryStrategy type supports: retry, revise, rollback, branch, escalate, skip" },
+        { "id": "cr03-b", "description": "Default retry: 3 attempts with exponential backoff (base 30s)" },
+        { "id": "cr03-c", "description": "Revise includes failure context in retry prompt (+20-30% improvement per Reflexion)" },
+        { "id": "cr03-d", "description": "Escalate creates human gate after max retries exhausted" },
+        { "id": "cr03-e", "description": "handleTaskFailure() selects strategy from config" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/recovery.ts",
+        "packages/forge-core/src/domain/types.ts"
+      ],
+      "research_basis": "Reflexion 2023: Self-correction with failure analysis improves performance +20-30%"
+    },
+    {
+      "id": "cr04",
+      "category": "enhancement",
+      "title": "Confidence Threshold Handling",
+      "description": "Use captured confidence scores in control flow decisions",
+      "acceptance_criteria": [
+        { "id": "cr04-a", "description": "Confidence < 0.3 fails task immediately" },
+        { "id": "cr04-b", "description": "Confidence < 0.5 triggers clarification or rerun" },
+        { "id": "cr04-c", "description": "Confidence >= 0.5 allows task to continue normally" },
+        { "id": "cr04-d", "description": "Confidence thresholds configurable in ExecutionPolicy" },
+        { "id": "cr04-e", "description": "Low confidence events captured in trajectory for learning" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/retrospective-service.ts",
+        "packages/forge-core/src/services/run-service.ts"
+      ],
+      "research_basis": "Multi-Agent Taxonomy 2025: 98% of silent failures detectable with proper validation including confidence"
+    },
+    {
+      "id": "cr05",
+      "category": "new_feature",
+      "title": "Parallelism Control Service",
+      "description": "Implement task queue with configurable concurrency limits",
+      "acceptance_criteria": [
+        { "id": "cr05-a", "description": "max_concurrent_tasks (default 5) enforced across run" },
+        { "id": "cr05-b", "description": "Optional max_concurrent_per_scope for scope isolation" },
+        { "id": "cr05-c", "description": "prefer_sequential_in_scope option respects scope ordering" },
+        { "id": "cr05-d", "description": "TaskQueue service manages ready tasks with limits" },
+        { "id": "cr05-e", "description": "getNextReadyTasks() respects parallelism config" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/task-queue.ts (new)",
+        "packages/forge-core/src/services/run-service.ts"
+      ],
+      "research_basis": "Resource contention and cascading failures reduced with controlled parallelism"
+    },
+    {
+      "id": "cr06",
+      "category": "new_feature",
+      "title": "Model Routing Rules",
+      "description": "Add complexity-to-model routing logic that Tuner can configure",
+      "acceptance_criteria": [
+        { "id": "cr06-a", "description": "CliConfig extended with model field (haiku, sonnet, opus)" },
+        { "id": "cr06-b", "description": "Model selection rules: condition -> model mapping" },
+        { "id": "cr06-c", "description": "Default rules: trivial -> haiku, complex -> sonnet, architecture -> opus" },
+        { "id": "cr06-d", "description": "selectModelForTask(task) applies rules from config" },
+        { "id": "cr06-e", "description": "Model selection logged as trajectory event" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/config/forge-config.ts",
+        "packages/forge-core/src/services/model-selector.ts (new)"
+      ],
+      "research_basis": "SWE-bench: Opus 80.9%, Sonnet 64.8%, Haiku 60.6% - Haiku 3.7x cost efficient per success"
+    },
+    {
+      "id": "cr07",
+      "category": "new_feature",
+      "title": "Dependency Resolution Enhancement",
+      "description": "Track input/output contracts between tasks for better dependency management",
+      "acceptance_criteria": [
+        { "id": "cr07-a", "description": "Task has optional input_artifacts and output_artifacts arrays" },
+        { "id": "cr07-b", "description": "Dependency validation checks artifact availability" },
+        { "id": "cr07-c", "description": "Blocked tasks track which artifact is missing" },
+        { "id": "cr07-d", "description": "getReadyTasks() validates artifact dependencies" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/domain/types.ts",
+        "packages/forge-core/src/services/run-service.ts"
+      ]
+    },
+    {
+      "id": "cr08",
+      "category": "integration",
+      "title": "Tuner Outcome Emission",
+      "description": "Emit TaskOutcome and RunOutcome to Tuner for adaptive learning",
+      "acceptance_criteria": [
+        { "id": "cr08-a", "description": "After task completes, build TaskOutcome with: model_used, duration, tokens, cost, outcome, confidence" },
+        { "id": "cr08-b", "description": "After run completes, build RunOutcome with aggregate metrics" },
+        { "id": "cr08-c", "description": "TunerClient.recordTaskOutcome() called fire-and-forget" },
+        { "id": "cr08-d", "description": "Graceful fallback if Tuner unavailable (log and continue)" },
+        { "id": "cr08-e", "description": "TUNER_URL env var enables integration" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/tuner-integration.ts (new)",
+        "packages/forge-core/src/services/run-service.ts"
+      ],
+      "integration_dependency": "tuner-package (packages/tuner/)"
+    },
+    {
+      "id": "cr09",
+      "category": "integration",
+      "title": "Tuner Config Reading",
+      "description": "Read ForgeExecutionConfig from Tuner on startup and periodically",
+      "acceptance_criteria": [
+        { "id": "cr09-a", "description": "Forge reads TUNER_URL from env (optional)" },
+        { "id": "cr09-b", "description": "If TUNER_URL set, fetches ForgeExecutionConfig on startup" },
+        { "id": "cr09-c", "description": "Config refreshed every 5 minutes via setInterval" },
+        { "id": "cr09-d", "description": "If Tuner unavailable, falls back to hardcoded defaults" },
+        { "id": "cr09-e", "description": "Config version tracked to detect changes" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/tuner-integration.ts",
+        "packages/forge-core/src/index.ts"
+      ],
+      "integration_dependency": "tuner-package (packages/tuner/)"
+    },
+    {
+      "id": "cr10",
+      "category": "new_feature",
+      "title": "Task Execution Metrics Table",
+      "description": "Store detailed execution metrics for learning and analysis",
+      "acceptance_criteria": [
+        { "id": "cr10-a", "description": "task_execution_metrics table with: task_id, model_id, duration_ms, tokens, cost, outcome" },
+        { "id": "cr10-b", "description": "Metrics captured on task completion (success or failure)" },
+        { "id": "cr10-c", "description": "Queryable by model, task_type, complexity for analysis" },
+        { "id": "cr10-d", "description": "Pruning strategy to prevent unbounded growth" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/storage/schema.ts",
+        "packages/forge-core/src/storage/sqlite.ts"
+      ]
+    },
+    {
+      "id": "cr11",
+      "category": "new_feature",
+      "title": "Timeout Enforcement",
+      "description": "Enforce per-task timeouts with graceful cancellation",
+      "acceptance_criteria": [
+        { "id": "cr11-a", "description": "Per-task timeout from ExecutionPolicy.budgets.per_task_time_seconds" },
+        { "id": "cr11-b", "description": "Timeout triggers task failure with timeout outcome" },
+        { "id": "cr11-c", "description": "Agent process signaled for graceful shutdown" },
+        { "id": "cr11-d", "description": "Timeout event captured in trajectory" }
+      ],
+      "files_affected": [
+        "packages/forge-core/src/services/health-monitor.ts",
+        "packages/forge-core/src/services/run-service.ts"
+      ]
+    }
+  ],
+
+  "implementation_phases": [
+    {
+      "phase": 1,
+      "title": "Foundation (Enables Everything Else)",
+      "changes": ["cr01", "cr10"],
+      "description": "Add ExecutionPolicy schema and metrics storage - all other features need this foundation",
+      "effort": "medium"
+    },
+    {
+      "phase": 2,
+      "title": "Core Orchestration Knobs",
+      "changes": ["cr02", "cr03", "cr04", "cr05", "cr11"],
+      "description": "Implement budget tracking, retry ladder, confidence handling, parallelism, timeouts",
+      "effort": "high"
+    },
+    {
+      "phase": 3,
+      "title": "Model Selection & Dependencies",
+      "changes": ["cr06", "cr07"],
+      "description": "Add model routing rules and dependency resolution",
+      "effort": "medium"
+    },
+    {
+      "phase": 4,
+      "title": "Tuner Integration",
+      "changes": ["cr08", "cr09"],
+      "description": "Wire Forge to read config from Tuner and emit outcomes",
+      "effort": "medium",
+      "dependency": "tuner-package implementation"
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      {
+        "feature_id": "tuner-package",
+        "reason": "Tuner provides ForgeExecutionConfig via API and receives TaskOutcome/RunOutcome",
+        "blocking": false,
+        "note": "Forge can operate with hardcoded defaults before Tuner is ready"
+      }
+    ],
+    "enables": [
+      {
+        "feature_id": "dot-framework-complete",
+        "reason": "These enhancements complete the Orchestration layer of DOT Framework"
+      }
+    ]
+  },
+
+  "research_sources": [
+    { "name": "METR 2025", "url": "https://arxiv.org/html/2503.14499v1", "finding": "P(success) ~= (0.5)^(T/50min)" },
+    { "name": "Six Sigma Agent 2026", "url": "https://arxiv.org/html/2601.22290", "finding": "5-agent voting: 43x reliability improvement" },
+    { "name": "Reflexion 2023", "url": "https://arxiv.org/abs/2303.11366", "finding": "Self-correction: +20-30% improvement" },
+    { "name": "Multi-Agent Taxonomy 2025", "url": "https://arxiv.org/abs/2503.13657", "finding": "36% silent failures, 98% detectable with validation" },
+    { "name": "Anthropic Model Cards", "url": "https://anthropic.com", "finding": "SWE-bench: Opus 80.9%, Sonnet 64.8%, Haiku 60.6%" }
+  ],
+
+  "risk_assessment": {
+    "risks": [
+      {
+        "risk": "Breaking existing Forge behavior",
+        "mitigation": "ExecutionPolicy is optional with sensible defaults matching current behavior",
+        "severity": "medium"
+      },
+      {
+        "risk": "Tuner dependency creates coupling",
+        "mitigation": "Graceful fallback to hardcoded defaults if Tuner unavailable",
+        "severity": "low"
+      },
+      {
+        "risk": "Performance overhead from tracking",
+        "mitigation": "Budget/metrics updates are fire-and-forget async operations",
+        "severity": "low"
+      }
+    ]
+  },
+
+  "catalog_updates": {
+    "add_component": {
+      "id": "forge-core",
+      "name": "Forge Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/forge-core/",
+      "description": "Orchestration engine for plan execution with budget enforcement, model selection, recovery strategies, and Tuner integration"
+    },
+    "add_features": [
+      { "id": "forge-execution-policy", "title": "Execution Policy Schema", "type": "feature", "status": "draft", "priority": "critical", "component": "forge-core" },
+      { "id": "forge-budget-enforcement", "title": "Budget Enforcement Service", "type": "feature", "status": "draft", "priority": "critical", "component": "forge-core", "dependencies": ["forge-execution-policy"] },
+      { "id": "forge-retry-ladder", "title": "Recovery Strategy Ladder", "type": "feature", "status": "draft", "priority": "high", "component": "forge-core", "dependencies": ["forge-execution-policy"] },
+      { "id": "forge-confidence-handling", "title": "Confidence Threshold Handling", "type": "feature", "status": "draft", "priority": "high", "component": "forge-core", "dependencies": ["forge-execution-policy"] },
+      { "id": "forge-parallelism-control", "title": "Parallelism Control Service", "type": "feature", "status": "draft", "priority": "high", "component": "forge-core", "dependencies": ["forge-execution-policy"] },
+      { "id": "forge-model-routing", "title": "Model Routing Rules", "type": "feature", "status": "draft", "priority": "high", "component": "forge-core" },
+      { "id": "forge-dependency-resolution", "title": "Dependency Resolution Enhancement", "type": "feature", "status": "draft", "priority": "medium", "component": "forge-core" },
+      { "id": "forge-tuner-integration", "title": "Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "component": "forge-core", "dependencies": ["tuner-package", "forge-execution-policy"], "note": "Reads config, emits outcomes" },
+      { "id": "forge-timeout-enforcement", "title": "Timeout Enforcement", "type": "feature", "status": "draft", "priority": "high", "component": "forge-core", "dependencies": ["forge-execution-policy"] }
+    ]
+  },
+
+  "notes": [
+    "This change request documents DOT Framework Phase 1 enhancements",
+    "Tuner integration (cr08, cr09) depends on tuner-package being implemented",
+    "All new features are additive - existing Forge behavior preserved with defaults",
+    "Research-backed recommendations from docs/architecture/03-orchestration-forge.md used for default values"
+  ],
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "p1-001",
+        "title": "Define ExecutionPolicy Zod schema and types",
+        "scope": "forge-core",
+        "description": "Add ExecutionPolicy schema with budgets, retry, parallelism, replan, and confidence sub-schemas to domain/types.ts. This is the foundational type all other features depend on.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ExecutionPolicySchema exported with all 5 sub-schemas (budgets, retry, parallelism, replan, confidence)" },
+          { "id": "ac2", "description": "BudgetsConfig: { per_task_time_seconds: number, per_task_token_limit: number, total_cost_limit_usd: number }" },
+          { "id": "ac3", "description": "RetryConfig: { max_retries_per_task: number (default 3), backoff: 'none'|'linear'|'exponential', backoff_base_seconds: number (default 30), include_failure_analysis: boolean (default true) }" },
+          { "id": "ac4", "description": "ParallelismConfig: { max_concurrent_tasks: number (default 5), max_concurrent_per_scope?: number, prefer_sequential_in_scope: boolean (default false) }" },
+          { "id": "ac5", "description": "ReplanConfig: { on_cascade_failure: boolean, threshold_blocked_tasks: number (default 3) }" },
+          { "id": "ac6", "description": "ConfidenceConfig: { escalation_threshold: number (default 0.3), review_threshold: number (default 0.5) }" },
+          { "id": "ac7", "description": "All configs use .default() for sensible defaults matching current behavior" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Zod schema with nested object composition",
+            "file": "packages/forge-core/src/domain/types.ts",
+            "location": "After existing Run/Task schemas"
+          },
+          "design": {
+            "defaults": {
+              "per_task_time_seconds": 300,
+              "per_task_token_limit": 100000,
+              "total_cost_limit_usd": 10.0,
+              "max_retries_per_task": 3,
+              "backoff": "exponential",
+              "backoff_base_seconds": 30,
+              "max_concurrent_tasks": 5,
+              "escalation_threshold": 0.3,
+              "review_threshold": 0.5
+            },
+            "note": "Defaults chosen to match current Forge behavior (no limits enforced)"
+          }
+        }
+      },
+      {
+        "step_id": "p1-002",
+        "title": "Extend Run entity with execution_policy field",
+        "scope": "forge-core",
+        "description": "Add optional execution_policy field to RunSchema and update createRun factory function. Run stores the policy for the entire execution.",
+        "dependencies": ["p1-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunSchema includes execution_policy: ExecutionPolicySchema.optional()" },
+          { "id": "ac2", "description": "Run type includes execution_policy?: ExecutionPolicy" },
+          { "id": "ac3", "description": "createRun() accepts optional ExecutionPolicy parameter" },
+          { "id": "ac4", "description": "Existing runs without execution_policy continue to work (backwards compatible)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/domain/types.ts",
+            "changes": ["Extend RunSchema", "Update createRun signature"]
+          }
+        }
+      },
+      {
+        "step_id": "p1-003",
+        "title": "Create task_execution_metrics table schema",
+        "scope": "forge-core",
+        "description": "Add SQL schema for task_execution_metrics table to store detailed execution metrics for each task completion. This enables Tuner learning and analytics.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_TASK_EXECUTION_METRICS_TABLE constant with columns: metric_id, task_id, run_id, model_id, complexity_score, duration_ms, tokens_used, cost_usd, outcome, confidence, created_at" },
+          { "id": "ac2", "description": "Index on (run_id, created_at DESC) for time-series queries" },
+          { "id": "ac3", "description": "Index on (model_id, outcome) for model performance analysis" },
+          { "id": "ac4", "description": "Schema added to ALL_SCHEMA_STATEMENTS array" }
+        ],
+        "specification": {
+          "model": {
+            "table": "task_execution_metrics",
+            "columns": {
+              "metric_id": "TEXT PRIMARY KEY (UUID)",
+              "task_id": "TEXT NOT NULL FK tasks",
+              "run_id": "TEXT NOT NULL FK runs",
+              "model_id": "TEXT",
+              "complexity_score": "REAL",
+              "duration_ms": "INTEGER",
+              "tokens_used": "INTEGER",
+              "cost_usd": "REAL",
+              "outcome": "TEXT CHECK (success|failure|timeout|cancelled)",
+              "confidence": "REAL",
+              "created_at": "TEXT NOT NULL"
+            }
+          },
+          "architecture": {
+            "file": "packages/forge-core/src/storage/schema.ts"
+          }
+        }
+      },
+      {
+        "step_id": "p1-004",
+        "title": "Create run_budgets table schema",
+        "scope": "forge-core",
+        "description": "Add SQL schema for run_budgets table to track budget consumption per run. One row per run, updated as tasks consume resources.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_RUN_BUDGETS_TABLE constant with columns: run_id (PK), tokens_allowed, tokens_used, cost_allowed_usd, cost_used_usd, updated_at" },
+          { "id": "ac2", "description": "Foreign key to runs table with CASCADE delete" },
+          { "id": "ac3", "description": "Schema added to ALL_SCHEMA_STATEMENTS array" }
+        ],
+        "specification": {
+          "model": {
+            "table": "run_budgets",
+            "columns": {
+              "run_id": "TEXT PRIMARY KEY FK runs ON DELETE CASCADE",
+              "tokens_allowed": "INTEGER",
+              "tokens_used": "INTEGER NOT NULL DEFAULT 0",
+              "cost_allowed_usd": "REAL",
+              "cost_used_usd": "REAL NOT NULL DEFAULT 0",
+              "updated_at": "TEXT NOT NULL"
+            }
+          },
+          "architecture": {
+            "file": "packages/forge-core/src/storage/schema.ts"
+          }
+        }
+      },
+      {
+        "step_id": "p1-005",
+        "title": "Implement storage methods for metrics and budgets",
+        "scope": "forge-core",
+        "description": "Add SQLite storage methods for inserting/querying task_execution_metrics and run_budgets tables. Update ForgeStorage interface.",
+        "dependencies": ["p1-003", "p1-004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeStorage interface extended with: saveTaskMetric(), getTaskMetrics(runId), initRunBudget(), updateRunBudget(), getRunBudget()" },
+          { "id": "ac2", "description": "SqliteStorage implements all new methods" },
+          { "id": "ac3", "description": "saveTaskMetric() inserts TaskExecutionMetric entity" },
+          { "id": "ac4", "description": "updateRunBudget(runId, tokensUsed, costUsed) atomically increments counters" },
+          { "id": "ac5", "description": "getRunBudget() returns { tokens_used, tokens_allowed, cost_used_usd, cost_allowed_usd, warning_level }" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": [
+              "packages/forge-core/src/storage/interface.ts",
+              "packages/forge-core/src/storage/sqlite.ts"
+            ],
+            "pattern": "Repository pattern with Zod validation"
+          }
+        }
+      },
+      {
+        "step_id": "p1-006",
+        "title": "Add TaskExecutionMetric domain type",
+        "scope": "forge-core",
+        "description": "Define TaskExecutionMetric Zod schema and factory function in domain/types.ts.",
+        "dependencies": ["p1-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskExecutionMetricSchema exported with all fields from table schema" },
+          { "id": "ac2", "description": "createTaskExecutionMetric() factory function with required fields" },
+          { "id": "ac3", "description": "Outcome type reuses existing AttemptOutcome enum" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/domain/types.ts"
+          }
+        }
+      },
+      {
+        "step_id": "p1-007",
+        "title": "Phase 1 verification checkpoint",
+        "scope": "forge-core",
+        "description": "Verify Phase 1 implementation is complete and correct before proceeding. Run type checks, tests, and review code quality.",
+        "dependencies": ["p1-002", "p1-005", "p1-006"],
+        "owner_role": "tech-lead:Reviewer",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "npm run typecheck passes for forge-core package" },
+          { "id": "ac2", "description": "All new schemas have unit tests" },
+          { "id": "ac3", "description": "Storage methods have integration tests" },
+          { "id": "ac4", "description": "No circular dependencies introduced" },
+          { "id": "ac5", "description": "Code review: no slop, follows existing patterns" }
+        ],
+      },
+      {
+        "step_id": "p2-001",
+        "title": "Create BudgetService class",
+        "scope": "forge-core",
+        "description": "Implement BudgetService that tracks and enforces token/time/cost budgets per task and per run. Core orchestration knob.",
+        "dependencies": ["p1-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BudgetService class with constructor(storage, trajectoryCapture)" },
+          { "id": "ac2", "description": "initBudget(runId, executionPolicy) initializes run_budgets row" },
+          { "id": "ac3", "description": "recordUsage(taskId, { tokens, cost, duration }) updates run budget and emits trajectory event" },
+          { "id": "ac4", "description": "checkBudget(runId) returns { ok: boolean, remaining: BudgetRemaining, warning_level: 'none'|'warning'|'critical' }" },
+          { "id": "ac5", "description": "Warning at 80% usage, critical at 95% usage" },
+          { "id": "ac6", "description": "Budget exhaustion triggers configured action via callback: (action: 'pause'|'abort'|'warn') => void" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Service class with dependency injection",
+            "file": "packages/forge-core/src/services/budget-service.ts"
+          },
+          "design": {
+            "thresholds": {
+              "warning_percent": 80,
+              "critical_percent": 95
+            },
+            "actions": ["pause", "abort", "warn"]
+          }
+        }
+      },
+      {
+        "step_id": "p2-002",
+        "title": "Create TaskQueue service for parallelism control",
+        "scope": "forge-core",
+        "description": "Implement TaskQueue service that manages ready tasks with configurable concurrency limits. Replaces direct task scheduling.",
+        "dependencies": ["p1-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskQueue class with constructor(parallelismConfig)" },
+          { "id": "ac2", "description": "getNextReadyTasks(allReadyTasks, currentRunningCount) returns subset respecting limits" },
+          { "id": "ac3", "description": "max_concurrent_tasks (default 5) enforced globally" },
+          { "id": "ac4", "description": "max_concurrent_per_scope enforced when specified" },
+          { "id": "ac5", "description": "prefer_sequential_in_scope orders tasks within scope by step_id when true" },
+          { "id": "ac6", "description": "Returns empty array when limits reached" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Stateless service (config-driven)",
+            "file": "packages/forge-core/src/services/task-queue.ts"
+          },
+          "design": {
+            "algorithm": "Filter by global limit, then by scope limit, then order by preference"
+          }
+        }
+      },
+      {
+        "step_id": "p2-003",
+        "title": "Extend RecoveryService with strategy ladder",
+        "scope": "forge-core",
+        "description": "Enhance recovery.ts to support multiple recovery strategies beyond simple retry: revise, rollback, branch, escalate, skip.",
+        "dependencies": ["p1-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RecoveryStrategy type: 'retry'|'revise'|'rollback'|'branch'|'escalate'|'skip'" },
+          { "id": "ac2", "description": "handleTaskFailure(task, error, executionPolicy) selects and executes strategy" },
+          { "id": "ac3", "description": "retry: Current behavior - retry with exponential backoff" },
+          { "id": "ac4", "description": "revise: Retry with failure context prepended to prompt (Reflexion pattern)" },
+          { "id": "ac5", "description": "escalate: Create human gate after max retries exhausted" },
+          { "id": "ac6", "description": "Backoff uses config: backoff_base_seconds * 2^attempt for exponential" },
+          { "id": "ac7", "description": "include_failure_analysis flag controls whether error context is added to revise prompts" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Strategy pattern with config-driven selection",
+            "file": "packages/forge-core/src/services/recovery.ts"
+          },
+          "design": {
+            "strategy_selection": {
+              "attempt_1": "retry",
+              "attempt_2": "revise (if include_failure_analysis)",
+              "attempt_3": "revise",
+              "max_exceeded": "escalate"
+            }
+          },
+          "security": {
+            "note": "Failure context sanitized before injection into prompt"
+          }
+        }
+      },
+      {
+        "step_id": "p2-004",
+        "title": "Implement confidence threshold handling",
+        "scope": "forge-core",
+        "description": "Add confidence-based control flow to retrospective-service.ts. Low confidence triggers failure or clarification.",
+        "dependencies": ["p1-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "processConfidence(taskId, confidence, executionPolicy) evaluates thresholds" },
+          { "id": "ac2", "description": "confidence < escalation_threshold (default 0.3) returns { action: 'fail', reason: 'confidence_too_low' }" },
+          { "id": "ac3", "description": "confidence < review_threshold (default 0.5) returns { action: 'clarify', reason: 'confidence_needs_review' }" },
+          { "id": "ac4", "description": "confidence >= review_threshold returns { action: 'continue' }" },
+          { "id": "ac5", "description": "Low confidence events captured as trajectory event: confidence_threshold_triggered" },
+          { "id": "ac6", "description": "Integrated with existing retrospective capture flow" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/retrospective-service.ts"
+          },
+          "design": {
+            "trajectory_event_type": "confidence_threshold_triggered",
+            "trajectory_payload": "{ task_id, confidence, threshold_type, action_taken }"
+          }
+        }
+      },
+      {
+        "step_id": "p2-005",
+        "title": "Implement timeout enforcement in health-monitor",
+        "scope": "forge-core",
+        "description": "Add per-task timeout enforcement to health-monitor.ts. Timeout triggers task failure with graceful agent shutdown.",
+        "dependencies": ["p1-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "startTaskTimer(taskId, timeoutSeconds, onTimeout) starts timer for task" },
+          { "id": "ac2", "description": "clearTaskTimer(taskId) cancels timer on task completion" },
+          { "id": "ac3", "description": "onTimeout callback signals agent process (SIGTERM) for graceful shutdown" },
+          { "id": "ac4", "description": "If agent doesn't exit within 10s grace period, SIGKILL sent" },
+          { "id": "ac5", "description": "Timeout triggers task failure with outcome: 'timeout'" },
+          { "id": "ac6", "description": "Timeout event captured as trajectory event: task_timeout" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/health-monitor.ts",
+            "pattern": "Timer management with signal handling"
+          },
+          "design": {
+            "grace_period_ms": 10000,
+            "signals": ["SIGTERM", "SIGKILL"]
+          }
+        }
+      },
+      {
+        "step_id": "p2-006",
+        "title": "Integrate new services into run-service",
+        "scope": "forge-core",
+        "description": "Wire BudgetService, TaskQueue, confidence handling, and timeout enforcement into run-service.ts. This is the integration step.",
+        "dependencies": ["p2-001", "p2-002", "p2-003", "p2-004", "p2-005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunService constructor accepts BudgetService and TaskQueue dependencies" },
+          { "id": "ac2", "description": "startRun() initializes budget via budgetService.initBudget()" },
+          { "id": "ac3", "description": "getNextReadyTasks() delegates to taskQueue.getNextReadyTasks()" },
+          { "id": "ac4", "description": "onTaskStart() calls healthMonitor.startTaskTimer()" },
+          { "id": "ac5", "description": "onTaskComplete() calls budgetService.recordUsage() and clears timer" },
+          { "id": "ac6", "description": "onTaskComplete() evaluates confidence via processConfidence()" },
+          { "id": "ac7", "description": "onTaskFailure() delegates to recoveryService.handleTaskFailure()" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/run-service.ts",
+            "pattern": "Dependency injection, orchestrator pattern"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "p2-007",
+        "title": "Phase 2 verification checkpoint",
+        "scope": "forge-core",
+        "description": "Verify Phase 2 implementation is complete. Core orchestration knobs working correctly.",
+        "dependencies": ["p2-006"],
+        "owner_role": "tech-lead:Reviewer",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BudgetService unit tests: init, record, check, exhaustion" },
+          { "id": "ac2", "description": "TaskQueue unit tests: limits, scope isolation, sequential preference" },
+          { "id": "ac3", "description": "Recovery ladder tests: retry, revise, escalate paths" },
+          { "id": "ac4", "description": "Confidence threshold tests: fail, clarify, continue paths" },
+          { "id": "ac5", "description": "Timeout enforcement tests: timer, signals, cleanup" },
+          { "id": "ac6", "description": "Integration test: full run with all knobs enabled" },
+          { "id": "ac7", "description": "npm run typecheck passes" }
+        ],
+      },
+      {
+        "step_id": "p3-001",
+        "title": "Extend CliConfig with model field",
+        "scope": "forge-core",
+        "description": "Add model field to CliConfig schema for explicit model selection. Enables Tuner to configure model routing.",
+        "dependencies": ["p2-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CliConfigSchema extended with model: z.enum(['haiku', 'sonnet', 'opus']).optional()" },
+          { "id": "ac2", "description": "CliConfig type updated" },
+          { "id": "ac3", "description": "resolveCliConfig() returns model field if present" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/config/forge-config.ts"
+          }
+        }
+      },
+      {
+        "step_id": "p3-002",
+        "title": "Create ModelSelector service",
+        "scope": "forge-core",
+        "description": "Implement ModelSelector service that selects model based on task complexity and routing rules. Tuner can update rules at runtime.",
+        "dependencies": ["p3-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ModelSelector class with constructor(defaultRules, trajectoryCapture)" },
+          { "id": "ac2", "description": "selectModelForTask(task, stepMetadata) returns model: 'haiku'|'sonnet'|'opus'" },
+          { "id": "ac3", "description": "Default rules: { trivial: 'haiku', standard: 'sonnet', complex: 'sonnet', architecture: 'opus' }" },
+          { "id": "ac4", "description": "updateRules(newRules) allows Tuner to update routing at runtime" },
+          { "id": "ac5", "description": "Model selection logged as trajectory event: model_selected" },
+          { "id": "ac6", "description": "Complexity inferred from step title keywords or explicit complexity_hint" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Rule-based selector with runtime updates",
+            "file": "packages/forge-core/src/services/model-selector.ts"
+          },
+          "design": {
+            "complexity_keywords": {
+              "trivial": ["fix typo", "update comment", "rename"],
+              "complex": ["refactor", "migrate", "redesign"],
+              "architecture": ["design", "architecture", "system"]
+            }
+          }
+        }
+      },
+      {
+        "step_id": "p3-003",
+        "title": "Add input/output artifact tracking to Task",
+        "scope": "forge-core",
+        "description": "Extend Task entity with optional input_artifacts and output_artifacts arrays for contract-based dependency resolution.",
+        "dependencies": ["p2-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskSchema extended with input_artifacts: z.array(ArtifactRefSchema).optional()" },
+          { "id": "ac2", "description": "TaskSchema extended with output_artifacts: z.array(ArtifactRefSchema).optional()" },
+          { "id": "ac3", "description": "ArtifactRefSchema: { name: string, type: ArtifactType, required: boolean }" },
+          { "id": "ac4", "description": "createTask() accepts optional artifact arrays" },
+          { "id": "ac5", "description": "Tasks table migration adds input_artifacts, output_artifacts TEXT columns" }
+        ],
+        "specification": {
+          "model": {
+            "file": "packages/forge-core/src/domain/types.ts",
+            "new_types": ["ArtifactRef", "ArtifactRefSchema"]
+          },
+          "architecture": {
+            "storage_change": "Add columns to tasks table"
+          }
+        }
+      },
+      {
+        "step_id": "p3-004",
+        "title": "Implement artifact-based dependency validation",
+        "scope": "forge-core",
+        "description": "Enhance getReadyTasks() to validate artifact dependencies. Blocked tasks track which artifact is missing.",
+        "dependencies": ["p3-003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "validateArtifactDependencies(task, producedArtifacts) checks all required inputs are available" },
+          { "id": "ac2", "description": "If artifact missing, task status set to blocked with blocked_reason" },
+          { "id": "ac3", "description": "blocked_reason includes missing artifact name and producing task" },
+          { "id": "ac4", "description": "getReadyTasks() filters out tasks with unmet artifact dependencies" },
+          { "id": "ac5", "description": "On task completion, produced artifacts registered for dependency tracking" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/run-service.ts",
+            "pattern": "Contract-based validation"
+          }
+        }
+      },
+      {
+        "step_id": "p3-005",
+        "title": "Integrate ModelSelector into task dispatch",
+        "scope": "forge-core",
+        "description": "Wire ModelSelector into run-service task dispatch flow. Selected model passed to agent spawn.",
+        "dependencies": ["p3-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunService constructor accepts ModelSelector dependency" },
+          { "id": "ac2", "description": "dispatchTask() calls modelSelector.selectModelForTask()" },
+          { "id": "ac3", "description": "Selected model passed to agent spawn via CliConfig.model override" },
+          { "id": "ac4", "description": "Model used recorded in TaskExecutionMetric" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/run-service.ts"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "p3-006",
+        "title": "Phase 3 verification checkpoint",
+        "scope": "forge-core",
+        "description": "Verify Phase 3 implementation. Model routing and dependency resolution working.",
+        "dependencies": ["p3-004", "p3-005"],
+        "owner_role": "tech-lead:Reviewer",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ModelSelector unit tests: rule matching, default selection, runtime updates" },
+          { "id": "ac2", "description": "Artifact dependency tests: validation, blocking, unblocking" },
+          { "id": "ac3", "description": "Integration test: task with model selection and artifact deps" },
+          { "id": "ac4", "description": "npm run typecheck passes" }
+        ],
+      },
+      {
+        "step_id": "p4-001",
+        "title": "Define TaskOutcome and RunOutcome types",
+        "scope": "forge-core",
+        "description": "Add outcome types for Tuner integration. These are the data structures emitted to Tuner for learning.",
+        "dependencies": ["p3-006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskOutcomeSchema: { task_id, run_id, step_id, model_used, duration_ms, tokens_used, cost_usd, outcome, confidence, error?, complexity_score?, timestamp }" },
+          { "id": "ac2", "description": "RunOutcomeSchema: { run_id, plan_id, total_tasks, completed_tasks, failed_tasks, total_duration_ms, total_tokens, total_cost_usd, final_status, timestamp }" },
+          { "id": "ac3", "description": "Types exported from domain/types.ts" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/domain/types.ts"
+          }
+        }
+      },
+      {
+        "step_id": "p4-002",
+        "title": "Create TunerClient service",
+        "scope": "forge-core",
+        "description": "Implement TunerClient that communicates with Tuner API. Handles config fetching and outcome emission.",
+        "dependencies": ["p4-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TunerClient class with constructor(tunerUrl?: string)" },
+          { "id": "ac2", "description": "isEnabled() returns true if TUNER_URL env var set" },
+          { "id": "ac3", "description": "fetchConfig() returns ForgeExecutionConfig from GET /api/forge/config" },
+          { "id": "ac4", "description": "recordTaskOutcome(outcome) POSTs to /api/outcomes/task (fire-and-forget)" },
+          { "id": "ac5", "description": "recordRunOutcome(outcome) POSTs to /api/outcomes/run (fire-and-forget)" },
+          { "id": "ac6", "description": "Graceful fallback: if Tuner unavailable, log warning and continue" },
+          { "id": "ac7", "description": "Request timeout: 5000ms to prevent blocking" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "HTTP client with circuit breaker pattern",
+            "file": "packages/forge-core/src/services/tuner-integration.ts"
+          },
+          "design": {
+            "endpoints": {
+              "config": "GET /api/forge/config",
+              "task_outcome": "POST /api/outcomes/task",
+              "run_outcome": "POST /api/outcomes/run"
+            },
+            "timeout_ms": 5000
+          }
+        }
+      },
+      {
+        "step_id": "p4-003",
+        "title": "Implement config refresh mechanism",
+        "scope": "forge-core",
+        "description": "Add periodic config refresh from Tuner. Config version tracked to detect changes.",
+        "dependencies": ["p4-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "startConfigRefresh() starts setInterval at 5 minute interval" },
+          { "id": "ac2", "description": "stopConfigRefresh() clears interval (for graceful shutdown)" },
+          { "id": "ac3", "description": "Config version tracked via config_version field" },
+          { "id": "ac4", "description": "On version change, onConfigUpdate callback invoked with new config" },
+          { "id": "ac5", "description": "ModelSelector.updateRules() called when model routing rules change" },
+          { "id": "ac6", "description": "If fetch fails, continue with current config (no disruption)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/tuner-integration.ts",
+            "pattern": "Polling with version tracking"
+          },
+          "design": {
+            "refresh_interval_ms": 300000,
+            "on_failure": "log_and_continue"
+          }
+        }
+      },
+      {
+        "step_id": "p4-004",
+        "title": "Integrate outcome emission into run-service",
+        "scope": "forge-core",
+        "description": "Wire TunerClient into run-service to emit outcomes on task/run completion.",
+        "dependencies": ["p4-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunService constructor accepts optional TunerClient dependency" },
+          { "id": "ac2", "description": "onTaskComplete() builds TaskOutcome and calls tunerClient.recordTaskOutcome()" },
+          { "id": "ac3", "description": "onRunComplete() builds RunOutcome and calls tunerClient.recordRunOutcome()" },
+          { "id": "ac4", "description": "Emission is fire-and-forget (does not block execution)" },
+          { "id": "ac5", "description": "If TunerClient not enabled, skip emission (no-op)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/services/run-service.ts"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "p4-005",
+        "title": "Wire TunerClient into server startup",
+        "scope": "forge-core",
+        "description": "Initialize TunerClient on server startup. Fetch initial config and start refresh loop.",
+        "dependencies": ["p4-003", "p4-004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TUNER_URL env var read on startup" },
+          { "id": "ac2", "description": "If TUNER_URL set, TunerClient instantiated and config fetched" },
+          { "id": "ac3", "description": "If initial fetch fails, log warning and use hardcoded defaults" },
+          { "id": "ac4", "description": "startConfigRefresh() called after successful initial fetch" },
+          { "id": "ac5", "description": "Graceful shutdown stops config refresh" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/index.ts"
+          }
+        }
+      },
+      {
+        "step_id": "p4-006",
+        "title": "Phase 4 verification checkpoint",
+        "scope": "forge-core",
+        "description": "Verify Phase 4 Tuner integration. Config reading and outcome emission working.",
+        "dependencies": ["p4-005"],
+        "owner_role": "tech-lead:Reviewer",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TunerClient unit tests: fetch, emit, timeout handling, graceful fallback" },
+          { "id": "ac2", "description": "Config refresh tests: interval, version tracking, callback invocation" },
+          { "id": "ac3", "description": "Integration test: mock Tuner server, verify outcome emission" },
+          { "id": "ac4", "description": "Startup test: TUNER_URL unset works (no errors)" },
+          { "id": "ac5", "description": "npm run typecheck passes" }
+        ],
+      },
+      {
+        "step_id": "final-001",
+        "title": "End-to-end integration test",
+        "scope": "forge-core",
+        "description": "Create comprehensive E2E test that exercises all DOT Framework enhancements together.",
+        "dependencies": ["p4-006"],
+        "owner_role": "qa:Tester",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "E2E test creates run with ExecutionPolicy (all knobs configured)" },
+          { "id": "ac2", "description": "Test verifies budget tracking and exhaustion handling" },
+          { "id": "ac3", "description": "Test verifies parallelism limits respected" },
+          { "id": "ac4", "description": "Test verifies retry ladder progression (retry -> revise -> escalate)" },
+          { "id": "ac5", "description": "Test verifies confidence threshold handling" },
+          { "id": "ac6", "description": "Test verifies timeout enforcement" },
+          { "id": "ac7", "description": "Test verifies model selection based on complexity" },
+          { "id": "ac8", "description": "Test verifies Tuner outcome emission (mock server)" }
+        ],
+        "specification": {
+          "testing": {
+            "file": "packages/forge-core/src/__tests__/e2e/dot-framework.test.ts",
+            "strategy": "Full integration with mock Tuner"
+          }
+        }
+      },
+      {
+        "step_id": "final-002",
+        "title": "Documentation update",
+        "scope": "forge-core",
+        "description": "Update forge-core README and add ExecutionPolicy configuration guide.",
+        "dependencies": ["final-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "README.md updated with DOT Framework features overview" },
+          { "id": "ac2", "description": "ExecutionPolicy configuration examples added" },
+          { "id": "ac3", "description": "Tuner integration setup documented (TUNER_URL env var)" },
+          { "id": "ac4", "description": "Migration notes for existing Forge users" }
+        ]
+      },
+      {
+        "step_id": "final-003",
+        "title": "Final review and PR preparation",
+        "scope": "forge-core",
+        "description": "Final code review, cleanup, and PR preparation. All changes evaluated as a whole.",
+        "dependencies": ["final-002"],
+        "owner_role": "tech-lead:Reviewer",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All tests passing (npm run test)" },
+          { "id": "ac2", "description": "Type checks passing (npm run typecheck)" },
+          { "id": "ac3", "description": "No TODO comments or incomplete implementations" },
+          { "id": "ac4", "description": "Code follows existing patterns (no slop, no bloat)" },
+          { "id": "ac5", "description": "Breaking changes documented (if any)" },
+          { "id": "ac6", "description": "PR description includes summary of all changes" }
+        ],
+      }
+    ]
+  }
+}

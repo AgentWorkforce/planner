@@ -1,0 +1,958 @@
+{
+  "feature_id": "tuner-package",
+  "title": "Tuner Package",
+  "type": "epic",
+  "status": "implemented",
+  "priority": "high",
+  "component": "tuner",
+
+  "summary": {
+    "goal": "Build an adaptive learning loop that observes Forge execution outcomes, builds performance baselines, detects drift, and learns optimal model selection via Thompson sampling. CLI-only interface for operators.",
+    "in_scope": [
+      "Outcome collection from Forge (task + run outcomes)",
+      "Baseline computation for task patterns",
+      "Drift detection (duration, tokens, success rate)",
+      "Thompson sampling for model selection",
+      "Config generation for Forge and Planner",
+      "SQLite storage for outcomes, baselines, config versions",
+      "REST API for config read / outcome write",
+      "CLI for status, config, override, history"
+    ],
+    "out_of_scope": [
+      "Web UI (CLI only for v1)",
+      "Multi-tenancy / per-organization baselines",
+      "Real-time push notifications (polling for v1)",
+      "Integration with Portfolio (v2)",
+      "A/B testing framework",
+      "Human feedback metrics (goal achievement, user satisfaction) - these require user input, Tuner is automated-only",
+      "Planning-time guardrails (missing security, incomplete scope) - these belong in Planner, not Tuner",
+      "Subjective quality assessment - Tuner measures pass/fail, not 'is this good code'"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Forge can read ForgeExecutionConfig from /api/tuner/config/forge" },
+      { "id": "ac2", "description": "Planner can read PlannerConfig from /api/tuner/config/planner" },
+      { "id": "ac3", "description": "Forge can POST TaskOutcome to /api/tuner/outcomes/task" },
+      { "id": "ac4", "description": "Forge can POST RunOutcome to /api/tuner/outcomes/run" },
+      { "id": "ac5", "description": "Baselines are computed with exponential moving average after 30+ samples" },
+      { "id": "ac6", "description": "Drift alerts are generated when metrics exceed 2σ from baseline" },
+      { "id": "ac7", "description": "Model selection uses Thompson sampling with 10% initial exploration rate" },
+      { "id": "ac8", "description": "Exploration rate decays as sample count grows" },
+      { "id": "ac9", "description": "CLI shows current baselines and active drift alerts" },
+      { "id": "ac10", "description": "CLI allows temporary model override with expiration" },
+      { "id": "ac11", "description": "Config versions are stored with audit trail" },
+      { "id": "ac12", "description": "All storage operations use SQLite with proper indexes" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Pure deterministic system - no LLM calls within Tuner itself",
+        "Thompson sampling is a multi-armed bandit algorithm using Beta distributions",
+        "Drift detection uses statistical process control (mean ± Nσ thresholds)",
+        "Config is pull-based (Forge/Planner poll) not push-based",
+        "Baseline cold start: use research-backed defaults until 10+ samples",
+        "Exploration rate starts at 10%, decays exponentially with sample count",
+        "SCOPE BOUNDARY: Tuner measures automated/observable signals only (test pass/fail, duration, tokens, retries)",
+        "NOT IN SCOPE: Human judgment metrics (goal achieved?, is this secure?, is code quality good?)",
+        "Guardrails (missing security, incomplete scope) belong in Planner, not Tuner - see 02-decomposition-planner.md"
+      ],
+      "keywords": ["Thompson sampling", "Beta distribution", "drift detection", "baselines", "exponential moving average"],
+      "questions": [],
+      "concerns": [
+        "Cold start: need sensible defaults before learning kicks in",
+        "Config refresh frequency: 5min polling vs event-driven"
+      ],
+      "confidence": "confident"
+    },
+    "security": {
+      "observations": [
+        "Outcome data may contain cost information - not sensitive but operational",
+        "Config endpoints should be internal-only (not exposed publicly)",
+        "No authentication needed for v1 (internal service)"
+      ],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "approach": "Standalone package with SQLite storage, Express API, CLI interface",
+      "rationale": "Matches existing stack (planner-core, forge-core), simple deployment"
+    },
+    "research": {
+      "thompson_sampling": "Beta(α,β) distribution, sample for each arm, pick highest",
+      "drift_thresholds": "2σ = warning, 3σ = critical (statistical process control standard)",
+      "exploration_decay": "ε = max(0.02, 0.10 * exp(-n/1000)) where n = sample count"
+    }
+  },
+
+  "sub_features": [
+    {
+      "id": "tuner-domain",
+      "title": "Tuner Domain Model",
+      "summary": {
+        "goal": "Define TypeScript types for config, outcomes, baselines, and drift alerts",
+        "acceptance_criteria": [
+          { "id": "dom1", "description": "ForgeExecutionConfig type with model_selection, budgets, retry, parallelism, confidence, language_time_multipliers" },
+          { "id": "dom2", "description": "PlannerConfig type with complexity_weights, language_complexity_multipliers, decomposition" },
+          { "id": "dom3", "description": "TaskOutcome type with run_id, task_id, step_id, model_used, outcome, attempts, duration, tokens, cost, error_category?, verification?, ac_results?" },
+          { "id": "dom3b", "description": "VerificationResults type with: tests_passed?, tests_total?, build_passed?, type_check_passed?, lint_passed?" },
+          { "id": "dom3c", "description": "ErrorCategory enum: syntax_error, test_failure, type_error, build_error, lint_error, timeout, runtime_error, unknown" },
+          { "id": "dom3d", "description": "ACResult type with: ac_id, passed, evidence? (for automated AC verification)" },
+          { "id": "dom4", "description": "RunOutcome type with aggregate metrics including verification_summary { tests_passed, tests_failed, build_passed, ac_met, ac_total }" },
+          { "id": "dom5", "description": "TaskBaseline type with mean, stddev for duration/tokens, success_rate, verification_rate" },
+          { "id": "dom6", "description": "ModelBaseline type with alpha, beta (Beta distribution params)" },
+          { "id": "dom7", "description": "DriftAlert type with type, pattern, deviation_sigmas, severity" },
+          { "id": "dom8", "description": "Zod schemas for all types with validation" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-storage",
+      "title": "Tuner Storage Layer",
+      "summary": {
+        "goal": "SQLite storage for outcomes, baselines, drift alerts, and config versions",
+        "acceptance_criteria": [
+          { "id": "sto1", "description": "task_outcomes table with indexes on run_id, timestamp" },
+          { "id": "sto2", "description": "run_outcomes table with unique run_id" },
+          { "id": "sto3", "description": "task_baselines table keyed by normalized pattern" },
+          { "id": "sto4", "description": "model_baselines table keyed by (model, task_type, complexity)" },
+          { "id": "sto5", "description": "drift_alerts table with severity and acknowledged tracking" },
+          { "id": "sto6", "description": "config_versions table with JSON config and audit trail" },
+          { "id": "sto7", "description": "Storage interface abstraction for testability" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-api",
+      "title": "Tuner REST API",
+      "summary": {
+        "goal": "HTTP endpoints for config distribution and outcome ingestion",
+        "acceptance_criteria": [
+          { "id": "api1", "description": "GET /api/tuner/config/forge returns ForgeExecutionConfig" },
+          { "id": "api2", "description": "GET /api/tuner/config/planner returns PlannerConfig" },
+          { "id": "api3", "description": "GET /api/tuner/config/version returns current versions" },
+          { "id": "api4", "description": "POST /api/tuner/outcomes/task accepts TaskOutcome" },
+          { "id": "api5", "description": "POST /api/tuner/outcomes/run accepts RunOutcome" },
+          { "id": "api6", "description": "GET /api/tuner/insights/summary returns aggregate metrics" },
+          { "id": "api7", "description": "GET /api/tuner/insights/drift returns active drift alerts" },
+          { "id": "api8", "description": "POST /api/tuner/insights/drift/:id/acknowledge marks alert as acknowledged" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-outcome-collector",
+      "title": "Outcome Collector Service",
+      "summary": {
+        "goal": "Ingest execution outcomes from Forge and trigger downstream processing",
+        "acceptance_criteria": [
+          { "id": "oc1", "description": "recordTaskOutcome stores outcome and triggers baseline update" },
+          { "id": "oc2", "description": "recordTaskOutcome triggers model performance update" },
+          { "id": "oc3", "description": "recordRunOutcome stores aggregate run data" },
+          { "id": "oc4", "description": "Async processing doesn't block outcome acknowledgment" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-baseline-service",
+      "title": "Baseline Service",
+      "summary": {
+        "goal": "Compute and maintain baselines for drift detection using exponential moving average",
+        "acceptance_criteria": [
+          { "id": "bs1", "description": "updateBaseline computes EMA with α=0.1 smoothing factor" },
+          { "id": "bs2", "description": "First sample initializes baseline with zero stddev" },
+          { "id": "bs3", "description": "getBaseline returns null if pattern has no history" },
+          { "id": "bs4", "description": "normalizePattern extracts comparable pattern from task metadata" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-drift-detector",
+      "title": "Drift Detector Service",
+      "summary": {
+        "goal": "Compare current execution to baselines and generate alerts",
+        "acceptance_criteria": [
+          { "id": "dd1", "description": "checkDrift returns empty if sample_count < 30 (minimum samples for statistical validity)" },
+          { "id": "dd2", "description": "Duration deviation ≥ 2σ generates warning alert" },
+          { "id": "dd3", "description": "Duration deviation ≥ 3σ generates critical alert" },
+          { "id": "dd4", "description": "Token and success_rate drift detected similarly" },
+          { "id": "dd5", "description": "Alerts are persisted with timestamp" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-model-selector",
+      "title": "Model Selector (Thompson Sampling)",
+      "summary": {
+        "goal": "Learn optimal model selection using Thompson sampling multi-armed bandit with stability controls",
+        "acceptance_criteria": [
+          { "id": "ms1", "description": "selectModel checks hard rules first (from config)" },
+          { "id": "ms2", "description": "Random model selected with probability = exploration_rate (during burn-in)" },
+          { "id": "ms3", "description": "Thompson sampling samples from Beta(α,β) for each model" },
+          { "id": "ms4", "description": "Model with highest sampled value is selected (after passing stability checks)" },
+          { "id": "ms5", "description": "recordOutcome updates Beta distribution (α++ on success, β++ on failure)" },
+          { "id": "ms6", "description": "New model/taskType/complexity starts with Beta(1,1) prior" },
+          { "id": "ms7", "description": "sampleBeta uses Gamma distribution sampling trick" },
+          { "id": "ms8", "description": "MIN_SAMPLES (30) required per arm before exploitation (use round-robin during burn-in)" },
+          { "id": "ms9", "description": "Hysteresis: new model must have ≥15% higher probability than current to switch" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-stability-controls",
+      "title": "Stability Controls",
+      "summary": {
+        "goal": "Prevent parameter flapping with insufficient data using burn-in, rate limiting, hysteresis, and credible interval checks",
+        "acceptance_criteria": [
+          { "id": "sc1", "description": "BURN_IN_TRIALS (50) enforces round-robin during initial exploration" },
+          { "id": "sc2", "description": "MIN_SAMPLES_PER_ARM (30) required before Thompson sampling exploitation" },
+          { "id": "sc3", "description": "Rate limiting: config changes limited to once per COOL_DOWN_PERIOD (1 hour for model selection)" },
+          { "id": "sc4", "description": "Hysteresis: IMPROVEMENT_MARGIN (15%) required before parameter switch" },
+          { "id": "sc5", "description": "Credible interval check: 95% CI width must be < 0.10 before acting" },
+          { "id": "sc6", "description": "StabilityConfig type with all thresholds (burn_in_trials, min_samples_per_arm, cool_down_ms, improvement_margin, max_ci_width)" },
+          { "id": "sc7", "description": "checkStability() returns { canChange: boolean, reason?: string } explaining why change blocked" },
+          { "id": "sc8", "description": "All stability decisions logged for debugging" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-config-writer",
+      "title": "Config Writer Service",
+      "summary": {
+        "goal": "Generate updated config from learned parameters",
+        "acceptance_criteria": [
+          { "id": "cw1", "description": "generateForgeConfig produces valid ForgeExecutionConfig" },
+          { "id": "cw2", "description": "generatePlannerConfig produces valid PlannerConfig" },
+          { "id": "cw3", "description": "Exploration rate decays: max(0.02, 0.10 * exp(-n/1000))" },
+          { "id": "cw4", "description": "Config versions are monotonically increasing" },
+          { "id": "cw5", "description": "Previous config versions are retained for audit" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-cli",
+      "title": "Tuner CLI",
+      "summary": {
+        "goal": "Command-line interface for operators to inspect and override tuner state",
+        "acceptance_criteria": [
+          { "id": "cli1", "description": "tuner status shows current baselines summary" },
+          { "id": "cli2", "description": "tuner status shows active drift alerts" },
+          { "id": "cli3", "description": "tuner config show displays current ForgeExecutionConfig" },
+          { "id": "cli4", "description": "tuner override --model opus --duration 2h sets temporary override" },
+          { "id": "cli5", "description": "tuner history shows recent config changes" },
+          { "id": "cli6", "description": "tuner drift ack <id> acknowledges a drift alert" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-forge-integration",
+      "title": "Forge Integration",
+      "summary": {
+        "goal": "Wire Forge to read config from Tuner and emit outcomes",
+        "acceptance_criteria": [
+          { "id": "fi1", "description": "Forge reads ForgeExecutionConfig on startup" },
+          { "id": "fi2", "description": "Forge refreshes config periodically (every 5 min)" },
+          { "id": "fi3", "description": "Forge emits TaskOutcome after each task completes" },
+          { "id": "fi4", "description": "Forge emits RunOutcome after run completes" },
+          { "id": "fi5", "description": "Model selection uses tuner-provided rules" },
+          { "id": "fi6", "description": "Graceful fallback to defaults if Tuner unavailable" }
+        ]
+      }
+    },
+    {
+      "id": "tuner-planner-integration",
+      "title": "Planner Integration",
+      "summary": {
+        "goal": "Wire Planner to read decomposition config from Tuner",
+        "acceptance_criteria": [
+          { "id": "pi1", "description": "Planner reads PlannerConfig on startup" },
+          { "id": "pi2", "description": "Planner refreshes config periodically" },
+          { "id": "pi3", "description": "Complexity estimation uses tuner-provided weights" },
+          { "id": "pi4", "description": "Language tier multipliers applied to step estimates" },
+          { "id": "pi5", "description": "Graceful fallback to defaults if Tuner unavailable" }
+        ]
+      }
+    }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["tuner", "forge-core", "planner-core"],
+    "steps": [
+      {
+        "step_id": "t001",
+        "title": "Create package scaffolding",
+        "scope": "tuner",
+        "description": "Initialize packages/tuner with package.json, tsconfig, directory structure",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/tuner/package.json exists with dependencies: better-sqlite3, express, zod, commander" },
+          { "id": "ac2", "description": "Directory structure: src/{domain,storage,services,api,cli}" },
+          { "id": "ac3", "description": "tsconfig.json extends workspace config" },
+          { "id": "ac4", "description": "Package builds without errors" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "layered",
+            "structure": "domain → storage → services → api/cli",
+            "dependencies": ["better-sqlite3", "express", "zod", "commander", "tsx"]
+          }
+        }
+      },
+      {
+        "step_id": "t002",
+        "title": "Define domain types and Zod schemas",
+        "scope": "tuner",
+        "description": "Create TypeScript types for ForgeExecutionConfig, PlannerConfig, TaskOutcome, RunOutcome, TaskBaseline, ModelBaseline, DriftAlert with Zod validation",
+        "dependencies": ["t001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeExecutionConfig has: model_selection { default_model, exploration_rate, rules[] }, budgets { per_task_time_seconds, per_task_token_limit, per_run_cost_limit_usd }, retry { max_retries_per_task, backoff, backoff_base_seconds, include_failure_analysis }, parallelism { max_concurrent_tasks }, confidence { escalation_threshold, review_threshold }, language_time_multipliers, version, updated_at" },
+          { "id": "ac2", "description": "PlannerConfig has: complexity_weights, language_complexity_multipliers, decomposition { max_step_complexity, auto_decompose_threshold_tokens, max_steps_per_plan, max_depth }, version, updated_at" },
+          { "id": "ac3", "description": "TaskOutcome has: run_id, task_id, step_id, model_used, complexity_estimate, language_tier?, outcome, error_category?, attempts, duration_seconds, tokens_used, cost_usd, confidence_score?, verification?, ac_results?, timestamp" },
+          { "id": "ac3b", "description": "VerificationResults type has: tests_passed?, tests_total?, build_passed?, type_check_passed?, lint_passed? (all automated/observable CI signals)" },
+          { "id": "ac3c", "description": "ErrorCategory enum: 'syntax_error' | 'test_failure' | 'type_error' | 'build_error' | 'lint_error' | 'timeout' | 'runtime_error' | 'unknown'" },
+          { "id": "ac3d", "description": "ACResult type has: ac_id, passed, evidence? (for tracking which acceptance criteria passed/failed with optional proof)" },
+          { "id": "ac4", "description": "RunOutcome has: run_id, plan_id, outcome, tasks_total, tasks_succeeded, tasks_failed, total_duration_seconds, total_tokens, total_cost_usd, replan_count, escalation_count, verification_summary?, timestamp" },
+          { "id": "ac4b", "description": "VerificationSummary type has: tests_passed_count, tests_failed_count, builds_passed_count, ac_met_count, ac_total_count" },
+          { "id": "ac5", "description": "TaskBaseline has: pattern, mean_duration_seconds, stddev_duration_seconds, mean_tokens, stddev_tokens, mean_attempts, success_rate, verification_pass_rate?, sample_count, last_updated" },
+          { "id": "ac6", "description": "ModelBaseline has: model, task_type, complexity, alpha, beta, total_attempts, success_rate, mean_cost_per_success, last_updated" },
+          { "id": "ac7", "description": "DriftAlert has: id, type, pattern, current_value, baseline_value, stddev, deviation_sigmas, severity, acknowledged, acknowledged_by?, acknowledged_at?, timestamp" },
+          { "id": "ac8", "description": "Zod schemas export inferred TypeScript types and parse functions" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": ["src/domain/config.ts", "src/domain/outcome.ts", "src/domain/baseline.ts", "src/domain/drift.ts", "src/domain/verification.ts"],
+            "pattern": "Zod schema → inferred TS type",
+            "exports": "Both schema and type from each file"
+          }
+        }
+      },
+      {
+        "step_id": "t003",
+        "title": "Implement storage interface and SQLite adapter",
+        "scope": "tuner",
+        "description": "Create TunerStorage interface and SQLite implementation with 6 tables and indexes",
+        "dependencies": ["t002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TunerStorage interface defines: insertTaskOutcome, insertRunOutcome, getTaskBaseline, upsertTaskBaseline, getModelBaseline, upsertModelBaseline, insertDriftAlert, getDriftAlerts, acknowledgeDriftAlert, insertConfigVersion, getLatestConfigVersion" },
+          { "id": "ac2", "description": "SQLite creates task_outcomes table with indexes on (run_id), (timestamp)" },
+          { "id": "ac3", "description": "SQLite creates run_outcomes table with unique constraint on run_id" },
+          { "id": "ac4", "description": "SQLite creates task_baselines table with PRIMARY KEY (pattern)" },
+          { "id": "ac5", "description": "SQLite creates model_baselines table with PRIMARY KEY (model, task_type, complexity)" },
+          { "id": "ac6", "description": "SQLite creates drift_alerts table with index on (severity, acknowledged)" },
+          { "id": "ac7", "description": "SQLite creates config_versions table with PRIMARY KEY (version)" },
+          { "id": "ac8", "description": "Schema migration runs on init, is idempotent" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": ["src/storage/interface.ts", "src/storage/sqlite.ts"],
+            "tech": "better-sqlite3 (sync API)",
+            "pattern": "Repository pattern with interface abstraction"
+          },
+          "model": {
+            "tables": ["task_outcomes", "run_outcomes", "task_baselines", "model_baselines", "drift_alerts", "config_versions"],
+            "json_columns": ["config_versions.forge_config", "config_versions.planner_config"]
+          }
+        }
+      },
+      {
+        "step_id": "t004",
+        "title": "Implement OutcomeCollector service",
+        "scope": "tuner",
+        "description": "Create service to ingest task and run outcomes, triggering async downstream processing",
+        "dependencies": ["t003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "recordTaskOutcome(outcome) stores to task_outcomes table" },
+          { "id": "ac2", "description": "recordTaskOutcome fires async event for baseline update" },
+          { "id": "ac3", "description": "recordTaskOutcome fires async event for model selector update" },
+          { "id": "ac4", "description": "recordRunOutcome(outcome) stores to run_outcomes table" },
+          { "id": "ac5", "description": "Returns { received: true } immediately, processing is async" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/services/outcome-collector.ts",
+            "pattern": "Fire-and-forget with EventEmitter for downstream services",
+            "events": ["task_outcome_received", "run_outcome_received"]
+          }
+        }
+      },
+      {
+        "step_id": "t005",
+        "title": "Implement BaselineService",
+        "scope": "tuner",
+        "description": "Create service to compute and update task baselines using exponential moving average",
+        "dependencies": ["t003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "normalizePattern(outcome) extracts pattern string from task_type + complexity" },
+          { "id": "ac2", "description": "updateBaseline uses EMA with α=0.1 smoothing factor" },
+          { "id": "ac3", "description": "First sample initializes baseline with stddev=0" },
+          { "id": "ac4", "description": "Stddev computed using Welford's online algorithm" },
+          { "id": "ac5", "description": "getBaseline(pattern) returns null if no history" },
+          { "id": "ac6", "description": "sample_count incremented on each update" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/services/baseline-service.ts",
+            "algorithms": {
+              "ema": "new_mean = α * value + (1-α) * old_mean",
+              "welford": "Online variance: M2 = M2 + (x - old_mean) * (x - new_mean); stddev = sqrt(M2/n)"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "t006",
+        "title": "Implement DriftDetector service",
+        "scope": "tuner",
+        "description": "Create service to compare outcomes against baselines and generate alerts",
+        "dependencies": ["t005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "checkDrift(outcome) returns [] if baseline.sample_count < 10" },
+          { "id": "ac2", "description": "Calculates deviation_sigmas = (current - mean) / stddev" },
+          { "id": "ac3", "description": "Deviation ≥ 2σ creates warning alert" },
+          { "id": "ac4", "description": "Deviation ≥ 3σ creates critical alert" },
+          { "id": "ac5", "description": "Checks duration, tokens, success_rate independently" },
+          { "id": "ac6", "description": "Persists alerts to drift_alerts table with timestamp" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/services/drift-detector.ts",
+            "thresholds": { "warning": 2, "critical": 3 },
+            "metrics": ["duration_seconds", "tokens_used", "success_rate"]
+          }
+        }
+      },
+      {
+        "step_id": "t007",
+        "title": "Implement ModelSelector with Thompson sampling",
+        "scope": "tuner",
+        "description": "Create service for model selection using multi-armed bandit with Beta distributions",
+        "dependencies": ["t003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "selectModel checks hard rules from config first" },
+          { "id": "ac2", "description": "Random model selected with probability = exploration_rate" },
+          { "id": "ac3", "description": "Thompson sampling: sample Beta(α,β) for each model, pick highest" },
+          { "id": "ac4", "description": "recordOutcome updates α/β: success → α++, failure → β++" },
+          { "id": "ac5", "description": "New model/taskType/complexity initializes with Beta(1,1)" },
+          { "id": "ac6", "description": "sampleBeta implemented using Gamma distribution trick" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/services/model-selector.ts",
+            "algorithms": {
+              "thompson": "For each arm: sample = sampleBeta(α, β); pick max sample",
+              "beta_sampling": "sampleBeta(α,β) = x/(x+y) where x~Gamma(α,1), y~Gamma(β,1)",
+              "gamma_sampling": "Using Marsaglia and Tsang's method for shape ≥ 1"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "t007b",
+        "title": "Implement StabilityControls service",
+        "scope": "tuner",
+        "description": "Create service to prevent parameter flapping with burn-in, minimum samples, rate limiting, hysteresis, and credible interval checks",
+        "dependencies": ["t007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "StabilityConfig type with: burn_in_trials (50), min_samples_per_arm (30), cool_down_periods { model_selection_ms, budget_ms, retry_ms }, improvement_margin (0.15), max_ci_width (0.10)" },
+          { "id": "ac2", "description": "checkBurnIn(total_trials) returns true if below burn_in_trials" },
+          { "id": "ac3", "description": "checkMinSamples(arm) returns true if samples < min_samples_per_arm" },
+          { "id": "ac4", "description": "checkRateLimit(param_type, last_changed_at) returns true if within cool_down" },
+          { "id": "ac5", "description": "checkHysteresis(current_prob, candidate_prob, margin) returns true if improvement < margin" },
+          { "id": "ac6", "description": "checkCredibleInterval(alpha, beta) calculates 95% CI width and returns true if > max_ci_width" },
+          { "id": "ac7", "description": "checkStability(context) runs all checks, returns { canChange, blockedBy?: string[] }" },
+          { "id": "ac8", "description": "DEFAULT_STABILITY_CONFIG exported with research-backed values" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/services/stability-controls.ts",
+            "algorithms": {
+              "credible_interval": "Beta quantile at 0.025 and 0.975, width = upper - lower",
+              "ci_approximation": "For large samples: 4 * sqrt(alpha*beta / ((alpha+beta)^2 * (alpha+beta+1)))"
+            },
+            "defaults": {
+              "burn_in_trials": 50,
+              "min_samples_per_arm": 30,
+              "cool_down_model_selection_ms": 86400000,
+              "cool_down_budget_ms": 14400000,
+              "cool_down_retry_ms": 3600000,
+              "improvement_margin": 0.15,
+              "max_ci_width": 0.10
+            }
+          }
+        }
+      },
+      {
+        "step_id": "t008",
+        "title": "Implement ConfigWriter service",
+        "scope": "tuner",
+        "description": "Create service to generate ForgeExecutionConfig and PlannerConfig with versioning and stability checks",
+        "dependencies": ["t005", "t007", "t007b"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "generateForgeConfig() returns valid ForgeExecutionConfig with research-backed defaults" },
+          { "id": "ac2", "description": "generatePlannerConfig() returns valid PlannerConfig with research-backed defaults" },
+          { "id": "ac3", "description": "computeExplorationRate() implements max(0.02, 0.10 * exp(-n/1000))" },
+          { "id": "ac4", "description": "Config versions are monotonically increasing integers" },
+          { "id": "ac5", "description": "saveConfig stores version to config_versions table with JSON" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/services/config-writer.ts",
+            "defaults": {
+              "forge": "See docs/architecture/06-tuner.md Recommended Defaults section",
+              "exploration_decay": "ε = max(0.02, 0.10 * exp(-n/1000))"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "t009",
+        "title": "Wire services together in service factory",
+        "scope": "tuner",
+        "description": "Create factory to instantiate and connect all services with proper event wiring",
+        "dependencies": ["t004", "t005", "t006", "t007", "t007b", "t008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createTunerServices(dbPath) returns { storage, collector, baseline, drift, selector, stability, config }" },
+          { "id": "ac2", "description": "OutcomeCollector task_outcome_received triggers BaselineService.updateBaseline" },
+          { "id": "ac3", "description": "OutcomeCollector task_outcome_received triggers ModelSelector.recordOutcome" },
+          { "id": "ac4", "description": "OutcomeCollector task_outcome_received triggers DriftDetector.checkDrift" },
+          { "id": "ac5", "description": "All services share same storage instance" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/index.ts",
+            "pattern": "Factory function with EventEmitter-based composition"
+          }
+        }
+      },
+      {
+        "step_id": "t010",
+        "title": "Implement config API endpoints",
+        "scope": "tuner",
+        "description": "Create Express routes for Forge/Planner to read config",
+        "dependencies": ["t009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /api/tuner/config/forge returns ForgeExecutionConfig JSON" },
+          { "id": "ac2", "description": "GET /api/tuner/config/planner returns PlannerConfig JSON" },
+          { "id": "ac3", "description": "GET /api/tuner/config/version returns { forge_version, planner_version }" },
+          { "id": "ac4", "description": "Returns cached config, regenerated on demand if stale" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": ["src/api/routes.ts", "src/api/handlers/config.ts"],
+            "contract": {
+              "GET /api/tuner/config/forge": "→ ForgeExecutionConfig",
+              "GET /api/tuner/config/planner": "→ PlannerConfig",
+              "GET /api/tuner/config/version": "→ { forge_version: number, planner_version: number }"
+            }
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "t011",
+        "title": "Implement outcome API endpoints",
+        "scope": "tuner",
+        "description": "Create Express routes for Forge to submit outcomes",
+        "dependencies": ["t009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /api/tuner/outcomes/task accepts TaskOutcome, validates with Zod" },
+          { "id": "ac2", "description": "POST /api/tuner/outcomes/run accepts RunOutcome, validates with Zod" },
+          { "id": "ac3", "description": "Returns { received: true, id: string } on success" },
+          { "id": "ac4", "description": "Returns 400 with validation errors on invalid input" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": ["src/api/handlers/outcomes.ts"],
+            "contract": {
+              "POST /api/tuner/outcomes/task": "Body: TaskOutcome → { received: true }",
+              "POST /api/tuner/outcomes/run": "Body: RunOutcome → { received: true }"
+            }
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "t012",
+        "title": "Implement insights API endpoints",
+        "scope": "tuner",
+        "description": "Create Express routes for Portfolio/CLI to read insights",
+        "dependencies": ["t009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /api/tuner/insights/summary returns { total_runs, success_rate, avg_cost_per_run, drift_alerts_active, model_distribution[] }" },
+          { "id": "ac2", "description": "GET /api/tuner/insights/drift?severity=warning|critical&acknowledged=bool returns DriftAlert[]" },
+          { "id": "ac3", "description": "GET /api/tuner/insights/model-performance returns ModelBaseline[]" },
+          { "id": "ac4", "description": "POST /api/tuner/insights/drift/:id/acknowledge marks alert acknowledged" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": ["src/api/handlers/insights.ts"],
+            "contract": {
+              "GET /api/tuner/insights/summary": "→ InsightsSummary",
+              "GET /api/tuner/insights/drift": "→ DriftAlert[]",
+              "GET /api/tuner/insights/model-performance": "→ ModelBaseline[]",
+              "POST /api/tuner/insights/drift/:id/acknowledge": "→ { success: true }"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "t013",
+        "title": "Create Express server entrypoint",
+        "scope": "tuner",
+        "description": "Create server.ts that initializes services and mounts API routes",
+        "dependencies": ["t010", "t011", "t012"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Server reads TUNER_PORT (default 4002), TUNER_DB_PATH from env" },
+          { "id": "ac2", "description": "Initializes services via factory" },
+          { "id": "ac3", "description": "Mounts all routes under /api/tuner" },
+          { "id": "ac4", "description": "Logs startup and ready message" },
+          { "id": "ac5", "description": "npm run start works" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/server.ts",
+            "env": ["TUNER_PORT", "TUNER_DB_PATH"]
+          }
+        }
+      },
+      {
+        "step_id": "t014",
+        "title": "Implement CLI commands",
+        "scope": "tuner",
+        "description": "Create commander-based CLI with status, config, override, history, drift commands",
+        "dependencies": ["t009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "tuner status shows baselines summary table and active drift alerts" },
+          { "id": "ac2", "description": "tuner config show prints current ForgeExecutionConfig as YAML" },
+          { "id": "ac3", "description": "tuner override --model opus --duration 2h stores override with expiry" },
+          { "id": "ac4", "description": "tuner history shows last 10 config versions with timestamps" },
+          { "id": "ac5", "description": "tuner drift list shows active alerts" },
+          { "id": "ac6", "description": "tuner drift ack <id> acknowledges alert" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": ["src/cli/index.ts", "src/cli/commands/*.ts"],
+            "tech": "commander",
+            "pattern": "Each command in separate file, composed in index"
+          }
+        }
+      },
+      {
+        "step_id": "t015",
+        "title": "Add unit tests for services",
+        "scope": "tuner",
+        "description": "Create Vitest tests for BaselineService, DriftDetector, ModelSelector, ConfigWriter",
+        "dependencies": ["t009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BaselineService tests: EMA calculation, first sample init, Welford stddev" },
+          { "id": "ac2", "description": "DriftDetector tests: skip if sample_count < 30, 2σ warning, 3σ critical" },
+          { "id": "ac3", "description": "ModelSelector tests: hard rules, exploration, Thompson sampling, Beta update, min samples check" },
+          { "id": "ac4", "description": "ConfigWriter tests: exploration decay formula, version increment, stability checks" },
+          { "id": "ac5", "description": "StabilityControls tests: burn-in check, min samples, rate limiting, hysteresis, CI width" },
+          { "id": "ac6", "description": "All tests pass with npm run test" }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "files": ["src/**/*.test.ts"],
+            "mocking": "In-memory storage for unit tests"
+          }
+        }
+      },
+      {
+        "step_id": "t016",
+        "title": "Add integration tests for API",
+        "scope": "tuner",
+        "description": "Create Vitest tests for API endpoints with real SQLite",
+        "dependencies": ["t013", "t015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /outcomes/task stores and returns received:true" },
+          { "id": "ac2", "description": "GET /config/forge returns valid ForgeExecutionConfig" },
+          { "id": "ac3", "description": "GET /insights/drift returns alerts array" },
+          { "id": "ac4", "description": "POST /insights/drift/:id/acknowledge marks alert" },
+          { "id": "ac5", "description": "Tests use temp SQLite database, cleaned up after" }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "files": ["src/api/**/*.test.ts"],
+            "fixtures": "Temp DB per test file"
+          }
+        }
+      },
+      {
+        "step_id": "t017",
+        "title": "Create TunerClient for Forge/Planner",
+        "scope": "tuner",
+        "description": "Create client class that Forge/Planner import to read config and emit outcomes",
+        "dependencies": ["t013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TunerClient(baseUrl) constructor takes Tuner API URL" },
+          { "id": "ac2", "description": "getForgeConfig() fetches and parses ForgeExecutionConfig" },
+          { "id": "ac3", "description": "getPlannerConfig() fetches and parses PlannerConfig" },
+          { "id": "ac4", "description": "recordTaskOutcome(outcome) POSTs to /outcomes/task" },
+          { "id": "ac5", "description": "recordRunOutcome(outcome) POSTs to /outcomes/run" },
+          { "id": "ac6", "description": "Exported from package for Forge/Planner to import" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "src/client.ts",
+            "exports": "TunerClient class and types",
+            "pattern": "HTTP client with typed methods"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "t018",
+        "title": "Wire Forge to read config from Tuner",
+        "scope": "forge-core",
+        "description": "Add TunerClient to Forge, read config on startup and periodically",
+        "dependencies": ["t017"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Forge reads TUNER_URL from env (optional, defaults to disabled)" },
+          { "id": "ac2", "description": "If TUNER_URL set, fetches ForgeExecutionConfig on startup" },
+          { "id": "ac3", "description": "Config refreshed every 5 minutes via setInterval" },
+          { "id": "ac4", "description": "If Tuner unavailable, falls back to hardcoded defaults" },
+          { "id": "ac5", "description": "Model selection uses config.model_selection.rules" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Optional integration with graceful degradation",
+            "env": "TUNER_URL",
+            "refresh": "5 minute interval"
+          }
+        }
+      },
+      {
+        "step_id": "t019",
+        "title": "Wire Forge to emit outcomes to Tuner",
+        "scope": "forge-core",
+        "description": "After task/run completion, POST outcomes to Tuner API",
+        "dependencies": ["t017", "t018"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After task completes, Forge builds TaskOutcome from task state" },
+          { "id": "ac2", "description": "TaskOutcome includes: model_used, duration, tokens, cost, outcome, error_category (if failed), confidence" },
+          { "id": "ac2b", "description": "TaskOutcome.verification includes: tests_passed (from CI), build_passed, type_check_passed, lint_passed" },
+          { "id": "ac2c", "description": "TaskOutcome.ac_results includes per-AC pass/fail with evidence (file exists, command output, etc.)" },
+          { "id": "ac3", "description": "tunerClient.recordTaskOutcome() called (fire-and-forget)" },
+          { "id": "ac4", "description": "After run completes, Forge builds and sends RunOutcome with verification_summary aggregate" },
+          { "id": "ac5", "description": "Failures logged but don't block Forge operation" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Event listener on task/run completion",
+            "error_handling": "Log and continue (don't block execution)"
+          }
+        }
+      },
+      {
+        "step_id": "t020",
+        "title": "Wire Planner to read config from Tuner",
+        "scope": "planner-core",
+        "description": "Add TunerClient to Planner, read PlannerConfig for decomposition weights",
+        "dependencies": ["t017"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Planner reads TUNER_URL from env (optional)" },
+          { "id": "ac2", "description": "If TUNER_URL set, fetches PlannerConfig on startup" },
+          { "id": "ac3", "description": "Config refreshed periodically (5 minutes)" },
+          { "id": "ac4", "description": "Falls back to hardcoded defaults if unavailable" },
+          { "id": "ac5", "description": "Complexity estimation uses config.complexity_weights (future use)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Optional integration with graceful degradation",
+            "note": "Planner doesn't use weights yet, but wiring enables future enhancement"
+          }
+        }
+      },
+      {
+        "step_id": "t021",
+        "title": "Add Tuner to dev.sh startup script",
+        "scope": "tuner",
+        "description": "Update scripts/dev.sh to optionally start Tuner service alongside other services",
+        "dependencies": ["t013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "dev.sh has --with-tuner flag to enable Tuner" },
+          { "id": "ac2", "description": "Tuner starts on port 4002 when enabled" },
+          { "id": "ac3", "description": "Tuner DB stored in .data/tuner.db" },
+          { "id": "ac4", "description": "Tuner logs go to terminal output" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "scripts/dev.sh",
+            "default": "Tuner disabled by default (opt-in)"
+          }
+        }
+      },
+      {
+        "step_id": "t022",
+        "title": "Verify end-to-end flow",
+        "scope": "tuner",
+        "description": "Manual verification that Forge → Tuner → config flow works",
+        "dependencies": ["t018", "t019", "t020", "t021"],
+        "owner_role": "backend:Coder",
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" },
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tuner starts and serves /api/tuner/config/forge" },
+          { "id": "ac2", "description": "Forge with TUNER_URL reads config successfully" },
+          { "id": "ac3", "description": "After simulated task completion, outcome appears in Tuner DB" },
+          { "id": "ac4", "description": "tuner status CLI shows baseline after 10+ outcomes" },
+          { "id": "ac5", "description": "Drift alert appears when simulating outlier outcome" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "unit + integration",
+    "priority": "high",
+    "framework": "vitest",
+    "strategy": "Algorithm correctness first, then API contracts, then error handling",
+
+    "unit_tests": {
+      "baseline_service": {
+        "cases": [
+          { "type": "happy", "description": "EMA converges: 10 samples at value=100 → mean approaches 100" },
+          { "type": "happy", "description": "Welford stddev: known values [2,4,4,4,5,5,7,9] → stddev ≈ 2.0" },
+          { "type": "edge", "description": "First sample: initializes with stddev=0, sample_count=1" },
+          { "type": "edge", "description": "Cold start: getBaseline returns null for unknown pattern" },
+          { "type": "edge", "description": "Verification rate: tracks percentage of tasks with all verifications passing" }
+        ]
+      },
+      "drift_detector": {
+        "cases": [
+          { "type": "happy", "description": "No alert when within 1σ of baseline" },
+          { "type": "edge", "description": "Warning at exactly 2σ deviation" },
+          { "type": "edge", "description": "Critical at exactly 3σ deviation" },
+          { "type": "edge", "description": "Skip detection when sample_count < 30" },
+          { "type": "edge", "description": "Skip detection when stddev = 0 (avoid division by zero)" }
+        ]
+      },
+      "model_selector": {
+        "cases": [
+          { "type": "happy", "description": "Hard rule match: complexity=trivial → haiku" },
+          { "type": "happy", "description": "Thompson sampling: model with higher α/(α+β) selected more often" },
+          { "type": "edge", "description": "Cold start: Beta(1,1) prior for new model/task/complexity combo" },
+          { "type": "edge", "description": "Burn-in: round-robin until 50 total trials" },
+          { "type": "edge", "description": "Min samples: exploitation blocked until 30 samples per arm" },
+          { "type": "edge", "description": "Exploration rate decay: verify formula max(0.02, 0.10 * exp(-n/1000))" }
+        ]
+      },
+      "stability_controls": {
+        "cases": [
+          { "type": "happy", "description": "checkStability returns canChange=true when all checks pass" },
+          { "type": "edge", "description": "Rate limit: block change within cool_down_ms of last change" },
+          { "type": "edge", "description": "Hysteresis: block when improvement < 15%" },
+          { "type": "edge", "description": "CI width: block when 95% CI width > 0.10" },
+          { "type": "error", "description": "Returns blockedBy array explaining why change blocked" }
+        ]
+      }
+    },
+
+    "integration_tests": {
+      "api_contracts": {
+        "cases": [
+          { "type": "happy", "description": "POST /outcomes/task with full TaskOutcome including verification fields" },
+          { "type": "happy", "description": "POST /outcomes/run with VerificationSummary aggregates" },
+          { "type": "happy", "description": "GET /config/forge returns all required fields" },
+          { "type": "happy", "description": "GET /insights/summary includes verification_pass_rate" },
+          { "type": "error", "description": "POST /outcomes/task with invalid outcome enum → 400" },
+          { "type": "error", "description": "POST /outcomes/task missing required run_id → 400 with field error" }
+        ]
+      },
+      "tuner_client": {
+        "cases": [
+          { "type": "happy", "description": "getForgeConfig returns parsed ForgeExecutionConfig" },
+          { "type": "happy", "description": "recordTaskOutcome fires and forgets (doesn't block caller)" },
+          { "type": "edge", "description": "recordTaskOutcome: network error logged but doesn't throw (fire-and-forget)" }
+        ],
+        "note": "Tuner should always be available in production. Dev mode can use defaults with warning."
+      }
+    },
+
+    "data_requirements": [
+      "TaskOutcome fixtures: success with verification, failure with error_category, timeout",
+      "Baseline fixtures: pattern with 50+ samples (statistically valid), pattern with 5 samples (too few)",
+      "ModelBaseline fixtures: Beta(10,2) high performer, Beta(2,10) low performer, Beta(1,1) cold start"
+    ],
+
+    "not_testing": [
+      "Gamma distribution sampling correctness (use well-tested library or known implementation)",
+      "SQLite query performance (trust better-sqlite3)",
+      "Express routing mechanics (framework behavior)"
+    ]
+  },
+
+  "understanding": {
+    "tester": {
+      "observations": [
+        "Algorithms are mathematical with known correct outputs - easy to verify",
+        "Cold start is critical path - system must work with no prior data",
+        "Verification fields are new - need explicit coverage",
+        "TunerClient graceful degradation is important for Forge resilience"
+      ],
+      "concerns": [
+        "Thompson sampling is probabilistic - tests need statistical assertions (e.g., over 1000 trials)",
+        "Time-based tests (rate limiting) may be flaky - use dependency injection for clock"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "tester": {
+      "framework": "Vitest",
+      "mocking": "In-memory storage for unit tests, temp SQLite for integration",
+      "patterns": {
+        "statistical_tests": "Run N trials, assert ratio is within expected range (e.g., 60-80%)",
+        "time_tests": "Inject clock/timer to avoid real delays"
+      }
+    }
+  },
+
+  "audit": {
+    "last_run": "2026-02-04",
+    "result": "partial",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "packages/tuner/src/api/handlers/config.ts:16-27, tested in api.test.ts:127" },
+      { "id": "ac2", "status": "satisfied", "evidence": "packages/tuner/src/api/handlers/config.ts:33-41, tested in api.test.ts:136" },
+      { "id": "ac3", "status": "satisfied", "evidence": "packages/tuner/src/api/handlers/outcomes.ts:20-47, tested in api.test.ts:62" },
+      { "id": "ac4", "status": "satisfied", "evidence": "packages/tuner/src/api/handlers/outcomes.ts:53-80, tested in api.test.ts:101" },
+      { "id": "ac5", "status": "satisfied", "evidence": "packages/tuner/src/services/baseline-service.ts:113-164, uses EMA α=0.1, MIN_SAMPLES_FOR_DRIFT=30" },
+      { "id": "ac6", "status": "satisfied", "evidence": "packages/tuner/src/services/drift-detector.ts:49-90, 2σ warning/3σ critical thresholds" },
+      { "id": "ac7", "status": "satisfied", "evidence": "packages/tuner/src/services/model-selector.ts, exploration_rate=0.10 in config.ts:117" },
+      { "id": "ac8", "status": "satisfied", "evidence": "packages/tuner/src/services/config-writer.ts:151-157, max(0.02, 0.10*exp(-n/1000))" },
+      { "id": "ac9", "status": "satisfied", "evidence": "packages/tuner/src/cli/index.ts:25-97, status command shows baselines and alerts" },
+      { "id": "ac10", "status": "missing", "note": "CLI override command not implemented (tuner override --model --duration)" },
+      { "id": "ac11", "status": "satisfied", "evidence": "packages/tuner/src/storage/sqlite.ts config_versions table, src/services/config-writer.ts:72-83" },
+      { "id": "ac12", "status": "satisfied", "evidence": "packages/tuner/src/storage/sqlite.ts:21-89, 6 tables with indexes" }
+    ],
+    "drift": [
+      { "finding": "Port changed from 4002 to 3005", "file": "packages/tuner/src/server.ts:34", "action": "document - 3005 is the actual port" }
+    ]
+  }
+}
