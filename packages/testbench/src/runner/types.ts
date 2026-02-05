@@ -11,6 +11,24 @@ export const VerificationResultSchema = z.object({
 });
 
 // ============================================
+// Ideation Metrics
+// ============================================
+
+export const IdeationMetricsSchema = z.object({
+  session_id: z.string(),
+  specialist_count: z.number().nonnegative(),
+  understanding_keys: z.array(z.string()),
+  block_count: z.number().nonnegative(),
+  curated_block_count: z.number().nonnegative(),
+  ideation_time_ms: z.number().nonnegative(),
+  handoff_plan_id: z.string(),
+  handoff_plan_version: z.number(),
+  ideation_strategy: z.enum(['preconfigured', 'ai']),
+});
+
+export type IdeationMetrics = z.infer<typeof IdeationMetricsSchema>;
+
+// ============================================
 // Run Result
 // ============================================
 
@@ -30,8 +48,13 @@ export const RunResultSchema = z.object({
 
   // Execution metrics
   actual_time_seconds: z.number().nonnegative(),
+  setup_time_seconds: z.number().nonnegative().optional(),
+  execution_time_seconds: z.number().nonnegative().optional(),
   actual_tokens: z.number().nonnegative().optional(),
   actual_cost_usd: z.number().nonnegative().optional(),
+
+  // Ideation metrics
+  ideation_metrics: IdeationMetricsSchema.optional(),
 
   // Verification
   verification_result: VerificationResultSchema.optional(),

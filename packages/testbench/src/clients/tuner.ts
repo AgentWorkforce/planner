@@ -1,3 +1,5 @@
+import { fetchWithRetry } from '../util/fetch-retry.js';
+
 export interface TaskOutcome {
   task_id: string;
   run_id: string;
@@ -16,7 +18,11 @@ export class TunerClient {
   }
 
   async getOutcomes(runId: string): Promise<TaskOutcome[]> {
-    const res = await fetch(`${this.baseUrl}/api/tuner/outcomes?run_id=${encodeURIComponent(runId)}`);
+    const res = await fetchWithRetry(
+      `${this.baseUrl}/api/tuner/outcomes?run_id=${encodeURIComponent(runId)}`,
+      undefined,
+      { maxRetries: 2, initialDelay: 100, maxDelay: 500 }
+    );
 
     if (!res.ok) {
       throw new Error(`Tuner getOutcomes failed: ${res.status} ${await res.text()}`);
@@ -28,7 +34,11 @@ export class TunerClient {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/health`, { signal: AbortSignal.timeout(3000) });
+      const res = await fetchWithRetry(
+        `${this.baseUrl}/health`,
+        { signal: AbortSignal.timeout(3000) },
+        { maxRetries: 1, initialDelay: 500, maxDelay: 500 }
+      );
       return res.ok;
     } catch {
       return false;

@@ -1,3 +1,5 @@
+import { fetchWithRetry } from '../util/fetch-retry.js';
+
 /**
  * ForgePlan shape matching forge-core's ForgePlanSchema.
  * Passed inline to POST /runs.
@@ -42,14 +44,18 @@ export class ForgeClient {
   }
 
   async createRun(plan: ForgePlan, workspacePath?: string): Promise<CreateRunResult> {
-    const res = await fetch(`${this.baseUrl}/runs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        plan,
-        workspace_path: workspacePath,
-      }),
-    });
+    const res = await fetchWithRetry(
+      `${this.baseUrl}/runs`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan,
+          workspace_path: workspacePath,
+        }),
+      },
+      { maxRetries: 2, initialDelay: 100, maxDelay: 500 }
+    );
 
     if (!res.ok) {
       throw new Error(`Forge createRun failed: ${res.status} ${await res.text()}`);
@@ -59,7 +65,11 @@ export class ForgeClient {
   }
 
   async getRun(runId: string): Promise<RunStatus> {
-    const res = await fetch(`${this.baseUrl}/runs/${runId}`);
+    const res = await fetchWithRetry(
+      `${this.baseUrl}/runs/${runId}`,
+      undefined,
+      { maxRetries: 3, initialDelay: 200, maxDelay: 2000 }
+    );
     if (!res.ok) {
       throw new Error(`Forge getRun failed: ${res.status} ${await res.text()}`);
     }

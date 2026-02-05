@@ -2,7 +2,7 @@
   "id": "hello-cli-ai",
   "name": "Hello CLI (AI-Planned)",
   "difficulty": "trivial",
-  "planning_mode": "ai",
+  "planning_strategy": "ai",
   "goal": "Create a Node.js CLI program in a file called index.js that takes a name as the first command-line argument and prints 'Hello, <name>!' to stdout. If no name is provided, print 'Hello, World!'.",
   "expected": {
     "language_tier": "s",

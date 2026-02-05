@@ -59,6 +59,7 @@ function loadEnvOverrides(): Partial<TestbenchConfig> {
   if (process.env.PLANNER_URL) overrides.planner_url = process.env.PLANNER_URL;
   if (process.env.FORGE_URL) overrides.forge_url = process.env.FORGE_URL;
   if (process.env.TUNER_URL) overrides.tuner_url = process.env.TUNER_URL;
+  if (process.env.IDEATION_URL) overrides.ideation_url = process.env.IDEATION_URL;
   if (process.env.TESTBENCH_TIMEOUT) {
     const timeout = parseInt(process.env.TESTBENCH_TIMEOUT, 10);
     if (!Number.isNaN(timeout) && timeout > 0) {
