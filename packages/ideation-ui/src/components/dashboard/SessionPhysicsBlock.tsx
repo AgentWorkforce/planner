@@ -97,9 +97,7 @@ export function SessionPhysicsBlock({
     };
   }, [position.x, position.y, size]);
 
-  // Truncate title for display
   const title = session.source.initial_intent;
-  const truncatedTitle = title.length > 30 ? `${title.substring(0, 30)}...` : title;
 
   // Calculate block count
   const blockCount = session.blocks?.length || 0;
@@ -139,8 +137,6 @@ export function SessionPhysicsBlock({
           isAbandoned
             ? [
                 // Abandoned session styles
-                'bg-bg-secondary/50',
-                'border border-border-subtle',
                 'opacity-40',
                 'hover:opacity-70',
                 'hover:scale-150',
@@ -149,33 +145,35 @@ export function SessionPhysicsBlock({
                 // Active session styles
                 'p-3 gap-1',
                 'hover:shadow-lg hover:scale-105',
-                'bg-bg-primary',
-                'border border-border-default',
               ]
         )}
         style={{
           width: size,
           height: size,
           willChange: 'transform',
+          backgroundColor: 'var(--block-draft)',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: 'var(--block-draft-border)',
         }}
       >
         {/* Only show content for non-abandoned sessions */}
         {!isAbandoned && (
           <>
             {/* Session Title */}
-            <div className="text-xs font-medium text-text-primary text-center truncate w-full px-1">
-              {truncatedTitle}
+            <div className="text-xs font-medium text-[var(--canvas-text-primary)] text-center w-full px-1 line-clamp-2">
+              {title}
             </div>
 
             {/* Block Count Badge */}
             {blockCount > 0 && (
-              <div className="flex items-center gap-1 px-2 py-0.5 bg-bg-secondary rounded-full">
-                <span className="text-xs text-text-secondary">{blockCount} blocks</span>
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--canvas-bg-subtle)] rounded-full">
+                <span className="text-xs text-[var(--canvas-text-muted)]">{blockCount} blocks</span>
               </div>
             )}
 
             {/* Last Activity */}
-            <div className="text-[10px] text-text-muted mt-auto">
+            <div className="text-[10px] text-[var(--canvas-text-muted)] mt-auto">
               {activityLabel}
             </div>
           </>
@@ -185,20 +183,24 @@ export function SessionPhysicsBlock({
       {/* Tooltip for abandoned sessions */}
       {isAbandoned && showTooltip && (
         <div
-          className="absolute z-50 px-3 py-2 bg-bg-primary border border-border-default rounded-lg shadow-lg pointer-events-none"
+          className="absolute z-50 px-3 py-2 rounded-lg shadow-lg pointer-events-none"
           style={{
             left: position.x + size / 2 + 10,
             top: position.y,
             transform: 'translateY(-50%)',
+            backgroundColor: 'var(--block-draft)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            borderColor: 'var(--block-draft-border)',
           }}
         >
-          <div className="text-xs font-medium text-text-primary whitespace-nowrap">
+          <div className="text-xs font-medium text-[var(--canvas-text-primary)] whitespace-nowrap">
             {title}
           </div>
-          <div className="text-[10px] text-text-muted mt-1">
+          <div className="text-[10px] text-[var(--canvas-text-muted)] mt-1">
             Abandoned {activityLabel}
           </div>
-          <div className="text-[10px] text-text-accent mt-1">
+          <div className="text-[10px] text-[var(--canvas-accent)] mt-1">
             Click to reactivate
           </div>
         </div>

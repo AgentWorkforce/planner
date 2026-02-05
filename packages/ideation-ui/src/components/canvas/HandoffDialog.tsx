@@ -93,19 +93,19 @@ export function HandoffDialog({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
+      className="fixed inset-0 flex items-center justify-center bg-black/60 z-50"
       onClick={onClose}
     >
       <div
-        className="bg-background rounded-lg shadow-lg w-full max-w-md"
+        className="bg-[var(--canvas-bg-subtle)] rounded-lg shadow-xl border border-[var(--block-draft-border)] w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">Hand off to Planner</h2>
+        <div className="flex items-center justify-between p-4 border-b border-[var(--block-draft-border)]">
+          <h2 className="text-lg font-semibold text-[var(--canvas-text-primary)]">Hand off to Planner</h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[var(--canvas-text-muted)] hover:text-[var(--canvas-text-primary)] transition-colors"
             aria-label="Close"
           >
             ✕
@@ -116,17 +116,17 @@ export function HandoffDialog({
         <div className="p-4 space-y-4">
           {/* Block counts */}
           <div className="text-sm space-y-1">
-            <p className="font-medium text-foreground">Ready to send:</p>
-            <p className="text-green-600">• {curatedCount} curated blocks</p>
+            <p className="font-medium text-[var(--canvas-text-primary)]">Ready to send:</p>
+            <p className="text-[var(--canvas-accent)]">• {curatedCount} curated blocks</p>
             {uncuratedCount > 0 && (
-              <p className="text-muted-foreground">• {uncuratedCount} un-curated blocks remaining</p>
+              <p className="text-[var(--canvas-text-muted)]">• {uncuratedCount} un-curated blocks remaining</p>
             )}
           </div>
 
           {/* Options (only show if there are uncurated blocks) */}
           {uncuratedCount > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">How to handle un-curated blocks?</p>
+              <p className="text-sm font-medium text-[var(--canvas-text-primary)]">How to handle un-curated blocks?</p>
 
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -134,9 +134,9 @@ export function HandoffDialog({
                   name="action"
                   checked={uncuratedAction === 'leave_out'}
                   onChange={() => setUncuratedAction('leave_out')}
-                  className="cursor-pointer"
+                  className="cursor-pointer accent-[var(--canvas-accent)]"
                 />
-                <span className="text-sm text-foreground">Leave out (only send curated)</span>
+                <span className="text-sm text-[var(--canvas-text-primary)]">Leave out (only send curated)</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer">
@@ -145,9 +145,9 @@ export function HandoffDialog({
                   name="action"
                   checked={uncuratedAction === 'include_as_context'}
                   onChange={() => setUncuratedAction('include_as_context')}
-                  className="cursor-pointer"
+                  className="cursor-pointer accent-[var(--canvas-accent)]"
                 />
-                <span className="text-sm text-foreground">Include as context (AI considers them)</span>
+                <span className="text-sm text-[var(--canvas-text-primary)]">Include as context (AI considers them)</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer">
@@ -156,9 +156,9 @@ export function HandoffDialog({
                   name="action"
                   checked={uncuratedAction === 'include_above_threshold'}
                   onChange={() => setUncuratedAction('include_above_threshold')}
-                  className="cursor-pointer"
+                  className="cursor-pointer accent-[var(--canvas-accent)]"
                 />
-                <span className="text-sm text-foreground">
+                <span className="text-sm text-[var(--canvas-text-primary)]">
                   Include all above{' '}
                   <input
                     type="number"
@@ -166,7 +166,7 @@ export function HandoffDialog({
                     onChange={(e) => setThreshold(Number(e.target.value))}
                     disabled={uncuratedAction !== 'include_above_threshold'}
                     className={cn(
-                      'w-12 px-1 border border-border rounded bg-background text-foreground',
+                      'w-12 px-1 border border-[var(--block-draft-border)] rounded bg-[var(--canvas-bg)] text-[var(--canvas-text-primary)]',
                       uncuratedAction !== 'include_above_threshold' && 'opacity-50 cursor-not-allowed'
                     )}
                     min={0}
@@ -180,16 +180,16 @@ export function HandoffDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 p-4 border-t border-border">
+        <div className="flex justify-end gap-2 p-4 border-t border-[var(--block-draft-border)]">
           <button
             onClick={onClose}
-            className="px-3 py-2 text-sm text-foreground hover:bg-muted rounded-md transition-colors"
+            className="px-3 py-2 text-sm text-[var(--canvas-text-primary)] hover:bg-[var(--canvas-bg)] rounded-md transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            className="px-4 py-2 text-sm bg-[var(--canvas-accent)] text-white font-medium rounded-md hover:brightness-110 transition-all"
           >
             Send to Planner →
           </button>
