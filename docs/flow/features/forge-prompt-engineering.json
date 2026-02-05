@@ -1,0 +1,58 @@
+{
+  "feature_id": "forge-prompt-engineering",
+  "title": "Agent Prompt Engineering Refinement",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "forge-dot-enhancements",
+  "component": "forge-core",
+  "dependencies": ["forge-relay-integration"],
+
+  "summary": {
+    "goal": "Optimize the agent task prompts built by buildTaskPrompt() and buildForgeMcpInstructions() in forge-spawner.ts. Current prompts are functional but basic — they list task details and MCP curl examples. Need model-specific strategies, better context injection, structured acceptance criteria formatting, and workspace-aware instructions.",
+    "acceptance_criteria": [
+      { "id": "pe-ac1", "description": "Model-specific prompt variants exist for at least claude and codex CLIs (different instruction styles, context window awareness)" },
+      { "id": "pe-ac2", "description": "Acceptance criteria are formatted as a structured checklist the agent can self-verify against before calling report_complete" },
+      { "id": "pe-ac3", "description": "Workspace context is injected: relevant file paths, repo structure hints, language/framework detection from scope config" },
+      { "id": "pe-ac4", "description": "Prompt includes dependency context: what predecessor tasks produced (artifacts from completed dependencies)" },
+      { "id": "pe-ac5", "description": "Prompt template is configurable via ForgeConfig (not hardcoded in forge-spawner.ts)" },
+      { "id": "pe-ac6", "description": "MCP tool instructions include error handling guidance (what to do if curl fails, how to retry)" },
+      { "id": "pe-ac7", "description": "Prompts are tested: at least 3 scenarios verified to produce correct agent behavior (trivial task, multi-file task, task with dependencies)" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Current prompt built in server/src/relay/forge-spawner.ts by buildTaskPrompt() and buildForgeMcpInstructions()",
+        "Prompt includes: task ID, run ID, step title, description, scope, role, acceptance criteria, MCP curl examples",
+        "No model-specific adaptation — same prompt for claude, codex, gemini",
+        "No workspace context — agent doesn't know what files exist, what language/framework is used",
+        "No dependency context — agent doesn't know what predecessor tasks produced",
+        "ForgeConfig has role_cli_mapping and repo configs but these aren't used in prompt construction",
+        "Relay client's buildMcpContext() generates planner MCP instructions separately — forge MCP is independent"
+      ],
+      "patterns": [
+        "Prompt template pattern from ForgeConfig (similar to how role_cli_mapping works)",
+        "Artifact query from storage for dependency context",
+        "Scope → repo config lookup for workspace context"
+      ],
+      "keywords": ["prompt engineering", "agent instructions", "model-specific", "context injection"],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "current_location": "packages/server/src/relay/forge-spawner.ts",
+      "target_location": "Template in ForgeConfig, rendering in forge-spawner.ts",
+      "model_variants": "At minimum: claude (structured, verbose), codex (concise, code-focused)",
+      "workspace_context_source": "ForgeConfig repo configs + file system scan at spawn time"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core", "server"],
+    "steps": []
+  }
+}
