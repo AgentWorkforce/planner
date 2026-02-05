@@ -56,5 +56,8 @@ prpm.lock
 # Claude prompts (local snippets)
 .prompts/
 
-# Research docs (local reference, not tracked)
+# Local docs (not tracked, except docs/flow/)
+docs/architecture/
+docs/artifacts/
+docs/design/
 docs/research/
