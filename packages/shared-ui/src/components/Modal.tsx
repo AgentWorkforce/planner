@@ -91,13 +91,13 @@ export function Modal({
           // Shift + Tab: if on first element, go to last
           if (document.activeElement === firstElement) {
             e.preventDefault();
-            lastElement.focus();
+            lastElement?.focus();
           }
         } else {
           // Tab: if on last element, go to first
           if (document.activeElement === lastElement) {
             e.preventDefault();
-            firstElement.focus();
+            firstElement?.focus();
           }
         }
       }
@@ -127,7 +127,7 @@ export function Modal({
 
         const focusableElements = getFocusableElements();
         if (focusableElements.length > 0) {
-          focusableElements[0].focus();
+          focusableElements[0]?.focus();
         } else {
           modalRef.current.focus();
         }

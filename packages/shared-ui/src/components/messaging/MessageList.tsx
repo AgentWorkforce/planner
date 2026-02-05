@@ -30,6 +30,9 @@ function shouldShowAvatar(messages: Message[], index: number): boolean {
   const current = messages[index];
   const previous = messages[index - 1];
 
+  // Safety check
+  if (!current || !previous) return true;
+
   // Different sender
   if (current.from !== previous.from) return true;
 
@@ -57,7 +60,7 @@ function groupMessagesByDate(messages: Message[]): { date: string; messages: Mes
       currentDate = messageDate;
       groups.push({ date: message.timestamp, messages: [message] });
     } else {
-      groups[groups.length - 1].messages.push(message);
+      groups[groups.length - 1]?.messages.push(message);
     }
   });
 

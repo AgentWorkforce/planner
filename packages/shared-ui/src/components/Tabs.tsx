@@ -68,7 +68,7 @@ export function Tabs({
 
     for (let i = 0; i < tabCount; i++) {
       nextIndex = (nextIndex + direction + tabCount) % tabCount;
-      if (!tabs[nextIndex].disabled) {
+      if (!tabs[nextIndex]?.disabled) {
         return nextIndex;
       }
     }

@@ -82,7 +82,7 @@ export function Dropdown({
           e.preventDefault();
           if (isOpen && highlightedIndex >= 0) {
             const item = items[highlightedIndex];
-            if (!item.disabled) {
+            if (item && !item.disabled) {
               onSelect(item.id);
               setIsOpen(false);
             }
