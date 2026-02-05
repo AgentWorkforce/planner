@@ -15,8 +15,7 @@ import { MessageInput } from './MessageInput';
 import { ChevronIcon } from './icons';
 import { useChannels, useChannelMessages, usePresence } from '@/hooks';
 import { useRelay } from '@/contexts';
-
-const LAST_CHANNEL_KEY = 'planner_last_channel';
+import { STORAGE_KEYS } from '@/config/storage-keys';
 
 interface PlanContext {
   planId: string;
@@ -78,7 +77,7 @@ export function MessagingSidebar({
       }
 
       // Persist last selected channel
-      localStorage.setItem(LAST_CHANNEL_KEY, channelId);
+      localStorage.setItem(STORAGE_KEYS.LAST_CHANNEL, channelId);
     },
     [channels]
   );
@@ -107,7 +106,7 @@ export function MessagingSidebar({
   useEffect(() => {
     if (requestedChannelId && channels.channels.some(c => c.id === requestedChannelId)) {
       setActiveChannelId(requestedChannelId);
-      localStorage.setItem(LAST_CHANNEL_KEY, requestedChannelId);
+      localStorage.setItem(STORAGE_KEYS.LAST_CHANNEL, requestedChannelId);
       // Join if not already joined
       if (!channels.joinedChannels.has(requestedChannelId)) {
         channels.join(requestedChannelId);
@@ -157,7 +156,7 @@ export function MessagingSidebar({
       }
 
       // Try to restore last channel from localStorage
-      const lastChannelId = localStorage.getItem(LAST_CHANNEL_KEY);
+      const lastChannelId = localStorage.getItem(STORAGE_KEYS.LAST_CHANNEL);
 
       if (lastChannelId && channels.channels.some((c) => c.id === lastChannelId)) {
         // Last channel still exists, restore it

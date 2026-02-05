@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { get } from '@/api/client';
+import { getUserId } from '@/lib/identity';
 import type { Channel, PresenceEntry, UseChannelsResult } from '@/types';
 import type { UseRelayConnectionResult } from '@/types';
 
@@ -43,7 +44,7 @@ export function useChannels(
 
     try {
       // Get userId for DM channel fetching (same source as createDmChannel)
-      const userId = sessionStorage.getItem('relay_anonymous_user_id') || '';
+      const userId = getUserId();
 
       // Build query params
       // Use activeOnly=true to get #planner, active plan channels, and DMs only

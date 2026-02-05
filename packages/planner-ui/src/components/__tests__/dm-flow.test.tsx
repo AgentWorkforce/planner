@@ -14,6 +14,7 @@ import { ChannelList } from '../ChannelList';
 import { MessagingSidebar } from '../MessagingSidebar';
 import { useDmChannel } from '@/hooks/useDmChannel';
 import { createDmChannel } from '@/api/client';
+import { STORAGE_KEYS } from '@/config/storage-keys';
 import type { Channel, UseRelayConnectionResult } from '@/types';
 
 // Mock API client
@@ -41,6 +42,8 @@ vi.mock('@/hooks/useAgentOrchestration', () => ({
 
 vi.mock('@/contexts', () => ({
   useRelay: vi.fn(),
+  ToastProvider: ({ children }: { children: unknown }) => children,
+  useToastContext: vi.fn(() => ({ toasts: [], addToast: vi.fn(), removeToast: vi.fn() })),
 }));
 
 import { useChannels } from '@/hooks/useChannels';
@@ -308,7 +311,7 @@ describe('DM Flow Integration Tests', () => {
       ];
 
       // Pre-populate localStorage with last channel
-      const LAST_CHANNEL_KEY = 'planner_last_channel';
+      const LAST_CHANNEL_KEY = STORAGE_KEYS.LAST_CHANNEL;
       localStorage.setItem(LAST_CHANNEL_KEY, mockDmChannel.id);
 
       // Mock useChannels to return our test channels
@@ -334,7 +337,7 @@ describe('DM Flow Integration Tests', () => {
       const channels: Channel[] = [mockGlobalChannel, mockPlanChannel];
 
       // Last channel was a DM that no longer exists
-      const LAST_CHANNEL_KEY = 'planner_last_channel';
+      const LAST_CHANNEL_KEY = STORAGE_KEYS.LAST_CHANNEL;
       localStorage.setItem(LAST_CHANNEL_KEY, 'dm-agent-deleted');
 
       const planContext = {
@@ -360,7 +363,7 @@ describe('DM Flow Integration Tests', () => {
 
     it('saves channel selection to localStorage when channel is selected', async () => {
       const user = userEvent.setup();
-      const LAST_CHANNEL_KEY = 'planner_last_channel';
+      const LAST_CHANNEL_KEY = STORAGE_KEYS.LAST_CHANNEL;
 
       const channels: Channel[] = [mockGlobalChannel, mockDmChannel];
       const onSelectChannel = vi.fn((channelId: string) => {
@@ -630,7 +633,7 @@ describe('DM Flow Integration Tests', () => {
       unmountChannelList();
 
       // Step 3: Select the channel
-      const LAST_CHANNEL_KEY = 'planner_last_channel';
+      const LAST_CHANNEL_KEY = STORAGE_KEYS.LAST_CHANNEL;
       const onSelectChannel = vi.fn((id: string) => {
         localStorage.setItem(LAST_CHANNEL_KEY, id);
       });

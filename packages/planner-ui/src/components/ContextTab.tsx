@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { PlusIcon, SettingsIcon } from '@/components/icons';
 import { updateContext } from '@/api/client';
 import { cn } from '@/lib/utils';
+import { useToastContext } from '@/contexts';
 
 interface ContextTabProps {
   planId: string;
@@ -134,6 +135,7 @@ export function ContextTab({
   isEditable = false,
   onContextUpdate,
 }: ContextTabProps) {
+  const { addToast } = useToastContext();
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const roles = sortRoles(Object.keys(context));
@@ -165,7 +167,7 @@ export function ContextTab({
         }
       } catch (error) {
         console.error('[ContextTab] Failed to update context:', error);
-        // TODO: Show error toast
+        addToast('Failed to update context', 'error');
       } finally {
         setIsUpdating(false);
       }
@@ -192,7 +194,7 @@ export function ContextTab({
         }
       } catch (error) {
         console.error('[ContextTab] Failed to delete role context:', error);
-        // TODO: Show error toast
+        addToast('Failed to delete role context', 'error');
       } finally {
         setIsUpdating(false);
       }
@@ -221,7 +223,7 @@ export function ContextTab({
         setSelectedRole(role);
       } catch (error) {
         console.error('[ContextTab] Failed to add role:', error);
-        // TODO: Show error toast
+        addToast('Failed to add role', 'error');
       } finally {
         setIsUpdating(false);
       }
