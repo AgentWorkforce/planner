@@ -43,6 +43,7 @@ If feature exists but no summary → "Run /flow brainstorm or /flow discover fir
 - **Acceptance criteria must be specific** — not "returns data" but "returns { id, name, status }".
 - **Cross-scope boundaries need contracts** — if backend serves frontend, define the shape.
 - **Include integration steps** — every new component/endpoint/service needs a step for where it gets rendered/called/used.
+- **Wire UI handlers to APIs** — if a step creates a UI handler (onClick, onSubmit) and another creates an API endpoint, add an explicit step to connect them.
 - **Add specification for technical steps** — architecture decisions, design choices, security requirements.
 - After completion: single-sentence summary unless user requests more.
 

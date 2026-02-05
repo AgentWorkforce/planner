@@ -47,6 +47,10 @@ For each feature, create these tasks in order:
 | DOC | [DOC] Document [feature] completion | VERIFY |
 | CHECKPOINT | [CHECKPOINT] Context check | DOC |
 
+**AUDIT checkpoints**: Insert an [AUDIT] task after every ~5 IMPL tasks (use discretion based on logical groupings/phases). AUDIT tasks review the code produced so far for quality, bugs, and consistency before continuing. Block subsequent IMPLs on the AUDIT task.
+
+**Multi-phase features**: For features with distinct phases (e.g., "Phase 1", "Phase 2" or verification gates in the plan), treat each phase like a mini-feature: add a [PRE] task before each phase to analyze context and patterns from previous phases, and a [POST] task after each phase to review that phase's code before proceeding.
+
 ## Cross-Feature Dependencies
 
 If feature B depends on feature A:
@@ -106,6 +110,21 @@ DO: Review this code as if it were a PR from another developer.
 3. Make fixes and improvements—don't just note them
 
 Be critical. If you wouldn't approve this PR, fix it before marking complete.
+```
+
+**AUDIT** (inserted every ~5 IMPLs):
+```
+Feature: [feature_id]
+Phase: [phase or step range being audited]
+
+DO: Review code produced in the last batch of IMPLs.
+
+1. Re-read all code written since the last AUDIT (or PRE if first AUDIT)
+2. Check for bugs, logic errors, inconsistent patterns
+3. Verify the code follows existing codebase conventions
+4. Fix issues before proceeding to next batch of IMPLs
+
+This is a quality gate—subsequent IMPLs are blocked until this passes.
 ```
 
 **VERIFY**:
