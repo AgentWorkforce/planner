@@ -156,10 +156,11 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       if (tuner) {
         const { score: confidenceScore } = computeAggregateConfidence(session.understanding);
         const curatedBlocks = session.blocks.filter(b => b.status === 'curated');
+        const llmConfig = await getLLMConfig();
         const outcome: IdeationOutcome = {
           session_id: id,
           plan_id: undefined, // No plan for abandoned sessions
-          interviewer_model: getLLMConfig().model,
+          interviewer_model: llmConfig.model,
           specialist_count: session.active_specialists.length,
           confidence_score: confidenceScore,
           block_count: curatedBlocks.length,
@@ -435,10 +436,11 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       const tuner = getTunerIntegration();
       if (tuner) {
         const { score: confidenceScore } = computeAggregateConfidence(existingSession.understanding);
+        const llmConfig = await getLLMConfig();
         const outcome: IdeationOutcome = {
           session_id: existingSession.id,
           plan_id: result.plan_id,
-          interviewer_model: getLLMConfig().model,
+          interviewer_model: llmConfig.model,
           specialist_count: existingSession.active_specialists.length,
           confidence_score: confidenceScore,
           block_count: curatedBlocks.length,

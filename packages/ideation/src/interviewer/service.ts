@@ -458,7 +458,7 @@ class InterviewerService {
       : INTERVIEWER_TOOLS;
 
     try {
-      const llmConfig = getLLMConfig();
+      const llmConfig = await getLLMConfig();
       console.log(`[Interviewer] Calling Anthropic API: model=${llmConfig.model}, messages=${messages.length}, tools=${tools.length}`);
       const startTime = Date.now();
       const response = await this.state.anthropic.messages.create({

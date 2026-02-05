@@ -7,13 +7,11 @@
 import {
   IdeationIntegration,
   createIdeationIntegration,
-  type IdeationIntegrationConfig,
-} from '../../../tuner/src/integrations/ideation-integration.js';
-import {
   DEFAULT_IDEATION_CONFIG,
+  type IdeationIntegrationConfig,
   type IdeationConfig,
-} from '../../../tuner/src/domain/config.js';
-import type { IdeationOutcome } from '../../../tuner/src/domain/outcome.js';
+  type IdeationOutcome,
+} from 'tuner';
 
 // Re-export types for convenience
 export type {

@@ -73,18 +73,22 @@ const DEFAULT_LLM_CONFIG = {
  * NOTE: This is a dynamic getter that reads from Tuner's cached config.
  * If Tuner is unavailable, returns hardcoded defaults for graceful degradation.
  */
-export function getLLMConfig(): { model: string; maxTokens: number; temperature: number } {
-  // Lazy import to avoid circular dependency
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const tuner = (require('../tuner/index.js') as typeof import('../tuner/index.js')).getTunerIntegration();
-  const config = tuner?.getConfig();
+export async function getLLMConfig(): Promise<{ model: string; maxTokens: number; temperature: number }> {
+  try {
+    // Dynamic import to avoid circular dependency (ESM-compatible)
+    const { getTunerIntegration } = await import('../tuner/index.js');
+    const tuner = getTunerIntegration();
+    const config = tuner?.getConfig();
 
-  if (config) {
-    return {
-      model: config.interviewer.model,
-      maxTokens: config.interviewer.max_tokens,
-      temperature: config.interviewer.temperature,
-    };
+    if (config) {
+      return {
+        model: config.interviewer.model,
+        maxTokens: config.interviewer.max_tokens,
+        temperature: config.interviewer.temperature,
+      };
+    }
+  } catch {
+    // Tuner not available, use defaults
   }
 
   return { ...DEFAULT_LLM_CONFIG };

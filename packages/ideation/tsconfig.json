@@ -1,12 +1,11 @@
 {
   "extends": "../../tsconfig.node.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "paths": {
-      "tuner": ["../../dist/index.d.ts"],
-      "tuner/*": ["../../dist/*"]
-    }
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"],
+  "references": [
+    { "path": "../tuner" }
+  ]
 }
