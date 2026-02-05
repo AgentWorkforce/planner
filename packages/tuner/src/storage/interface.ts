@@ -3,8 +3,8 @@
  * Defines all storage operations for outcomes, baselines, alerts, and config.
  */
 
-import type { TaskOutcome, RunOutcome } from '../domain/outcome.js';
-import type { TaskBaseline, ModelBaseline } from '../domain/baseline.js';
+import type { TaskOutcome, RunOutcome, IdeationOutcome, PlanQualitySignal } from '../domain/outcome.js';
+import type { TaskBaseline, ModelBaseline, IdeationBaseline } from '../domain/baseline.js';
 import type { DriftAlert } from '../domain/drift.js';
 import type { ForgeExecutionConfig, PlannerConfig } from '../domain/config.js';
 
@@ -100,6 +100,48 @@ export interface TunerStorage {
 
   /** List all model baselines */
   listModelBaselines(): ModelBaseline[];
+
+  // -------------------------------------------------------------------------
+  // Ideation Outcomes
+  // -------------------------------------------------------------------------
+
+  /** Insert a new ideation outcome */
+  insertIdeationOutcome(outcome: IdeationOutcome): void;
+
+  /** Get ideation outcomes for a session */
+  getIdeationOutcomesBySession(sessionId: string): IdeationOutcome[];
+
+  /** Get recent ideation outcomes (for insights) */
+  getRecentIdeationOutcomes(limit: number): IdeationOutcome[];
+
+  /** Get total ideation outcome count */
+  getIdeationOutcomeCount(): number;
+
+  // -------------------------------------------------------------------------
+  // Plan Quality Signals
+  // -------------------------------------------------------------------------
+
+  /** Insert a new plan quality signal */
+  insertPlanQualitySignal(signal: PlanQualitySignal): void;
+
+  /** Get plan quality signal by plan ID */
+  getPlanQualitySignal(planId: string): PlanQualitySignal | null;
+
+  /** Get plan quality signals by session ID */
+  getPlanQualitySignalsBySession(sessionId: string): PlanQualitySignal[];
+
+  // -------------------------------------------------------------------------
+  // Ideation Baselines
+  // -------------------------------------------------------------------------
+
+  /** Get an ideation baseline by pattern */
+  getIdeationBaseline(pattern: string): IdeationBaseline | null;
+
+  /** Insert or update an ideation baseline */
+  upsertIdeationBaseline(baseline: IdeationBaseline): void;
+
+  /** List all ideation baselines */
+  listIdeationBaselines(): IdeationBaseline[];
 
   // -------------------------------------------------------------------------
   // Drift Alerts

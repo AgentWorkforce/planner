@@ -181,7 +181,7 @@ export async function executeSpecialistTool(
         const updatedSession = await storage.updateBlocks(session_id, updatedBlocks);
 
         // Emit event so SSE clients get notified
-        ideationEvents.emitSessionEvent('session:block', updatedSession);
+        ideationEvents.emitSessionEvent('session:block_created', updatedSession);
 
         // If merge/split suggestions provided, queue insights for user
         if (merge_suggestion) {
@@ -225,10 +225,11 @@ export async function executeSpecialistTool(
           return { success: false, error: `Block not found: ${block_id}` };
         }
 
-        const existingBlock = session.blocks[blockIndex];
+        // existingBlock is guaranteed to exist since we check blockIndex !== -1
+        const existingBlock = session.blocks[blockIndex]!;
 
-        // Build updated block
-        const updatedBlock = { ...existingBlock };
+        // Build updated block - spread preserves all required fields
+        const updatedBlock = { ...existingBlock } as typeof existingBlock;
 
         // Update confidence if provided
         if (confidence !== undefined) {

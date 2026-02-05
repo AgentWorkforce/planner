@@ -31,3 +31,5 @@ export {
 } from './client.js';
 
 export type { TunerClientOptions, TunerClientStatus } from './client.js';
+
+export { emitPlanQualitySignal } from './quality-signal.js';

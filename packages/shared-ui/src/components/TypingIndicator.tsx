@@ -37,15 +37,15 @@ export function TypingIndicator({
 
   const formatTypingText = (): string => {
     if (typingUsers.length === 1) {
-      return `${typingUsers[0].name} is typing`;
+      return `${typingUsers[0]?.name} is typing`;
     }
     if (typingUsers.length === 2) {
-      return `${typingUsers[0].name} and ${typingUsers[1].name} are typing`;
+      return `${typingUsers[0]?.name} and ${typingUsers[1]?.name} are typing`;
     }
     if (typingUsers.length === 3) {
-      return `${typingUsers[0].name}, ${typingUsers[1].name}, and ${typingUsers[2].name} are typing`;
+      return `${typingUsers[0]?.name}, ${typingUsers[1]?.name}, and ${typingUsers[2]?.name} are typing`;
     }
-    return `${typingUsers[0].name} and ${typingUsers.length - 1} others are typing`;
+    return `${typingUsers[0]?.name} and ${typingUsers.length - 1} others are typing`;
   };
 
   return (

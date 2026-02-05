@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
-import { SqliteStorage } from '../storage/sqlite.js';
+import { SqliteStorage } from '../storage/index.js';
 import { createStep } from '../domain/step.js';
 
 describe('Change Request Flow Tests (Standalone)', () => {

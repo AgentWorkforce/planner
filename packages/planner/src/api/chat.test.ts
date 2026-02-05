@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
-import { SqliteStorage } from '../storage/sqlite.js';
+import { SqliteStorage } from '../storage/index.js';
 import type { PlanStorage } from '../storage/interface.js';
 import type { PlanVersion } from '../domain/plan.js';
 
@@ -61,93 +61,8 @@ describe('Chat API', () => {
     });
   });
 
-  describe('POST /api/ai/chat', () => {
-    it('returns mock response when no active session', async () => {
-      const response = await request(app)
-        .post('/api/ai/chat')
-        .send({
-          message: 'Hello',
-          context: {
-            plan_id: planId,
-            version: 1,
-            goal: 'Test goal',
-            steps: [],
-          },
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message');
-      expect(response.body).toHaveProperty('session_status', 'none');
-    });
-
-    it('requires message field', async () => {
-      const response = await request(app)
-        .post('/api/ai/chat')
-        .send({
-          context: {
-            plan_id: planId,
-            version: 1,
-            goal: 'Test goal',
-            steps: [],
-          },
-        });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('requires context with plan_id', async () => {
-      const response = await request(app)
-        .post('/api/ai/chat')
-        .send({
-          message: 'Hello',
-          context: {},
-        });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('returns 404 for non-existent plan', async () => {
-      const response = await request(app)
-        .post('/api/ai/chat')
-        .send({
-          message: 'Hello',
-          context: {
-            plan_id: 'non-existent',
-            version: 1,
-            goal: 'Test goal',
-            steps: [],
-          },
-        });
-
-      expect(response.status).toBe(404);
-    });
-
-    it('returns response for criteria request', async () => {
-      const response = await request(app)
-        .post('/api/ai/chat')
-        .send({
-          message: 'add acceptance criteria',
-          context: {
-            plan_id: planId,
-            version: 1,
-            goal: version.summary.goal,
-            steps: version.steps.map((s) => ({
-              step_id: s.step_id,
-              title: s.title,
-              description: s.description,
-              dependencies: s.dependencies,
-              acceptance_criteria_count: 0,
-              has_gate: false,
-            })),
-          },
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message');
-      expect(response.body).toHaveProperty('session_status');
-      // Suggestion may or may not be present depending on mock implementation
-    });
-  });
+  // Note: POST /api/ai/chat route was moved to packages/server
+  // Tests for that endpoint should be in packages/server/src/api/chat.test.ts
 
   describe('POST /api/ai/suggestions/apply', () => {
     it('requires all fields', async () => {

@@ -13,6 +13,7 @@ import { createChannelHandlers } from './handlers/channels.js';
 import { createHealthHandlers } from './handlers/health.js';
 import { createAgentHandlers } from './handlers/agents.js';
 import { createChatHandlers } from './handlers/chat.js';
+import { createCapabilitiesHandlers } from './handlers/capabilities.js';
 
 /** Storage interface subset needed for routes */
 interface RouteStorage {
@@ -31,9 +32,14 @@ export function createServerRouter(storage: RouteStorage): Router {
   const healthHandlers = createHealthHandlers();
   const agentHandlers = createAgentHandlers();
   const chatHandlers = createChatHandlers(storage);
+  const capabilitiesHandlers = createCapabilitiesHandlers();
 
   // Health routes
   router.get('/health/relay', healthHandlers.relayHealth);
+  router.get('/health/planner-lead', healthHandlers.plannerLeadHealth);
+
+  // Capabilities routes
+  router.get('/capabilities', capabilitiesHandlers.list);
 
   // Agent routes
   router.get('/agents', agentHandlers.list);

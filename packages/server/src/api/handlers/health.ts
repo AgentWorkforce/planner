@@ -3,10 +3,12 @@
  *
  * Provides relay-aware health endpoints:
  * - GET /api/health/relay - Check relay daemon connection status
+ * - GET /api/health/planner-lead - Check PlannerLead agent health
  */
 
 import type { Request, Response } from 'express';
 import { getRelayMode, getRelayConfig } from '../../relay/index.js';
+import { getPlannerLeadHealth, type PlannerLeadHealth } from '../../relay/planner-lead.js';
 
 export interface RelayHealthResponse {
   status: 'connected' | 'disconnected' | 'error' | 'standalone';
@@ -50,6 +52,15 @@ export function createHealthHandlers() {
         message,
       };
       res.json(response);
+    },
+
+    /**
+     * GET /api/health/planner-lead
+     * Reports PlannerLead agent health and activity.
+     */
+    plannerLeadHealth: async (_req: Request, res: Response): Promise<void> => {
+      const health: PlannerLeadHealth = getPlannerLeadHealth();
+      res.json(health);
     },
   };
 }

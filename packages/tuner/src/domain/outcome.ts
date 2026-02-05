@@ -149,3 +149,50 @@ export const RunOutcomeSchema = z.object({
 });
 
 export type RunOutcome = z.infer<typeof RunOutcomeSchema>;
+
+// ============================================================================
+// Ideation Outcome
+// ============================================================================
+
+/**
+ * Ideation session outcome.
+ * Emitted after each ideation session completes.
+ */
+export const IdeationOutcomeSchema = z.object({
+  session_id: z.string(),
+  plan_id: z.string().optional(), // May not have plan yet if abandoned
+  interviewer_model: z.string(),
+  specialist_count: z.number().int().min(0),
+  confidence_score: z.number().min(0).max(100).optional(),
+  block_count: z.number().int().min(0),
+  conversation_turns: z.number().int().min(0),
+  duration_ms: z.number().int().min(0),
+  outcome: z.enum(['approved', 'rejected', 'abandoned']),
+  source: z.enum(['test', 'production', 'training']).default('production'),
+  timestamp: z.string().datetime(),
+});
+
+export type IdeationOutcome = z.infer<typeof IdeationOutcomeSchema>;
+
+// ============================================================================
+// Plan Quality Signal
+// ============================================================================
+
+/**
+ * Plan quality signal from Planner.
+ * Emitted when a plan is approved, linking back to ideation session.
+ */
+export const PlanQualitySignalSchema = z.object({
+  plan_id: z.string(),
+  plan_version: z.number().int().min(1),
+  session_id: z.string(), // Links back to ideation session
+  question_count: z.number().int().min(0),
+  version_count: z.number().int().min(1),
+  improvements_made: z.number().int().min(0),
+  block_count: z.number().int().min(0),
+  time_to_approval_ms: z.number().int().min(0),
+  source: z.enum(['test', 'production', 'training']).default('production'),
+  timestamp: z.string().datetime(),
+});
+
+export type PlanQualitySignal = z.infer<typeof PlanQualitySignalSchema>;

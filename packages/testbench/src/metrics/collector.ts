@@ -54,7 +54,7 @@ export class MetricsCollector {
 
     const meanTime = times.reduce((a, b) => a + b, 0) / n;
     const p95Index = Math.min(Math.ceil(n * 0.95) - 1, n - 1);
-    const p95Time = times[p95Index];
+    const p95Time = times[p95Index] ?? 0;
 
     const totalCost = costs.reduce((a, b) => a + b, 0);
     const totalTokens = tokens.reduce((a, b) => a + b, 0);

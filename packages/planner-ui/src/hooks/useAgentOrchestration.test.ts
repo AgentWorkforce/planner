@@ -8,9 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAgentOrchestration, type Agent, type AgentState, type AgentRole } from './useAgentOrchestration';
 
-// Mock the useRelay hook
+// Mock the useRelay hook and other context exports
 vi.mock('@/contexts', () => ({
   useRelay: vi.fn(),
+  ToastProvider: ({ children }: { children: unknown }) => children,
+  useToastContext: vi.fn(() => ({ toasts: [], addToast: vi.fn(), removeToast: vi.fn() })),
 }));
 
 import { useRelay } from '@/contexts';
@@ -18,7 +20,7 @@ import { useRelay } from '@/contexts';
 // Helper to create a mock relay connection
 function createMockRelayConnection() {
   const messageHandlers: Array<(msg: { data: unknown }) => void> = [];
-  const channelHandlers: Array<(msg: { channel: string; data: unknown }) => void> = [];
+  const channelHandlers: Array<(msg: { channelId: string; data: unknown }) => void> = [];
 
   return {
     isConnected: true,
@@ -30,7 +32,7 @@ function createMockRelayConnection() {
         if (index >= 0) messageHandlers.splice(index, 1);
       };
     }),
-    onChannelMessage: vi.fn((handler: (msg: { channel: string; data: unknown }) => void) => {
+    onChannelMessage: vi.fn((handler: (msg: { channelId: string; data: unknown }) => void) => {
       channelHandlers.push(handler);
       return () => {
         const index = channelHandlers.indexOf(handler);
@@ -43,8 +45,8 @@ function createMockRelayConnection() {
     _simulateMessage: (data: unknown) => {
       messageHandlers.forEach((handler) => handler({ data }));
     },
-    _simulateChannelMessage: (channel: string, data: unknown) => {
-      channelHandlers.forEach((handler) => handler({ channel, data }));
+    _simulateChannelMessage: (channelId: string, data: unknown) => {
+      channelHandlers.forEach((handler) => handler({ channelId, data }));
     },
   };
 }

@@ -17,7 +17,7 @@ import { getRelayMode } from './service.js';
 import { PLANNER_CHANNEL } from './channels.js';
 import { getAnthropicClient, hasApiKey, MODEL, MAX_TOKENS } from './anthropic-config.js';
 import { getSystemPrompt } from './planner-lead-prompt.js';
-import { PLANNER_LEAD_TOOLS, executeTool, getMockToolResult, type ToolResult } from './planner-lead-tools.js';
+import { PLANNER_LEAD_TOOLS, executeTool, getMockToolResult, type ToolResult } from './planner-lead-tools/index.js';
 import { addMessage, getHistory, type ConversationMessage } from './conversation-history.js';
 import type { PlanStorage } from '../../../planner/src/storage/interface.js';
 import { emitAgentJoined, emitAgentStatusUpdate, emitAgentLeft, type AgentState, type AgentRole } from './agent-status.js';
@@ -41,6 +41,11 @@ let unsubscribeMessage: (() => void) | null = null;
 
 /** Unique agent ID for status tracking */
 let agentId: string | null = null;
+
+/** Health tracking */
+let lastActivityTimestamp: string | null = null;
+let messagesProcessed = 0;
+let errorCount = 0;
 
 /**
  * Pending questions map for trajectory tracking.
@@ -231,6 +236,10 @@ async function handleMessage(
 
   console.log(`[planner-lead] Handling message from ${from} in ${channelId || 'DM'}`);
 
+  // Update activity timestamp
+  lastActivityTimestamp = new Date().toISOString();
+  messagesProcessed++;
+
   // Emit working state when processing starts
   if (agentId) {
     emitAgentStatusUpdate(agentId, 'working', {
@@ -278,6 +287,9 @@ async function handleMessage(
       });
     }
   } catch (error) {
+    // Track error
+    errorCount++;
+
     // Emit error state on failure
     if (agentId) {
       const message = error instanceof Error ? error.message : String(error);
@@ -705,4 +717,36 @@ export async function notifyNewPlan(
   } else {
     console.warn(`[planner-lead] Failed to send welcome message to ${channelId}`);
   }
+}
+
+// ============================================================================
+// Health Check Exports
+// ============================================================================
+
+/**
+ * Health status interface for PlannerLead.
+ */
+export interface PlannerLeadHealth {
+  active: boolean;
+  relay_connected: boolean;
+  ai_available: boolean;
+  last_activity: string | null;
+  messages_processed: number;
+  error_count: number;
+  pending_questions_count: number;
+}
+
+/**
+ * Get PlannerLead health status.
+ */
+export function getPlannerLeadHealth(): PlannerLeadHealth {
+  return {
+    active: initialized,
+    relay_connected: isConnected(),
+    ai_available: hasApiKey(),
+    last_activity: lastActivityTimestamp,
+    messages_processed: messagesProcessed,
+    error_count: errorCount,
+    pending_questions_count: pendingQuestions.size,
+  };
 }

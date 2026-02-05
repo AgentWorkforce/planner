@@ -1,0 +1,80 @@
+{
+  "feature_id": "trajectory-integration",
+  "title": "Trajectory Integration Across Pipeline",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["ideation-lead", "planner-lead-service"],
+  "components": ["planner-core", "ideation-core", "forge-core", "testbench"],
+
+  "summary": {
+    "goal": "Record what agents thought/decided/did and use previous trajectories as context for downstream agents, so they understand 'why' and 'how', not just 'what'.",
+    "acceptance_criteria": [
+      { "id": "traj-ac1", "description": "Interviewer records trajectory events (tool calls, decisions, findings) during ideation sessions" },
+      { "id": "traj-ac2", "description": "Interviewer completes trajectory with retrospective on send-to-planner" },
+      { "id": "traj-ac3", "description": "PlannerLead receives ideation retrospective as prompt context when plan sourced from ideation" },
+      { "id": "traj-ac4", "description": "PlannerLead records its own trajectory (tool calls, decisions, step rationale)" },
+      { "id": "traj-ac5", "description": "PlannerLead completes trajectory with retrospective on plan approval" },
+      { "id": "traj-ac6", "description": "Forge workers receive planning retrospective as prompt context" },
+      { "id": "traj-ac7", "description": "Testbench collects and displays forge trajectory metrics after runs" },
+      { "id": "traj-ac8", "description": "Trajectories persist to .trajectories/ directory as JSON files" },
+      { "id": "traj-ac9", "description": "Service gracefully degrades if agent-trajectories library unavailable" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Three distinct trajectory systems: agent-trajectories library, relay TrajectoryIntegration (subprocess-based), forge TrajectoryCapture (SQLite+SSE)",
+        "agent-trajectories library is ideal for persistent services - zero subprocess overhead, pure TypeScript, pluggable storage",
+        "Forge TrajectoryCapture must remain separate - needs real-time SSE, indexed queries, non-blocking writes",
+        "Retrospective is the built-in context bridge - distilled summary on trajectory completion",
+        "Relay SDK spawn() has no env parameter - can't pass trajectory env vars to spawned agents"
+      ],
+      "keywords": ["agent-trajectories", "retrospective", "FileStorage", "context injection", "PDERO"],
+      "questions": [],
+      "concerns": ["FileStorage rewrites full JSON on each save - fine for low-frequency agent reasoning, not for high-frequency execution"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "library": "agent-trajectories (direct library usage, not CLI)",
+      "storage": "FileStorage to .trajectories/ in project root",
+      "layering": "Agent reasoning → agent-trajectories, Orchestration execution → forge TrajectoryCapture"
+    },
+    "decisions": [
+      {
+        "question": "Use relay TrajectoryIntegration or agent-trajectories library directly?",
+        "chosen": "agent-trajectories library directly",
+        "reasoning": "Zero subprocess overhead, no trail CLI dependency, full type safety"
+      },
+      {
+        "question": "Replace forge TrajectoryCapture with agent-trajectories?",
+        "chosen": "Keep forge TrajectoryCapture separate",
+        "reasoning": "Forge needs SSE real-time streaming, indexed queries, non-blocking writes - different requirements"
+      },
+      {
+        "question": "How to pass context between stages?",
+        "chosen": "Retrospectives as context bridge",
+        "reasoning": "Built-in to agent-trajectories, already distilled summary, no custom compaction needed"
+      }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "ideation-core", "forge-core", "testbench"],
+    "steps": [],
+    "plan_reference": "/Users/flysikring/.claude/plans/swirling-tinkering-sunset.md"
+  },
+
+  "sub_features": [
+    "trajectory-service",
+    "trajectory-interviewer-write",
+    "trajectory-planner-read-write",
+    "trajectory-forge-read",
+    "trajectory-spawned-agents",
+    "trajectory-testbench-verification"
+  ]
+}

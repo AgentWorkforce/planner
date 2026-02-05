@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
-import { SqliteStorage } from '../../storage/sqlite.js';
+import { SqliteStorage } from '../../storage/index.js';
 import type { Question } from '../../domain/question.js';
 
 describe('Question Handlers - Integration Tests', () => {

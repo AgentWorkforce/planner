@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
-import type { TaskOutcome, RunOutcome } from '../domain/outcome.js';
+import type { TaskOutcome, RunOutcome, IdeationOutcome, PlanQualitySignal } from '../domain/outcome.js';
 import type { TunerStorage } from '../storage/interface.js';
 
 /**
@@ -15,6 +15,8 @@ import type { TunerStorage } from '../storage/interface.js';
 export interface OutcomeCollectorEvents {
   task_outcome_received: (outcome: TaskOutcome) => void;
   run_outcome_received: (outcome: RunOutcome) => void;
+  ideation_outcome_received: (outcome: IdeationOutcome) => void;
+  plan_quality_signal_received: (signal: PlanQualitySignal) => void;
 }
 
 /**
@@ -82,6 +84,42 @@ export class OutcomeCollector extends EventEmitter {
    */
   getTotalOutcomeCount(): number {
     return this.storage.getTotalOutcomeCount();
+  }
+
+  /**
+   * Record an ideation outcome.
+   * Stores immediately, then emits event for async processing.
+   *
+   * @returns { received: true } immediately (fire-and-forget pattern)
+   */
+  recordIdeationOutcome(outcome: IdeationOutcome): { received: true } {
+    // Store outcome synchronously
+    this.storage.insertIdeationOutcome(outcome);
+
+    // Emit event for async processing (non-blocking)
+    setImmediate(() => {
+      this.emit('ideation_outcome_received', outcome);
+    });
+
+    return { received: true };
+  }
+
+  /**
+   * Record a plan quality signal.
+   * Stores immediately, then emits event for async processing.
+   *
+   * @returns { received: true } immediately
+   */
+  recordPlanQualitySignal(signal: PlanQualitySignal): { received: true } {
+    // Store outcome synchronously
+    this.storage.insertPlanQualitySignal(signal);
+
+    // Emit event for async processing
+    setImmediate(() => {
+      this.emit('plan_quality_signal_received', signal);
+    });
+
+    return { received: true };
   }
 }
 

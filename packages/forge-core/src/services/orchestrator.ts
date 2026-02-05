@@ -63,6 +63,8 @@ interface AgentTracker {
   agentId: string;
   startTime: number;
   attemptNumber: number;
+  model: string; // Model used for the task (e.g., 'sonnet', 'opus')
+  errorMessage?: string; // Error message if task failed
 }
 
 // ============================================
@@ -285,6 +287,7 @@ export class Orchestrator {
         agentId: result.agentId,
         startTime: Date.now(),
         attemptNumber,
+        model: recommendedModel,
       };
       this.activeRuns.get(runId)?.set(task.task_id, agentTracker);
 
@@ -352,7 +355,7 @@ export class Orchestrator {
       tokens: tokensUsed,
       cost: costUsd,
       duration_ms: durationMs,
-      model_id: 'sonnet', // TODO: get actual model from tracker
+      model_id: tracker.model,
     });
 
     if (!result.accepted) {
@@ -371,8 +374,12 @@ export class Orchestrator {
       run_id: runId,
       task_id: task.task_id,
       step_id: task.step_id,
-      model_used: 'sonnet', // TODO: actual model (forge-agent-metrics)
-      complexity_estimate: 'simple', // TODO: from plan
+      model_used: tracker.model,
+      // NOTE: complexity_estimate should come from plan step metadata, but the Task entity
+      // doesn't currently include it. This would require extending ForgeStep schema to include
+      // a complexity field from the planner, then populating it during run compilation.
+      // For now, defaulting to 'simple' - this can be wired when planner adds complexity estimates.
+      complexity_estimate: 'simple',
       outcome: 'success',
       attempts: tracker.attemptNumber,
       duration_seconds: durationMs / 1000,
@@ -401,12 +408,17 @@ export class Orchestrator {
     const durationMs = Date.now() - tracker.startTime;
     const executionPolicy = this.storage.getRun(runId)?.execution_policy ?? DEFAULT_EXECUTION_POLICY;
 
+    // Get actual error message from the latest attempt
+    const attempts = this.storage.listAttemptsByTask(task.task_id);
+    const latestAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+    const errorMessage = latestAttempt?.error || tracker.errorMessage || 'Task execution failed';
+
     // Let RunService apply recovery ladder
     await this.runService.handleTaskFailure(
       task,
       runId,
       tracker.attemptNumber,
-      'Task execution failed', // TODO: get actual error from agent
+      errorMessage,
       executionPolicy
     );
 
@@ -415,8 +427,12 @@ export class Orchestrator {
       run_id: runId,
       task_id: task.task_id,
       step_id: task.step_id,
-      model_used: 'sonnet', // TODO: actual model (forge-agent-metrics)
-      complexity_estimate: 'simple', // TODO: from plan
+      model_used: tracker.model,
+      // NOTE: complexity_estimate should come from plan step metadata, but the Task entity
+      // doesn't currently include it. This would require extending ForgeStep schema to include
+      // a complexity field from the planner, then populating it during run compilation.
+      // For now, defaulting to 'simple' - this can be wired when planner adds complexity estimates.
+      complexity_estimate: 'simple',
       outcome: 'failure',
       attempts: tracker.attemptNumber,
       duration_seconds: durationMs / 1000,

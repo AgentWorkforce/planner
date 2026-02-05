@@ -66,6 +66,7 @@ export function ThemeProvider({
       return () => mediaQuery.removeEventListener("change", handler);
     } else {
       applyTheme(theme);
+      return undefined;
     }
   }, [theme, attribute]);
 

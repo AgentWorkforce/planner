@@ -28,12 +28,13 @@ import {
   UpdateSessionRequestSchema,
 } from './schemas.js';
 import { ideationEvents } from './events.js';
-import { sessionChannelId } from '../interviewer/config.js';
+import { sessionChannelId, getLLMConfig } from '../interviewer/config.js';
 import { interviewer } from '../interviewer/service.js';
 import { specialistQueue } from '../interviewer/specialist-queue.js';
 import { conversationHistory } from '../interviewer/history.js';
 import { sendChannelMessage, isConnected as isRelayConnected } from '../relay/index.js';
 import { navigatorService, isNavigatorActive } from '../navigator/index.js';
+import { getTunerIntegration, type IdeationOutcome } from '../tuner/index.js';
 
 // =============================================================================
 // Planner Client Interface
@@ -149,6 +150,32 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       conversationHistory.clearHistory(channelId);
       specialistQueue.clearQueue(sessionPrefix);
       console.log(`[ideation-handlers] Cleaned up memory for abandoned session ${id}`);
+
+      // Emit IdeationOutcome to Tuner (fire-and-forget)
+      const tuner = getTunerIntegration();
+      if (tuner) {
+        const { score: confidenceScore } = computeAggregateConfidence(session.understanding);
+        const curatedBlocks = session.blocks.filter(b => b.status === 'curated');
+        const llmConfig = await getLLMConfig();
+        const outcome: IdeationOutcome = {
+          session_id: id,
+          plan_id: undefined, // No plan for abandoned sessions
+          interviewer_model: llmConfig.model,
+          specialist_count: session.active_specialists.length,
+          confidence_score: confidenceScore,
+          block_count: curatedBlocks.length,
+          conversation_turns: session.transcript.length,
+          duration_ms: Date.now() - new Date(session.created_at).getTime(),
+          outcome: 'abandoned',
+          source: 'production',
+          timestamp: new Date().toISOString(),
+        };
+
+        // Fire-and-forget - don't await
+        tuner.recordOutcome(outcome).catch((err: Error) => {
+          console.error('[ideation-handlers] Failed to record abandoned outcome:', err);
+        });
+      }
 
       ideationEvents.emitSessionEvent('session:updated', session);
       res.json(session);
@@ -403,6 +430,31 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
         }
       } else {
         console.log(`[ideation-handlers] Relay not connected, skipping PlannerLead notification`);
+      }
+
+      // Emit IdeationOutcome to Tuner (fire-and-forget)
+      const tuner = getTunerIntegration();
+      if (tuner) {
+        const { score: confidenceScore } = computeAggregateConfidence(existingSession.understanding);
+        const llmConfig = await getLLMConfig();
+        const outcome: IdeationOutcome = {
+          session_id: existingSession.id,
+          plan_id: result.plan_id,
+          interviewer_model: llmConfig.model,
+          specialist_count: existingSession.active_specialists.length,
+          confidence_score: confidenceScore,
+          block_count: curatedBlocks.length,
+          conversation_turns: existingSession.transcript.length,
+          duration_ms: Date.now() - new Date(existingSession.created_at).getTime(),
+          outcome: 'approved', // sendToPlanner = successful handoff
+          source: 'production',
+          timestamp: new Date().toISOString(),
+        };
+
+        // Fire-and-forget - don't await
+        tuner.recordOutcome(outcome).catch((err: Error) => {
+          console.error('[ideation-handlers] Failed to record outcome to Tuner:', err);
+        });
       }
 
       res.json({
@@ -698,7 +750,9 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       }
     };
 
-    ideationEvents.on('session', handler);
+    // Use any cast to escape type augmentation from tuner's typed emitter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ideationEvents as any).on('session', handler);
     console.log(`[ideation-sse] Subscribed to session events`);
 
     // Keep-alive ping to prevent connection timeout

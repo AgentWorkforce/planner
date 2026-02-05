@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
 import request from 'supertest';
 import { createApp } from './app.js';
-import { SqliteStorage } from '../storage/sqlite.js';
+import { SqliteStorage } from '../storage/index.js';
 import { emitPlanChange } from '../events/plan-events.js';
 import { createPlan, createPlanVersion } from '../domain/plan.js';
 import { createOrganization } from '../domain/organization.js';

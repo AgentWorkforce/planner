@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initPlannerLead, stopPlannerLead, emitQuestion, answerQuestion } from './planner-lead.js';
 import { getTrajectory, clearTrajectory, findSimilarQuestion } from './user-trajectory.js';
-import { SqliteStorage } from '../../../planner/src/storage/sqlite.js';
+import { SqliteStorage } from '../../../planner/src/storage/sqlite/index.js';
 
 describe('PlannerLead Trajectory Integration', () => {
   let storage: SqliteStorage;

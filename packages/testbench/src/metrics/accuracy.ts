@@ -8,14 +8,18 @@ import type { RunResult } from '../runner/types.js';
  */
 export function calculateComplexityAccuracy(results: RunResult[]): number | null {
   // Filter to results that have both estimated complexity and actual time
+  // Include complexity >= 0 (zero-complexity tasks are valid)
   const pairs = results
-    .filter((r) => r.estimated_complexity !== undefined && r.estimated_complexity > 0)
+    .filter((r) => r.estimated_complexity !== undefined && r.estimated_complexity >= 0)
     .map((r) => ({
       x: r.estimated_complexity!,
       y: r.actual_time_seconds,
     }));
 
-  if (pairs.length < 2) return null;
+  if (pairs.length < 2) {
+    console.warn(`[Metrics] Complexity correlation: insufficient data (${pairs.length} samples, need at least 2)`);
+    return null;
+  }
 
   const n = pairs.length;
   const meanX = pairs.reduce((sum, p) => sum + p.x, 0) / n;
@@ -35,7 +39,10 @@ export function calculateComplexityAccuracy(results: RunResult[]): number | null
 
   const denominator = Math.sqrt(sumX2 * sumY2);
 
-  if (denominator === 0) return null;
+  if (denominator === 0) {
+    console.warn('[Metrics] Complexity correlation: no variance in data (all values identical)');
+    return null;
+  }
 
   return sumXY / denominator;
 }

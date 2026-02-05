@@ -29,6 +29,32 @@ export const ExpectedSchema = z.object({
 export type Expected = z.infer<typeof ExpectedSchema>;
 
 // ============================================
+// Ideation Configuration
+// ============================================
+
+export const IdeationBlockInputSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  keyword: z.string(),
+  emoji: z.string(),
+  content: z.string().optional().default(''),
+});
+
+export type IdeationBlockInput = z.infer<typeof IdeationBlockInputSchema>;
+
+export const IdeationConfigSchema = z.object({
+  ideation_strategy: z.enum(['preconfigured', 'ai']),
+  understanding: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+  blocks: z.array(IdeationBlockInputSchema).optional(),
+  messages: z.array(z.string()).optional(),
+  handoff_goal: z.string().optional(),
+  handoff_context: z.string().optional(),
+  timeout_ms: z.number().positive().optional().default(120_000),
+});
+
+export type IdeationConfig = z.infer<typeof IdeationConfigSchema>;
+
+// ============================================
 // Scenario
 // ============================================
 
@@ -40,7 +66,8 @@ export const ScenarioSchema = z.object({
   expected: ExpectedSchema.optional(),
   verification: VerificationSchema,
   tags: z.array(z.string()).optional(),
-  planning_mode: z.enum(['synthetic', 'ai']).default('synthetic'),
+  planning_strategy: z.enum(['hardcoded', 'ai']).default('hardcoded'),
+  ideation: IdeationConfigSchema.optional(),
 });
 
 export type Scenario = z.infer<typeof ScenarioSchema>;

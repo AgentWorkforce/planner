@@ -56,8 +56,46 @@ export function extractSessionPrefix(channelId: string): string | undefined {
 // LLM Config
 // =============================================================================
 
-export const LLM_CONFIG = {
+/**
+ * Static LLM config defaults.
+ * Used as fallback when Tuner is unavailable.
+ */
+const DEFAULT_LLM_CONFIG = {
   model: 'claude-sonnet-4-20250514',
   maxTokens: 4096,
   temperature: 0.7,
 } as const;
+
+/**
+ * Get current LLM configuration.
+ * Uses Tuner config if available, otherwise falls back to defaults.
+ *
+ * NOTE: This is a dynamic getter that reads from Tuner's cached config.
+ * If Tuner is unavailable, returns hardcoded defaults for graceful degradation.
+ */
+export async function getLLMConfig(): Promise<{ model: string; maxTokens: number; temperature: number }> {
+  try {
+    // Dynamic import to avoid circular dependency (ESM-compatible)
+    const { getTunerIntegration } = await import('../tuner/index.js');
+    const tuner = getTunerIntegration();
+    const config = tuner?.getConfig();
+
+    if (config) {
+      return {
+        model: config.interviewer.model,
+        maxTokens: config.interviewer.max_tokens,
+        temperature: config.interviewer.temperature,
+      };
+    }
+  } catch {
+    // Tuner not available, use defaults
+  }
+
+  return { ...DEFAULT_LLM_CONFIG };
+}
+
+/**
+ * Static LLM config export for backward compatibility.
+ * @deprecated Use getLLMConfig() instead for dynamic config
+ */
+export const LLM_CONFIG = DEFAULT_LLM_CONFIG;

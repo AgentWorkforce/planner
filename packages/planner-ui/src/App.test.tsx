@@ -28,9 +28,10 @@ beforeAll(() => {
   };
 });
 
-// Mock the RelayProvider and useRelay to avoid WebSocket setup
+// Mock the RelayProvider, ToastProvider, and useRelay to avoid WebSocket setup
 vi.mock('@/contexts', () => ({
   RelayProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useRelay: vi.fn(() => ({
     connection: {
       onMessage: vi.fn(() => vi.fn()), // Returns unsubscribe function
@@ -43,6 +44,11 @@ vi.mock('@/contexts', () => ({
     sendMessage: vi.fn(),
     joinChannel: vi.fn(),
     leaveChannel: vi.fn(),
+  })),
+  useToastContext: vi.fn(() => ({
+    toasts: [],
+    addToast: vi.fn(),
+    removeToast: vi.fn(),
   })),
 }));
 

@@ -5,7 +5,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { TaskOutcomeSchema, RunOutcomeSchema } from '../../domain/outcome.js';
+import { TaskOutcomeSchema, RunOutcomeSchema, IdeationOutcomeSchema, PlanQualitySignalSchema } from '../../domain/outcome.js';
 import type { TunerServices } from '../../services/factory.js';
 
 /**
@@ -76,6 +76,70 @@ export function createOutcomeHandlers(services: TunerServices) {
       } catch (error) {
         console.error('[Tuner API] Error recording run outcome:', error);
         res.status(500).json({ error: 'Failed to record run outcome' });
+      }
+    },
+
+    /**
+     * POST /api/tuner/outcomes/ideation
+     * Accepts IdeationOutcome from ideation sessions.
+     */
+    recordIdeationOutcome: (req: Request, res: Response) => {
+      try {
+        // Validate request body
+        const parseResult = IdeationOutcomeSchema.safeParse(req.body);
+
+        if (!parseResult.success) {
+          res.status(400).json({
+            error: 'Invalid ideation outcome',
+            details: parseResult.error.errors.map((e) => ({
+              path: e.path.join('.'),
+              message: e.message,
+            })),
+          });
+          return;
+        }
+
+        // Record outcome (fire-and-forget processing)
+        const result = services.collector.recordIdeationOutcome(parseResult.data);
+
+        res.json({
+          received: result.received,
+        });
+      } catch (error) {
+        console.error('[Tuner API] Error recording ideation outcome:', error);
+        res.status(500).json({ error: 'Failed to record ideation outcome' });
+      }
+    },
+
+    /**
+     * POST /api/tuner/outcomes/plan-quality
+     * Accepts PlanQualitySignal from Planner when plan is approved.
+     */
+    recordPlanQualitySignal: (req: Request, res: Response) => {
+      try {
+        // Validate request body
+        const parseResult = PlanQualitySignalSchema.safeParse(req.body);
+
+        if (!parseResult.success) {
+          res.status(400).json({
+            error: 'Invalid plan quality signal',
+            details: parseResult.error.errors.map((e) => ({
+              path: e.path.join('.'),
+              message: e.message,
+            })),
+          });
+          return;
+        }
+
+        // Record signal (fire-and-forget processing)
+        const result = services.collector.recordPlanQualitySignal(parseResult.data);
+
+        res.json({
+          received: result.received,
+        });
+      } catch (error) {
+        console.error('[Tuner API] Error recording plan quality signal:', error);
+        res.status(500).json({ error: 'Failed to record plan quality signal' });
       }
     },
 

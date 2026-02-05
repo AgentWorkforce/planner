@@ -40,6 +40,23 @@ export class MockExecutor {
     const completedAt = new Date().toISOString();
     const actualTimeSeconds = (Date.now() - startTime) / 1000 + timeMinutes * 60;
 
+    // Generate mock ideation metrics when scenario has ideation config
+    const ideation_metrics = scenario.ideation ? {
+      session_id: `mock-session-${randomUUID()}`,
+      specialist_count: scenario.ideation.understanding
+        ? Object.keys(scenario.ideation.understanding).length
+        : randomInRange(1, 4),
+      understanding_keys: scenario.ideation.understanding
+        ? Object.keys(scenario.ideation.understanding)
+        : ['Architect', 'Designer'],
+      block_count: scenario.ideation.blocks?.length ?? randomInRange(2, 6),
+      curated_block_count: scenario.ideation.blocks?.length ?? randomInRange(1, 4),
+      ideation_time_ms: randomInRange(500, 5000),
+      handoff_plan_id: `mock-plan-${randomUUID()}`,
+      handoff_plan_version: 1,
+      ideation_strategy: scenario.ideation.ideation_strategy,
+    } as const : undefined;
+
     return {
       scenario_id: scenario.id,
       run_id: runId,
@@ -57,6 +74,7 @@ export class MockExecutor {
         details: success ? 'Mock verification passed.' : 'Mock verification failed (simulated).',
       },
       mock: true,
+      ideation_metrics,
     };
   }
 

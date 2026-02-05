@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SqliteStorage } from '../../../planner/src/storage/sqlite.js';
+import { SqliteStorage } from '../../../planner/src/storage/sqlite/index.js';
 
 // Mock the relay client module
 const mockSendMessage = vi.fn().mockReturnValue(true);

@@ -160,7 +160,7 @@ class NavigatorService {
       status: s.status,
       initialIntent: s.source.initial_intent,
       messageCount: s.transcript.length,
-      blockCount: s.understanding?.blocks?.length ?? 0,
+      blockCount: s.blocks?.length ?? 0,
       lastActivity: s.updated_at,
       hasHandoff: s.planner_sends.length > 0,
       initiativeId: s.initiative_id,
@@ -317,7 +317,7 @@ class NavigatorService {
       status: s.status,
       initial_intent: s.source.initial_intent,
       message_count: s.transcript.length,
-      block_count: s.understanding?.blocks?.length ?? 0,
+      block_count: s.blocks?.length ?? 0,
       last_activity: s.updated_at,
       has_handoff: s.planner_sends.length > 0,
       initiative_id: s.initiative_id,
@@ -397,7 +397,7 @@ class NavigatorService {
     } else if (prioritize === 'completion') {
       // Session with most blocks (closest to done)
       bestSession = activeSessions.sort((a, b) =>
-        (b.understanding?.blocks?.length ?? 0) - (a.understanding?.blocks?.length ?? 0)
+        (b.blocks?.length ?? 0) - (a.blocks?.length ?? 0)
       )[0];
       reason = 'This session has the most developed ideas. It might be ready to send to the planner soon.';
     } else {
@@ -409,16 +409,17 @@ class NavigatorService {
     }
 
     // Check if session looks ready for handoff
-    const blockCount = bestSession.understanding?.blocks?.length ?? 0;
-    const hasHandoff = bestSession.planner_sends.length > 0;
+    // bestSession is guaranteed to exist because we return early if activeSessions is empty
+    const blockCount = bestSession!.blocks?.length ?? 0;
+    const hasHandoff = bestSession!.planner_sends.length > 0;
 
     if (blockCount >= 3 && !hasHandoff) {
       const result: RecommendActionResult = {
         recommendation: {
           type: 'handoff_ready',
           reason: 'You have several well-formed ideas. This might be ready to send to the planner for structured planning.',
-          session_id: bestSession.id,
-          intent: bestSession.source.initial_intent,
+          session_id: bestSession!.id,
+          intent: bestSession!.source.initial_intent,
           confidence: 'high',
         },
       };
@@ -430,8 +431,8 @@ class NavigatorService {
       recommendation: {
         type: 'continue_session',
         reason,
-        session_id: bestSession.id,
-        intent: bestSession.source.initial_intent,
+        session_id: bestSession!.id,
+        intent: bestSession!.source.initial_intent,
         confidence: 'medium',
       },
     };

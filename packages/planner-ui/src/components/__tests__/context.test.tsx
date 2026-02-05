@@ -9,17 +9,26 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, type RenderOptions } from '@testing-library/react';
 import { ContextTab } from '../ContextTab';
 import { KeyValueEditor } from '../context/KeyValueEditor';
 import { AddRolePopover } from '../context/AddRolePopover';
 import { RoleContextCard } from '../context/RoleContextCard';
+import { ToastProvider } from '@/contexts/ToastContext';
 import type { Context } from '@/types';
 
 // Mock the API client
 vi.mock('@/api/client', () => ({
   updateContext: vi.fn().mockResolvedValue({}),
 }));
+
+// Wrapper that provides required context
+const AllProviders = ({ children }: { children: React.ReactNode }) => (
+  <ToastProvider>{children}</ToastProvider>
+);
+
+const renderWithProviders = (ui: React.ReactElement, options?: Omit<RenderOptions, 'wrapper'>) =>
+  render(ui, { wrapper: AllProviders, ...options });
 
 describe('ContextTab', () => {
   const mockContext: Context = {
@@ -33,7 +42,7 @@ describe('ContextTab', () => {
   };
 
   it('renders role tabs dynamically from context keys', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -48,7 +57,7 @@ describe('ContextTab', () => {
   });
 
   it('shows field count badge for each role tab', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -62,7 +71,7 @@ describe('ContextTab', () => {
   });
 
   it('shows roles count text', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -74,7 +83,7 @@ describe('ContextTab', () => {
   });
 
   it('shows empty state when no context', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={undefined}
@@ -87,7 +96,7 @@ describe('ContextTab', () => {
   });
 
   it('shows empty state with Add First Role button when editable', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={{}}
@@ -99,7 +108,7 @@ describe('ContextTab', () => {
   });
 
   it('selects first role by default', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -116,7 +125,7 @@ describe('ContextTab', () => {
   });
 
   it('switches tabs when clicking another role', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -135,7 +144,7 @@ describe('ContextTab', () => {
   });
 
   it('shows + button for adding role when editable', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -148,7 +157,7 @@ describe('ContextTab', () => {
   });
 
   it('hides + button when not editable', () => {
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={mockContext}
@@ -168,7 +177,7 @@ describe('ContextTab', () => {
       designer: { library: 'shadcn' },
     };
 
-    render(
+    renderWithProviders(
       <ContextTab
         planId="plan-1"
         context={context}

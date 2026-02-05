@@ -15,6 +15,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AgentAvatar } from './AgentAvatar';
 import { Button } from './ui/Button';
+import { NextQuestionPrompt } from './chat-bubble/NextQuestionPrompt';
+import { getBlockingBadge, formatTime } from './chat-bubble/questionHelpers';
 import { getRoleConfig } from '@/config/agentRoles';
 import type { Question } from '@/types/plan';
 import type { AgentRole } from '@/hooks/useAgentOrchestration';
@@ -45,51 +47,6 @@ interface ChatBubbleProps {
   planId?: string;
   /** Callback to record decision to trajectory (async, don't block UI) */
   onRecordDecision?: (event: Omit<DecisionEvent, 'event_id' | 'timestamp'>) => void;
-}
-
-/**
- * Get blocking level badge styling.
- */
-function getBlockingBadge(blockingLevel: Question['blocking_level']): {
-  text: string;
-  className: string;
-} {
-  switch (blockingLevel) {
-    case 'hard_block':
-      return {
-        text: 'BLOCKING',
-        className: 'bg-error text-white',
-      };
-    case 'soft_block':
-      return {
-        text: 'SOFT BLOCK',
-        className: 'bg-warning/20 text-warning',
-      };
-    case 'preference':
-      return {
-        text: 'PREFERENCE',
-        className: 'bg-warning/20 text-warning',
-      };
-    case 'fyi':
-      return {
-        text: 'FYI',
-        className: 'bg-accent-cyan/20 text-accent-cyan',
-      };
-    default:
-      return {
-        text: blockingLevel,
-        className: 'bg-bg-elevated text-text-muted',
-      };
-  }
-}
-
-/**
- * Format seconds to mm:ss display.
- */
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export function ChatBubble({
@@ -260,35 +217,11 @@ export function ChatBubble({
   // After answering, show next question prompt
   if (showNextPrompt) {
     return (
-      <>
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 z-40"
-          onClick={onLater}
-          aria-hidden="true"
-        />
-
-        {/* Next question prompt */}
-        <div className="fixed right-4 bottom-16 w-72 bg-bg-tertiary border border-border-subtle rounded-xl shadow-lg p-4 z-50 animate-slide-up">
-          <p className="text-sm text-accent-green mb-2 flex items-center gap-1.5">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="stroke-current">
-              <path d="M2 7l3 3 7-7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Sent to {roleConfig.label}
-          </p>
-          <p className="text-xs text-text-secondary mb-3">
-            Another agent has a question
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onLater} className="flex-1">
-              Later
-            </Button>
-            <Button variant="default" size="sm" onClick={onShowNext} className="flex-1">
-              Show Now
-            </Button>
-          </div>
-        </div>
-      </>
+      <NextQuestionPrompt
+        agentRole={agentRole}
+        onShowNext={onShowNext}
+        onLater={onLater}
+      />
     );
   }
 

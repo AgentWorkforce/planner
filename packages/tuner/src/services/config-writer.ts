@@ -5,12 +5,13 @@
  * Applies stability checks before making changes and maintains version history.
  */
 
-import type { ForgeExecutionConfig, PlannerConfig } from '../domain/config.js';
-import { DEFAULT_FORGE_CONFIG, DEFAULT_PLANNER_CONFIG } from '../domain/config.js';
+import type { ForgeExecutionConfig, PlannerConfig, IdeationConfig } from '../domain/config.js';
+import { DEFAULT_FORGE_CONFIG, DEFAULT_PLANNER_CONFIG, DEFAULT_IDEATION_CONFIG } from '../domain/config.js';
 import type { TunerStorage, ConfigVersion } from '../storage/interface.js';
 import type { StabilityControls } from './stability-controls.js';
 import type { ModelSelector } from './model-selector.js';
 import type { BaselineService } from './baseline-service.js';
+import type { IdeationBaselineService } from './ideation-baseline-service.js';
 
 /**
  * ConfigWriter service.
@@ -21,7 +22,8 @@ export class ConfigWriter {
     private storage: TunerStorage,
     private stabilityControls: StabilityControls,
     private modelSelector: ModelSelector,
-    private baselineService: BaselineService
+    private baselineService: BaselineService,
+    private ideationBaselineService?: IdeationBaselineService  // Optional for backward compat
   ) {}
 
   /**
@@ -154,6 +156,90 @@ export class ConfigWriter {
     const decayFactor = 1000;
 
     return Math.max(minRate, startRate * Math.exp(-totalSamples / decayFactor));
+  }
+
+  /**
+   * Generate current IdeationConfig from learned state.
+   * Applies learning rules gated by stability controls.
+   */
+  generateIdeationConfig(): IdeationConfig {
+    const baseline = this.ideationBaselineService?.getBaseline();
+
+    const config: IdeationConfig = {
+      ...DEFAULT_IDEATION_CONFIG,
+      version: this.storage.getNextVersionNumber(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // No learning if no baseline data or insufficient samples
+    if (!baseline || baseline.sample_count < 30) {
+      return config;
+    }
+
+    // --- Confidence calibration ---
+    // If questions are high, lower the confident_above threshold
+    const confidenceCheck = this.stabilityControls.checkStability({
+      totalTrials: baseline.sample_count,
+      currentArmSamples: baseline.sample_count,
+      parameterType: 'ideation_confidence',
+    });
+
+    if (confidenceCheck.canChange && baseline.mean_questions_per_plan > 3) {
+      // More questions = lower confidence threshold (they're being conservative)
+      // Reduce by up to 10 points based on question count
+      const reduction = Math.min(10, Math.round(baseline.mean_questions_per_plan * 2));
+      config.confidence_calibration.confident_above = Math.max(
+        70, // Floor
+        DEFAULT_IDEATION_CONFIG.confidence_calibration.confident_above - reduction
+      );
+    }
+
+    // --- Readiness advisory ---
+    // Set min_conversation_turns based on baseline
+    const readinessCheck = this.stabilityControls.checkStability({
+      totalTrials: baseline.sample_count,
+      currentArmSamples: baseline.sample_count,
+      parameterType: 'ideation_readiness',
+    });
+
+    if (readinessCheck.canChange) {
+      // Set threshold to ~80% of mean turns (with floor of 2)
+      config.readiness_advisory.min_conversation_turns = Math.max(
+        2,
+        Math.floor(baseline.mean_conversation_turns * 0.8)
+      );
+    }
+
+    // --- Specialist deprioritization ---
+    // Add specialists with < 20% contribution rate to deprioritized list
+    const spawningCheck = this.stabilityControls.checkStability({
+      totalTrials: baseline.sample_count,
+      currentArmSamples: baseline.sample_count,
+      parameterType: 'ideation_spawning',
+    });
+
+    if (spawningCheck.canChange && baseline.specialist_contribution_rates) {
+      const deprioritized: string[] = [];
+      for (const [specialist, rate] of Object.entries(baseline.specialist_contribution_rates)) {
+        if (rate < 0.2) {
+          deprioritized.push(specialist);
+        }
+      }
+      if (deprioritized.length > 0) {
+        config.specialist_spawning.deprioritized_specialists = deprioritized;
+      }
+    }
+
+    return config;
+  }
+
+  /**
+   * Get current ideation config.
+   * For v1, just generate fresh each time.
+   * Caching will be added when learning logic is implemented.
+   */
+  getCurrentIdeationConfig(): IdeationConfig {
+    return this.generateIdeationConfig();
   }
 
   /**

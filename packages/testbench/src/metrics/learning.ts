@@ -35,6 +35,9 @@ export class LearningCurve {
     const first = this.points[0];
     const last = this.points[this.points.length - 1];
 
+    // Early return checked length >= 2 above, so both are defined
+    if (!first || !last) return null;
+
     return {
       success_rate_delta: last.success_rate - first.success_rate,
       accuracy_delta:

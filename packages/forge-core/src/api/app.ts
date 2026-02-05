@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
+import { errorHandler } from '@plannr/errors';
 import { createForgeRouter, type ForgeRouterDeps } from './routes.js';
 import type { ErrorResponse } from './schemas.js';
 
@@ -64,36 +65,6 @@ function requestLogger(req: Request, _res: Response, next: NextFunction): void {
   });
 
   next();
-}
-
-/**
- * Error handling middleware.
- */
-function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction
-): void {
-  console.error('[Forge] Unhandled error:', err);
-
-  // Check for specific error types
-  if (err.name === 'SyntaxError' && 'body' in err) {
-    // JSON parse error
-    const response: ErrorResponse = {
-      error: 'Invalid JSON in request body',
-      code: 'INVALID_JSON',
-    };
-    res.status(400).json(response);
-    return;
-  }
-
-  // Generic server error
-  const response: ErrorResponse = {
-    error: 'Internal server error',
-    code: 'INTERNAL_ERROR',
-  };
-  res.status(500).json(response);
 }
 
 /**

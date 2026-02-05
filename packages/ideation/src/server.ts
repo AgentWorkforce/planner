@@ -9,6 +9,7 @@ import cors from 'cors';
 import { createIdeationRouter } from './api/index.js';
 import { SQLiteIdeationStorage } from './storage/index.js';
 import { initNavigator } from './navigator/index.js';
+import { initTunerIntegration, stopTunerIntegration } from './tuner/index.js';
 
 const PORT = process.env.IDEATION_PORT || 3001;
 const DB_PATH = process.env.IDEATION_DB_PATH || './ideation.db';
@@ -17,6 +18,14 @@ async function main() {
   // Initialize storage
   const storage = new SQLiteIdeationStorage(DB_PATH);
   await storage.initialize();
+
+  // Initialize Tuner integration
+  try {
+    await initTunerIntegration();
+    console.log('[Ideation Server] Tuner integration initialized');
+  } catch (error) {
+    console.warn('[Ideation Server] Tuner not available:', error instanceof Error ? error.message : error);
+  }
 
   // Initialize Navigator service
   try {
@@ -43,11 +52,24 @@ async function main() {
   });
 
   // Start server
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[Ideation Server] Running on http://localhost:${PORT}`);
     console.log(`[Ideation Server] API: http://localhost:${PORT}/api/ideation`);
     console.log(`[Ideation Server] Database: ${DB_PATH}`);
   });
+
+  // Graceful shutdown
+  const shutdown = () => {
+    console.log('[Ideation Server] Shutting down...');
+    stopTunerIntegration();
+    server.close(() => {
+      console.log('[Ideation Server] Server closed');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 main().catch((err) => {

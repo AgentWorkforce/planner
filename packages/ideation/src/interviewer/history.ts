@@ -77,7 +77,7 @@ class ConversationHistoryStore {
     // Anthropic API requires first message to be from user
     // If history starts with assistant message, skip it
     let messages = history;
-    if (messages.length > 0 && messages[0].role === 'assistant') {
+    if (messages.length > 0 && messages[0]?.role === 'assistant') {
       console.warn('[History] Skipping initial assistant message - Anthropic requires user-first');
       messages = messages.slice(1);
     }

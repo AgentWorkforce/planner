@@ -2,9 +2,9 @@
  * SQLite storage implementation for Tuner.
  */
 
-import Database from 'better-sqlite3';
-import type { TaskOutcome, RunOutcome, VerificationResults, ACResult } from '../domain/outcome.js';
-import type { TaskBaseline, ModelBaseline } from '../domain/baseline.js';
+import { BaseSqliteStorage } from '@plannr/storage-base';
+import type { TaskOutcome, RunOutcome, VerificationResults, ACResult, IdeationOutcome, PlanQualitySignal } from '../domain/outcome.js';
+import type { TaskBaseline, ModelBaseline, IdeationBaseline } from '../domain/baseline.js';
 import type { DriftAlert } from '../domain/drift.js';
 import type { ForgeExecutionConfig, PlannerConfig } from '../domain/config.js';
 import type {
@@ -118,20 +118,65 @@ interface ConfigVersionRow {
   notes: string | null;
 }
 
+interface IdeationOutcomeRow {
+  id: number;
+  session_id: string;
+  plan_id: string | null;
+  interviewer_model: string;
+  specialist_count: number;
+  confidence_score: number | null;
+  block_count: number;
+  conversation_turns: number;
+  duration_ms: number;
+  outcome: string;
+  source: string;
+  timestamp: string;
+}
+
+interface PlanQualitySignalRow {
+  id: number;
+  plan_id: string;
+  plan_version: number;
+  session_id: string;
+  question_count: number;
+  version_count: number;
+  improvements_made: number;
+  block_count: number;
+  time_to_approval_ms: number;
+  source: string;
+  timestamp: string;
+}
+
+interface IdeationBaselineRow {
+  pattern: string;
+  mean_questions_per_plan: number;
+  mean_versions_per_plan: number;
+  mean_block_utilization: number;
+  mean_conversation_turns: number;
+  mean_time_to_approval_ms: number;
+  m2_questions: number;
+  m2_versions: number;
+  m2_block_utilization: number;
+  m2_conversation_turns: number;
+  m2_time_to_approval: number;
+  alpha: number;
+  beta: number;
+  approval_rate: number;
+  specialist_contribution_rates: string;
+  sample_count: number;
+  last_updated: string;
+}
+
 // ============================================================================
 // SQLite Storage Implementation
 // ============================================================================
 
-export class SQLiteTunerStorage implements TunerStorage {
-  private db: Database.Database;
-
+export class SQLiteTunerStorage extends BaseSqliteStorage implements TunerStorage {
   constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.initSchema();
+    super(dbPath);
   }
 
-  private initSchema(): void {
+  protected initializeSchema(): void {
     // Run migrations first so existing tables get new columns
     // before indexes reference them. For fresh DBs, these fail
     // harmlessly (table doesn't exist yet).
@@ -660,10 +705,204 @@ export class SQLiteTunerStorage implements TunerStorage {
   }
 
   // -------------------------------------------------------------------------
-  // Lifecycle
+  // Ideation Outcomes
   // -------------------------------------------------------------------------
 
-  close(): void {
-    this.db.close();
+  insertIdeationOutcome(outcome: IdeationOutcome): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO ideation_outcomes (
+        session_id, plan_id, interviewer_model, specialist_count, confidence_score,
+        block_count, conversation_turns, duration_ms, outcome, source, timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      outcome.session_id,
+      outcome.plan_id ?? null,
+      outcome.interviewer_model,
+      outcome.specialist_count,
+      outcome.confidence_score ?? null,
+      outcome.block_count,
+      outcome.conversation_turns,
+      outcome.duration_ms,
+      outcome.outcome,
+      outcome.source,
+      outcome.timestamp
+    );
   }
+
+  getIdeationOutcomesBySession(sessionId: string): IdeationOutcome[] {
+    const stmt = this.db.prepare('SELECT * FROM ideation_outcomes WHERE session_id = ? ORDER BY timestamp');
+    const rows = stmt.all(sessionId) as IdeationOutcomeRow[];
+    return rows.map(this.rowToIdeationOutcome);
+  }
+
+  getRecentIdeationOutcomes(limit: number): IdeationOutcome[] {
+    const stmt = this.db.prepare('SELECT * FROM ideation_outcomes ORDER BY timestamp DESC LIMIT ?');
+    const rows = stmt.all(limit) as IdeationOutcomeRow[];
+    return rows.map(this.rowToIdeationOutcome);
+  }
+
+  getIdeationOutcomeCount(): number {
+    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM ideation_outcomes');
+    const row = stmt.get() as { count: number };
+    return row.count;
+  }
+
+  private rowToIdeationOutcome(row: IdeationOutcomeRow): IdeationOutcome {
+    return {
+      session_id: row.session_id,
+      plan_id: row.plan_id ?? undefined,
+      interviewer_model: row.interviewer_model,
+      specialist_count: row.specialist_count,
+      confidence_score: row.confidence_score ?? undefined,
+      block_count: row.block_count,
+      conversation_turns: row.conversation_turns,
+      duration_ms: row.duration_ms,
+      outcome: row.outcome as IdeationOutcome['outcome'],
+      source: row.source as IdeationOutcome['source'],
+      timestamp: row.timestamp,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Plan Quality Signals
+  // -------------------------------------------------------------------------
+
+  insertPlanQualitySignal(signal: PlanQualitySignal): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO plan_quality_signals (
+        plan_id, plan_version, session_id, question_count, version_count,
+        improvements_made, block_count, time_to_approval_ms, source, timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      signal.plan_id,
+      signal.plan_version,
+      signal.session_id,
+      signal.question_count,
+      signal.version_count,
+      signal.improvements_made,
+      signal.block_count,
+      signal.time_to_approval_ms,
+      signal.source,
+      signal.timestamp
+    );
+  }
+
+  getPlanQualitySignal(planId: string): PlanQualitySignal | null {
+    const stmt = this.db.prepare('SELECT * FROM plan_quality_signals WHERE plan_id = ? ORDER BY timestamp DESC LIMIT 1');
+    const row = stmt.get(planId) as PlanQualitySignalRow | undefined;
+    return row ? this.rowToPlanQualitySignal(row) : null;
+  }
+
+  getPlanQualitySignalsBySession(sessionId: string): PlanQualitySignal[] {
+    const stmt = this.db.prepare('SELECT * FROM plan_quality_signals WHERE session_id = ? ORDER BY timestamp');
+    const rows = stmt.all(sessionId) as PlanQualitySignalRow[];
+    return rows.map(this.rowToPlanQualitySignal);
+  }
+
+  private rowToPlanQualitySignal(row: PlanQualitySignalRow): PlanQualitySignal {
+    return {
+      plan_id: row.plan_id,
+      plan_version: row.plan_version,
+      session_id: row.session_id,
+      question_count: row.question_count,
+      version_count: row.version_count,
+      improvements_made: row.improvements_made,
+      block_count: row.block_count,
+      time_to_approval_ms: row.time_to_approval_ms,
+      source: row.source as PlanQualitySignal['source'],
+      timestamp: row.timestamp,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Ideation Baselines
+  // -------------------------------------------------------------------------
+
+  getIdeationBaseline(pattern: string): IdeationBaseline | null {
+    const stmt = this.db.prepare('SELECT * FROM ideation_baselines WHERE pattern = ?');
+    const row = stmt.get(pattern) as IdeationBaselineRow | undefined;
+    return row ? this.rowToIdeationBaseline(row) : null;
+  }
+
+  upsertIdeationBaseline(baseline: IdeationBaseline): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO ideation_baselines (
+        pattern, mean_questions_per_plan, mean_versions_per_plan, mean_block_utilization,
+        mean_conversation_turns, mean_time_to_approval_ms, m2_questions, m2_versions,
+        m2_block_utilization, m2_conversation_turns, m2_time_to_approval, alpha, beta,
+        approval_rate, specialist_contribution_rates, sample_count, last_updated
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(pattern) DO UPDATE SET
+        mean_questions_per_plan = excluded.mean_questions_per_plan,
+        mean_versions_per_plan = excluded.mean_versions_per_plan,
+        mean_block_utilization = excluded.mean_block_utilization,
+        mean_conversation_turns = excluded.mean_conversation_turns,
+        mean_time_to_approval_ms = excluded.mean_time_to_approval_ms,
+        m2_questions = excluded.m2_questions,
+        m2_versions = excluded.m2_versions,
+        m2_block_utilization = excluded.m2_block_utilization,
+        m2_conversation_turns = excluded.m2_conversation_turns,
+        m2_time_to_approval = excluded.m2_time_to_approval,
+        alpha = excluded.alpha,
+        beta = excluded.beta,
+        approval_rate = excluded.approval_rate,
+        specialist_contribution_rates = excluded.specialist_contribution_rates,
+        sample_count = excluded.sample_count,
+        last_updated = excluded.last_updated
+    `);
+
+    stmt.run(
+      baseline.pattern,
+      baseline.mean_questions_per_plan,
+      baseline.mean_versions_per_plan,
+      baseline.mean_block_utilization,
+      baseline.mean_conversation_turns,
+      baseline.mean_time_to_approval_ms,
+      baseline.m2_questions,
+      baseline.m2_versions,
+      baseline.m2_block_utilization,
+      baseline.m2_conversation_turns,
+      baseline.m2_time_to_approval,
+      baseline.alpha,
+      baseline.beta,
+      baseline.approval_rate,
+      JSON.stringify(baseline.specialist_contribution_rates),
+      baseline.sample_count,
+      baseline.last_updated
+    );
+  }
+
+  listIdeationBaselines(): IdeationBaseline[] {
+    const stmt = this.db.prepare('SELECT * FROM ideation_baselines ORDER BY sample_count DESC');
+    const rows = stmt.all() as IdeationBaselineRow[];
+    return rows.map(this.rowToIdeationBaseline);
+  }
+
+  private rowToIdeationBaseline(row: IdeationBaselineRow): IdeationBaseline {
+    return {
+      pattern: row.pattern,
+      mean_questions_per_plan: row.mean_questions_per_plan,
+      mean_versions_per_plan: row.mean_versions_per_plan,
+      mean_block_utilization: row.mean_block_utilization,
+      mean_conversation_turns: row.mean_conversation_turns,
+      mean_time_to_approval_ms: row.mean_time_to_approval_ms,
+      m2_questions: row.m2_questions,
+      m2_versions: row.m2_versions,
+      m2_block_utilization: row.m2_block_utilization,
+      m2_conversation_turns: row.m2_conversation_turns,
+      m2_time_to_approval: row.m2_time_to_approval,
+      alpha: row.alpha,
+      beta: row.beta,
+      approval_rate: row.approval_rate,
+      specialist_contribution_rates: JSON.parse(row.specialist_contribution_rates),
+      sample_count: row.sample_count,
+      last_updated: row.last_updated,
+    };
+  }
+
+  // -------------------------------------------------------------------------
 }

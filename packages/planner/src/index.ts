@@ -7,7 +7,7 @@
  */
 
 import type { Router } from 'express';
-import { SqliteStorage } from './storage/sqlite.js';
+import { SqliteStorage } from './storage/index.js';
 import { createRouter } from './api/routes.js';
 import {
   initDefaultTunerClient,

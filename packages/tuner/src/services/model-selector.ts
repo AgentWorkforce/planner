@@ -68,7 +68,7 @@ export class ModelSelector {
 
     // 3. During burn-in, use round-robin to ensure all models get tried
     if (totalSamples < 50) {
-      const model = ModelSelector.MODELS[totalSamples % ModelSelector.MODELS.length];
+      const model = ModelSelector.MODELS[totalSamples % ModelSelector.MODELS.length] ?? 'claude-sonnet';
       return { model, reason: 'round_robin' };
     }
 
@@ -174,7 +174,7 @@ export class ModelSelector {
    */
   private randomModel(): string {
     const index = Math.floor(Math.random() * ModelSelector.MODELS.length);
-    return ModelSelector.MODELS[index];
+    return ModelSelector.MODELS[index] ?? 'claude-sonnet';
   }
 
   /**
@@ -200,7 +200,7 @@ export class ModelSelector {
 
     // Sort by sampled value (descending) and return highest
     samples.sort((a, b) => b.sample - a.sample);
-    return samples[0].model;
+    return samples[0]?.model ?? 'claude-sonnet';
   }
 
   /**

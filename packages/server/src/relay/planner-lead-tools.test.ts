@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SqliteStorage } from '../../../planner/src/storage/sqlite.js';
+import { SqliteStorage } from '../../../planner/src/storage/sqlite/index.js';
 import { createPlan, createPlanVersion } from '../../../planner/src/domain/plan.js';
 import { createOrganization } from '../../../planner/src/domain/organization.js';
 import {
@@ -13,7 +13,7 @@ import {
   executeTool,
   getMockToolResult,
   type ToolResult,
-} from './planner-lead-tools.js';
+} from './planner-lead-tools/index.js';
 
 describe('planner-lead-tools', () => {
   describe('PLANNER_LEAD_TOOLS schema', () => {
@@ -79,7 +79,7 @@ describe('planner-lead-tools', () => {
       planId = plan.plan_id;
 
       // Create initial version
-      const version = createPlanVersion(planId, 'Test goal', 'Test context');
+      const version = createPlanVersion(planId, 'Test goal', { context: 'Test context' });
       storage.createVersion(version);
     });
 

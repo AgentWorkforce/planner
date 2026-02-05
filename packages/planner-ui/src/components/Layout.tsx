@@ -12,9 +12,7 @@ import { useCommandPalette, useRecentPlans, useAgentOrchestration, useQuestionQu
 import { listPlans, getPlan } from '@/api';
 import type { PlanSummary, PlanWithVersion, Question } from '@/types';
 import type { Agent } from '@/hooks/useAgentOrchestration';
-
-/** Storage key for messaging sidebar collapsed state */
-const MESSAGING_SIDEBAR_COLLAPSED_KEY = 'planner-messaging-sidebar-collapsed';
+import { STORAGE_KEYS } from '@/config/storage-keys';
 
 /**
  * Layout - Main application layout component
@@ -44,7 +42,7 @@ export function Layout() {
 
   // Messaging sidebar collapsed state (persisted)
   const [messagingSidebarCollapsed, setMessagingSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem(MESSAGING_SIDEBAR_COLLAPSED_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.MESSAGING_SIDEBAR_COLLAPSED);
     return stored === 'true';
   });
 
@@ -185,7 +183,7 @@ export function Layout() {
   // Handle messaging sidebar collapse change with persistence
   const handleMessagingSidebarCollapseChange = useCallback((collapsed: boolean) => {
     setMessagingSidebarCollapsed(collapsed);
-    localStorage.setItem(MESSAGING_SIDEBAR_COLLAPSED_KEY, String(collapsed));
+    localStorage.setItem(STORAGE_KEYS.MESSAGING_SIDEBAR_COLLAPSED, String(collapsed));
   }, []);
 
   // Handle agent avatar click

@@ -27,6 +27,11 @@ export class ConsoleReporter {
     if (!result.success && result.verification_result && !result.verification_result.passed) {
       console.log(`  ${RED}Verification: ${result.verification_result.details.slice(0, 200)}${RESET}`);
     }
+
+    if (result.ideation_metrics) {
+      const im = result.ideation_metrics;
+      console.log(`  ${DIM}Ideation: ${im.ideation_strategy}, ${im.specialist_count} specialist(s), ${im.curated_block_count}/${im.block_count} blocks curated, ${im.ideation_time_ms}ms${RESET}`);
+    }
   }
 
   reportAggregate(metrics: AggregateMetrics): void {
@@ -47,8 +52,10 @@ export class ConsoleReporter {
 
     if (metrics.complexity_accuracy !== null) {
       const acc = metrics.complexity_accuracy;
-      const accColor = acc > 0.7 ? GREEN : acc > 0.3 ? YELLOW : RED;
-      console.log(`  Accuracy: ${accColor}${acc.toFixed(3)}${RESET} (correlation)`);
+      const accColor = acc > 0.5 ? GREEN : acc > 0 ? YELLOW : RED;
+      console.log(`  Complexity Correlation: ${accColor}${acc.toFixed(3)}${RESET} (r ∈ [-1,1], higher is better)`);
+    } else {
+      console.log(`  Complexity Correlation: N/A (insufficient data)`);
     }
   }
 

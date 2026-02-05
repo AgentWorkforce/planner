@@ -5,7 +5,20 @@
  * conversation history, and specialist queue.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
+
+// Mock ANTHROPIC_API_KEY for tests that require it
+const originalEnv = process.env.ANTHROPIC_API_KEY;
+beforeAll(() => {
+  process.env.ANTHROPIC_API_KEY = 'test-api-key-for-unit-tests';
+});
+afterAll(() => {
+  if (originalEnv) {
+    process.env.ANTHROPIC_API_KEY = originalEnv;
+  } else {
+    delete process.env.ANTHROPIC_API_KEY;
+  }
+});
 import {
   INTERVIEWER_CONFIG,
   IDEATION_CHANNEL,

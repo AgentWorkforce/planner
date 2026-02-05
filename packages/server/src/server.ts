@@ -15,6 +15,12 @@ import { createPlannerService, type PlannerService } from '../../planner/src/ind
 import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
 import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
 
+// Shared error handling
+import { errorHandler } from '@plannr/errors';
+
+// Middleware
+import { timeoutMiddleware } from './middleware/timeout.js';
+
 // Relay infrastructure
 import {
   connect as connectRelay,
@@ -71,7 +77,7 @@ async function start(): Promise<void> {
   console.log(`[planner] Initialized (database: ${DB_PATH})`);
 
   // Initialize ideation service
-  ideationService = createIdeationService({ dbPath: IDEATION_DB_PATH });
+  ideationService = createIdeationService({ dbPath: IDEATION_DB_PATH, plannerUrl: `http://localhost:${PORT}` });
   await ideationService.initialize();
   console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
 
@@ -79,6 +85,9 @@ async function start(): Promise<void> {
   const app = express();
   app.use(cors());
   app.use(express.json());
+
+  // Request timeout middleware (before route handlers)
+  app.use(timeoutMiddleware);
 
   // Mount plan channel middleware (intercepts POST /api/plans to create channels)
   app.use('/api', planChannelMiddleware);
@@ -148,6 +157,9 @@ async function start(): Promise<void> {
   const sessionTimeoutService = createSessionTimeoutService(storage);
   sessionTimeoutService.start();
 
+  // Mount error handler middleware (must be last)
+  app.use(errorHandler);
+
   // Start HTTP server
   const server = app.listen(PORT, () => {
     console.log('');
@@ -164,6 +176,8 @@ async function start(): Promise<void> {
     console.log('  POST   /api/plans/:id/versions/:version/approve');
     console.log('  POST   /api/plans/:id/versions/:version/publish');
     console.log('  GET    /api/health/relay');
+    console.log('  GET    /api/health/planner-lead');
+    console.log('  GET    /api/capabilities');
     console.log('  GET    /api/channels');
     console.log('  GET    /api/channels/:id/messages');
     console.log('  GET    /api/channels/:id/presence');

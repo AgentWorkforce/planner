@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SqliteStorage } from '../../storage/sqlite.js';
+import { SqliteStorage } from '../../storage/index.js';
 import { createPlan, createPlanVersion } from '../../domain/plan.js';
 import { createStep } from '../../domain/step.js';
 import { createOrganization } from '../../domain/organization.js';

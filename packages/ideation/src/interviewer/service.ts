@@ -13,7 +13,7 @@ import {
   sessionChannelId,
   isIdeationChannel,
   extractSessionPrefix,
-  LLM_CONFIG,
+  getLLMConfig,
 } from './config.js';
 import { getInterviewerPrompt, getWelcomeMessage } from './prompt.js';
 import { INTERVIEWER_TOOLS, type ToolResult } from './tools.js';
@@ -164,17 +164,17 @@ class InterviewerService {
 
     // Subscribe to relay state changes
     this.unsubscribeStateChange = relayOnStateChange((state: ClientState) => {
-      const wasConnected = this.state.relayConnected;
-      this.state.relayConnected = state === 'connected';
+      const wasConnected = this.state!.relayConnected;
+      this.state!.relayConnected = state === 'connected';
 
-      if (!wasConnected && this.state.relayConnected) {
+      if (!wasConnected && this.state!.relayConnected) {
         console.log('[Interviewer] Relay connected');
         this.announceStartup();
       }
     });
 
     // Check initial relay state
-    this.state.relayConnected = relayIsConnected();
+    this.state!.relayConnected = relayIsConnected();
 
     this.state.isActive = true;
     console.log(`[Interviewer] Initialized (relay=${getRelayMode()})`);
@@ -458,11 +458,12 @@ class InterviewerService {
       : INTERVIEWER_TOOLS;
 
     try {
-      console.log(`[Interviewer] Calling Anthropic API: model=${LLM_CONFIG.model}, messages=${messages.length}, tools=${tools.length}`);
+      const llmConfig = await getLLMConfig();
+      console.log(`[Interviewer] Calling Anthropic API: model=${llmConfig.model}, messages=${messages.length}, tools=${tools.length}`);
       const startTime = Date.now();
       const response = await this.state.anthropic.messages.create({
-        model: LLM_CONFIG.model,
-        max_tokens: LLM_CONFIG.maxTokens,
+        model: llmConfig.model,
+        max_tokens: llmConfig.maxTokens,
         system: fullSystemPrompt,
         tools,
         messages,
@@ -505,7 +506,7 @@ class InterviewerService {
           console.log(`[Interviewer] Tool ${toolUseBlock.name} result: ${JSON.stringify(toolResult).substring(0, 100)}`);
 
           // Track already_active responses and break if stuck in a loop
-          if (toolUseBlock.name === 'spawn_specialist' && toolResult?.data?.already_active) {
+          if (toolUseBlock.name === 'spawn_specialist' && (toolResult?.data as { already_active?: boolean })?.already_active) {
             alreadyActiveCount++;
             console.log(`[Interviewer] Specialist already active (count: ${alreadyActiveCount}/${maxAlreadyActive})`);
             if (alreadyActiveCount >= maxAlreadyActive) {
@@ -520,8 +521,8 @@ class InterviewerService {
           console.log('[Interviewer] Calling Anthropic API for tool result continuation');
           const continueStartTime = Date.now();
           result = await this.state.anthropic.messages.create({
-            model: LLM_CONFIG.model,
-            max_tokens: LLM_CONFIG.maxTokens,
+            model: llmConfig.model,
+            max_tokens: llmConfig.maxTokens,
             system: fullSystemPrompt,
             tools,
             messages: [
@@ -567,8 +568,8 @@ class InterviewerService {
         console.log(`[Interviewer] ${reason}, making final call without tools`);
         // Use original messages WITHOUT the tool_use response (avoid tool_use/tool_result mismatch)
         const finalResult = await this.state.anthropic.messages.create({
-          model: LLM_CONFIG.model,
-          max_tokens: LLM_CONFIG.maxTokens,
+          model: llmConfig.model,
+          max_tokens: llmConfig.maxTokens,
           system: fullSystemPrompt + '\n\nIMPORTANT: You have already used tools to spawn specialists and update understanding. Now respond CONVERSATIONALLY to the user. Do NOT output XML, tool invocations, or function calls. Just speak naturally.',
           messages, // Original messages without the tool-heavy response
         });
