@@ -4,7 +4,20 @@
  * Tests that Interviewer correctly integrates with relay messaging.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+
+// Mock ANTHROPIC_API_KEY for tests that require it
+const originalEnv = process.env.ANTHROPIC_API_KEY;
+beforeAll(() => {
+  process.env.ANTHROPIC_API_KEY = 'test-api-key-for-unit-tests';
+});
+afterAll(() => {
+  if (originalEnv) {
+    process.env.ANTHROPIC_API_KEY = originalEnv;
+  } else {
+    delete process.env.ANTHROPIC_API_KEY;
+  }
+});
 import { interviewer, initInterviewer, stopInterviewer } from './service.js';
 import { SQLiteIdeationStorage } from '../storage/sqlite.js';
 import type { ClientState } from '../relay/index.js';
