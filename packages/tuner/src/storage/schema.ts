@@ -119,6 +119,66 @@ export const SCHEMA_STATEMENTS = [
     generated_at TEXT NOT NULL,
     notes TEXT
   )`,
+
+  // Ideation outcomes (raw data from ideation sessions)
+  `CREATE TABLE IF NOT EXISTS ideation_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    plan_id TEXT,
+    interviewer_model TEXT NOT NULL,
+    specialist_count INTEGER NOT NULL,
+    confidence_score REAL,
+    block_count INTEGER NOT NULL,
+    conversation_turns INTEGER NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    outcome TEXT NOT NULL CHECK(outcome IN ('approved', 'rejected', 'abandoned')),
+    source TEXT NOT NULL DEFAULT 'production',
+    timestamp TEXT NOT NULL
+  )`,
+
+  // Indexes for ideation_outcomes
+  `CREATE INDEX IF NOT EXISTS idx_ideation_outcomes_session ON ideation_outcomes(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_ideation_outcomes_timestamp ON ideation_outcomes(timestamp)`,
+
+  // Plan quality signals (links ideation session to final plan quality)
+  `CREATE TABLE IF NOT EXISTS plan_quality_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id TEXT NOT NULL,
+    plan_version INTEGER NOT NULL,
+    session_id TEXT NOT NULL,
+    question_count INTEGER NOT NULL,
+    version_count INTEGER NOT NULL,
+    improvements_made INTEGER NOT NULL,
+    block_count INTEGER NOT NULL,
+    time_to_approval_ms INTEGER NOT NULL,
+    source TEXT NOT NULL DEFAULT 'production',
+    timestamp TEXT NOT NULL
+  )`,
+
+  // Indexes for plan_quality_signals
+  `CREATE INDEX IF NOT EXISTS idx_plan_quality_session ON plan_quality_signals(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_plan_quality_plan ON plan_quality_signals(plan_id)`,
+
+  // Ideation baselines (for session quality metrics)
+  `CREATE TABLE IF NOT EXISTS ideation_baselines (
+    pattern TEXT PRIMARY KEY,
+    mean_questions_per_plan REAL NOT NULL DEFAULT 0,
+    mean_versions_per_plan REAL NOT NULL DEFAULT 1,
+    mean_block_utilization REAL NOT NULL DEFAULT 0,
+    mean_conversation_turns REAL NOT NULL DEFAULT 0,
+    mean_time_to_approval_ms REAL NOT NULL DEFAULT 0,
+    m2_questions REAL NOT NULL DEFAULT 0,
+    m2_versions REAL NOT NULL DEFAULT 0,
+    m2_block_utilization REAL NOT NULL DEFAULT 0,
+    m2_conversation_turns REAL NOT NULL DEFAULT 0,
+    m2_time_to_approval REAL NOT NULL DEFAULT 0,
+    alpha REAL NOT NULL DEFAULT 1,
+    beta REAL NOT NULL DEFAULT 1,
+    approval_rate REAL NOT NULL DEFAULT 0,
+    specialist_contribution_rates TEXT NOT NULL DEFAULT '{}',
+    sample_count INTEGER NOT NULL DEFAULT 0,
+    last_updated TEXT NOT NULL
+  )`,
 ];
 
 /**
