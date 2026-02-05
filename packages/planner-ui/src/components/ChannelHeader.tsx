@@ -7,6 +7,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Channel, PresenceEntry } from '@/types';
 import { ChannelIcon, UsersIcon, CloseIcon, EnvelopeIcon } from './icons';
+import { AgentAvatar } from './AgentAvatar';
+import type { AgentRole } from '@/hooks/useAgentOrchestration';
+
+// Valid agent roles for DM channels (fallback to planner-lead if unknown)
+const VALID_AGENT_ROLES: AgentRole[] = ['planner-lead', 'architect', 'ui-designer', 'data-modeler', 'coder', 'tester', 'security'];
+
+function getAgentRole(agentId?: string): AgentRole {
+  if (!agentId) return 'planner-lead';
+  if (VALID_AGENT_ROLES.includes(agentId as AgentRole)) {
+    return agentId as AgentRole;
+  }
+  return 'planner-lead'; // Safe fallback
+}
 
 interface ChannelHeaderProps {
   channel: Channel | null;
@@ -19,6 +32,8 @@ interface ChannelHeaderProps {
   onSwitchChannel?: (channelId: string) => void;
   /** Callback when user wants to DM an agent */
   onDirectMessage?: (agentId: string, agentName: string) => void;
+  /** When true and channel is a plan channel, show just "#plan" */
+  inPlanContext?: boolean;
 }
 
 export function ChannelHeader({
@@ -29,10 +44,11 @@ export function ChannelHeader({
   otherChannels = [],
   onSwitchChannel,
   onDirectMessage,
+  inPlanContext = false,
 }: ChannelHeaderProps) {
   if (!channel) {
     return (
-      <div className="h-14 border-b border-border-subtle px-4 flex items-center justify-between">
+      <div className="h-12 border-b border-border-subtle px-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-text-muted">
           <ChannelIcon size="lg" />
           <span className="font-medium">Select a channel</span>
@@ -60,25 +76,58 @@ export function ChannelHeader({
   const showSwitcher = (hasOtherChannels || hasAgents) && (onSwitchChannel || onDirectMessage);
 
   return (
-    <div className="h-14 border-b border-border-subtle px-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <ChannelIcon size="lg" className="text-accent-cyan" />
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-text-primary">{channel.name}</span>
-            {isMock && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-warning/10 text-warning rounded">
-                DEMO
+    <div className="h-12 border-b border-border-subtle px-4 flex items-center justify-between">
+      {channel.type === 'dm' ? (
+        // DM Channel Header - show agent avatar and name
+        <div className="flex items-center gap-3">
+          <AgentAvatar
+            role={getAgentRole(channel.agentId)}
+            state="normal"
+            size="sm"
+            showTooltip={false}
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-text-primary">
+                {channel.agentName || channel.name}
               </span>
+              {isMock && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-warning/10 text-warning rounded">
+                  DEMO
+                </span>
+              )}
+            </div>
+            {channel.description && (
+              <p className="text-xs text-text-muted truncate max-w-[200px]">
+                {channel.description}
+              </p>
             )}
           </div>
-          {channel.description && (
-            <p className="text-xs text-text-muted truncate max-w-[200px]">
-              {channel.description}
-            </p>
-          )}
         </div>
-      </div>
+      ) : (
+        // Regular Channel Header - show channel icon and name
+        // For plan channels in plan context, show just "#plan"
+        <div className="flex items-center gap-3">
+          <ChannelIcon size="lg" className="text-accent-cyan" />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-text-primary">
+                {inPlanContext && channel.type === 'plan' ? 'plan' : channel.name}
+              </span>
+              {isMock && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-warning/10 text-warning rounded">
+                  DEMO
+                </span>
+              )}
+            </div>
+            {channel.description && (
+              <p className="text-xs text-text-muted truncate max-w-[200px]">
+                {channel.description}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <PresenceIndicator
@@ -154,8 +203,16 @@ function ChannelSwitcher({
     [onDirectMessage]
   );
 
-  const hasChannels = otherChannels.length > 0 && onSwitchChannel;
-  const hasAgents = agents.length > 0 && onDirectMessage;
+  // Group channels by type
+  const globalChannels = otherChannels.filter((ch) => ch.type === 'global');
+  const planChannels = otherChannels.filter((ch) => ch.type === 'plan');
+  const dmChannels = otherChannels.filter((ch) => ch.type === 'dm');
+
+  const hasGlobalChannels = globalChannels.length > 0 && onSwitchChannel;
+  const hasPlanChannels = planChannels.length > 0 && onSwitchChannel;
+  const hasDmChannels = dmChannels.length > 0 && onSwitchChannel;
+  const hasOnlineAgents = agents.length > 0 && onDirectMessage;
+  const hasAnyContent = hasGlobalChannels || hasPlanChannels || hasDmChannels || hasOnlineAgents;
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -171,14 +228,31 @@ function ChannelSwitcher({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-56 py-2 bg-bg-elevated border border-border-subtle rounded-lg shadow-lg z-50">
-          {/* Channels section */}
-          {hasChannels && (
+        <div className="absolute right-0 top-full mt-1 w-64 py-2 bg-bg-elevated border border-border-subtle rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+          {/* Global channels section (e.g. #planner) */}
+          {hasGlobalChannels && (
             <>
+              {globalChannels.map((ch) => (
+                <button
+                  key={ch.id}
+                  onClick={() => handleSelectChannel(ch.id)}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors text-left"
+                >
+                  <ChannelIcon size="sm" className="text-accent-cyan" />
+                  <span className="truncate font-medium">{ch.name}</span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Plan channels section */}
+          {hasPlanChannels && (
+            <>
+              {hasGlobalChannels && <div className="my-2 border-t border-border-subtle" />}
               <div className="px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wide">
-                Channels
+                Plans
               </div>
-              {otherChannels.map((ch) => (
+              {planChannels.map((ch) => (
                 <button
                   key={ch.id}
                   onClick={() => handleSelectChannel(ch.id)}
@@ -191,16 +265,32 @@ function ChannelSwitcher({
             </>
           )}
 
-          {/* Divider */}
-          {hasChannels && hasAgents && (
-            <div className="my-2 border-t border-border-subtle" />
+          {/* DM channels section */}
+          {hasDmChannels && (
+            <>
+              {(hasGlobalChannels || hasPlanChannels) && <div className="my-2 border-t border-border-subtle" />}
+              <div className="px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wide">
+                Direct Messages
+              </div>
+              {dmChannels.map((ch) => (
+                <button
+                  key={ch.id}
+                  onClick={() => handleSelectChannel(ch.id)}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors text-left"
+                >
+                  <span className="w-2 h-2 rounded-full bg-accent-purple flex-shrink-0" />
+                  <span className="truncate">{ch.agentName || ch.name}</span>
+                </button>
+              ))}
+            </>
           )}
 
-          {/* Direct Message section */}
-          {hasAgents && (
+          {/* Online agents (for starting new DMs) */}
+          {hasOnlineAgents && (
             <>
+              {(hasGlobalChannels || hasPlanChannels || hasDmChannels) && <div className="my-2 border-t border-border-subtle" />}
               <div className="px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wide">
-                Direct Message
+                Message Agent
               </div>
               {agents.map((agent) => (
                 <button
@@ -208,17 +298,18 @@ function ChannelSwitcher({
                   onClick={() => handleSelectAgent(agent.id, agent.name)}
                   className="w-full px-3 py-2 flex items-center gap-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors text-left"
                 >
-                  <span className="w-2 h-2 rounded-full bg-accent-purple flex-shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-success flex-shrink-0" />
                   <span className="truncate">{agent.name}</span>
+                  <span className="text-xs text-text-muted ml-auto">online</span>
                 </button>
               ))}
             </>
           )}
 
           {/* Empty state */}
-          {!hasChannels && !hasAgents && (
+          {!hasAnyContent && (
             <div className="px-3 py-2 text-sm text-text-muted">
-              No channels or agents available
+              No channels available
             </div>
           )}
         </div>

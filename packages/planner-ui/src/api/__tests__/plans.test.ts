@@ -21,29 +21,29 @@ describe('listPlans', () => {
     expect(client.get).toHaveBeenCalledWith('/plans?include_attention=true');
   });
 
-  it('should work with status parameter (legacy)', async () => {
+  it('should work with status parameter in object', async () => {
     const mockResponse = { plans: [] };
     vi.mocked(client.get).mockResolvedValue(mockResponse);
 
-    await listPlans('draft');
+    await listPlans({ status: 'draft' });
 
     expect(client.get).toHaveBeenCalledWith('/plans?status=draft&include_attention=true');
   });
 
-  it('should work with status and includeAttention=false (legacy)', async () => {
+  it('should work with status and includeAttention=false in object', async () => {
     const mockResponse = { plans: [] };
     vi.mocked(client.get).mockResolvedValue(mockResponse);
 
-    await listPlans('approved', false);
+    await listPlans({ status: 'approved', include_attention: false });
 
     expect(client.get).toHaveBeenCalledWith('/plans?status=approved');
   });
 
-  it('should work with all three legacy parameters', async () => {
+  it('should work with status and initiative_id in object', async () => {
     const mockResponse = { plans: [] };
     vi.mocked(client.get).mockResolvedValue(mockResponse);
 
-    await listPlans('published', true, 'init-123');
+    await listPlans({ status: 'published', initiative_id: 'init-123' });
 
     expect(client.get).toHaveBeenCalledWith(
       '/plans?status=published&initiative_id=init-123&include_attention=true'

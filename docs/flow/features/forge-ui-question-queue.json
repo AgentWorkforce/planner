@@ -1,0 +1,223 @@
+{
+  "feature_id": "forge-ui-question-queue",
+  "title": "Agent Question Queue UI",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-run-dashboard", "forge-question-queue"],
+
+  "summary": {
+    "goal": "Interface for answering agent questions that are blocking execution. Different from gates - these are runtime questions from agents.",
+    "acceptance_criteria": [
+      { "id": "fqq-ac1", "description": "Queue showing pending questions from agents, sorted by priority_score" },
+      { "id": "fqq-ac2", "description": "Question context: which agent, which task, blocking level" },
+      { "id": "fqq-ac3", "description": "Pre-defined options or free-form text input for answers" },
+      { "id": "fqq-ac4", "description": "Notification badge when new question arrives" },
+      { "id": "fqq-ac5", "description": "Question type badges: BLOCKING (hard_block, red), PREFERENCE (soft_block, orange), FYI (fyi/preference, cyan)" },
+      { "id": "fqq-ac6", "description": "Priority factors visible: steps_blocked, agents_waiting (= subscribers.length from backend)" },
+      { "id": "fqq-ac7", "description": "Answer button sends response back to agent via POST /questions/:id/answer" },
+      { "id": "fqq-ac8", "description": "Duplicate question detection: same-text questions merged with 'Asked by N agents'" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Mirrors ui-question-queue pattern from planner-ui",
+        "Questions come via request_human_input MCP tool",
+        "Priority scoring: blocking_level_value*100 + steps_blocked*10 + agents_waiting*15 + cascade_depth*5 - (can_use_default ? 30 : 0)",
+        "agents_waiting in UI = subscribers.length from Question entity in backend",
+        "Multiple agents may ask the same question - need duplicate handling"
+      ],
+      "patterns": [
+        "Triage panel pattern from design system",
+        "Question type badges from design system"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "data_mapping": {
+        "agents_waiting": "subscribers.length from backend Question entity",
+        "steps_blocked": "directly from Question.steps_blocked",
+        "blocking_level": "Question.blocking_level ('hard_block', 'soft_block', 'preference', 'fyi')"
+      },
+      "duplicate_handling": {
+        "detection": "Group questions with identical question_text",
+        "display": "Show as single card with 'Asked by N agents' subtitle",
+        "answer_behavior": "Single answer applies to all duplicate questions via backend",
+        "api_note": "Backend may expose grouped endpoint or client-side grouping needed"
+      }
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "fuqq-s1",
+        "title": "Create QuestionQueue component",
+        "scope": "forge-ui",
+        "description": "Main component for displaying pending questions with duplicate grouping",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "QuestionQueue component displays list of pending questions" },
+          { "id": "ac2", "description": "Questions sorted by priority_score (highest first)" },
+          { "id": "ac3", "description": "Empty state when no pending questions" },
+          { "id": "ac4", "description": "Duplicate questions (same question_text) grouped into single card" }
+        ],
+        "specification": {
+          "pattern_reference": "planner-ui question queue component",
+          "pattern_description": "Copy triage panel pattern from planner-ui design system",
+          "grouping_logic": {
+            "group_by": "question_text",
+            "display": "Single card per unique question_text",
+            "agents_list": "Collect all agent_ids that asked the same question"
+          }
+        }
+      },
+      {
+        "step_id": "fuqq-s2",
+        "title": "Create QuestionCard component",
+        "scope": "forge-ui",
+        "description": "Individual question card with context, answer controls, and duplicate handling",
+        "dependencies": ["fuqq-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows: question text, agent name (or 'Asked by N agents'), task title, blocking level badge" },
+          { "id": "ac2", "description": "Shows priority factors: steps_blocked, agents_waiting (= subscribers.length)" },
+          { "id": "ac3", "description": "Expandable context section if context provided" },
+          { "id": "ac4", "description": "Options displayed as button group if pre-defined options exist" },
+          { "id": "ac5", "description": "Free-form text input for custom answers" },
+          { "id": "ac6", "description": "For grouped questions: 'Asked by N agents' with expandable agent list" }
+        ],
+        "specification": {
+          "design": {
+            "component": "Card with expandable sections",
+            "library": "shadcn/ui Card, Button, Badge, Textarea",
+            "duplicate_display": {
+              "subtitle": "'Asked by N agents' when N > 1",
+              "expandable": "Click to see list of agent names",
+              "styling": "text-text-secondary text-sm"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "fuqq-s3",
+        "title": "Create blocking level badges",
+        "scope": "forge-ui",
+        "description": "Visual badges for question blocking levels",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BLOCKING badge: red, used for hard_block" },
+          { "id": "ac2", "description": "PREFERENCE badge: orange, used for soft_block" },
+          { "id": "ac3", "description": "FYI badge: cyan, used for fyi and preference blocking_level" },
+          { "id": "ac4", "description": "Badge component with variant prop matching blocking_level value" }
+        ],
+        "specification": {
+          "pattern_reference": "Design system question type badges",
+          "pattern_description": "Use color semantics from design system",
+          "mapping": {
+            "hard_block": "BLOCKING (red)",
+            "soft_block": "PREFERENCE (orange)",
+            "preference": "FYI (cyan)",
+            "fyi": "FYI (cyan)"
+          }
+        }
+      },
+      {
+        "step_id": "fuqq-s4",
+        "title": "Implement answer submission with duplicate handling",
+        "scope": "forge-ui",
+        "description": "Handle answer submission for single or grouped questions",
+        "dependencies": ["fuqq-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Answer button calls POST /questions/:id/answer" },
+          { "id": "ac2", "description": "For grouped questions: submit answer to all question IDs in group" },
+          { "id": "ac3", "description": "Loading state during submission" },
+          { "id": "ac4", "description": "Optimistic UI update (question(s) removed from list)" },
+          { "id": "ac5", "description": "Error handling with toast notification" }
+        ],
+        "specification": {
+          "pattern_reference": "planner-ui API call patterns",
+          "pattern_description": "Use existing fetch utilities and error handling",
+          "grouped_submission": {
+            "option_1": "Backend supports batch answer endpoint: POST /questions/batch-answer { question_ids, answer }",
+            "option_2": "Client sends parallel requests to each question ID",
+            "preferred": "Option 1 if backend supports, else Option 2 with Promise.all"
+          }
+        }
+      },
+      {
+        "step_id": "fuqq-s5",
+        "title": "Create notification badge for header",
+        "scope": "forge-ui",
+        "description": "Badge showing count of pending questions",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Badge in header/nav showing pending question count" },
+          { "id": "ac2", "description": "Badge updates in real-time via SSE" },
+          { "id": "ac3", "description": "Clicking badge navigates to question queue view" },
+          { "id": "ac4", "description": "Badge hidden when count is 0" }
+        ],
+        "specification": {
+          "design": {
+            "component": "Badge with count",
+            "position": "Header status area"
+          }
+        }
+      },
+      {
+        "step_id": "fuqq-s6",
+        "title": "Implement real-time updates via SSE",
+        "scope": "forge-ui",
+        "description": "Subscribe to SSE for new questions and answers",
+        "dependencies": ["fuqq-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Subscribe to question_added event" },
+          { "id": "ac2", "description": "Subscribe to question_answered event" },
+          { "id": "ac3", "description": "Update UI without page refresh" },
+          { "id": "ac4", "description": "Reconnect on connection loss" },
+          { "id": "ac5", "description": "Re-group questions when new question matches existing text" }
+        ],
+        "specification": {
+          "pattern_reference": "planner-ui SSE subscription pattern",
+          "pattern_description": "Use existing SSE hook/utility",
+          "duplicate_handling": "On question_added, check if question_text matches existing group and merge"
+        }
+      },
+      {
+        "step_id": "fuqq-s7",
+        "title": "Add priority score visualization",
+        "scope": "forge-ui",
+        "description": "Show priority factors visually",
+        "dependencies": ["fuqq-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Show steps_blocked count with icon (from Question.steps_blocked)" },
+          { "id": "ac2", "description": "Show agents_waiting count with icon (from Question.subscribers.length)" },
+          { "id": "ac3", "description": "Tooltip explaining priority calculation" }
+        ],
+        "specification": {
+          "design": {
+            "icons": "Use existing icon components",
+            "layout": "Horizontal row of priority factors"
+          },
+          "data_source": {
+            "steps_blocked": "Question.steps_blocked",
+            "agents_waiting": "Question.subscribers.length (backend provides this)"
+          }
+        }
+      }
+    ]
+  }
+}

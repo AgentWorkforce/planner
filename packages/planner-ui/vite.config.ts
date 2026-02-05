@@ -17,8 +17,9 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/ws/relay': {
-        target: 'ws://localhost:3001',
+        target: 'http://localhost:3001',
         ws: true,
+        changeOrigin: true,
       },
     },
   },

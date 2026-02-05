@@ -199,7 +199,7 @@ export function useAgentOrchestration(planId?: string): UseAgentOrchestrationRes
 
     // Handle channel messages (agent broadcasts)
     const unsubChannel = onChannelMessage((msg) => {
-      if (msg.channel === `plan:${planId}:agents`) {
+      if (msg.channelId === `plan:${planId}:agents`) {
         // Handle plan-specific agent updates
         if (msg.data?.type === 'agents_snapshot') {
           const snapshot = msg.data as { agents: Agent[] };

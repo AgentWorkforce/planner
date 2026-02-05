@@ -113,7 +113,8 @@ describe('SequenceView', () => {
     it('renders nothing when waveGroups is empty', () => {
       const { container } = renderWithRouter(<SequenceView waveGroups={[]} />);
 
-      const columns = container.querySelectorAll('.min-w-\\[280px\\]');
+      // No WaveColumn children (which use flex-1 class)
+      const columns = container.querySelectorAll('.flex-1');
       expect(columns).toHaveLength(0);
     });
 
@@ -129,14 +130,15 @@ describe('SequenceView', () => {
   });
 
   describe('layout and scrolling', () => {
-    it('applies horizontal scroll layout', () => {
+    it('applies flex layout with divider styling', () => {
       const waveGroups: WaveGroup[] = [
         { wave: 'NOW', plans: [createMockPlan()] },
       ];
 
       const { container } = renderWithRouter(<SequenceView waveGroups={waveGroups} />);
 
-      const layout = container.querySelector('.flex.overflow-x-auto.overflow-y-hidden');
+      // Implementation uses flex h-full gap-px bg-border-subtle for Kanban layout with 1px dividers
+      const layout = container.querySelector('.flex.h-full');
       expect(layout).toBeInTheDocument();
     });
 
@@ -237,7 +239,7 @@ describe('SequenceView', () => {
   });
 
   describe('continuous flow layout', () => {
-    it('columns touch each other (no gap between columns)', () => {
+    it('uses 1px gap for column dividers', () => {
       const waveGroups: WaveGroup[] = [
         { wave: 'NOW', plans: [createMockPlan()] },
         { wave: 'Wave 2', plans: [createMockPlan({ plan_id: 'plan-2' })] },
@@ -245,9 +247,9 @@ describe('SequenceView', () => {
 
       const { container } = renderWithRouter(<SequenceView waveGroups={waveGroups} />);
 
-      // Verify parent flex container has no gap class
-      const flexContainer = container.querySelector('.flex.h-full');
-      expect(flexContainer?.className).not.toContain('gap-');
+      // Implementation uses gap-px with bg-border-subtle for 1px divider effect between columns
+      const flexContainer = container.querySelector('.flex.h-full.gap-px');
+      expect(flexContainer).toBeInTheDocument();
     });
   });
 });

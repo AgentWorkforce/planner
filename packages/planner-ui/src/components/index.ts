@@ -5,8 +5,6 @@ export { EditableTextarea } from './EditableTextarea';
 export { PlanHeader } from './PlanHeader';
 export { StepEditor } from './StepEditor';
 export { WorkflowActions } from './WorkflowActions';
-export { ChatPanel } from './ChatPanel';
-export { ChatMessage, ChatTypingIndicator } from './ChatMessage';
 export { ImprovementBadge } from './ImprovementBadge';
 export { FlaggedConcernIndicator, StepConcerns } from './FlaggedConcernIndicator';
 export { PendingGatesNotification } from './PendingGatesNotification';
@@ -16,7 +14,6 @@ export { ChangeRequestNotification } from './ChangeRequestNotification';
 export { ChangeRequestCard } from './ChangeRequestCard';
 export { ChangeDiffView } from './ChangeDiffView';
 export { ChangeRequestLinkBadge } from './ChangeRequestLinkBadge';
-export { AIConnectionBadge } from './AIConnectionBadge';
 export { ScopeSummaryStats } from './ScopeSummaryStats';
 export { SwimlaneView } from './SwimlaneView';
 export { ViewModeToggle } from './ViewModeToggle';
@@ -40,3 +37,14 @@ export { ChannelHeader } from './ChannelHeader';
 export { MessageStream } from './MessageStream';
 export { MessageInput } from './MessageInput';
 export { MessagingSidebar } from './MessagingSidebar';
+
+// Understanding components
+export { ConfidenceBadge } from './ConfidenceBadge';
+export { AgentObservationCard } from './AgentObservationCard';
+export { UnderstandingTab } from './UnderstandingTab';
+
+// Context components
+export { KeyValueEditor } from './context/KeyValueEditor';
+export { AddRolePopover } from './context/AddRolePopover';
+export { RoleContextCard } from './context/RoleContextCard';
+export { ContextTab } from './ContextTab';

@@ -1,0 +1,189 @@
+{
+  "feature_id": "ideation-documents",
+  "title": "Document Upload & Analysis for Ideation Sessions",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-package"],
+  "component": "ideation-core",
+
+  "summary": {
+    "goal": "Enable users to upload text/markdown documents when creating ideation sessions. Documents are another form of input (like chat messages) that agents analyze and distill into unified understanding. The value of ideation is the interpretation layer - transforming raw input into understanding formatted for planners.",
+
+    "in_scope": [
+      "Document upload at session creation (text, markdown files)",
+      "Chunked document processing for large files",
+      "Analysis produces observations in UNIFIED understanding (same schema as chat-derived insights)",
+      "Source citations as metadata on any observation (not separate namespace)",
+      "Keyword/topic tagging of chunks for retrieval",
+      "Agent tool to query raw chunks by topic/keyword",
+      "Channel summary announcing available topics",
+      "Analysis progress visibility in UI"
+    ],
+
+    "out_of_scope": [
+      "PDF, Word, or binary document formats (v2)",
+      "Vector embeddings / semantic search (v2)",
+      "OCR for images (v2)",
+      "Real-time collaborative editing of documents",
+      "Document versioning within a session",
+      "External document URLs/links (v2)"
+    ],
+
+    "constraints": [
+      "Must handle documents up to 500KB each, up to 10 documents per session",
+      "Total document content per session capped at 2MB",
+      "Chunk size ~4000 tokens to fit analyst context windows",
+      "Analysis must complete within 2 minutes for typical document sets",
+      "Must work in mock mode without API keys"
+    ],
+
+    "acceptance_criteria": [
+      { "id": "doc-ac1", "description": "User can upload .txt and .md files when creating a session" },
+      { "id": "doc-ac2", "description": "Documents are stored as raw input (separate storage, like chat messages are separate from understanding)" },
+      { "id": "doc-ac3", "description": "Large documents (>4000 tokens) are automatically chunked" },
+      { "id": "doc-ac4", "description": "Each chunk is tagged with topics/keywords during analysis" },
+      { "id": "doc-ac5", "description": "Analysis produces observations in UNIFIED understanding schema (not separate namespace)" },
+      { "id": "doc-ac6", "description": "Channel receives summary message with topic index when analysis completes" },
+      { "id": "doc-ac7", "description": "Agents have a tool to query raw chunks by topic/keyword" },
+      { "id": "doc-ac8", "description": "Observations can include optional source citation (e.g., source: 'doc:requirements.md:L10-20')" },
+      { "id": "doc-ac9", "description": "Session shows analysis status: pending | analyzing | ready | failed" },
+      { "id": "doc-ac10", "description": "Understanding contains interpreted insights - never raw document text" }
+    ],
+
+    "decisions": [
+      {
+        "decision": "All input (chat + documents) distills into UNIFIED understanding",
+        "rationale": "Documents are just another information source. There's no 'document understanding' vs 'chat understanding' - agents synthesize ALL input into one understanding schema that helps planners plan."
+      },
+      {
+        "decision": "Source citations as metadata, not separate namespace",
+        "rationale": "An observation like 'auth must use OAuth2' can have source: 'doc:requirements.md:L15' or source: 'chat:turn-3'. No Understanding.document_insights - just Understanding.{specialist}.observations with optional source."
+      },
+      {
+        "decision": "Documents are raw input storage (like transcript)",
+        "rationale": "Just as chat messages are stored as transcript but understanding is separate, documents are stored raw but understanding contains only interpreted insights."
+      },
+      {
+        "decision": "Keyword-tagged chunks over vector search",
+        "rationale": "Simpler, no embedding API dependency, no vector store. Topics/keywords extracted during analysis enable targeted retrieval without semantic search complexity."
+      },
+      {
+        "decision": "Channel summary with topic index",
+        "rationale": "All agents see what topics are available. Format: 'Analyzed 3 docs. Topics: auth, scaling, data-model. Query with cite_document(topic) tool.'"
+      },
+      {
+        "decision": "Chunked analysis with eager processing",
+        "rationale": "Allows handling large documents. Analysis runs on upload so session starts ready."
+      },
+      {
+        "decision": "Chunk analyzers are ephemeral agents",
+        "rationale": "Spawn for analysis, exit when done. No need for persistent services."
+      }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Input layer (raw storage): transcript (chat) + documents (files) - stored separately",
+        "Output layer: unified Understanding schema - agents synthesize ALL input here",
+        "Analysis flow: Upload → Chunk → Tag → Synthesize into Understanding → Ready",
+        "Agent tool: cite_document(topic) returns raw chunk for precise quoting",
+        "Source citations are metadata on observations, e.g., { observation: '...', source: 'doc:req.md:L10' }",
+        "Channel integration: Post summary with topic index when analysis completes"
+      ],
+      "patterns": ["Coordinator-Worker", "Chunked Processing", "Keyword Tagging", "Source Attribution"],
+      "questions": [
+        "Should topic extraction use LLM or simpler NLP?",
+        "How to handle chunks that span multiple topics?"
+      ],
+      "concerns": [
+        "Rate limiting with parallel chunk analysis",
+        "Token cost for document interpretation"
+      ],
+      "confidence": "forming"
+    },
+    "modeller": {
+      "observations": [
+        "Document (raw storage): id, session_id, filename, content, mime_type, size, status, topics[]",
+        "DocumentChunk (raw storage): id, document_id, index, content, start_line, end_line, topics[], keywords[]",
+        "Session.documents: references to attached documents (raw input, like Session.transcript)",
+        "Understanding (unified): Record<specialist, { observations: Observation[] }> where Observation can have optional 'source' field",
+        "Example observation with source: { text: 'OAuth2 required', source: 'doc:requirements.md:L15-20', confidence: 'high' }",
+        "NO separate Understanding.document_insights namespace - all insights go to appropriate specialist"
+      ],
+      "keywords": ["Document", "Chunk", "Observation", "Source", "TopicTag"],
+      "confidence": "forming"
+    },
+    "interviewer_integration": {
+      "observations": [
+        "Interviewer's context includes understanding summary (already unified)",
+        "Interviewer has cite_document tool to retrieve raw sections when needed",
+        "When spawning specialists, include relevant document topics in their context",
+        "Specialists add to unified understanding - with source citations when from docs"
+      ],
+      "tool_design": {
+        "name": "cite_document",
+        "description": "Retrieve raw document sections by topic or keyword for precise quoting",
+        "input": { "query": "string (topic, keyword, or filename)", "max_chunks": "number (default 3)" },
+        "output": { "chunks": [{ "filename": "...", "lines": "L10-L50", "content": "...", "topics": [] }] }
+      },
+      "confidence": "forming"
+    },
+    "core_principle": {
+      "observations": [
+        "Ideation's value = interpretation layer between raw input and planners",
+        "If we just forwarded docs to planner, why have ideation?",
+        "Agents distill ALL input (chat + docs) into understanding formatted for planners",
+        "This must be central to agent prompts - they understand this is their task"
+      ],
+      "confidence": "solid"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "storage": "SQLite - documents table + chunks table with JSONB for tags (raw input layer)",
+      "understanding": "Existing Understanding schema unchanged - observations gain optional 'source' metadata",
+      "chunking": "Token-based splitting (~4000 tokens) with ~100 token overlap",
+      "tagging": "LLM extracts 3-7 topic tags per chunk during analysis",
+      "parallelism": "Max 3 concurrent chunk analyses to respect rate limits",
+      "progress": "SSE events: doc_analysis_started, chunk_analyzed, doc_analysis_complete"
+    },
+    "observation_with_source": {
+      "schema_example": {
+        "architect": {
+          "observations": [
+            { "text": "REST API with versioned endpoints", "source": "chat:turn-5" },
+            { "text": "OAuth2 required for all auth", "source": "doc:requirements.md:L15-20" },
+            { "text": "Max 100 concurrent users", "source": "doc:constraints.txt:L3" },
+            { "text": "Prefer PostgreSQL for production", "confidence": "tentative" }
+          ]
+        }
+      },
+      "note": "Source is optional. Chat-derived observations may omit source or use 'chat:turn-N'."
+    },
+    "api": {
+      "upload_endpoint": "POST /api/ideation/sessions (multipart with documents[])",
+      "documents_endpoint": "GET /api/ideation/sessions/:id/documents",
+      "topics_endpoint": "GET /api/ideation/sessions/:id/documents/topics",
+      "query_endpoint": "GET /api/ideation/sessions/:id/documents/query?topic=auth"
+    },
+    "channel_message_format": {
+      "example": "📄 Analyzed 3 documents (requirements.md, architecture.md, constraints.txt).\n\nTopics found: authentication, data-model, scaling, api-design, security\n\nUse cite_document('topic') to reference specific sections."
+    }
+  },
+
+  "sub_features": [
+    "ideation-doc-domain",
+    "ideation-doc-storage",
+    "ideation-doc-api",
+    "ideation-doc-chunking",
+    "ideation-doc-analysis",
+    "ideation-doc-agent-tool",
+    "ideation-doc-source-citations",
+    "ideation-doc-ui-upload",
+    "ideation-doc-ui-progress"
+  ]
+}

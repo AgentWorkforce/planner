@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getPlan, updatePlan, ApiError, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion } from '@/api';
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
 import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
 import { StepEditor } from '@/components/StepEditor';
-import { EditableText } from '@/components/EditableText';
-import { ChatPanel } from '@/components/ChatPanel';
+import { EditableTextarea } from '@/components/EditableTextarea';
 import { CommentThread } from '@/components/CommentThread';
 import { WorkflowActions } from '@/components/WorkflowActions';
 import { SwimlaneView } from '@/components/SwimlaneView';
@@ -13,12 +12,22 @@ import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { DependencyLinesOverlay } from '@/components/DependencyLinesOverlay';
 import { MessagingSidebar } from '@/components/MessagingSidebar';
 import { Badge } from '@/components/ui/Badge';
-import { MessageIcon, DocumentIcon, DecisionsIcon } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { DocumentIcon, DecisionsIcon, BrainIcon, SettingsIcon, PlusIcon, ChevronLeftIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
+import { usePlanEvents } from '@/hooks';
+import { useUserTrajectory } from '@/hooks/useUserTrajectory';
+import { DecisionLogHeader } from '@/components/trajectory/DecisionLogHeader';
+import { DecisionList } from '@/components/trajectory/DecisionList';
+import { DecisionEmptyState } from '@/components/trajectory/DecisionEmptyState';
+import { DecisionDetailSheet } from '@/components/trajectory/DecisionDetailSheet';
+import { PreferencesSummary } from '@/components/trajectory/PreferencesSummary';
+import { UnderstandingTab } from '@/components/UnderstandingTab';
+import { ContextTab } from '@/components/ContextTab';
 
-/** Panel type for coexistence - only one panel can be open at a time */
-type ActivePanel = 'chat' | 'comments' | null;
+/** Panel type for comments */
+type ActivePanel = 'comments' | null;
 
 /** Storage key for sidebar collapsed state */
 const SIDEBAR_COLLAPSED_KEY = 'planner-sidebar-collapsed';
@@ -26,6 +35,7 @@ const SIDEBAR_COLLAPSED_KEY = 'planner-sidebar-collapsed';
 export function PlanEditorPage() {
   const { planId } = useParams<{ planId: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [version, setVersion] = useState<PlanVersion | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +76,59 @@ export function PlanEditorPage() {
   const [hoveredDirection, setHoveredDirection] = useState<'incoming' | 'outgoing' | null>(null);
   const stepsContainerRef = useRef<HTMLDivElement>(null);
 
+  // Active tab detection based on URL
+  const activeTab = location.pathname.endsWith('/decisions')
+    ? 'decisions'
+    : location.pathname.endsWith('/understanding')
+      ? 'understanding'
+      : location.pathname.endsWith('/context')
+        ? 'context'
+        : 'plan';
+
+  // Decision-related state (for decisions tab)
+  const [agentFilter, setAgentFilter] = useState<string>('all');
+  const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [decisionSheetOpen, setDecisionSheetOpen] = useState(false);
+
+  // Fetch trajectory data for decisions tab
+  const { decisions, preferences, isLoading: decisionsLoading, error: decisionsError } = useUserTrajectory(planId || null);
+
+  // Extract unique agent roles from decisions
+  const uniqueAgents = useMemo(() => {
+    const agents = new Set<string>();
+    decisions.forEach((decision) => {
+      if (decision.asking_agent) {
+        agents.add(decision.asking_agent);
+      }
+    });
+    return Array.from(agents).sort();
+  }, [decisions]);
+
+  // Filter decisions by agent
+  const filteredDecisions = useMemo(() => {
+    if (agentFilter === 'all') {
+      return decisions;
+    }
+    return decisions.filter((decision) => decision.asking_agent === agentFilter);
+  }, [decisions, agentFilter]);
+
+  // Get selected decision object
+  const selectedDecision = useMemo(() => {
+    if (!selectedDecisionId) return null;
+    return decisions.find((d) => d.event_id === selectedDecisionId) || null;
+  }, [decisions, selectedDecisionId]);
+
+  // Handle decision row click
+  const handleDecisionSelect = (eventId: string) => {
+    setSelectedDecisionId(eventId);
+    setDecisionSheetOpen(true);
+  };
+
+  // Handle decision sheet close
+  const handleDecisionSheetClose = () => {
+    setDecisionSheetOpen(false);
+  };
+
   // Scroll to and highlight a step (used by dependency indicator click)
   const handleScrollToStep = useCallback((stepId: string) => {
     const container = stepsContainerRef.current;
@@ -80,30 +143,18 @@ export function PlanEditorPage() {
     }
   }, []);
 
-  // AI connection status - check if planning agent is active
-  const {
-    status: connectionStatus,
-    connect: connectToAgent,
-    isConnecting,
-    connectError,
-  } = useAIConnectionStatus(planId ?? null);
-
-  // Clear connection error handler
-  const [localConnectError, setLocalConnectError] = useState<string | null>(null);
-  useEffect(() => {
-    setLocalConnectError(connectError);
-  }, [connectError]);
-  const clearConnectError = useCallback(() => setLocalConnectError(null), []);
-
   // Debounced refetch plan data (used by real-time sync)
   const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refetchPlan = useCallback(async () => {
     if (!planId) return;
     try {
       const result = await getPlan(planId);
-      // Only update if fetched version is newer than local
+      // Update if fetched version is newer OR same version but updated more recently
+      // (understanding/context updates don't create new versions, only update timestamp)
       setVersion((prev) => {
-        if (!prev || result.version.version > prev.version) {
+        if (!prev) return result.version;
+        if (result.version.version > prev.version) return result.version;
+        if (result.version.version === prev.version && result.version.updated_at > prev.updated_at) {
           return result.version;
         }
         return prev;
@@ -150,10 +201,6 @@ export function PlanEditorPage() {
       console.debug('[PlanEditorPage] Event stream connected for real-time plan updates');
     }
   }, [eventStreamError, isEventStreamConnected]);
-
-  // AI chat hook - must be called unconditionally (before early returns)
-  // Use mock when not connected to real agent
-  const aiChat = useAIChat(version, { useMock: connectionStatus !== 'connected' });
 
   // Fetch plan on mount
   useEffect(() => {
@@ -249,13 +296,7 @@ export function PlanEditorPage() {
     [planId, version, selectedStep, expandedStepId, commentStepId]
   );
 
-  // Panel coexistence handlers
-  const openChatPanel = useCallback(() => {
-    setActivePanel('chat');
-    // Also call aiChat.open to ensure its internal state is synced
-    aiChat.open();
-  }, [aiChat]);
-
+  // Panel handlers
   const openCommentsPanel = useCallback((stepId: string) => {
     setCommentStepId(stepId);
     setActivePanel('comments');
@@ -264,8 +305,7 @@ export function PlanEditorPage() {
   const closeActivePanel = useCallback(() => {
     setActivePanel(null);
     setCommentStepId(null);
-    aiChat.close();
-  }, [aiChat]);
+  }, []);
 
   // Comment handlers
   const handleAddComment = useCallback(
@@ -331,6 +371,16 @@ export function PlanEditorPage() {
     [planId, version]
   );
 
+  // Handler for updating the plan context
+  const handleContextUpdate = useCallback(
+    async (newContext: string) => {
+      if (!planId || !version) return;
+      const result = await updatePlan(planId, { context: newContext });
+      setVersion(result.version);
+    },
+    [planId, version]
+  );
+
   // Get comments for a specific step
   const getStepComments = useCallback(
     (stepId: string): Comment[] => {
@@ -351,22 +401,6 @@ export function PlanEditorPage() {
   const commentStep = commentStepId
     ? version?.steps.find((s) => s.step_id === commentStepId)
     : null;
-
-  // Keyboard shortcut: Cmd+/ (or Ctrl+/) toggles chat panel
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
-        e.preventDefault();
-        if (activePanel === 'chat') {
-          closeActivePanel();
-        } else {
-          openChatPanel();
-        }
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activePanel, openChatPanel, closeActivePanel]);
 
   if (loading) {
     return (
@@ -417,58 +451,91 @@ export function PlanEditorPage() {
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex overflow-hidden">
       {/* Main content area - higher z-index so popovers appear above sidebar */}
-      <div className="flex-1 min-w-0 overflow-auto relative z-10">
+      <div className="flex-1 min-w-0 overflow-y-auto relative z-10">
         {/* Header */}
-        <div className="border-b border-border-subtle bg-bg-card">
-          <div className="px-6 py-4">
+        <div className="border-b border-border-subtle">
+          {/* Row 1: Back + Action */}
+          <div className="flex items-center justify-between h-12 px-4 border-b border-border-subtle">
+            <Link
+              to="/plans"
+              className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ChevronLeftIcon size="sm" />
+              Back to plans
+            </Link>
+            <Button asChild variant="primary" size="sm">
+              <Link to="/plans/new">
+                <PlusIcon size="sm" />
+                New Plan
+              </Link>
+            </Button>
+          </div>
+
+          {/* Row 2: Tab toggle */}
+          <div className="flex items-center h-12 px-4 border-b border-border-subtle">
+            <ToggleGroup
+              type="single"
+              value={activeTab}
+              onValueChange={(value) => {
+                if (value === 'plan') {
+                  navigate(`/plans/${planId}`);
+                } else if (value === 'understanding') {
+                  navigate(`/plans/${planId}/understanding`);
+                } else if (value === 'context') {
+                  navigate(`/plans/${planId}/context`);
+                } else if (value === 'decisions') {
+                  navigate(`/plans/${planId}/decisions`);
+                }
+              }}
+              className="h-8 p-0.5 bg-bg-tertiary rounded-lg"
+            >
+              <ToggleGroupItem value="plan" aria-label="Plan view" className="h-7">
+                <DocumentIcon size="sm" />
+                Plan
+              </ToggleGroupItem>
+              <ToggleGroupItem value="understanding" aria-label="Understanding view" className="h-7">
+                <BrainIcon size="sm" />
+                Understanding
+              </ToggleGroupItem>
+              <ToggleGroupItem value="context" aria-label="Context view" className="h-7">
+                <SettingsIcon size="sm" />
+                Context
+              </ToggleGroupItem>
+              <ToggleGroupItem value="decisions" aria-label="Decisions view" className="h-7">
+                <DecisionsIcon size="sm" />
+                Decisions
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          <div className="px-6 py-4 bg-bg-card">
           {/* Breadcrumb row */}
           <PlanBreadcrumb parents={parents} currentGoal={version.summary.goal} />
-
-          {/* Tab navigation */}
-          <div className="flex items-center gap-2 mt-3 mb-1 border-b border-border-subtle pb-3">
-            <Link
-              to={`/plans/${planId}`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === `/plans/${planId}`
-                  ? 'bg-bg-tertiary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-              }`}
-            >
-              <DocumentIcon size="sm" />
-              <span>Plan</span>
-            </Link>
-            <Link
-              to={`/plans/${planId}/decisions`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === `/plans/${planId}/decisions`
-                  ? 'bg-bg-tertiary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-              }`}
-            >
-              <DecisionsIcon size="sm" />
-              <span>Decisions</span>
-            </Link>
-          </div>
 
           {/* Main header: 2-column layout */}
           <div className="mt-4 flex gap-8">
             {/* Left column: Title and metadata */}
             <div className="flex-1 min-w-0">
-              <EditableText
+              <EditableTextarea
                 value={version.summary.goal || ''}
                 onSave={handleGoalUpdate}
                 placeholder="Enter plan goal..."
                 disabled={version.status !== 'draft'}
-                as="h1"
+                rows={1}
                 className="text-2xl font-semibold text-text-primary"
               />
-              {version.summary.context && (
-                <p className="mt-2 text-sm text-text-secondary line-clamp-2">
-                  {version.summary.context}
-                </p>
-              )}
+              <div className="mt-2">
+                <EditableTextarea
+                  value={version.summary.context || ''}
+                  onSave={handleContextUpdate}
+                  placeholder="Add context or background for this plan..."
+                  disabled={version.status !== 'draft'}
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
               <div className="flex items-center gap-3 mt-2 text-sm text-text-muted">
                 <span>Version {version.version}</span>
                 {version.submitted_at && (
@@ -493,11 +560,11 @@ export function PlanEditorPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="px-6 py-6 space-y-6">
-        {/* Steps section */}
-        <div className="bg-bg-tertiary rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
+      {/* Content - conditionally render Plan, Understanding, or Decisions based on active tab */}
+      {activeTab === 'plan' && (
+        <div className="px-6 py-6 space-y-6 overflow-hidden">
+          {/* Steps header */}
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-text-primary">
               Steps ({version.steps.length})
             </h2>
@@ -577,6 +644,7 @@ export function PlanEditorPage() {
                         <StepEditor
                           step={step}
                           allSteps={version.steps}
+                          planId={planId!}
                           onUpdate={handleStepUpdate}
                           onDelete={handleStepDelete}
                           disabled={!isEditable}
@@ -617,33 +685,89 @@ export function PlanEditorPage() {
               )}
             </div>
           )}
-        </div>
 
-        {/* Timestamps */}
-        <div className="flex items-center gap-6 text-sm text-text-muted">
-          <span>Created: {new Date(version.created_at).toLocaleString()}</span>
-          <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
+          {/* Timestamps */}
+          <div className="flex items-center gap-6 text-sm text-text-muted">
+            <span>Created: {new Date(version.created_at).toLocaleString()}</span>
+            <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* AI Chat Panel */}
-      <ChatPanel
-        isOpen={activePanel === 'chat'}
-        onClose={closeActivePanel}
-        version={version}
-        messages={aiChat.messages}
-        isLoading={aiChat.isLoading}
-        selectedStep={selectedStep}
-        connectionStatus={connectionStatus}
-        planStatus={version.status}
-        isConnecting={isConnecting}
-        connectError={localConnectError}
-        onConnect={connectToAgent}
-        onClearConnectError={clearConnectError}
-        onSendMessage={aiChat.sendMessage}
-        onApplySuggestion={aiChat.applySuggestion}
-        onDismissSuggestion={aiChat.dismissSuggestion}
-      />
+      {/* Understanding tab content */}
+      {activeTab === 'understanding' && (
+        <div className="px-6 py-6 space-y-6 overflow-auto">
+          <UnderstandingTab
+            understanding={version.understanding}
+            isEditable={version.status === 'draft'}
+          />
+        </div>
+      )}
+
+      {/* Context tab content */}
+      {activeTab === 'context' && (
+        <div className="px-6 py-6 space-y-6 overflow-auto">
+          <ContextTab
+            planId={planId!}
+            context={version.context}
+            isEditable={version.status === 'draft'}
+            onContextUpdate={(updatedContext) => {
+              setVersion((prev) => (prev ? { ...prev, context: updatedContext } : prev));
+            }}
+          />
+        </div>
+      )}
+
+      {/* Decisions tab content */}
+      {activeTab === 'decisions' && (
+        <div className="px-6 py-6 space-y-6 overflow-hidden">
+          {/* Header with title and agent filter */}
+          <DecisionLogHeader
+            count={filteredDecisions.length}
+            agents={uniqueAgents}
+            selectedAgent={agentFilter}
+            onAgentChange={setAgentFilter}
+          />
+
+          {/* Main content area */}
+          <div>
+            {/* Preferences summary (if preferences exist) */}
+            {preferences.length > 0 && (
+              <div className="mb-4">
+                <PreferencesSummary preferences={preferences} />
+              </div>
+            )}
+
+            {/* Decision list or empty state */}
+            {decisionsLoading && decisions.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-text-muted text-sm">Loading decisions...</p>
+              </div>
+            ) : decisionsError ? (
+              <div className="py-12 text-center">
+                <p className="text-error text-sm">{decisionsError}</p>
+              </div>
+            ) : filteredDecisions.length > 0 ? (
+              <DecisionList
+                decisions={filteredDecisions}
+                selectedId={selectedDecisionId}
+                onSelect={handleDecisionSelect}
+              />
+            ) : (
+              <DecisionEmptyState />
+            )}
+          </div>
+
+          {/* Decision detail sheet - only render when open */}
+          {decisionSheetOpen && (
+            <DecisionDetailSheet
+              decision={selectedDecision}
+              open={decisionSheetOpen}
+              onClose={handleDecisionSheetClose}
+            />
+          )}
+        </div>
+      )}
 
       {/* Comment Thread Panel */}
       {activePanel === 'comments' && commentStep && (
@@ -658,19 +782,6 @@ export function PlanEditorPage() {
         />
       )}
 
-      {/* Panel toggle button (visible when panels closed and sidebar collapsed) */}
-      {activePanel === null && sidebarCollapsed && (
-        <div className="fixed bottom-6 right-6 z-40">
-          <button
-            className="p-4 bg-accent-cyan text-bg-deep rounded-full shadow-glow-cyan hover:bg-accent-cyan/90 transition-colors"
-            onClick={openChatPanel}
-            aria-label="Open AI Chat (Cmd+/)"
-            title="AI Chat (Cmd+/)"
-          >
-            <MessageIcon size="lg" />
-          </button>
-        </div>
-      )}
       </div>
 
       {/* Messaging Sidebar */}
@@ -678,7 +789,6 @@ export function PlanEditorPage() {
         planContext={planContext}
         isCollapsed={sidebarCollapsed}
         onCollapseChange={handleSidebarCollapseChange}
-        displayName="User"
       />
     </div>
   );

@@ -2,7 +2,8 @@
   "feature_id": "ui-attention-sections",
   "title": "Attention Section Components",
   "type": "feature",
-  "status": "completed",
+  "status": "in_progress",
+  "change_note": "2026-01-31: Completed PlanCard navigation enhancements (ac8-ac12, steps i011-i016). Steps i011-i016 implemented: backend API, PlanSummary type, ProgressBar, AgentActivityDot, QuestionsBadge, PlanCard integration. Step i017 (tests) deferred due to pre-existing test file issues requiring separate cleanup.",
   "priority": "high",
   "dependencies": ["ui-attention-signals"],
 

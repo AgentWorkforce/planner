@@ -1,14 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { PlansViewMode } from '@/components/PlansViewModeToggle';
 
-const STORAGE_KEY = 'planner-plans-view-mode';
-const DEFAULT_MODE: PlansViewMode = 'list';
+export type PlansViewMode = 'table' | 'sectioned' | 'cards';
+
+const STORAGE_KEY = 'planner-plans-view-mode-v2';
+const DEFAULT_MODE: PlansViewMode = 'table';
 
 /**
  * Validate that a value is a valid PlansViewMode.
  */
 function isValidViewMode(value: unknown): value is PlansViewMode {
-  return value === 'list' || value === 'grouped';
+  return value === 'table' || value === 'sectioned' || value === 'cards';
 }
 
 /**

@@ -1,0 +1,213 @@
+{
+  "feature_id": "forge-trajectory-capture",
+  "title": "Trajectory Capture & Retrospectives",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-relay-integration", "forge-storage"],
+
+  "summary": {
+    "goal": "Capture all execution events as trajectories for replay, debugging, and retrospective analysis. Enable learning from past runs to improve future execution.",
+    "acceptance_criteria": [
+      { "id": "ftc-ac1", "description": "Every state transition (run, task) emits trajectory event" },
+      { "id": "ftc-ac2", "description": "Agent messages and tool calls captured with timestamps" },
+      { "id": "ftc-ac3", "description": "Trajectory events stored with run_id, task_id, event_type, payload, timestamp" },
+      { "id": "ftc-ac4", "description": "GET /runs/:id/trajectory returns full event stream" },
+      { "id": "ftc-ac5", "description": "Query by time range, event type, or task" },
+      { "id": "ftc-ac6", "description": "Aggregate stats endpoint: completion rate, retry rate, avg duration per step type" },
+      { "id": "ftc-ac7", "description": "Trajectory pruning policy (keep N days or N runs)" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Event sourcing pattern - state derivable from event stream",
+        "Trajectories enable: replay, debugging, retrospective, preference learning",
+        "Same pattern as agentworkforce/trajectories but execution-focused",
+        "Aggregate stats help identify slow steps, frequent failures"
+      ],
+      "patterns": [
+        "Append-only event log per run",
+        "Event types: task_started, task_completed, task_failed, agent_message, tool_call, gate_reached, gate_resolved",
+        "Periodic aggregation for stats"
+      ],
+      "keywords": ["trajectory", "event-sourcing", "audit", "retrospective"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "event_types": [
+        "run_started", "run_completed", "run_failed", "run_paused",
+        "task_started", "task_completed", "task_failed", "task_blocked",
+        "agent_spawned", "agent_progress", "agent_tool_call", "agent_exited",
+        "gate_reached", "gate_approved", "gate_rejected",
+        "human_input_requested", "question_answered",
+        "audit_completed", "decision_recorded",
+        "checkpoint_created"
+      ],
+      "storage": "trajectory_events table with run_id, task_id, event_type, payload JSONB, timestamp"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "ftc-s1",
+        "title": "Define trajectory event types and schemas",
+        "scope": "forge-core",
+        "description": "Define all trajectory event types with Zod schemas",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TrajectoryEventTypeSchema: enum of all event types (run_started, task_completed, agent_spawned, gate_reached, etc.)" },
+          { "id": "ac2", "description": "TrajectoryEventSchema: { event_id, run_id, task_id?, event_type, payload: Record<string,unknown>, timestamp }" },
+          { "id": "ac3", "description": "Payload schemas per event type (e.g., TaskCompletedPayload, AgentProgressPayload, GateReachedPayload)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/trajectory.ts",
+          "pattern_description": "Copy DecisionEvent pattern from planner-core trajectory domain"
+        }
+      },
+      {
+        "step_id": "ftc-s2",
+        "title": "Create TrajectoryCapture service",
+        "scope": "forge-core",
+        "description": "Service for emitting and storing trajectory events",
+        "dependencies": ["ftc-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TrajectoryCapture class with emit(runId, eventType, payload, taskId?) method" },
+          { "id": "ac2", "description": "Auto-generates event_id (UUID) and timestamp" },
+          { "id": "ac3", "description": "Validates payload against event type schema" },
+          { "id": "ac4", "description": "Stores via ForgeStorage.createTrajectoryEvent()" },
+          { "id": "ac5", "description": "Emits to SSE subscribers for real-time updates" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Event emitter + storage dual write",
+            "storage": "Uses trajectory_events table defined in forge-storage fs-s4"
+          }
+        }
+      },
+      {
+        "step_id": "ftc-s3",
+        "title": "Integrate trajectory capture with state transitions",
+        "scope": "forge-core",
+        "description": "Emit trajectory events on all run and task state changes",
+        "dependencies": ["ftc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "transitionRun() calls trajectoryCapture.emit() for run state changes" },
+          { "id": "ac2", "description": "transitionTask() calls trajectoryCapture.emit() for task state changes" },
+          { "id": "ac3", "description": "Agent spawn/exit captured as agent_spawned/agent_exited events" },
+          { "id": "ac4", "description": "Gate decisions captured as gate_reached/gate_approved/gate_rejected events" },
+          { "id": "ac5", "description": "Question events captured as human_input_requested/question_answered events" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Decorator or hook pattern on state transition functions",
+            "integration_points": ["transitionRun", "transitionTask", "AgentSpawner.spawn", "gate handlers", "question handlers"]
+          }
+        }
+      },
+      {
+        "step_id": "ftc-s4",
+        "title": "Capture agent MCP tool calls",
+        "scope": "forge-core",
+        "description": "Capture agent MCP tool calls as trajectory events",
+        "dependencies": ["ftc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "MCP tool handlers call trajectoryCapture.emit() after successful execution" },
+          { "id": "ac2", "description": "report_progress captured as agent_progress event" },
+          { "id": "ac3", "description": "record_decision captured as decision_recorded event" },
+          { "id": "ac4", "description": "report_audit_result captured as audit_completed event" },
+          { "id": "ac5", "description": "Payload includes tool name, arguments, and result summary" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts",
+          "pattern_description": "Add trajectory emit calls after successful tool execution",
+          "notes": "MCP tools pass trajectoryCapture service via handleToolCall dependency"
+        }
+      },
+      {
+        "step_id": "ftc-s5",
+        "title": "Create trajectory query API",
+        "scope": "forge-core",
+        "description": "API endpoints for querying trajectory events",
+        "dependencies": ["ftc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /runs/:id/trajectory returns full event stream ordered by timestamp" },
+          { "id": "ac2", "description": "Query params: event_type, task_id, from_time, to_time" },
+          { "id": "ac3", "description": "Pagination support: limit, offset" },
+          { "id": "ac4", "description": "Returns { events: [...], total, has_more }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/trajectories.ts",
+          "pattern_description": "Copy trajectory handler pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "ftc-s6",
+        "title": "Create aggregate stats endpoint",
+        "scope": "forge-core",
+        "description": "Compute and return aggregate statistics from trajectory",
+        "dependencies": ["ftc-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /runs/:id/trajectory/stats returns aggregate metrics" },
+          { "id": "ac2", "description": "Metrics: completion_rate, retry_rate, avg_task_duration, avg_attempts" },
+          { "id": "ac3", "description": "Per-step-type breakdown if requested (?by_step_type=true)" },
+          { "id": "ac4", "description": "Computed from trajectory events, not cached (for now)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "SQL aggregation queries on trajectory_events table",
+            "future": "Consider materialized views or periodic aggregation for performance"
+          }
+        }
+      },
+      {
+        "step_id": "ftc-s7",
+        "title": "Implement trajectory pruning policy",
+        "scope": "forge-core",
+        "description": "Automatic cleanup of old trajectory data",
+        "dependencies": ["ftc-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Configurable retention: FORGE_TRAJECTORY_RETENTION_DAYS (default 30)" },
+          { "id": "ac2", "description": "pruneOldTrajectories() deletes events older than retention period" },
+          { "id": "ac3", "description": "Alternative: keep last N runs (FORGE_TRAJECTORY_KEEP_RUNS)" },
+          { "id": "ac4", "description": "Scheduled via setInterval or cron (daily)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Scheduled cleanup job",
+            "sql": "DELETE FROM trajectory_events WHERE timestamp < datetime('now', '-30 days')"
+          }
+        }
+      },
+      {
+        "step_id": "ftc-s8",
+        "title": "Mount trajectory routes on API router",
+        "scope": "forge-core",
+        "description": "Add trajectory routes to the Forge API router",
+        "dependencies": ["ftc-s5", "ftc-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /runs/:id/trajectory mounted on Forge router" },
+          { "id": "ac2", "description": "GET /runs/:id/trajectory/stats mounted on Forge router" }
+        ],
+        "specification": {
+          "integration": "Add to forge-api fa-s7 createForgeRouter"
+        }
+      }
+    ]
+  }
+}

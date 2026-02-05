@@ -8,6 +8,7 @@ import type { Initiative } from '@/types/initiative';
 // Mock hooks
 vi.mock('@/hooks/useInitiatives', () => ({
   useInitiatives: vi.fn(),
+  invalidateInitiatives: vi.fn(),
 }));
 
 // Mock API functions
@@ -40,7 +41,7 @@ vi.mock('@/components/initiatives/InitiativeModal', () => ({
     ) : null,
 }));
 
-import { useInitiatives } from '@/hooks/useInitiatives';
+import { useInitiatives, invalidateInitiatives } from '@/hooks/useInitiatives';
 import { createInitiative, reorderInitiatives } from '@/api/initiatives';
 
 function createMockInitiative(overrides?: Partial<Initiative>): Initiative {
@@ -238,10 +239,11 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Active' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Completed' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Archived' })).toBeInTheDocument();
+      // Radix ToggleGroupItem uses role="radio" and aria-label includes "initiatives"
+      expect(screen.getByRole('radio', { name: /all initiatives/i })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /active initiatives/i })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /completed initiatives/i })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /archived initiatives/i })).toBeInTheDocument();
     });
   });
 
@@ -256,8 +258,9 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      const allButton = screen.getByRole('button', { name: 'All' });
-      expect(allButton).toHaveClass('bg-bg-elevated', 'text-text-primary');
+      const allButton = screen.getByRole('radio', { name: /all initiatives/i });
+      // Radix ToggleGroup uses data-state="on" for active items
+      expect(allButton).toHaveAttribute('data-state', 'on');
     });
 
     it('filters initiatives by active status', async () => {
@@ -276,8 +279,8 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      // Click Active filter
-      await user.click(screen.getByRole('button', { name: 'Active' }));
+      // Click Active filter (Radix uses role="radio")
+      await user.click(screen.getByRole('radio', { name: /active initiatives/i }));
 
       // Only active initiative should be visible
       expect(screen.getByTestId('initiative-card-init-1')).toBeInTheDocument();
@@ -300,7 +303,7 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: 'Completed' }));
+      await user.click(screen.getByRole('radio', { name: /completed initiatives/i }));
 
       expect(screen.queryByTestId('initiative-card-init-1')).not.toBeInTheDocument();
       expect(screen.getByTestId('initiative-card-init-2')).toBeInTheDocument();
@@ -322,7 +325,7 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: 'Archived' }));
+      await user.click(screen.getByRole('radio', { name: /archived initiatives/i }));
 
       expect(screen.queryByTestId('initiative-card-init-1')).not.toBeInTheDocument();
       expect(screen.getByTestId('initiative-card-init-2')).toBeInTheDocument();
@@ -341,7 +344,7 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: 'Completed' }));
+      await user.click(screen.getByRole('radio', { name: /completed initiatives/i }));
 
       expect(screen.getByText(/no completed initiatives/i)).toBeInTheDocument();
       expect(screen.getByText(/try selecting a different status filter/i)).toBeInTheDocument();
@@ -358,13 +361,14 @@ describe('InitiativesListPage', () => {
 
       renderPage();
 
-      const activeButton = screen.getByRole('button', { name: 'Active' });
+      const activeButton = screen.getByRole('radio', { name: /active initiatives/i });
       await user.click(activeButton);
 
-      expect(activeButton).toHaveClass('bg-bg-elevated', 'text-text-primary');
+      // Radix ToggleGroup uses data-state="on" for active items
+      expect(activeButton).toHaveAttribute('data-state', 'on');
 
-      const allButton = screen.getByRole('button', { name: 'All' });
-      expect(allButton).not.toHaveClass('bg-bg-elevated');
+      const allButton = screen.getByRole('radio', { name: /all initiatives/i });
+      expect(allButton).toHaveAttribute('data-state', 'off');
     });
   });
 
@@ -439,7 +443,8 @@ describe('InitiativesListPage', () => {
       await user.click(screen.getByRole('button', { name: 'Save' }));
 
       await waitFor(() => {
-        expect(mockRefresh).toHaveBeenCalled();
+        // Implementation uses invalidateInitiatives to notify all hooks to refresh
+        expect(invalidateInitiatives).toHaveBeenCalled();
       });
     });
 

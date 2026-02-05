@@ -141,10 +141,11 @@ If a step's UI is missing:
 
 | Skill | Section |
 |-------|---------|
-| flow-discover | `summary` (from code) |
-| flow-brainstorm | `summary` (from ideas) |
-| flow-planner | `plan_implementation` |
-| flow-todos | Creates executable tasks from plan |
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
+| flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
 | **flow-ui-ux-validation** | `validation_uiux` |
 | flow-test-designer | `plan_tests` |

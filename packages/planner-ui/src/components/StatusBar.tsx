@@ -160,7 +160,10 @@ export function StatusBar({
       <div className="flex-1 flex items-center justify-center gap-2">
         {agents.length > 0 ? (
           agents.map((agent) => {
-            const isNotificationAgent = currentNotification?.agentId === agent.id;
+            // Match notification by agent ID or role (questions may use role as agent_id)
+            const isNotificationAgent =
+              currentNotification?.agentId === agent.id ||
+              currentNotification?.agentId === agent.role;
             return (
               <AgentAvatar
                 key={agent.id}

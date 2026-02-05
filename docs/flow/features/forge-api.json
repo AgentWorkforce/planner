@@ -1,0 +1,222 @@
+{
+  "feature_id": "forge-api",
+  "title": "Forge REST API",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-storage", "forge-task-queue", "forge-relay-integration"],
+
+  "summary": {
+    "goal": "REST API for run management, monitoring, and real-time updates. Primary interface for Forge UI and external integrations. Gate approval endpoints are defined in forge-gate-handling.",
+    "acceptance_criteria": [
+      { "id": "fa-ac1", "description": "POST /runs - create run from ForgePlan, starts task scheduling, returns run_id" },
+      { "id": "fa-ac2", "description": "GET /runs - list runs with status filter and pagination" },
+      { "id": "fa-ac3", "description": "GET /runs/:id - get run details including all tasks and their states" },
+      { "id": "fa-ac4", "description": "POST /runs/:id/pause - pause run (no new tasks started)" },
+      { "id": "fa-ac5", "description": "POST /runs/:id/resume - resume paused run" },
+      { "id": "fa-ac6", "description": "POST /runs/:id/cancel - cancel run (terminate active agents)" },
+      { "id": "fa-ac7", "description": "GET /runs/:id/tasks/:taskId - task details with attempts and artifacts" },
+      { "id": "fa-ac8", "description": "GET /runs/:id/events (SSE) - real-time run updates" },
+      { "id": "fa-ac9", "description": "GET /health - service health check" },
+      { "id": "fa-ac10", "description": "GET /agents - list active agents (merged relay presence + DB state)" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Similar patterns to planner-core API",
+        "SSE for real-time updates (not WebSocket - simpler)",
+        "Gate endpoints owned by forge-gate-handling feature",
+        "Question endpoints owned by forge-question-queue feature",
+        "Pagination for runs list (could have many)"
+      ],
+      "patterns": [
+        "Express + Zod validation",
+        "Consistent error responses",
+        "SSE with reconnection support"
+      ],
+      "keywords": ["REST", "API", "SSE", "Express"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "api_port": "configurable, default 3001",
+      "sse_endpoint": "/runs/:id/events",
+      "auth": "TBD - start with API key, add OAuth later"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fa-s1",
+        "title": "Create API request/response schemas",
+        "scope": "forge-core",
+        "description": "Define Zod schemas for API request validation and response types",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreateRunRequestSchema: { plan: ForgePlan } or { plan_id, plan_version } to fetch from Planner" },
+          { "id": "ac2", "description": "ListRunsQuerySchema: { status?, limit?, offset? }" },
+          { "id": "ac3", "description": "RunResponseSchema: { run_id, plan_id, plan_version, status, has_pending_gate, tasks_count, tasks_completed, created_at }" },
+          { "id": "ac4", "description": "Export TypeScript types from schemas" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/schemas.ts (if exists) or src/api/handlers/*.ts",
+          "pattern_description": "Copy Zod schema validation pattern from planner-core API handlers"
+        }
+      },
+      {
+        "step_id": "fa-s2",
+        "title": "Create run management handlers",
+        "scope": "forge-core",
+        "description": "HTTP handlers for run CRUD operations",
+        "dependencies": ["fa-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /runs handler: validate ForgePlan, create Run + Tasks, start scheduler, return { run_id, status, tasks_count }" },
+          { "id": "ac2", "description": "GET /runs handler: list with status filter, pagination, return [{ run_id, plan_id, status, created_at, tasks_count, tasks_completed }]" },
+          { "id": "ac3", "description": "GET /runs/:id handler: full run with all tasks, return { run, tasks: [{ task_id, status, attempts_count }] }" },
+          { "id": "ac4", "description": "Error responses match planner-core format: { error: string, code?: string }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/plans.ts",
+          "pattern_description": "Copy handler pattern: createXxxHandlers(storage) returns object with handler functions"
+        }
+      },
+      {
+        "step_id": "fa-s3",
+        "title": "Create run control handlers",
+        "scope": "forge-core",
+        "description": "HTTP handlers for pause/resume/cancel operations",
+        "dependencies": ["fa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /runs/:id/pause: set run status to 'paused', stop enqueueing new tasks" },
+          { "id": "ac2", "description": "POST /runs/:id/resume: set run status to 'running', resume task scheduling" },
+          { "id": "ac3", "description": "POST /runs/:id/cancel: set run status to 'cancelled', terminate active agents via spawner.terminate()" },
+          { "id": "ac4", "description": "All return updated run object with new status" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/workflow.ts",
+          "pattern_description": "Copy workflow handler pattern for state transitions"
+        }
+      },
+      {
+        "step_id": "fa-s4",
+        "title": "Create task detail handlers",
+        "scope": "forge-core",
+        "description": "HTTP handlers for task details and attempts",
+        "dependencies": ["fa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /runs/:id/tasks/:taskId: return { task, attempts: [...], artifacts: [...] }" },
+          { "id": "ac2", "description": "Attempts include: attempt_number, started_at, ended_at, outcome, error, audit_findings" },
+          { "id": "ac3", "description": "Artifacts include: artifact_id, type, reference, metadata" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/plans.ts:getVersion",
+          "pattern_description": "Similar pattern for nested resource retrieval"
+        }
+      },
+      {
+        "step_id": "fa-s5",
+        "title": "Create SSE events handler",
+        "scope": "forge-core",
+        "description": "Server-Sent Events for real-time run updates",
+        "dependencies": ["fa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /runs/:id/events returns SSE stream" },
+          { "id": "ac2", "description": "Events: run_status_changed, task_status_changed, gate_reached, agent_progress, question_added, question_answered" },
+          { "id": "ac3", "description": "Event format: { event, data: JSON }" },
+          { "id": "ac4", "description": "Heartbeat every 30s to keep connection alive" },
+          { "id": "ac5", "description": "Support Last-Event-ID for reconnection" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/events.ts",
+          "pattern_description": "Copy SSE handler pattern from planner-core events handler"
+        }
+      },
+      {
+        "step_id": "fa-s6",
+        "title": "Create active agents handler",
+        "scope": "forge-core",
+        "description": "HTTP handler for listing active agents",
+        "dependencies": ["fa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /agents returns merged view of agent presence and task state" },
+          { "id": "ac2", "description": "Response: [{ agent_id, run_id, task_id, status, last_heartbeat, current_task_title }]" },
+          { "id": "ac3", "description": "Merges relay.listAgents() presence with storage task info" },
+          { "id": "ac4", "description": "Optional filter by run_id" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/agents.ts in planner-core",
+          "pattern_description": "Merge presence + state pattern"
+        }
+      },
+      {
+        "step_id": "fa-s7",
+        "title": "Create router with all endpoints",
+        "scope": "forge-core",
+        "description": "Express router mounting all Forge API endpoints",
+        "dependencies": ["fa-s2", "fa-s3", "fa-s4", "fa-s5", "fa-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createForgeRouter(deps) factory function, deps: { storage, queue, spawner, scheduler }" },
+          { "id": "ac2", "description": "All run routes mounted under /runs" },
+          { "id": "ac3", "description": "Agent routes under /agents" },
+          { "id": "ac4", "description": "Health check at /health" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/routes.ts",
+          "pattern_description": "Copy router pattern with dependency injection. See lines 24-138.",
+          "notes": "Gate and question routes added by their respective features"
+        }
+      },
+      {
+        "step_id": "fa-s8",
+        "title": "Create Express app factory",
+        "scope": "forge-core",
+        "description": "Express application setup with middleware",
+        "dependencies": ["fa-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createForgeApp(config) returns configured Express app" },
+          { "id": "ac2", "description": "Middleware: cors, json body parser, request logging" },
+          { "id": "ac3", "description": "Error handler middleware for consistent error responses" },
+          { "id": "ac4", "description": "Configurable port (default 3001)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/server.ts",
+          "pattern_description": "Copy app factory pattern from planner-core server"
+        }
+      },
+      {
+        "step_id": "fa-s9",
+        "title": "Implement run startup sequence",
+        "scope": "forge-core",
+        "description": "When run is created, start the execution pipeline",
+        "dependencies": ["fa-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After creating Run + Tasks in DB, call scheduler.scheduleReadyTasks(runId)" },
+          { "id": "ac2", "description": "Run status transitions from 'pending' to 'running'" },
+          { "id": "ac3", "description": "Emit trajectory event 'run_started'" },
+          { "id": "ac4", "description": "Return immediately after scheduling - execution is async" }
+        ],
+        "specification": {
+          "architecture": {
+            "sequence": "create run -> create tasks -> transition to running -> schedule ready tasks -> return"
+          }
+        }
+      }
+    ]
+  }
+}

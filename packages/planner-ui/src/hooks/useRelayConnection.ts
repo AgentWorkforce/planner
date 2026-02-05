@@ -51,6 +51,7 @@ export function useRelayConnection(
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isConnectingRef = useRef(false);
 
   // Event handlers registry
   const messageHandlersRef = useRef<Set<MessageHandler>>(new Set());
@@ -61,6 +62,7 @@ export function useRelayConnection(
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    console.log('[useRelayConnection] cleanup() called', new Error().stack?.split('\n')[2]);
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -70,6 +72,7 @@ export function useRelayConnection(
       heartbeatIntervalRef.current = null;
     }
     if (wsRef.current) {
+      console.log('[useRelayConnection] Closing WebSocket');
       wsRef.current.close();
       wsRef.current = null;
     }
@@ -84,6 +87,17 @@ export function useRelayConnection(
 
   // Connect to WebSocket
   const connect = useCallback(() => {
+    // Don't reconnect if already connecting or connected
+    if (isConnectingRef.current) {
+      console.log('[useRelayConnection] Skipping connect - already connecting');
+      return;
+    }
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
+      console.log('[useRelayConnection] Skipping connect - already connected/connecting');
+      return;
+    }
+    console.log('[useRelayConnection] Starting new connection...');
+    isConnectingRef.current = true;
     cleanup();
     setState('connecting');
     setError(null);
@@ -99,6 +113,8 @@ export function useRelayConnection(
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log('[useRelayConnection] WebSocket connected');
+      isConnectingRef.current = false;
       setState('connected');
       setError(null);
       reconnectAttemptsRef.current = 0;
@@ -124,12 +140,13 @@ export function useRelayConnection(
             break;
 
           case 'message': {
+            // Transform wire protocol (body) to domain model (content)
             const msg: RelayMessage = {
               id: data.id || crypto.randomUUID(),
               from: data.from || 'unknown',
               fromName: data.fromName || data.from || 'Unknown',
               entityType: data.entityType || 'agent',
-              body: data.body || '',
+              content: data.body || '',
               timestamp: data.timestamp || new Date().toISOString(),
               data: data.data,
             };
@@ -138,13 +155,14 @@ export function useRelayConnection(
           }
 
           case 'channel_message': {
+            // Transform wire protocol (body, channel) to domain model (content, channelId)
             const msg: RelayMessage = {
               id: data.id || crypto.randomUUID(),
               from: data.from || 'unknown',
               fromName: data.fromName || data.from || 'Unknown',
               entityType: data.entityType || 'agent',
-              channel: data.channel,
-              body: data.body || '',
+              channelId: data.channel,
+              content: data.body || '',
               timestamp: data.timestamp || new Date().toISOString(),
               data: data.data,
             };
@@ -175,17 +193,22 @@ export function useRelayConnection(
       }
     };
 
-    ws.onerror = () => {
+    ws.onerror = (event) => {
+      console.log('[useRelayConnection] WebSocket error:', event);
+      isConnectingRef.current = false;
       setError('Connection error');
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log(`[useRelayConnection] WebSocket closed: code=${event.code}, reason="${event.reason}", wasClean=${event.wasClean}`);
+      isConnectingRef.current = false;
       cleanup();
       setState('disconnected');
 
       // Attempt reconnection if under max attempts
       if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttemptsRef.current++;
+        console.log(`[useRelayConnection] Scheduling reconnect attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
         setState('reconnecting');
         setError(`Reconnecting (${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})...`);
 
@@ -221,15 +244,17 @@ export function useRelayConnection(
   );
 
   const sendChannelMessage = useCallback(
-    (channelId: string, body: string, data?: Record<string, unknown>) => {
-      send({ type: 'send', channel: channelId, body, data });
+    (channelId: string, content: string, data?: Record<string, unknown>) => {
+      // Wire protocol expects 'body', transform from domain 'content'
+      send({ type: 'send', channel: channelId, body: content, data });
     },
     [send]
   );
 
   const sendDirectMessage = useCallback(
-    (to: string, body: string, data?: Record<string, unknown>) => {
-      send({ type: 'dm', to, body, data });
+    (to: string, content: string, data?: Record<string, unknown>) => {
+      // Wire protocol expects 'body', transform from domain 'content'
+      send({ type: 'dm', to, body: content, data });
     },
     [send]
   );
@@ -271,13 +296,26 @@ export function useRelayConnection(
   }, []);
 
   // Auto-connect on mount
+  // Auto-connect on mount
   useEffect(() => {
+    console.log('[useRelayConnection] useEffect running, autoConnect:', autoConnect);
     if (autoConnect) {
-      connect();
+      // Delay connection slightly to handle React StrictMode double-mounting
+      const timeoutId = setTimeout(() => {
+        console.log('[useRelayConnection] setTimeout fired, wsRef state:', wsRef.current?.readyState);
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+          connect();
+        }
+      }, 0);
+      return () => {
+        console.log('[useRelayConnection] useEffect cleanup (autoConnect=true)');
+        clearTimeout(timeoutId);
+        cleanup();
+      };
     }
-
     return cleanup;
-  }, [autoConnect, connect, cleanup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConnect]);
 
   return {
     state,

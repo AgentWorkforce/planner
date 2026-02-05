@@ -1,0 +1,202 @@
+{
+  "feature_id": "forge-user-trajectory",
+  "title": "User Trajectory & Preference Learning",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-trajectory-capture", "forge-storage"],
+
+  "summary": {
+    "goal": "Capture user interactions (questions answered, preferences expressed) and build a preference model that agents query before asking questions. Reduces question fatigue and enables consistent decision-making.",
+    "acceptance_criteria": [
+      { "id": "fut-ac1", "description": "UserTrajectoryEvent entity captures each question answered with context" },
+      { "id": "fut-ac2", "description": "DerivedPreference extracted from repeated decisions (e.g., 'prefers SQLite')" },
+      { "id": "fut-ac3", "description": "Preference confidence increases with evidence count" },
+      { "id": "fut-ac4", "description": "Agents can query getUserPreference(category) before asking" },
+      { "id": "fut-ac5", "description": "findSimilarQuestions(text, threshold) finds past answers for deduplication" },
+      { "id": "fut-ac6", "description": "User trajectories persist across runs (project scope)" },
+      { "id": "fut-ac7", "description": "Override capability: user can change an established preference" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "User trajectory is separate from agent trajectories",
+        "Preference learning is statistical - patterns emerge from repeated decisions",
+        "Similarity matching needed for question deduplication",
+        "Three scopes: global (all projects), project, run"
+      ],
+      "patterns": [
+        "Event sourcing for user interactions",
+        "Fuzzy text matching for similar questions (0.85 threshold)",
+        "Confidence scoring based on evidence count"
+      ],
+      "keywords": ["preference-learning", "question-deduplication", "user-trajectory"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "data_model": {
+        "UserTrajectoryEvent": "{ event_id, user_id, scope, question_text, selected_option, reasoning, run_id, task_id, timestamp }",
+        "DerivedPreference": "{ preference_id, user_id, scope, category, value, confidence, evidence_count, last_expressed }"
+      },
+      "similarity_threshold": 0.85,
+      "scopes": ["global", "project", "run"]
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fut-s1",
+        "title": "Define UserTrajectory entity schemas",
+        "scope": "forge-core",
+        "description": "Define schemas for user trajectory events and derived preferences",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "UserTrajectoryEventSchema: { event_id, user_id, scope, question_text, selected_option, reasoning?, run_id?, task_id?, timestamp }" },
+          { "id": "ac2", "description": "DerivedPreferenceSchema: { preference_id, user_id, scope, category, value, confidence, evidence_count, last_expressed }" },
+          { "id": "ac3", "description": "ScopeSchema: z.enum(['global', 'project', 'run'])" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/trajectory.ts",
+          "pattern_description": "Copy DecisionEvent pattern, extend for user-specific data"
+        }
+      },
+      {
+        "step_id": "fut-s2",
+        "title": "Verify user trajectory tables in storage",
+        "scope": "forge-core",
+        "description": "User trajectory tables defined in forge-storage, verify storage methods work",
+        "dependencies": ["fut-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Verify ForgeStorage user trajectory event methods: createUserEvent, listUserEvents" },
+          { "id": "ac2", "description": "Verify ForgeStorage preference methods: getPreference, upsertPreference, listPreferences" },
+          { "id": "ac3", "description": "Verify indexes on (user_id, scope) work efficiently" }
+        ],
+        "specification": {
+          "notes": "Table schemas defined in forge-storage fs-s6"
+        }
+      },
+      {
+        "step_id": "fut-s3",
+        "title": "Implement trajectory event recording",
+        "scope": "forge-core",
+        "description": "Record user decisions in trajectory",
+        "dependencies": ["fut-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "recordUserDecision(userId, scope, event) stores event in DB" },
+          { "id": "ac2", "description": "Called when question is answered via question queue" },
+          { "id": "ac3", "description": "Captures: question text, selected option, reasoning if provided" },
+          { "id": "ac4", "description": "Triggers preference derivation analysis" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/user-trajectory.ts",
+          "pattern_description": "Copy user trajectory recording pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fut-s4",
+        "title": "Implement preference derivation",
+        "scope": "forge-core",
+        "description": "Derive preferences from repeated decisions",
+        "dependencies": ["fut-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After each decision, analyze for patterns (same category, similar answers)" },
+          { "id": "ac2", "description": "Create/update DerivedPreference when pattern detected (3+ similar decisions)" },
+          { "id": "ac3", "description": "Confidence formula: min(0.95, 0.5 + 0.15 * evidence_count)" },
+          { "id": "ac4", "description": "Categories extracted from question context (e.g., 'database', 'styling', 'testing')" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Statistical aggregation on decision stream",
+            "confidence_threshold": "0.7 for auto-use, 0.5 for suggestion"
+          }
+        }
+      },
+      {
+        "step_id": "fut-s5",
+        "title": "Implement getUserPreference query",
+        "scope": "forge-core",
+        "description": "Query user preferences for agent use",
+        "dependencies": ["fut-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getUserPreference(userId, scope, category) returns preference if exists with sufficient confidence" },
+          { "id": "ac2", "description": "Scope priority: run > project > global (more specific wins)" },
+          { "id": "ac3", "description": "Returns { value, confidence } or null if no preference" },
+          { "id": "ac4", "description": "Confidence threshold 0.7 for returning preference" }
+        ],
+        "specification": {
+          "architecture": {
+            "agent_integration": "Agents can call before asking redundant questions"
+          }
+        }
+      },
+      {
+        "step_id": "fut-s6",
+        "title": "Implement findSimilarQuestions",
+        "scope": "forge-core",
+        "description": "Find past answers to similar questions",
+        "dependencies": ["fut-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "findSimilarQuestions(userId, scope, text, threshold=0.85) finds matching past answers" },
+          { "id": "ac2", "description": "Text similarity using trigram or Levenshtein distance" },
+          { "id": "ac3", "description": "Returns [{ question_text, selected_option, reasoning, similarity_score }]" },
+          { "id": "ac4", "description": "Ordered by similarity_score descending" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/sqlite.ts findSimilarQuestions",
+          "pattern_description": "Copy similarity search pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fut-s7",
+        "title": "Implement preference override",
+        "scope": "forge-core",
+        "description": "Allow users to change established preferences",
+        "dependencies": ["fut-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PUT /user/preferences/:category allows preference update" },
+          { "id": "ac2", "description": "Override resets evidence_count to 1, sets new value" },
+          { "id": "ac3", "description": "Records override as trajectory event for audit" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Explicit override resets statistical accumulation"
+          }
+        }
+      },
+      {
+        "step_id": "fut-s8",
+        "title": "Create UserTrajectoryService",
+        "scope": "forge-core",
+        "description": "Service class that combines all user trajectory operations",
+        "dependencies": ["fut-s3", "fut-s4", "fut-s5", "fut-s6", "fut-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "UserTrajectoryService class with all user trajectory methods" },
+          { "id": "ac2", "description": "Constructor takes ForgeStorage" },
+          { "id": "ac3", "description": "Exported for use by forge-question-queue" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Service class composing storage operations",
+            "integration": "Used by forge-question-queue for deduplication"
+          }
+        }
+      }
+    ]
+  }
+}

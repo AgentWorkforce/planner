@@ -26,7 +26,7 @@ export function DecisionList({ decisions, selectedId, onSelect }: DecisionListPr
   }
 
   return (
-    <div className="px-3 py-2 space-y-1">
+    <div className="space-y-1">
       {decisions.map((decision) => (
         <DecisionRow
           key={decision.event_id}

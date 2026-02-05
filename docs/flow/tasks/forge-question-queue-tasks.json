@@ -1,0 +1,394 @@
+{
+  "feature_id": "forge-question-queue",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fqq-s1-task",
+      "step_id": "fqq-s1",
+      "title": "Define Question entity schema",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect for blocking levels and priority formula",
+            "Review Question entity pattern from planner-core"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "QuestionSchema: { question_id, run_id, task_id, agent_id, text, options?, blocking_level, steps_blocked, cascade_depth, can_use_default, default_value?, subscribers: string[], status, answer?, priority_score, created_at, answered_at? }",
+            "BlockingLevelSchema: z.enum(['hard_block', 'soft_block', 'preference', 'fyi'])",
+            "QuestionStatusSchema: z.enum(['pending', 'answered', 'dismissed', 'auto_defaulted'])",
+            "createQuestion() factory with priority score calculation"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify schema captures all required fields",
+            "Test priority score calculation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for Question schema and factory"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s2-task",
+      "step_id": "fqq-s2",
+      "title": "Verify questions table in storage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-storage fs-s5 for questions table schema"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Verify ForgeStorage.createQuestion() works with question schema",
+            "Verify ForgeStorage.getQuestion() retrieves by ID",
+            "Verify ForgeStorage.updateQuestion() updates status, answer, subscribers",
+            "Verify ForgeStorage.listPendingByPriority() returns sorted by priority_score DESC"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test CRUD operations",
+            "Test priority sorting"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for storage methods"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s3-task",
+      "step_id": "fqq-s3",
+      "title": "Implement priority scoring",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review priority formula from context.architect"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "calculatePriorityScore(question) implements formula",
+            "Formula: blocking_level_value*100 + steps_blocked*10 + subscribers.length*15 + cascade_depth*5 - (can_use_default ? 30 : 0)",
+            "Blocking level values: hard_block=3, soft_block=2, preference=1, fyi=0",
+            "Score recalculated when subscribers added or steps_blocked changes"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test score calculation with various inputs",
+            "Verify recalculation triggers"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for priority scoring"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s4-task",
+      "step_id": "fqq-s4",
+      "title": "Implement trajectory-aware deduplication with transparency",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review userTrajectory.findSimilarQuestions integration",
+            "Understand transparency requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Before adding question, call userTrajectory.findSimilarQuestions(text, threshold=0.85)",
+            "If similar answer exists in trajectory: create question with status='auto_answered_from_trajectory'",
+            "Store trajectory event 'question_auto_answered' with { question_text, matched_question_id, similarity_score, auto_answer }",
+            "Emit SSE event 'question_auto_answered' so UI can display auto-answered questions in history",
+            "Notify agent immediately with auto-answer via relay, include { source: 'trajectory', matched_question_id }",
+            "Auto-answered questions visible in GET /questions/history (not just skipped silently)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test deduplication with similar questions",
+            "Verify transparency in UI"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for deduplication"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s5-task",
+      "step_id": "fqq-s5",
+      "title": "Implement question subscription",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Understand pub/sub pattern for answer notification"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Before creating new question, check if similar question already pending",
+            "If similar pending: subscribeToQuestion(questionId, agentId) adds to subscribers array",
+            "Recalculate priority_score after adding subscriber",
+            "When answered, all subscribers notified via relay message"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test subscription flow",
+            "Verify priority recalculation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for subscription"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s6-task",
+      "step_id": "fqq-s6",
+      "title": "Implement answer flow",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/questions.ts:answer pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "answerQuestion(questionId, answer, answeredBy) updates status to 'answered'",
+            "Records answer in user trajectory via userTrajectory.recordUserDecision()",
+            "Notifies all subscribers via relay message { type: 'question_answered', question_id, answer }",
+            "Updates preference model if applicable",
+            "Unblocks waiting tasks by setting task.status back to 'running'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test answer flow end-to-end",
+            "Verify all side effects"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for answer flow"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s7-task",
+      "step_id": "fqq-s7",
+      "title": "Create question queue API endpoints",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/questions.ts patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "POST /questions creates question (called internally by MCP tool handler)",
+            "GET /questions/pending returns sorted by priority score, includes subscribers.length as agents_waiting",
+            "GET /questions/history returns all questions including auto_answered_from_trajectory for transparency",
+            "POST /questions/:id/answer submits answer",
+            "All emit SSE events for real-time UI updates"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all endpoints",
+            "Verify SSE events"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "API tests for all endpoints"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s8-task",
+      "step_id": "fqq-s8",
+      "title": "Implement default value handling with visibility",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review scheduled job patterns",
+            "Understand timeout configuration"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Scheduled job checks for pending questions past timeout",
+            "If can_use_default=true and created_at + timeout < now, use default_value",
+            "Set status to 'auto_defaulted' (distinct from 'answered')",
+            "Store trajectory event 'question_auto_defaulted' with { question_id, default_value, timeout_duration }",
+            "Emit SSE event 'question_auto_defaulted' for UI visibility",
+            "Notify agent with { type: 'question_answered', answer, source: 'timeout_default' }",
+            "Configurable timeout: FORGE_QUESTION_DEFAULT_TIMEOUT (default 5 min)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test timeout behavior",
+            "Verify visibility in UI"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for default handling"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fqq-s9-task",
+      "step_id": "fqq-s9",
+      "title": "Mount question routes on API router",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-api fa-s7 createForgeRouter"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Question routes mounted under /questions on Forge router",
+            "GET /questions/pending",
+            "GET /questions/history",
+            "POST /questions/:id/answer"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify routes are accessible",
+            "Test with curl"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "E2E test: full question flow via API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fqq-s9"
+          ]
+        }
+      }
+    }
+  ]
+}

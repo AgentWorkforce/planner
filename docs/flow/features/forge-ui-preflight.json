@@ -1,0 +1,298 @@
+{
+  "feature_id": "forge-ui-preflight",
+  "title": "Pre-Flight Check View",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-layout"],
+
+  "summary": {
+    "goal": "Review plan and configuration before starting execution. Builds confidence and catches issues before agents are spawned.",
+    "acceptance_criteria": [
+      { "id": "fpf-ac1", "description": "Plan summary: goal, step count, scope count, estimated duration" },
+      { "id": "fpf-ac2", "description": "Pre-flight checklist with status: repos accessible, roles mapped, gates identified" },
+      { "id": "fpf-ac3", "description": "Environment selector dropdown if multiple environments configured" },
+      { "id": "fpf-ac4", "description": "Start Forging button (calls POST /runs/:id/start)" },
+      { "id": "fpf-ac5", "description": "Cancel button returns to previous view" },
+      { "id": "fpf-ac6", "description": "Validation errors block start with clear messages" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Pre-flight validates configuration before expensive operations",
+        "Environment selector maps to scope->repo configuration",
+        "Checklist items come from Forge validation endpoint",
+        "Cross-service API call to Planner requires special handling"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "cross_service_api": {
+        "pattern": "Forge UI calls both Forge API and Planner API",
+        "planner_api_base": "PLANNER_API_BASE env var (default: /api)",
+        "vite_proxy_dev": "Proxy /api to Planner backend in vite.config.ts for development",
+        "production_cors": "Configure CORS on Planner API to accept Forge UI origin, or use API gateway",
+        "fallback": "If Planner unavailable, show error: 'Cannot connect to Planner service. Please try again or contact support.'"
+      }
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "fpf-s1",
+        "title": "Create preflight API module",
+        "scope": "forge-ui",
+        "description": "API functions for preflight checks and run creation, including cross-service Planner API calls",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getPlanForPreflight(planId, version?) returns ForgePlan with summary and steps" },
+          { "id": "ac2", "description": "validatePreflight(planId) returns { checks: PreflightCheck[], valid: boolean }" },
+          { "id": "ac3", "description": "createRun(planId, options?: { environment?: string }) returns { run_id, status }" },
+          { "id": "ac4", "description": "PreflightCheck type: { id, name, status: 'pass' | 'fail' | 'warning', message? }" },
+          { "id": "ac5", "description": "PLANNER_API_BASE configurable via env var, default /api" },
+          { "id": "ac6", "description": "Error handling for Planner unavailable: 'Cannot connect to Planner service'" }
+        ],
+        "specification": {
+          "api_endpoints": {
+            "plan": "GET ${PLANNER_API_BASE}/plans/:id (from Planner API)",
+            "validate": "POST /preflight/validate { plan_id, environment? }",
+            "create": "POST /runs { plan_id, plan_version, environment? }"
+          },
+          "cross_service": {
+            "planner_api_base": "import.meta.env.VITE_PLANNER_API_BASE || '/api'",
+            "error_handling": "Catch network errors specifically, return user-friendly message",
+            "timeout": "5 second timeout for Planner calls"
+          },
+          "notes": "Plan comes from Planner API, validation from Forge API"
+        }
+      },
+      {
+        "step_id": "fpf-s1b",
+        "title": "Configure Vite proxy for Planner API",
+        "scope": "forge-ui",
+        "description": "Add Vite dev server proxy for Planner API calls",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "vite.config.ts proxy /api to Planner backend (default localhost:3000)" },
+          { "id": "ac2", "description": "Separate proxy target from /forge-api (which goes to Forge backend)" },
+          { "id": "ac3", "description": "Document CORS requirements for production deployment" }
+        ],
+        "specification": {
+          "vite_config": {
+            "proxy": {
+              "/api": {
+                "target": "http://localhost:3000",
+                "changeOrigin": true
+              },
+              "/forge-api": {
+                "target": "http://localhost:3001",
+                "changeOrigin": true
+              }
+            }
+          },
+          "production_notes": [
+            "Option 1: API Gateway that routes /api to Planner, /forge-api to Forge",
+            "Option 2: Configure CORS on Planner to accept Forge UI origin",
+            "Option 3: Forge backend proxies Planner requests (backend-to-backend)"
+          ]
+        }
+      },
+      {
+        "step_id": "fpf-s2",
+        "title": "Create PlanSummaryCard component",
+        "scope": "forge-ui",
+        "description": "Card showing plan overview",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Plan goal as title" },
+          { "id": "ac2", "description": "Stats row: X steps, Y scopes, Z gates" },
+          { "id": "ac3", "description": "Estimated duration (if available)" },
+          { "id": "ac4", "description": "Plan version badge" }
+        ],
+        "specification": {
+          "design": {
+            "card": "bg-bg-card border border-border-subtle rounded-xl p-6",
+            "stats": "flex gap-6 text-sm text-text-secondary"
+          }
+        }
+      },
+      {
+        "step_id": "fpf-s3",
+        "title": "Create PreflightCheckItem component",
+        "scope": "forge-ui",
+        "description": "Single checklist item with status",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Status icon: CheckIcon (pass), XIcon (fail), AlertTriangleIcon (warning)" },
+          { "id": "ac2", "description": "Check name" },
+          { "id": "ac3", "description": "Message shown for fail/warning status" },
+          { "id": "ac4", "description": "Loading spinner while checking" }
+        ],
+        "specification": {
+          "design": {
+            "item": "flex items-center gap-3 p-3",
+            "pass": "text-success",
+            "fail": "text-error",
+            "warning": "text-warning"
+          }
+        }
+      },
+      {
+        "step_id": "fpf-s4",
+        "title": "Create PreflightChecklist component",
+        "scope": "forge-ui",
+        "description": "List of all preflight checks",
+        "dependencies": ["fpf-s3"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header: 'Pre-Flight Checks'" },
+          { "id": "ac2", "description": "PreflightCheckItem for each check" },
+          { "id": "ac3", "description": "Overall status: 'All checks passed' or 'N issues found'" },
+          { "id": "ac4", "description": "Expand/collapse details for failed checks" }
+        ],
+        "specification": {
+          "default_checks": [
+            "repos_accessible - All repositories can be cloned",
+            "roles_mapped - Agent roles are configured",
+            "gates_identified - Human gates have approvers",
+            "dependencies_valid - Step dependencies form valid DAG",
+            "env_configured - Environment variables set"
+          ]
+        }
+      },
+      {
+        "step_id": "fpf-s5",
+        "title": "Create EnvironmentSelector component",
+        "scope": "forge-ui",
+        "description": "Dropdown for selecting execution environment",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Dropdown with available environments (development, staging, production)" },
+          { "id": "ac2", "description": "Default to development" },
+          { "id": "ac3", "description": "Warning badge for production" },
+          { "id": "ac4", "description": "Hidden if only one environment available" }
+        ],
+        "specification": {
+          "design": {
+            "dropdown": "shadcn/ui Select component",
+            "production_warning": "bg-error/20 text-error px-2 py-0.5 rounded text-xs"
+          }
+        }
+      },
+      {
+        "step_id": "fpf-s6",
+        "title": "Create StepsPreview component",
+        "scope": "forge-ui",
+        "description": "Condensed preview of plan steps",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Collapsible list of steps grouped by scope" },
+          { "id": "ac2", "description": "Step title with gate indicator if applicable" },
+          { "id": "ac3", "description": "Dependency lines between steps (simplified)" },
+          { "id": "ac4", "description": "Default collapsed, expandable per scope" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/SwimlaneView.tsx (simplified)",
+          "pattern_description": "Read-only version of swimlane view"
+        }
+      },
+      {
+        "step_id": "fpf-s7",
+        "title": "Create usePreflight hook",
+        "scope": "forge-ui",
+        "description": "Data fetching for preflight page with cross-service error handling",
+        "dependencies": ["fpf-s1", "fpf-s1b"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "usePreflight(planId) returns { plan, checks, isLoading, error, revalidate, plannerAvailable }" },
+          { "id": "ac2", "description": "Fetches plan from Planner API" },
+          { "id": "ac3", "description": "Runs preflight validation" },
+          { "id": "ac4", "description": "isValid computed from checks" },
+          { "id": "ac5", "description": "plannerAvailable: false if Planner API unreachable, shows fallback UI" }
+        ],
+        "specification": {
+          "architecture": {
+            "sequence": "1. Fetch plan from Planner, 2. Run validation in Forge, 3. Combine results",
+            "error_states": {
+              "planner_unavailable": "Show error card: 'Cannot connect to Planner service'",
+              "plan_not_found": "Show error: 'Plan not found or not published'",
+              "validation_failed": "Show checks with failure details"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "fpf-s8",
+        "title": "Implement PreflightPage",
+        "scope": "forge-ui",
+        "description": "Main preflight page assembly",
+        "dependencies": ["fpf-s2", "fpf-s4", "fpf-s5", "fpf-s6", "fpf-s7"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header: 'Pre-Flight Check' with plan title" },
+          { "id": "ac2", "description": "PlanSummaryCard at top" },
+          { "id": "ac3", "description": "Two-column: PreflightChecklist (left), StepsPreview (right)" },
+          { "id": "ac4", "description": "EnvironmentSelector above action buttons" },
+          { "id": "ac5", "description": "Action bar: Cancel (secondary), Start Forging (primary)" },
+          { "id": "ac6", "description": "Start Forging disabled if validation fails" },
+          { "id": "ac7", "description": "If Planner unavailable: show error state with retry button" }
+        ],
+        "specification": {
+          "design": {
+            "layout": "max-w-4xl mx-auto p-6",
+            "action_bar": "flex justify-end gap-3 mt-6 pt-6 border-t border-border-subtle"
+          }
+        }
+      },
+      {
+        "step_id": "fpf-s9",
+        "title": "Implement run creation flow",
+        "scope": "forge-ui",
+        "description": "Handle Start Forging button click",
+        "dependencies": ["fpf-s8"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Confirmation dialog: 'Start forging this plan?'" },
+          { "id": "ac2", "description": "Shows environment if not development" },
+          { "id": "ac3", "description": "On confirm: createRun API call" },
+          { "id": "ac4", "description": "Loading state on button during creation" },
+          { "id": "ac5", "description": "On success: navigate to /forge/runs/:newRunId" },
+          { "id": "ac6", "description": "On error: show error toast, stay on page" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/WorkflowActions.tsx",
+          "pattern_description": "Similar confirmation dialog pattern"
+        }
+      },
+      {
+        "step_id": "fpf-s10",
+        "title": "Add navigation from runs list",
+        "scope": "forge-ui",
+        "description": "Connect Import Plan flow to preflight page",
+        "dependencies": ["fpf-s8"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Import Plan modal (from frl-s6) navigates to /forge/preflight/:planId" },
+          { "id": "ac2", "description": "URL includes plan version if specific version selected" }
+        ],
+        "specification": {
+          "integration": "Modify frl-s6 Import Plan flow to navigate to preflight page"
+        }
+      }
+    ]
+  }
+}

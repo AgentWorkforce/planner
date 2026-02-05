@@ -77,6 +77,11 @@ For each feature, check if these sections exist and have content:
 | `plan_implementation` | Has `steps` array with ≥1 step |
 | `plan_tests` | Has `cases` array with ≥1 case |
 | `validation_uiux` | Has `summary` with pass/fail values |
+| `understanding` | Has at least one role with `observations` |
+| `context` | Has at least one role with entries |
+| `design_spec` | Has `views` array (UI features only) |
+
+Note: `understanding`, `context`, and `design_spec` are optional metadata sections. They indicate depth of documentation but don't block progress.
 
 ### 4. Build Dependency Graph
 
@@ -93,10 +98,23 @@ Where ①②③④⑤ = Sum, Flow, Plan, Test, Valid
 - `○` = section missing
 - `●` = section partial (exists but incomplete)
 
+**Optional metadata markers** (shown after main sections if present):
+```
+[PRIO ✓✓✓✓✓ U·C·D] feature-name (status)
+```
+Where U/C/D = Understanding, Context, Design spec
+- `U` = understanding section has content
+- `C` = context section has content
+- `D` = design_spec section has content
+- `·` = section not present (use dot as separator)
+
+Only display metadata markers when at least one is present for any feature.
+
 **DAG view** (on request or when useful):
 - Boxes for each feature
 - Arrows showing dependencies
 - Section status as `■○` bar
+- Optional: Add `[UCD]` indicator below status bar if metadata sections present
 
 ### 6. Suggest Next Action
 
@@ -115,6 +133,9 @@ Based on:
 | `■` | Complete (DAG view) |
 | `←` | Depends on |
 | `────▶` | Blocks (DAG view) |
+| `U` | Understanding metadata present |
+| `C` | Context metadata present |
+| `D` | Design spec metadata present |
 
 ## Priority Display
 
@@ -132,14 +153,16 @@ Based on:
 - Show max 3 dependencies inline; use DAG view if more
 - Always end with "Next:" suggestion
 - If no catalog exists: "No catalog found. Run /flow discover or /flow brainstorm first."
+- Metadata markers (U/C/D) are optional—only show if at least one feature has them
 
 ## Fits the Whole
 
 | Skill | Section |
 |-------|---------|
-| flow-discover | `summary` (from code) |
-| flow-brainstorm | `summary` (from ideas) |
-| flow-planner | `plan_implementation` |
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
 | flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
 | flow-ui-ux-validation | `validation_uiux` |

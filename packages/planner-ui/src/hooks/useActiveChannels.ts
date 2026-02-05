@@ -93,10 +93,11 @@ export function useActiveChannels() {
   });
 
   // Subscribe to channel messages for activity tracking
+  // Only count real messages, not join/leave system messages
   useEffect(() => {
     const unsub = connection.onChannelMessage((msg) => {
-      if (msg.channel) {
-        updateActivity(msg.channel);
+      if (msg.channelId && isRealMessage(msg.content)) {
+        updateActivity(msg.channelId);
       }
     });
     return unsub;
@@ -121,6 +122,36 @@ export function useActiveChannels() {
     isLoading,
     refresh: fetchChannels,
   };
+}
+
+/**
+ * Check if a message is a real chat message (not a system join/leave message).
+ * Filters out messages like "X joined", "X left", "X has joined the channel", etc.
+ */
+function isRealMessage(content: string): boolean {
+  if (!content || content.trim() === '') return false;
+
+  const lowerContent = content.toLowerCase().trim();
+
+  // Filter out common join/leave patterns
+  const systemPatterns = [
+    /^.+ joined$/,
+    /^.+ left$/,
+    /^.+ has joined/,
+    /^.+ has left/,
+    /joined the channel/,
+    /left the channel/,
+    /^joined$/,
+    /^left$/,
+  ];
+
+  for (const pattern of systemPatterns) {
+    if (pattern.test(lowerContent)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**

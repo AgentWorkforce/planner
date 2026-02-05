@@ -39,8 +39,9 @@ function generateGutterPath(
   const targetY = to.y + to.height / 2;
   const verticalDist = Math.abs(targetY - sourceY);
 
-  // Control point offset based on vertical distance (min 30px, max 80px)
-  const controlOffset = Math.min(80, Math.max(30, verticalDist * 0.4));
+  // Control point offset based on vertical distance (min 15px, max 55px)
+  // Kept tight to avoid curves extending beyond visible area
+  const controlOffset = Math.min(55, Math.max(15, verticalDist * 0.4));
 
   if (direction === 'incoming') {
     // Connect from source's left edge to target's left edge

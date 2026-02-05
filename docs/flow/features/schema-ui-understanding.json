@@ -1,0 +1,185 @@
+{
+  "feature_id": "schema-ui-understanding",
+  "title": "Understanding Section UI",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["schema-api-endpoints"],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Add Understanding tab to PlanEditorPage showing plan-level agent observations from ideation",
+    "context": "Understanding captures what specialist agents observed during ideation conversations. It's plan-level context (not per-step) that informs the overall planning. Displayed as a dedicated tab alongside Plan and Decisions.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "New 'Understanding' tab appears in PlanEditorPage tab bar (Plan | Understanding | Decisions)" },
+      { "id": "ac2", "description": "Understanding tab shows AgentObservationCard for each role that has observations" },
+      { "id": "ac3", "description": "AgentObservationCard displays: role name, confidence badge, observations, keywords, questions, concerns" },
+      { "id": "ac4", "description": "Confidence badge colors: exploring (purple), forming (orange), confident (green)" },
+      { "id": "ac5", "description": "Keywords render as inline tags/chips with accent-cyan styling" },
+      { "id": "ac6", "description": "Questions and concerns have distinct visual treatment (icon prefix or background)" },
+      { "id": "ac7", "description": "Cards are collapsible individually (default expanded)" },
+      { "id": "ac8", "description": "Empty state: 'No agent observations yet. Chat with PlannerLead to start ideation.'" },
+      { "id": "ac9", "description": "Manual edit mode for draft plans: human can add/edit observations" },
+      { "id": "ac10", "description": "Tab shows count badge if observations exist (e.g., 'Understanding (4)')" }
+    ]
+  },
+  "design_spec": {
+    "location": "New tab in PlanEditorPage alongside Plan and Decisions",
+    "navigation": {
+      "tabs": ["Plan", "Understanding", "Decisions"],
+      "routes": ["/plans/:id", "/plans/:id/understanding", "/plans/:id/decisions"],
+      "active_indicator": "Same ToggleGroup pattern as existing tabs"
+    },
+    "pattern": "agent-observation-card"
+  },
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uu001",
+        "title": "Add Understanding types to frontend",
+        "scope": "planner-ui",
+        "description": "Add TypeScript types for Understanding and AgentObservations to frontend types",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/types/index.ts exports: Understanding, AgentObservations, Confidence types" },
+          { "id": "ac2", "description": "PlanVersion type includes optional understanding field" },
+          { "id": "ac3", "description": "Types match backend Zod schemas" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "uu002",
+        "title": "Add API client methods for understanding",
+        "scope": "planner-ui",
+        "description": "Add API client methods for updating understanding",
+        "dependencies": ["uu001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "updateUnderstanding(planId, role, observations) calls PATCH /plans/:id/understanding/:role" },
+          { "id": "ac2", "description": "Returns updated AgentObservations for the role" },
+          { "id": "ac3", "description": "Handles 400/404 errors appropriately" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "uu003",
+        "title": "Create ConfidenceBadge component",
+        "scope": "planner-ui",
+        "description": "Create badge component showing agent confidence level",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/ConfidenceBadge.tsx" },
+          { "id": "ac2", "description": "Props: level: 'exploring' | 'forming' | 'confident'" },
+          { "id": "ac3", "description": "Styling: exploring=purple, forming=orange, confident=green (per design system)" },
+          { "id": "ac4", "description": "Renders uppercase text with appropriate bg/text colors" }
+        ]
+      },
+      {
+        "step_id": "uu004",
+        "title": "Create role icons",
+        "scope": "planner-ui",
+        "description": "Add SVG icons for agent roles (architect, designer, tester, security)",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ArchitectIcon: boxes/system diagram style" },
+          { "id": "ac2", "description": "PaletteIcon: design/color palette style" },
+          { "id": "ac3", "description": "TestTubeIcon: testing/flask style" },
+          { "id": "ac4", "description": "ShieldIcon: security/shield style" },
+          { "id": "ac5", "description": "All icons follow existing icon pattern (size prop, currentColor)" }
+        ]
+      },
+      {
+        "step_id": "uu005",
+        "title": "Create AgentObservationCard component",
+        "scope": "planner-ui",
+        "description": "Create collapsible card component displaying agent observations",
+        "dependencies": ["uu003", "uu004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/AgentObservationCard.tsx" },
+          { "id": "ac2", "description": "Props: role: string, observations: AgentObservations, isEditable: boolean, onUpdate: (observations) => void" },
+          { "id": "ac3", "description": "Header shows: role icon, role name (capitalized), ConfidenceBadge, collapse chevron" },
+          { "id": "ac4", "description": "Body shows: observations as bullet list, keywords as chips, questions with icon, concerns with icon" },
+          { "id": "ac5", "description": "Collapsible via header click, default expanded" },
+          { "id": "ac6", "description": "Edit mode (when isEditable): inline text inputs for each field" },
+          { "id": "ac7", "description": "Follows agent-observation-card design pattern" }
+        ]
+      },
+      {
+        "step_id": "uu006",
+        "title": "Create UnderstandingTab component",
+        "scope": "planner-ui",
+        "description": "Create the Understanding tab content container",
+        "dependencies": ["uu005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/UnderstandingTab.tsx" },
+          { "id": "ac2", "description": "Props: understanding: Understanding, isEditable: boolean, onUpdate: (role, observations) => void" },
+          { "id": "ac3", "description": "Renders AgentObservationCard for each role in understanding object" },
+          { "id": "ac4", "description": "Empty state when no roles have observations" },
+          { "id": "ac5", "description": "Header shows 'Agent Observations' title + count badge" }
+        ]
+      },
+      {
+        "step_id": "uu007",
+        "title": "Add Understanding tab to PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Integrate Understanding tab into existing tab navigation",
+        "dependencies": ["uu006", "uu002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ToggleGroup includes 'Understanding' option between Plan and Decisions" },
+          { "id": "ac2", "description": "Route /plans/:id/understanding renders UnderstandingTab" },
+          { "id": "ac3", "description": "activeTab detection updated for 'understanding' path" },
+          { "id": "ac4", "description": "Tab navigation updates URL correctly" },
+          { "id": "ac5", "description": "Understanding data from version.understanding passed to tab" },
+          { "id": "ac6", "description": "onUpdate calls updateUnderstanding API, refetches plan" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "uu008",
+        "title": "Add Understanding route",
+        "scope": "planner-ui",
+        "description": "Add route for /plans/:id/understanding",
+        "dependencies": ["uu007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Route added to App.tsx or router config" },
+          { "id": "ac2", "description": "Route renders PlanEditorPage (same as /plans/:id)" },
+          { "id": "ac3", "description": "PlanEditorPage detects 'understanding' tab from URL" }
+        ]
+      },
+      {
+        "step_id": "uu009",
+        "title": "Add Understanding icon to tab bar",
+        "scope": "planner-ui",
+        "description": "Add icon for Understanding tab in ToggleGroup",
+        "dependencies": ["uu004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Understanding tab shows appropriate icon (e.g., brain/lightbulb)" },
+          { "id": "ac2", "description": "Icon matches existing DocumentIcon and DecisionsIcon style" }
+        ]
+      },
+      {
+        "step_id": "uu010",
+        "title": "Add tests for Understanding UI",
+        "scope": "planner-ui",
+        "description": "Add component tests for Understanding UI",
+        "dependencies": ["uu007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: AgentObservationCard renders all observation fields" },
+          { "id": "ac2", "description": "Test: AgentObservationCard collapse/expand works" },
+          { "id": "ac3", "description": "Test: UnderstandingTab renders cards for each role" },
+          { "id": "ac4", "description": "Test: UnderstandingTab shows empty state when no observations" },
+          { "id": "ac5", "description": "Test: ConfidenceBadge shows correct color per level" }
+        ]
+      }
+    ]
+  }
+}

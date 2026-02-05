@@ -1,0 +1,511 @@
+/**
+ * Ideation UI - Global Styles with Tailwind CSS v4
+ * Mission Control Theme (matching relay-dashboard)
+ *
+ * Theme colors are defined as CSS variables and referenced by Tailwind.
+ * Uses system preference (prefers-color-scheme) by default.
+ * Manual override available with .theme-light or .theme-dark on <html>.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+/*---break---
+ */
+@custom-variant dark (&:is(.dark *));
+@config "../tailwind.config.cjs";
+@plugin "@tailwindcss/typography";
+
+/* ===== Theme System - CSS Variables ===== */
+
+/**
+ * Light Theme (System default for light mode)
+ * These values are referenced by Tailwind via var(--color-*)
+ */
+:root {
+  color-scheme: light;
+
+  /* Background Colors */
+  --color-bg-deep: #f8f9fa;
+  --color-bg-primary: #f0f2f5;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f5f6f8;
+  --color-bg-card: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  --color-bg-active: rgba(0, 0, 0, 0.08);
+
+  /* Text Colors */
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #4a4a5a;
+  --color-text-muted: #6a6a7a;
+  --color-text-dim: #8a8a9a;
+  --color-text-inverse: #ffffff;
+
+  /* Border Colors */
+  --color-border-default: rgba(0, 0, 0, 0.1);
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+  --color-border-light: rgba(0, 0, 0, 0.1);
+  --color-border-medium: rgba(0, 0, 0, 0.15);
+
+  /* Accent Colors - Adjusted for light backgrounds */
+  --color-accent-cyan: #0099cc;
+  --color-accent-orange: #e55a2b;
+  --color-accent-purple: #8b44d9;
+  --color-accent-green: #00b894;
+  --color-accent-hover: #007aa3;
+  --color-accent-light: rgba(0, 153, 204, 0.12);
+
+  /* Status Colors */
+  --color-success: #00b894;
+  --color-success-light: rgba(0, 184, 148, 0.12);
+  --color-warning: #e55a2b;
+  --color-warning-light: rgba(229, 90, 43, 0.12);
+  --color-error: #e53935;
+  --color-error-light: rgba(229, 57, 53, 0.12);
+
+  /* Sidebar Colors */
+  --color-sidebar-bg: #f0f2f5;
+  --color-sidebar-border: rgba(0, 0, 0, 0.08);
+  --color-sidebar-hover: rgba(0, 0, 0, 0.06);
+
+  /* Layout Dimensions */
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 4rem;
+  --sidebar-transition-duration: 200ms;
+  --specialists-panel-width: 18rem;
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+
+  /* Selection */
+  --selection-bg: rgba(0, 153, 204, 0.2);
+  --selection-color: #0099cc;
+
+  /* Focus */
+  --focus-color: #0099cc;
+
+  /* Sidebar (shadcn/ui) - mapped to Mission Control theme */
+  --sidebar: #f0f2f5;
+  --sidebar-foreground: #1a1a2e;
+  --sidebar-primary: #0099cc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(0, 0, 0, 0.04);
+  --sidebar-accent-foreground: #1a1a2e;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-ring: #0099cc;
+
+  /* Canvas Theme - Light (sandy/warm) */
+  --canvas-bg: #f5f0e8;
+  --canvas-bg-subtle: #ebe6de;
+  --canvas-text-primary: #2d2d2d;
+  --canvas-text-muted: #7a7a7a;
+  --block-draft: #fbf8f2;
+  --block-draft-border: #e3ddd3;
+  --block-curated: #fbf8f2;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #4a7c59;
+  --canvas-accent-light: #e8f0eb;
+}
+
+/**
+ * Dark Theme (System preference via media query)
+ * Automatically applies when user's system is set to dark mode
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    /* Background Colors */
+    --color-bg-deep: #0a0a0f;
+    --color-bg-primary: #0d0d14;
+    --color-bg-secondary: #12121c;
+    --color-bg-tertiary: #181824;
+    --color-bg-card: #1a1a28;
+    --color-bg-elevated: #202030;
+    --color-bg-hover: rgba(255, 255, 255, 0.04);
+    --color-bg-active: rgba(255, 255, 255, 0.08);
+
+    /* Text Colors */
+    --color-text-primary: #f0f0f5;
+    --color-text-secondary: #a0a0b0;
+    --color-text-muted: #606070;
+    --color-text-dim: #404050;
+    --color-text-inverse: #0a0a0f;
+
+    /* Border Colors */
+    --color-border-default: rgba(255, 255, 255, 0.1);
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-border-light: rgba(255, 255, 255, 0.1);
+    --color-border-medium: rgba(255, 255, 255, 0.15);
+
+    /* Accent Colors - Neon */
+    --color-accent-cyan: #00d9ff;
+    --color-accent-orange: #ff6b35;
+    --color-accent-purple: #a855f7;
+    --color-accent-green: #00ffc8;
+    --color-accent-hover: #00b8d9;
+    --color-accent-light: rgba(0, 217, 255, 0.15);
+
+    /* Status Colors */
+    --color-success: #00ffc8;
+    --color-success-light: rgba(0, 255, 200, 0.15);
+    --color-warning: #ff6b35;
+    --color-warning-light: rgba(255, 107, 53, 0.15);
+    --color-error: #ff4757;
+    --color-error-light: rgba(255, 71, 87, 0.15);
+
+    /* Sidebar Colors */
+    --color-sidebar-bg: #0d0d14;
+    --color-sidebar-border: rgba(255, 255, 255, 0.08);
+    --color-sidebar-hover: rgba(255, 255, 255, 0.06);
+
+    /* Layout Dimensions */
+    --sidebar-width: 16rem;
+    --sidebar-width-collapsed: 3.5rem;
+    --sidebar-transition-duration: 200ms;
+    --specialists-panel-width: 18rem;
+
+    /* Scrollbar */
+    --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+
+    /* Selection */
+    --selection-bg: rgba(0, 217, 255, 0.15);
+    --selection-color: #00d9ff;
+
+    /* Focus */
+    --focus-color: #00d9ff;
+
+    /* Sidebar (shadcn/ui) - mapped to Mission Control dark theme */
+    --sidebar: #0d0d14;
+    --sidebar-foreground: #f0f0f5;
+    --sidebar-primary: #00d9ff;
+    --sidebar-primary-foreground: #0a0a0f;
+    --sidebar-accent: rgba(255, 255, 255, 0.04);
+    --sidebar-accent-foreground: #f0f0f5;
+    --sidebar-border: rgba(255, 255, 255, 0.06);
+    --sidebar-ring: #00d9ff;
+
+    /* Canvas Theme - Dark (mission control) */
+    --canvas-bg: #1a1a1a;
+    --canvas-bg-subtle: #242424;
+    --canvas-text-primary: #e5e5e5;
+    --canvas-text-muted: #888888;
+    --block-draft: #2d2a24;
+    --block-draft-border: #3d3830;
+    --block-curated: #2d2a24;
+    --block-curated-border: #4a7c59;
+    --canvas-accent: #5a9c6a;
+    --canvas-accent-light: #1e2a1e;
+  }
+}
+
+/**
+ * Manual Theme Overrides
+ * Add .theme-light or .theme-dark to <html> to override system preference
+ */
+html.theme-light {
+  color-scheme: light;
+
+  --color-bg-deep: #f8f9fa;
+  --color-bg-primary: #f0f2f5;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f5f6f8;
+  --color-bg-card: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  --color-bg-active: rgba(0, 0, 0, 0.08);
+
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #4a4a5a;
+  --color-text-muted: #6a6a7a;
+  --color-text-dim: #8a8a9a;
+  --color-text-inverse: #ffffff;
+
+  --color-border-default: rgba(0, 0, 0, 0.1);
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+  --color-border-light: rgba(0, 0, 0, 0.1);
+  --color-border-medium: rgba(0, 0, 0, 0.15);
+
+  --color-accent-cyan: #0099cc;
+  --color-accent-orange: #e55a2b;
+  --color-accent-purple: #8b44d9;
+  --color-accent-green: #00b894;
+  --color-accent-hover: #007aa3;
+  --color-accent-light: rgba(0, 153, 204, 0.12);
+
+  --color-success: #00b894;
+  --color-success-light: rgba(0, 184, 148, 0.12);
+  --color-warning: #e55a2b;
+  --color-warning-light: rgba(229, 90, 43, 0.12);
+  --color-error: #e53935;
+  --color-error-light: rgba(229, 57, 53, 0.12);
+
+  --color-sidebar-bg: #f0f2f5;
+  --color-sidebar-border: rgba(0, 0, 0, 0.08);
+  --color-sidebar-hover: rgba(0, 0, 0, 0.06);
+
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 4rem;
+  --sidebar-transition-duration: 200ms;
+  --specialists-panel-width: 18rem;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+
+  --selection-bg: rgba(0, 153, 204, 0.2);
+  --selection-color: #0099cc;
+
+  --focus-color: #0099cc;
+
+  --sidebar: #f0f2f5;
+  --sidebar-foreground: #1a1a2e;
+  --sidebar-primary: #0099cc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(0, 0, 0, 0.04);
+  --sidebar-accent-foreground: #1a1a2e;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-ring: #0099cc;
+
+  /* Canvas Theme - Light (sandy/warm) */
+  --canvas-bg: #f5f0e8;
+  --canvas-bg-subtle: #ebe6de;
+  --canvas-text-primary: #2d2d2d;
+  --canvas-text-muted: #7a7a7a;
+  --block-draft: #fbf8f2;
+  --block-draft-border: #e3ddd3;
+  --block-curated: #fbf8f2;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #4a7c59;
+  --canvas-accent-light: #e8f0eb;
+}
+
+html.theme-dark {
+  color-scheme: dark;
+
+  --color-bg-deep: #0a0a0f;
+  --color-bg-primary: #0d0d14;
+  --color-bg-secondary: #12121c;
+  --color-bg-tertiary: #181824;
+  --color-bg-card: #1a1a28;
+  --color-bg-elevated: #202030;
+  --color-bg-hover: rgba(255, 255, 255, 0.04);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+
+  --color-text-primary: #f0f0f5;
+  --color-text-secondary: #a0a0b0;
+  --color-text-muted: #606070;
+  --color-text-dim: #404050;
+  --color-text-inverse: #0a0a0f;
+
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-light: rgba(255, 255, 255, 0.1);
+  --color-border-medium: rgba(255, 255, 255, 0.15);
+
+  --color-accent-cyan: #00d9ff;
+  --color-accent-orange: #ff6b35;
+  --color-accent-purple: #a855f7;
+  --color-accent-green: #00ffc8;
+  --color-accent-hover: #00b8d9;
+  --color-accent-light: rgba(0, 217, 255, 0.15);
+
+  --color-success: #00ffc8;
+  --color-success-light: rgba(0, 255, 200, 0.15);
+  --color-warning: #ff6b35;
+  --color-warning-light: rgba(255, 107, 53, 0.15);
+  --color-error: #ff4757;
+  --color-error-light: rgba(255, 71, 87, 0.15);
+
+  --color-sidebar-bg: #0d0d14;
+  --color-sidebar-border: rgba(255, 255, 255, 0.08);
+  --color-sidebar-hover: rgba(255, 255, 255, 0.06);
+
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 4rem;
+  --sidebar-transition-duration: 200ms;
+  --specialists-panel-width: 18rem;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+
+  --selection-bg: rgba(0, 217, 255, 0.15);
+  --selection-color: #00d9ff;
+
+  --focus-color: #00d9ff;
+
+  --sidebar: #0d0d14;
+  --sidebar-foreground: #f0f0f5;
+  --sidebar-primary: #00d9ff;
+  --sidebar-primary-foreground: #0a0a0f;
+  --sidebar-accent: rgba(255, 255, 255, 0.04);
+  --sidebar-accent-foreground: #f0f0f5;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #00d9ff;
+
+  /* Canvas Theme - Dark (mission control) */
+  --canvas-bg: #1a1a1a;
+  --canvas-bg-subtle: #242424;
+  --canvas-text-primary: #e5e5e5;
+  --canvas-text-muted: #888888;
+  --block-draft: #2d2a24;
+  --block-draft-border: #3d3830;
+  --block-curated: #2d2a24;
+  --block-curated-border: #4a7c59;
+  --canvas-accent: #5a9c6a;
+  --canvas-accent-light: #1e2a1e;
+}
+
+/* ===== Base Styles ===== */
+
+html,
+body {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Selection */
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-color);
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Smooth theme transition */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.1s ease !important;
+}
+/*---break---
+ */
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+/*---break---
+ */
+/* Base styles - use CSS properties directly instead of @apply */
+* {
+  border-color: var(--color-border-default);
+}
+body {
+  background-color: var(--color-bg-deep);
+  color: var(--color-text-primary);
+}
+
+/* Typing indicator animation */
+@keyframes bounce-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-bounce-dot {
+  animation: bounce-dot 1.4s ease-in-out infinite;
+}
+
+.animate-bounce-dot-delay-1 {
+  animation: bounce-dot 1.4s ease-in-out 0.2s infinite;
+}
+
+.animate-bounce-dot-delay-2 {
+  animation: bounce-dot 1.4s ease-in-out 0.4s infinite;
+}
+
+/* Block glow effect for ready blocks (90%+ confidence) */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(var(--canvas-accent-rgb, 120 200 80), 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(var(--canvas-accent-rgb, 120 200 80), 0.5);
+  }
+}
+
+.block-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Focus mode entry animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.focus-mode-enter {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* Typography plugin - canvas theme overrides */
+.prose-canvas {
+  --tw-prose-body: var(--canvas-text-primary);
+  --tw-prose-headings: var(--canvas-text-primary);
+  --tw-prose-lead: var(--canvas-text-muted);
+  --tw-prose-links: var(--canvas-accent);
+  --tw-prose-bold: var(--canvas-text-primary);
+  --tw-prose-counters: var(--canvas-text-muted);
+  --tw-prose-bullets: var(--canvas-text-muted);
+  --tw-prose-hr: var(--block-draft-border);
+  --tw-prose-quotes: var(--canvas-text-muted);
+  --tw-prose-quote-borders: var(--canvas-accent);
+  --tw-prose-code: var(--canvas-text-primary);
+  --tw-prose-pre-code: var(--canvas-text-primary);
+  --tw-prose-pre-bg: var(--block-draft);
+  --tw-prose-th-borders: var(--block-draft-border);
+  --tw-prose-td-borders: var(--block-draft-border);
+}

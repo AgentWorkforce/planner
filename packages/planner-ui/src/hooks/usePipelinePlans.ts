@@ -42,7 +42,7 @@ export function usePipelinePlans(initiativeId?: string | null) {
         setIsLoading(true);
         setError(null);
 
-        const result = await listPlans(undefined, true);
+        const result = await listPlans({ include_attention: true });
 
         if (isCancelled) return;
 

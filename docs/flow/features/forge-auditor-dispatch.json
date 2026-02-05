@@ -1,0 +1,192 @@
+{
+  "feature_id": "forge-auditor-dispatch",
+  "title": "Auditor Dispatch & Verification",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-relay-integration", "forge-mcp-tools"],
+
+  "summary": {
+    "goal": "Dispatch auditor agents to verify worker output against acceptance criteria. Auditors review code, run tests, and check that produced artifacts meet the defined criteria.",
+    "acceptance_criteria": [
+      { "id": "fad-ac1", "description": "spawnAuditor(taskId, artifacts, criteria) creates verification agent" },
+      { "id": "fad-ac2", "description": "Auditor receives read-only workspace access (no commits)" },
+      { "id": "fad-ac3", "description": "Auditor prompt includes artifacts produced and acceptance criteria" },
+      { "id": "fad-ac4", "description": "Auditor reports pass/fail via report_audit_result MCP tool (defined in forge-mcp-tools)" },
+      { "id": "fad-ac5", "description": "Failed audit transitions task to failed state with findings" },
+      { "id": "fad-ac6", "description": "Task can be retried after failed audit (worker re-spawned with findings)" },
+      { "id": "fad-ac7", "description": "Audit findings stored in task_attempts.audit_findings" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Auditors are separate from workers - different prompt, different role",
+        "Read-only access prevents auditor from 'fixing' issues",
+        "Auditor sees: what was produced + what was expected",
+        "Detailed findings help worker on retry",
+        "report_audit_result MCP tool defined in forge-mcp-tools"
+      ],
+      "patterns": [
+        "Worker -> Auditor -> Complete (or Retry)",
+        "Auditor uses same relay spawn as worker, different prompt",
+        "Findings stored as JSONB for UI display"
+      ],
+      "concerns": [
+        "Auditor hallucinating pass/fail - consider structured output format"
+      ],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "auditor_role": "QA:Tester or QA:Reviewer (from owner_role mapping)",
+      "read_only_enforcement": "Workspace on detached HEAD or separate read-only clone"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fad-s1",
+        "title": "Define auditor prompt template",
+        "scope": "forge-core",
+        "description": "Create prompt template for auditor agents",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Auditor prompt includes: task description, acceptance criteria, artifacts produced" },
+          { "id": "ac2", "description": "Prompt instructs auditor to verify each criterion with pass/fail" },
+          { "id": "ac3", "description": "Prompt instructs use of report_audit_result MCP tool" },
+          { "id": "ac4", "description": "Template is configurable (can be overridden per project)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/prompts/planning-agent.ts",
+          "pattern_description": "Copy prompt template pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fad-s2",
+        "title": "Implement read-only workspace for auditor",
+        "scope": "forge-core",
+        "description": "Create read-only access to workspace for auditor",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createAuditorWorkspace(workerWorkspacePath) returns read-only access" },
+          { "id": "ac2", "description": "Option 1: git checkout --detach in worker workspace" },
+          { "id": "ac3", "description": "Option 2: Separate shallow clone with no push remote" },
+          { "id": "ac4", "description": "Write separate .forge/mcp-config.json for auditor with task_id context" }
+        ],
+        "specification": {
+          "architecture": {
+            "option_1": "git checkout --detach in worker workspace",
+            "option_2": "Separate worktree with no push remote",
+            "decision": "Start with option 1 for simplicity"
+          }
+        }
+      },
+      {
+        "step_id": "fad-s3",
+        "title": "Implement spawnAuditor function",
+        "scope": "forge-core",
+        "description": "Function to spawn auditor agent for task verification",
+        "dependencies": ["fad-s1", "fad-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "spawnAuditor(taskId, artifacts, criteria) spawns auditor agent" },
+          { "id": "ac2", "description": "Agent name pattern: audit-run-{runId}-task-{taskId}" },
+          { "id": "ac3", "description": "Prompt includes artifacts and criteria from task" },
+          { "id": "ac4", "description": "Timeout shorter than worker (default 10 minutes)" },
+          { "id": "ac5", "description": "Uses AgentSpawner from forge-relay-integration" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/spawner.ts",
+          "pattern_description": "Similar to worker spawn but different prompt and role"
+        }
+      },
+      {
+        "step_id": "fad-s4",
+        "title": "Integrate auditor dispatch after worker completion",
+        "scope": "forge-core",
+        "description": "Trigger auditor spawn when worker reports completion",
+        "dependencies": ["fad-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Listen for task status change to 'auditing' (set by report_complete tool)" },
+          { "id": "ac2", "description": "If step.audit=true or global forge.audit_all=true, spawn auditor" },
+          { "id": "ac3", "description": "Load artifacts from storage for auditor context" },
+          { "id": "ac4", "description": "Emit trajectory event 'auditor_spawned'" }
+        ],
+        "specification": {
+          "architecture": {
+            "audit_trigger": "step.audit = true or global config forge.audit_all = true",
+            "integration": "Hook on task status change via event listener"
+          }
+        }
+      },
+      {
+        "step_id": "fad-s5",
+        "title": "Handle audit pass result",
+        "scope": "forge-core",
+        "description": "Process successful audit result from report_audit_result tool",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On audit pass (result='pass'): set task status to 'completed'" },
+          { "id": "ac2", "description": "Findings already stored by report_audit_result MCP tool handler" },
+          { "id": "ac3", "description": "Emit trajectory event 'task_completed'" },
+          { "id": "ac4", "description": "Call scheduler.scheduleReadyTasks(runId) to process dependent tasks" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration_point": "Listen for audit_completed trajectory event with result='pass'"
+          }
+        }
+      },
+      {
+        "step_id": "fad-s6",
+        "title": "Handle audit fail result with retry",
+        "scope": "forge-core",
+        "description": "Process failed audit result with retry logic",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On audit fail: check if current_attempt < max_attempts" },
+          { "id": "ac2", "description": "If retries remaining: set task status to 'pending', increment current_attempt" },
+          { "id": "ac3", "description": "Re-enqueue task with audit findings in context" },
+          { "id": "ac4", "description": "If no retries: set task status to 'failed' with audit findings" },
+          { "id": "ac5", "description": "Retry worker prompt includes previous audit findings for correction guidance" }
+        ],
+        "specification": {
+          "architecture": {
+            "retry_context": "Audit findings injected into worker prompt on retry",
+            "max_audit_retries": "Configurable, default 2"
+          }
+        }
+      },
+      {
+        "step_id": "fad-s7",
+        "title": "Update workspace context for retry",
+        "scope": "forge-core",
+        "description": "Update .forge/context.json with audit findings for retry",
+        "dependencies": ["fad-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On retry, update .forge/context.json with previous_attempt section" },
+          { "id": "ac2", "description": "previous_attempt includes: audit_findings, worker_output, attempt_number" },
+          { "id": "ac3", "description": "Worker prompt template shows how to use retry context" }
+        ],
+        "specification": {
+          "architecture": {
+            "context_update": "Append to existing context.json, don't overwrite"
+          }
+        }
+      }
+    ]
+  }
+}

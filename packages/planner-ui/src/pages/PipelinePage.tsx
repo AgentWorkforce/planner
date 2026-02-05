@@ -36,7 +36,7 @@ export function PipelinePage() {
   // Read view mode from localStorage on mount
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const stored = localStorage.getItem('pipeline-view-mode');
-    return (stored === 'board' || stored === 'sequence') ? stored : 'sequence';
+    return (stored === 'board' || stored === 'sequence') ? stored : 'board';
   });
 
   const { plans, waveGroups, statusGroups, isLoading, error } = usePipelinePlans(selectedInitiative);

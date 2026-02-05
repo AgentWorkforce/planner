@@ -1,0 +1,395 @@
+{
+  "feature_id": "forge-ui-run-dashboard",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "frd-s1-task",
+      "step_id": "frd-s1",
+      "title": "Create RunProgress component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/ExecutionProgress.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Progress bar with fill animation (cyan accent color)",
+            "Text: 'X/Y tasks completed (Z%)'",
+            "Sub-text: elapsed time in HH:MM:SS format",
+            "Status indicator: 'Running' / 'Paused' / 'Complete' / 'Failed'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test progress bar animation",
+            "Test time formatting"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s2-task",
+      "step_id": "frd-s2",
+      "title": "Create TaskItem component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/StepEditor.tsx (view mode)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Status icon for each state",
+            "Task title with scope badge if multi-scope plan",
+            "Duration shown for completed/running tasks",
+            "Expandable to show: description, artifacts, dependencies",
+            "Status colors match design system"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test expand/collapse",
+            "Test all status states"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection of all states"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s3-task",
+      "step_id": "frd-s3",
+      "title": "Create TaskList component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/ScopeGroup.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Renders TaskItem for each task",
+            "Groups by scope if multi-scope plan",
+            "Auto-scrolls to currently running task",
+            "Handles empty state"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test grouping",
+            "Test auto-scroll"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s4-task",
+      "step_id": "frd-s4",
+      "title": "Create RunControls component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/WorkflowActions.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Pause button (visible when running)",
+            "Resume button (visible when paused)",
+            "Cancel button (always visible, with confirmation dialog)",
+            "Loading state on buttons during API call",
+            "Disabled when run is completed/cancelled/failed"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test button visibility based on state",
+            "Test confirmation dialog"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual and functional tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s5-task",
+      "step_id": "frd-s5",
+      "title": "Create GateBanner component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/PendingGatesNotification.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Banner with warning icon and 'Gate pending approval' message",
+            "Shows task title of the gate step",
+            "Review button navigates to gate approval UI",
+            "Orange/warning color scheme",
+            "Hidden when no gates pending"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test visibility logic",
+            "Test review button navigation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s6-task",
+      "step_id": "frd-s6",
+      "title": "Create useRun hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/usePlanEvents.ts + API fetch",
+            "Review context.architect.hook_return_shape"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useRun(runId) returns { run, tasks, activeGate, agents, elapsedMs, isLoading, error, refetch }",
+            "Initial fetch via getRun API",
+            "SSE subscription for live updates",
+            "Updates local state on task_status_changed, run_status_changed events",
+            "Elapsed time counter updates every second for running runs",
+            "activeGate computed from tasks with status 'awaiting_approval'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test data fetching",
+            "Test SSE updates"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s7-task",
+      "step_id": "frd-s7",
+      "title": "Create RunHeader component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/PlanHeader.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Breadcrumb: Forge > Run [short-id]",
+            "Plan goal as title",
+            "RunProgress component",
+            "RunControls on the right side",
+            "Link to timeline view"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test header rendering",
+            "Test breadcrumb navigation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s8-task",
+      "step_id": "frd-s8",
+      "title": "Implement RunDashboardPage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/pages/PlanEditorPage.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Uses useRun hook to fetch and subscribe",
+            "Renders RunHeader at top",
+            "GateBanner shown below header if has_pending_gate",
+            "Two-column layout on desktop: TaskList (main), ActiveAgents (sidebar)",
+            "Single column on mobile",
+            "Loading state: skeleton",
+            "Error state: ErrorMessage with retry"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all states",
+            "Test responsive layout"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection on desktop and mobile"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "frd-s9-task",
+      "step_id": "frd-s9",
+      "title": "Add run control API integration",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/WorkflowActions.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Pause calls pauseRun(runId), updates local state",
+            "Resume calls resumeRun(runId), updates local state",
+            "Cancel shows confirmation dialog, calls cancelRun(runId)",
+            "Error toast on failure",
+            "Success toast on state change"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all control actions",
+            "Test error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests with backend"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step frd-s9"
+          ]
+        }
+      }
+    }
+  ]
+}

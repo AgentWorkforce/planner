@@ -1,0 +1,220 @@
+{
+  "feature_id": "forge-gate-handling",
+  "title": "Human Gate Handling",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-relay-integration", "forge-storage"],
+
+  "summary": {
+    "goal": "Pause execution at human gates, notify stakeholders, and handle approval/rejection decisions. Gates are explicit checkpoints where human oversight is required.",
+    "acceptance_criteria": [
+      { "id": "fgh-ac1", "description": "Detect gate steps in ForgePlan (step.gate.type === 'human_approval')" },
+      { "id": "fgh-ac2", "description": "Transition task to 'awaiting_approval' state when gate reached" },
+      { "id": "fgh-ac3", "description": "Set run.has_pending_gate=true to pause new task scheduling" },
+      { "id": "fgh-ac4", "description": "GET /gates/pending returns all pending gates across runs" },
+      { "id": "fgh-ac5", "description": "POST /gates/:taskId/approve with optional comment resumes execution" },
+      { "id": "fgh-ac6", "description": "POST /gates/:taskId/reject with reason fails the task and pauses run" },
+      { "id": "fgh-ac7", "description": "SSE notification when gate is reached" },
+      { "id": "fgh-ac8", "description": "Gate decision stored with approver identity and timestamp" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Gates are checkpoints, not tasks - no agent spawned",
+        "Human approval is blocking - no new tasks scheduled until resolved",
+        "Rejection may require plan revision via ChangeRequest to Planner",
+        "Gate ID is same as task_id (1:1 relationship)"
+      ],
+      "patterns": [
+        "Gate as special task state (awaiting_approval)",
+        "Notification via SSE to Forge UI",
+        "Audit trail of approvals with identity"
+      ],
+      "keywords": ["gate", "approval", "human-in-the-loop", "checkpoint"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "gate_states": ["awaiting_approval", "approved", "rejected"],
+      "notification_channel": "SSE /runs/:id/events",
+      "gate_id": "Same as task_id - gates are 1:1 with tasks that have gate config"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fgh-s1",
+        "title": "Create Gate entity and status types",
+        "scope": "forge-core",
+        "description": "Define Gate entity for tracking approval workflow state",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GateStatus: 'awaiting_approval' | 'approved' | 'rejected'" },
+          { "id": "ac2", "description": "GateSchema: { gate_id (same as task_id), task_id, status, approver_role?, decided_by?, decided_at?, comment?, created_at }" },
+          { "id": "ac3", "description": "createGate(taskId, approverRole) factory function" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/gate.ts",
+          "pattern_description": "Create with Zod schema following existing domain patterns",
+          "notes": "gate_id = task_id for simplicity, they are 1:1"
+        }
+      },
+      {
+        "step_id": "fgh-s2",
+        "title": "Verify gates table in storage",
+        "scope": "forge-core",
+        "description": "Gates table schema defined in forge-storage, verify storage methods work",
+        "dependencies": ["fgh-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Verify ForgeStorage.createGate() works with gate schema" },
+          { "id": "ac2", "description": "Verify ForgeStorage.getGate(taskId) retrieves gate" },
+          { "id": "ac3", "description": "Verify ForgeStorage.updateGate() updates status, decided_by, decided_at" },
+          { "id": "ac4", "description": "Verify ForgeStorage.listPendingGates() returns awaiting_approval gates" }
+        ],
+        "specification": {
+          "notes": "Table schema defined in forge-storage fs-s2, methods in fs-s1"
+        }
+      },
+      {
+        "step_id": "fgh-s3",
+        "title": "Implement gate detection in task processing",
+        "scope": "forge-core",
+        "description": "Detect gate steps and create gate instead of spawning agent",
+        "dependencies": ["fgh-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When processing task from queue, check if forgeStep.gate exists" },
+          { "id": "ac2", "description": "If gate: create Gate entity, set task status to 'awaiting_approval'" },
+          { "id": "ac3", "description": "If no gate: proceed with normal agent spawn" },
+          { "id": "ac4", "description": "Emit trajectory event 'gate_reached'" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration_point": "forge-task-queue ftq-s7 ForgemasterService onTaskReady callback"
+          }
+        }
+      },
+      {
+        "step_id": "fgh-s4",
+        "title": "Implement scheduling pause on gate",
+        "scope": "forge-core",
+        "description": "Pause task scheduling while gate is pending",
+        "dependencies": ["fgh-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When gate reached, set run.has_pending_gate = true via storage.updateRun()" },
+          { "id": "ac2", "description": "TaskScheduler.scheduleReadyTasks checks has_pending_gate flag" },
+          { "id": "ac3", "description": "If has_pending_gate=true, skip enqueueing new tasks" },
+          { "id": "ac4", "description": "In-flight tasks continue execution" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Flag-based scheduling pause, not full run pause",
+            "integration": "Uses Run.has_pending_gate field defined in forge-domain"
+          }
+        }
+      },
+      {
+        "step_id": "fgh-s5",
+        "title": "Create gate approval handler",
+        "scope": "forge-core",
+        "description": "Handle gate approval via API",
+        "dependencies": ["fgh-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /gates/:taskId/approve updates gate status to 'approved'" },
+          { "id": "ac2", "description": "Records decided_by, decided_at, optional comment" },
+          { "id": "ac3", "description": "Updates task status to 'completed'" },
+          { "id": "ac4", "description": "Clears run.has_pending_gate=false, resumes scheduling" },
+          { "id": "ac5", "description": "Calls scheduler.scheduleReadyTasks(runId) to resume" },
+          { "id": "ac6", "description": "Emits trajectory event 'gate_approved'" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/workflow.ts",
+          "pattern_description": "Copy approval handler pattern"
+        }
+      },
+      {
+        "step_id": "fgh-s6",
+        "title": "Create gate rejection handler",
+        "scope": "forge-core",
+        "description": "Handle gate rejection via API",
+        "dependencies": ["fgh-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /gates/:taskId/reject updates gate status to 'rejected'" },
+          { "id": "ac2", "description": "Records decided_by, decided_at, required reason" },
+          { "id": "ac3", "description": "Updates task status to 'failed' with rejection reason" },
+          { "id": "ac4", "description": "Run stays paused (has_pending_gate becomes moot since task failed)" },
+          { "id": "ac5", "description": "Emits trajectory event 'gate_rejected'" }
+        ],
+        "specification": {
+          "architecture": {
+            "post_rejection": "User can cancel run or request plan revision via ChangeRequest"
+          }
+        }
+      },
+      {
+        "step_id": "fgh-s7",
+        "title": "Create pending gates query endpoint",
+        "scope": "forge-core",
+        "description": "API to list all pending gates across runs",
+        "dependencies": ["fgh-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /gates/pending returns [{ gate_id, task_id, run_id, task_title, approver_role, created_at }]" },
+          { "id": "ac2", "description": "Sorted by created_at (oldest first)" },
+          { "id": "ac3", "description": "Optional filter by run_id (?run_id=xxx)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/api/handlers/questions.ts",
+          "pattern_description": "Similar to question queue list pattern"
+        }
+      },
+      {
+        "step_id": "fgh-s8",
+        "title": "Emit SSE notification on gate reached",
+        "scope": "forge-core",
+        "description": "Notify UI when gate is reached",
+        "dependencies": ["fgh-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SSE event 'gate_reached' emitted on /runs/:id/events" },
+          { "id": "ac2", "description": "Event payload: { gate_id, task_id, task_title, approver_role }" },
+          { "id": "ac3", "description": "Also emit on approval/rejection: 'gate_approved', 'gate_rejected'" }
+        ],
+        "specification": {
+          "pattern_reference": "src/events/question-events.ts",
+          "pattern_description": "Copy event emission pattern"
+        }
+      },
+      {
+        "step_id": "fgh-s9",
+        "title": "Mount gate routes on API router",
+        "scope": "forge-core",
+        "description": "Add gate routes to the Forge API router",
+        "dependencies": ["fgh-s5", "fgh-s6", "fgh-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Gate routes mounted under /gates on Forge router" },
+          { "id": "ac2", "description": "POST /gates/:taskId/approve" },
+          { "id": "ac3", "description": "POST /gates/:taskId/reject" },
+          { "id": "ac4", "description": "GET /gates/pending" }
+        ],
+        "specification": {
+          "integration": "Add to forge-api fa-s7 createForgeRouter"
+        }
+      }
+    ]
+  }
+}

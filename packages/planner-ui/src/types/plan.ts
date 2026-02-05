@@ -25,6 +25,67 @@ export interface Gate {
   approver_role?: string;
 }
 
+// ============================================
+// Understanding Types (agent observations during ideation)
+// ============================================
+
+/**
+ * Confidence level for agent observations during ideation.
+ */
+export type Confidence = 'exploring' | 'forming' | 'confident';
+
+/**
+ * AgentObservations captures what a specialist agent noticed during ideation.
+ */
+export interface AgentObservations {
+  observations?: string[];
+  keywords?: string[];
+  questions?: string[];
+  concerns?: string[];
+  references?: string[];
+  confidence?: Confidence;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+/**
+ * Understanding is a record of agent observations keyed by role.
+ * Common roles: architect, designer, tester, security
+ */
+export type Understanding = Record<string, AgentObservations>;
+
+// ============================================
+// Context Types (formalized decisions by role)
+// ============================================
+
+/**
+ * RoleContext stores any fields for a given role.
+ * The structure is completely freeform - any key-value pairs allowed.
+ */
+export type RoleContext = Record<string, unknown>;
+
+/**
+ * Context is a record keyed by role name.
+ * Any role key is allowed (designer, architect, custom_role, etc.)
+ */
+export type Context = Record<string, RoleContext>;
+
+// ============================================
+// Specification Types (freeform - any domain, any fields)
+// ============================================
+
+/**
+ * DomainSpec stores any fields for a given domain.
+ * The structure is completely freeform - any key-value pairs allowed.
+ */
+export type DomainSpec = Record<string, unknown>;
+
+/**
+ * Specification is a record keyed by domain name.
+ * Any domain key is allowed (architecture, model, design, custom_domain, etc.)
+ */
+export type Specification = Record<string, DomainSpec>;
+
 export interface Step {
   step_id: string;
   title: string;
@@ -35,6 +96,7 @@ export interface Step {
   acceptance_criteria?: AcceptanceCriterion[];
   gate?: Gate;
   sub_plan_id?: string;
+  specification?: Specification;
 }
 
 export interface Summary {
@@ -58,6 +120,8 @@ export interface PlanVersion {
   version: number;
   status: PlanStatus;
   summary: Summary;
+  understanding?: Understanding;
+  context?: Context;
   steps: Step[];
   submitted_at?: string;
   approval_info?: ApprovalInfo;
@@ -81,6 +145,7 @@ export interface InitiativeBadgeData {
 export interface PlanSummary {
   plan_id: string;
   goal: string;
+  context?: string;
   status: PlanStatus;
   latest_version: number;
   scopes?: string[];
@@ -95,6 +160,15 @@ export interface PlanSummary {
   org_id?: string;
   /** Owner user ID for "My Plans" filtering */
   owner_user_id?: string;
+  // Navigation fields for PlanCard enhancements
+  /** Total number of steps in the plan */
+  step_count?: number;
+  /** Number of steps marked as completed */
+  completed_step_count?: number;
+  /** Number of pending questions awaiting user answer */
+  pending_questions?: number;
+  /** Whether an agent is currently working on this plan */
+  agent_active?: boolean;
 }
 
 // Navigation state for sub-plan breadcrumbs

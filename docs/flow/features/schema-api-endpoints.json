@@ -1,0 +1,135 @@
+{
+  "feature_id": "schema-api-endpoints",
+  "title": "API Endpoints for Understanding & Specification",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["schema-db-migration"],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Add REST API endpoints for reading and updating understanding and step specifications",
+    "context": "Agents and UI need to incrementally update specific parts of understanding (per role) and specification (per step, per domain) without replacing the whole object.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "GET /plans/:id returns understanding in version response" },
+      { "id": "ac2", "description": "GET /plans/:id returns specification in each step" },
+      { "id": "ac3", "description": "PATCH /plans/:id/understanding/:role merges AgentObservations for that role" },
+      { "id": "ac4", "description": "PATCH /plans/:id/steps/:stepId/specification/:domain merges DomainSpec for that domain" },
+      { "id": "ac5", "description": "PATCH endpoints validate against Zod schemas, return 400 on invalid data" },
+      { "id": "ac6", "description": "PATCH endpoints return the updated section, not full plan" },
+      { "id": "ac7", "description": "Only draft status plans can have understanding/specification updated" },
+      { "id": "ac8", "description": "SSE events emitted on understanding/specification changes" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "a001",
+        "title": "Update GET /plans/:id response",
+        "scope": "planner-core",
+        "description": "Ensure existing GET endpoint returns understanding and step specifications",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Response includes version.understanding (object or empty {})" },
+          { "id": "ac2", "description": "Response includes version.steps[].specification for each step" },
+          { "id": "ac3", "description": "Backward compatible: existing clients that ignore new fields continue to work" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "a002",
+        "title": "Add PATCH /plans/:id/understanding/:role endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to update agent observations for a specific role",
+        "dependencies": ["a001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Route: PATCH /api/plans/:id/understanding/:role" },
+          { "id": "ac2", "description": "Request body: Partial<AgentObservations> (any subset of fields)" },
+          { "id": "ac3", "description": "Merges with existing observations for that role (deep merge arrays)" },
+          { "id": "ac4", "description": "Sets updated_at to current timestamp" },
+          { "id": "ac5", "description": "Validates against AgentObservationsSchema, returns 400 on invalid" },
+          { "id": "ac6", "description": "Returns 400 if plan status is not 'draft'" },
+          { "id": "ac7", "description": "Response: { role: string, observations: AgentObservations }" }
+        ]
+      },
+      {
+        "step_id": "a003",
+        "title": "Add PATCH /plans/:id/steps/:stepId/specification/:domain endpoint",
+        "scope": "planner-core",
+        "description": "Create endpoint to update specification for a specific step and domain",
+        "dependencies": ["a001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Route: PATCH /api/plans/:id/steps/:stepId/specification/:domain" },
+          { "id": "ac2", "description": "Domain param must be one of: architecture, design, testing, security" },
+          { "id": "ac3", "description": "Request body: Partial<DomainSpec> for that domain" },
+          { "id": "ac4", "description": "Merges with existing spec for that domain (deep merge arrays)" },
+          { "id": "ac5", "description": "Validates against appropriate DomainSpecSchema, returns 400 on invalid" },
+          { "id": "ac6", "description": "Returns 400 if plan status is not 'draft'" },
+          { "id": "ac7", "description": "Returns 404 if step_id not found" },
+          { "id": "ac8", "description": "Response: { step_id: string, domain: string, specification: DomainSpec }" }
+        ]
+      },
+      {
+        "step_id": "a004",
+        "title": "Add Zod request schemas",
+        "scope": "planner-core",
+        "description": "Create Zod schemas for validating PATCH request bodies",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "UpdateUnderstandingRequestSchema = AgentObservationsSchema.partial()" },
+          { "id": "ac2", "description": "UpdateArchitectureSpecRequestSchema = ArchitectureSpecSchema.partial()" },
+          { "id": "ac3", "description": "UpdateDesignSpecRequestSchema = DesignSpecSchema.partial()" },
+          { "id": "ac4", "description": "UpdateTestingSpecRequestSchema = TestingSpecSchema.partial()" },
+          { "id": "ac5", "description": "UpdateSecuritySpecRequestSchema = SecuritySpecSchema.partial()" }
+        ]
+      },
+      {
+        "step_id": "a005",
+        "title": "Register routes",
+        "scope": "planner-core",
+        "description": "Register new routes in src/api/routes.ts",
+        "dependencies": ["a002", "a003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PATCH /api/plans/:id/understanding/:role registered" },
+          { "id": "ac2", "description": "PATCH /api/plans/:id/steps/:stepId/specification/:domain registered" }
+        ]
+      },
+      {
+        "step_id": "a006",
+        "title": "Emit SSE events on changes",
+        "scope": "planner-core",
+        "description": "Emit plan_updated SSE event when understanding or specification changes",
+        "dependencies": ["a002", "a003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PATCH understanding emits SSE event with type: 'understanding_updated'" },
+          { "id": "ac2", "description": "PATCH specification emits SSE event with type: 'specification_updated'" },
+          { "id": "ac3", "description": "Event includes plan_id, role/step_id/domain as applicable" }
+        ]
+      },
+      {
+        "step_id": "a007",
+        "title": "Add API endpoint tests",
+        "scope": "planner-core",
+        "description": "Add integration tests for new endpoints",
+        "dependencies": ["a005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: PATCH understanding adds observations for new role" },
+          { "id": "ac2", "description": "Test: PATCH understanding merges with existing role observations" },
+          { "id": "ac3", "description": "Test: PATCH understanding returns 400 for invalid data" },
+          { "id": "ac4", "description": "Test: PATCH understanding returns 400 for non-draft plan" },
+          { "id": "ac5", "description": "Test: PATCH specification adds spec to step" },
+          { "id": "ac6", "description": "Test: PATCH specification merges with existing spec" },
+          { "id": "ac7", "description": "Test: PATCH specification returns 404 for unknown step_id" },
+          { "id": "ac8", "description": "Test: GET plan returns understanding and step specifications" }
+        ]
+      }
+    ]
+  }
+}

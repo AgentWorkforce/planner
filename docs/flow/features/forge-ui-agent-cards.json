@@ -1,0 +1,180 @@
+{
+  "feature_id": "forge-ui-agent-cards",
+  "title": "Active Agent Cards",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-run-dashboard"],
+
+  "summary": {
+    "goal": "Visual cards showing active agents and their current status. Provides insight into what agents are doing without overwhelming detail.",
+    "acceptance_criteria": [
+      { "id": "fac-ac1", "description": "Card per active agent with role icon (based on owner_role)" },
+      { "id": "fac-ac2", "description": "Agent name displayed (run-X-task-Y pattern)" },
+      { "id": "fac-ac3", "description": "Current task title shown on card" },
+      { "id": "fac-ac4", "description": "Latest status message from agent (from report_progress)" },
+      { "id": "fac-ac5", "description": "View Details link expands to show more context" },
+      { "id": "fac-ac6", "description": "Real-time updates as agent reports via SSE" },
+      { "id": "fac-ac7", "description": "Working indicator animation when agent is active" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Matches agent avatar pattern from planner-ui",
+        "Status comes from SSE events",
+        "Details view could show recent messages"
+      ],
+      "patterns": [
+        "Card grid layout",
+        "Status dots with color coding"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "fac-s1",
+        "title": "Create agents API module",
+        "scope": "forge-ui",
+        "description": "API functions for fetching active agents",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getActiveAgents(runId?: string) returns { agents: Agent[] }" },
+          { "id": "ac2", "description": "Agent type: { agent_id, run_id, task_id, task_title, owner_role, status, last_message?, last_heartbeat }" },
+          { "id": "ac3", "description": "Status enum: 'working', 'blocked', 'idle', 'error'" }
+        ],
+        "specification": {
+          "api_endpoint": "GET /agents?run_id=X",
+          "notes": "Merges relay presence with DB state per forge-api fa-s6"
+        }
+      },
+      {
+        "step_id": "fac-s2",
+        "title": "Create AgentRoleIcon component",
+        "scope": "forge-ui",
+        "description": "Icon representing agent role",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Maps owner_role to icon: 'backend:Coder' -> CodeIcon, 'frontend:Coder' -> LayoutIcon, 'tester' -> TestTubeIcon, 'reviewer' -> EyeIcon, 'auditor' -> ShieldIcon" },
+          { "id": "ac2", "description": "Default icon for unknown roles" },
+          { "id": "ac3", "description": "Size variants: sm, md, lg" },
+          { "id": "ac4", "description": "Color based on status (working=cyan, blocked=orange, error=red)" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/AgentAvatar.tsx",
+          "pattern_description": "Similar avatar/icon pattern with status colors"
+        }
+      },
+      {
+        "step_id": "fac-s3",
+        "title": "Create AgentCard component",
+        "scope": "forge-ui",
+        "description": "Card showing single agent status",
+        "dependencies": ["fac-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AgentRoleIcon with working pulse animation" },
+          { "id": "ac2", "description": "Agent ID displayed (shortened if long)" },
+          { "id": "ac3", "description": "Current task title" },
+          { "id": "ac4", "description": "Latest status message (truncated to 2 lines)" },
+          { "id": "ac5", "description": "'View Details' button at bottom" },
+          { "id": "ac6", "description": "Status dot: green (working), orange (blocked), gray (idle), red (error)" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/AgentActivityPopover.tsx",
+          "pattern_description": "Similar agent info display pattern",
+          "design": {
+            "card": "bg-bg-card border border-border-subtle rounded-xl p-4 min-w-[200px]",
+            "status_dot": "absolute top-3 right-3 w-2 h-2 rounded-full",
+            "working_animation": "animate-pulse"
+          }
+        }
+      },
+      {
+        "step_id": "fac-s4",
+        "title": "Create AgentDetailPanel component",
+        "scope": "forge-ui",
+        "description": "Expanded view of agent with more context",
+        "dependencies": ["fac-s3"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Slide-over panel from right side" },
+          { "id": "ac2", "description": "Full task context: title, description, acceptance criteria" },
+          { "id": "ac3", "description": "Recent messages from agent (last 10)" },
+          { "id": "ac4", "description": "Artifacts produced by this agent" },
+          { "id": "ac5", "description": "Time elapsed on current task" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/MessagingSidebar.tsx",
+          "pattern_description": "Similar slide-over panel pattern",
+          "design": {
+            "panel": "fixed right-0 top-0 h-full w-[400px] bg-bg-secondary border-l border-border-subtle z-40"
+          }
+        }
+      },
+      {
+        "step_id": "fac-s5",
+        "title": "Create useActiveAgents hook",
+        "scope": "forge-ui",
+        "description": "Data fetching and SSE for agent updates",
+        "dependencies": ["fac-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useActiveAgents(runId) returns { agents, isLoading, error }" },
+          { "id": "ac2", "description": "Initial fetch via getActiveAgents API" },
+          { "id": "ac3", "description": "SSE subscription for agent_progress events" },
+          { "id": "ac4", "description": "Updates agent.last_message on progress events" },
+          { "id": "ac5", "description": "Removes agent from list on agent_exited event" }
+        ],
+        "specification": {
+          "architecture": {
+            "events": ["agent_progress", "agent_spawned", "agent_exited"]
+          }
+        }
+      },
+      {
+        "step_id": "fac-s6",
+        "title": "Create ActiveAgentsSection component",
+        "scope": "forge-ui",
+        "description": "Section container for agent cards",
+        "dependencies": ["fac-s3", "fac-s4", "fac-s5"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header: 'Active Agents (N)' with count" },
+          { "id": "ac2", "description": "Grid of AgentCards (2 columns)" },
+          { "id": "ac3", "description": "Opens AgentDetailPanel on 'View Details' click" },
+          { "id": "ac4", "description": "Empty state: 'No agents currently working'" },
+          { "id": "ac5", "description": "Loading state: skeleton cards" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/WorkingOnSection.tsx",
+          "pattern_description": "Similar section with header and content"
+        }
+      },
+      {
+        "step_id": "fac-s7",
+        "title": "Integrate into RunDashboardPage",
+        "scope": "forge-ui",
+        "description": "Add ActiveAgentsSection to dashboard sidebar",
+        "dependencies": ["fac-s6"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ActiveAgentsSection in right sidebar of RunDashboardPage" },
+          { "id": "ac2", "description": "Receives runId from page context" },
+          { "id": "ac3", "description": "Panel opens over dashboard content (not inside sidebar)" }
+        ],
+        "specification": {
+          "integration": "Modify frd-s8 RunDashboardPage to include ActiveAgentsSection"
+        }
+      }
+    ]
+  }
+}

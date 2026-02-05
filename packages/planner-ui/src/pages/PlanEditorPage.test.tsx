@@ -21,16 +21,25 @@ vi.mock('@/api', () => ({
 
 // Mock hooks
 vi.mock('@/hooks', () => ({
-  useAIChat: vi.fn().mockReturnValue({
-    messages: [],
-    isLoading: false,
-    sendMessage: vi.fn(),
-    applySuggestion: vi.fn(),
-    dismissSuggestion: vi.fn(),
-    open: vi.fn(),
-    close: vi.fn(),
+  usePlanEvents: vi.fn().mockReturnValue({
+    subscribe: vi.fn(() => vi.fn()),
+    isConnected: true,
   }),
-  useAIConnectionStatus: vi.fn().mockReturnValue({ status: 'demo' }),
+}));
+
+// Mock useUserTrajectory hook
+vi.mock('@/hooks/useUserTrajectory', () => ({
+  useUserTrajectory: vi.fn().mockReturnValue({
+    decisions: [],
+    preferences: [],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
+// Mock MessagingSidebar to avoid RelayProvider dependency
+vi.mock('@/components/MessagingSidebar', () => ({
+  MessagingSidebar: () => null,
 }));
 
 import {
@@ -95,8 +104,8 @@ describe('PlanEditorPage - Workflow Integration', () => {
         expect(screen.getByText('Test goal')).toBeInTheDocument();
       });
 
-      // WorkflowActions should render - check for status display
-      expect(screen.getByText('Status:')).toBeInTheDocument();
+      // WorkflowActions should render - check for status badge (displays status in uppercase)
+      expect(screen.getByText(/draft/i)).toBeInTheDocument();
     });
   });
 
@@ -141,7 +150,9 @@ describe('PlanEditorPage - Workflow Integration', () => {
       renderWithRouter();
 
       await waitFor(() => {
-        expect(screen.getByText(/published.*ready for orchestrator/i)).toBeInTheDocument();
+        // WorkflowActions shows "published" status badge and "Ready for Orchestrator" text separately
+        expect(screen.getByText(/published/i)).toBeInTheDocument();
+        expect(screen.getByText(/ready for orchestrator/i)).toBeInTheDocument();
       });
     });
   });
@@ -320,7 +331,8 @@ describe('PlanEditorPage - Workflow Integration', () => {
 
       // After publish, the Published badge should appear
       await waitFor(() => {
-        expect(screen.getByText(/published.*ready for orchestrator/i)).toBeInTheDocument();
+        expect(screen.getByText(/published/i)).toBeInTheDocument();
+        expect(screen.getByText(/ready for orchestrator/i)).toBeInTheDocument();
       });
     });
   });

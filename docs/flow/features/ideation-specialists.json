@@ -1,0 +1,118 @@
+{
+  "feature_id": "ideation-specialists",
+  "title": "Dynamic Specialist Agents",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "dependencies": ["ideation-lead"],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Implement dynamic specialists that are spawned on-demand by the Interviewer. Specialists contribute freeform observations - intelligence lives in their prompts, not schema constraints. User never sees specialists - they're invisible infrastructure.",
+    "in_scope": [
+      "Prompt templates for common specialist types (Architect, DataModeller, Designer, QA, Security)",
+      "Freeform observation contribution via MCP tools",
+      "Relay integration for channel observation",
+      "Specialist-to-specialist awareness (can see each other's observations)",
+      "On-demand spawning by Interviewer"
+    ],
+    "out_of_scope": [
+      "Fixed specialist roles (Interviewer decides what to spawn)",
+      "User-visible specialists (always invisible to user)",
+      "Planning phase behavior (handled by planner-core)",
+      "Review phase behavior (handled by orchestrator)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Prompt templates for common specialist types (suggestions, not requirements)" },
+      { "id": "ac2", "description": "Specialists are spawned LAZILY by Interviewer when expertise is needed" },
+      { "id": "ac3", "description": "Specialists join session channel via Relay and observe conversation" },
+      { "id": "ac4", "description": "Specialists use update_observations MCP tool with freeform Record<string, unknown>" },
+      { "id": "ac5", "description": "Observations structure is defined by specialist prompt, not enforced by schema" },
+      { "id": "ac6", "description": "Specialists can read other specialists' observations via read_understanding tool" },
+      { "id": "ac7", "description": "Specialists queue insights for Interviewer (never speak to user directly)" },
+      { "id": "ac8", "description": "Interviewer spawns specialists with custom focus/prompt based on conversation needs" },
+      { "id": "ac9", "description": "Specialists are released when session is abandoned" }
+    ],
+    "decisions": [
+      { "decision": "Lazy spawning", "rationale": "Interviewer spawns specialists on-demand based on conversation needs. More efficient, allows dynamic specialist types." },
+      { "decision": "Freeform observations", "rationale": "Intelligence lives in agent prompts, not Zod schemas. Any structure that makes sense for the specialist's domain." },
+      { "decision": "Invisible to user", "rationale": "User sees only Interviewer. Specialists contribute insights that Interviewer weaves into conversation." },
+      { "decision": "Prompt templates, not fixed roles", "rationale": "Common templates (Architect, Designer, etc.) as suggestions. Interviewer can spawn custom specialists as needed." }
+    ],
+    "notes": "Specialists are 'wise observers' not 'task workers'. They watch, notice patterns, raise concerns, and contribute understanding. They never appear in the user conversation - Interviewer facilitates and presents insights as its own."
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core"],
+    "steps": [
+      {
+        "step_id": "spc001",
+        "title": "Create specialist prompt templates",
+        "scope": "ideation-core",
+        "description": "Create prompt templates for common specialist types (suggestions, not requirements)",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SPECIALIST_TEMPLATES: Map<string, { displayName, focus, basePrompt }>" },
+          { "id": "ac2", "description": "Templates for: Architect (system design), DataModeller (schemas), Designer (UX), QA (testing), Security" },
+          { "id": "ac3", "description": "Templates are suggestions - Interviewer can spawn custom specialists with inline prompts" },
+          { "id": "ac4", "description": "getSpecialistPrompt(name, focus, customContext?) builds complete prompt" }
+        ]
+      },
+      {
+        "step_id": "spc002",
+        "title": "Define specialist MCP tools",
+        "scope": "ideation-core",
+        "description": "Create MCP tool definitions for specialist capabilities (freeform observations)",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "update_observations: { session_id, observations: Record<string, unknown> } -> freeform observations" },
+          { "id": "ac2", "description": "read_understanding: { session_id } -> returns all specialists' observations" },
+          { "id": "ac3", "description": "queue_insight: { session_id, type: 'question'|'observation'|'concern', content, priority } -> queues for Interviewer" },
+          { "id": "ac4", "description": "Observations structure is NOT validated - intelligence lives in prompts" }
+        ]
+      },
+      {
+        "step_id": "spc003",
+        "title": "Implement specialist tool execution",
+        "scope": "ideation-core",
+        "description": "Create MCP tool handlers for specialist tools",
+        "dependencies": ["spc002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "executeSpecialistTool(specialistName, toolName, input, storage) dispatches to handler" },
+          { "id": "ac2", "description": "update_observations calls storage.updateUnderstanding(sessionId, specialistName, observations)" },
+          { "id": "ac3", "description": "read_understanding calls storage.getSession() and returns full understanding" },
+          { "id": "ac4", "description": "queue_insight calls queueSpecialistInput() from Interviewer module" }
+        ]
+      },
+      {
+        "step_id": "spc004",
+        "title": "Implement specialist release",
+        "scope": "ideation-core",
+        "description": "Release specialists when session is abandoned",
+        "dependencies": ["spc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "releaseSpecialists(sessionId) releases all spawned specialists for session" },
+          { "id": "ac2", "description": "Reads session.active_specialists[] to find agent IDs" },
+          { "id": "ac3", "description": "Uses Relay release() for each agent" },
+          { "id": "ac4", "description": "Called when session status changes to 'abandoned'" }
+        ]
+      },
+      {
+        "step_id": "spc005",
+        "title": "Write specialist tests",
+        "scope": "ideation-core",
+        "description": "Unit tests for specialist tools and lifecycle",
+        "dependencies": ["spc003", "spc004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test prompt template generation" },
+          { "id": "ac2", "description": "Test tool execution with freeform observations (mock storage)" },
+          { "id": "ac3", "description": "Test release lifecycle" },
+          { "id": "ac4", "description": "Test custom specialist spawning (non-template)" }
+        ]
+      }
+    ]
+  }
+}

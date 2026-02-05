@@ -5,6 +5,8 @@
  * with agent-relay for real-time agent communication.
  */
 
+import type { QuestionBlockingLevel } from './plan';
+
 /** Entity types in relay system */
 export type RelayEntityType = 'user' | 'agent';
 
@@ -12,7 +14,7 @@ export type RelayEntityType = 'user' | 'agent';
 export type RelayConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 /** Channel types */
-export type ChannelType = 'global' | 'plan';
+export type ChannelType = 'global' | 'plan' | 'dm';
 
 /** Channel info from REST API */
 export interface Channel {
@@ -21,6 +23,8 @@ export interface Channel {
   type: ChannelType;
   planId?: string;
   description?: string;
+  agentId?: string;    // For DM channels: the agent's ID
+  agentName?: string;  // For DM channels: the agent's display name
 }
 
 /** Entity present in a channel */
@@ -37,9 +41,14 @@ export interface RelayMessage {
   from: string;
   fromName: string;
   entityType: RelayEntityType;
-  channel?: string;
-  body: string;
+  channelId?: string;
+  content: string;
   timestamp: string;
+  /** Optional threading support */
+  threadId?: string;
+  /** Read state for current user */
+  isRead?: boolean;
+  /** Arbitrary metadata (QA payloads, etc.) */
   data?: Record<string, unknown>;
 }
 
@@ -85,9 +94,9 @@ export interface UseRelayConnectionResult {
   /** Leave a channel */
   leaveChannel: (channelId: string) => void;
   /** Send message to a channel */
-  sendChannelMessage: (channelId: string, body: string, data?: Record<string, unknown>) => void;
+  sendChannelMessage: (channelId: string, content: string, data?: Record<string, unknown>) => void;
   /** Send direct message to an entity */
-  sendDirectMessage: (to: string, body: string, data?: Record<string, unknown>) => void;
+  sendDirectMessage: (to: string, content: string, data?: Record<string, unknown>) => void;
   /** Subscribe to incoming messages */
   onMessage: (handler: (message: RelayMessage) => void) => () => void;
   /** Subscribe to channel messages */
@@ -131,7 +140,7 @@ export interface UseChannelMessagesResult {
   /** Error message */
   error: string | null;
   /** Send a message */
-  send: (body: string, data?: Record<string, unknown>) => void;
+  send: (content: string, data?: Record<string, unknown>) => void;
   /** Clear messages */
   clear: () => void;
 }
@@ -146,4 +155,26 @@ export interface UsePresenceResult {
   error: string | null;
   /** Refresh presence list */
   refresh: () => void;
+}
+
+/** QA message payload (answered question notification) */
+export interface QAMessagePayload {
+  type: 'qa';
+  questionId: string;
+  questionText: string;
+  answerText: string;
+  agentName: string;
+  agentRole: string;
+  blockingLevel: QuestionBlockingLevel;
+  answeredAt: string;
+}
+
+/** Type guard for QA message payload */
+export function isQAMessage(data: unknown): data is QAMessagePayload {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'type' in data &&
+    (data as QAMessagePayload).type === 'qa'
+  );
 }

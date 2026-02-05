@@ -20,6 +20,10 @@ vi.mock('@/hooks/useInitiative', () => ({
   useInitiative: vi.fn(),
 }));
 
+vi.mock('@/hooks/useInitiatives', () => ({
+  invalidateInitiatives: vi.fn(),
+}));
+
 // Mock API functions
 vi.mock('@/api/initiatives', () => ({
   updateInitiative: vi.fn(),
@@ -598,7 +602,7 @@ describe('InitiativeDetailPage', () => {
 
       expect(screen.getByText('No plans in this initiative yet')).toBeInTheDocument();
       expect(
-        screen.getByText('Create a new plan and associate it with this initiative to get started.')
+        screen.getByText('Create a new plan or add existing plans to this initiative.')
       ).toBeInTheDocument();
     });
 
