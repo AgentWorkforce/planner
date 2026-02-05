@@ -38,7 +38,7 @@ export function parseConfidenceValue(value: unknown): number {
     };
 
     if (trimmed in verbalLevels) {
-      return verbalLevels[trimmed];
+      return verbalLevels[trimmed] ?? 0;
     }
 
     // Try direct number parse

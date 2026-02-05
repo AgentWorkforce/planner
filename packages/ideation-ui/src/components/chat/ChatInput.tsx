@@ -48,7 +48,6 @@ export function ChatInput({
       <div
         className={cn(
           'relative rounded-xl bg-bg-secondary border border-border-subtle shadow-md',
-          'focus-within:ring-2 focus-within:ring-accent-cyan focus-within:border-accent-cyan/40',
           'transition-all',
           disabled && 'opacity-50 cursor-not-allowed'
         )}

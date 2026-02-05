@@ -56,7 +56,7 @@ export function IdeationGridLayout({
     : {
         gridTemplateAreas:
           '"left nav right" "left center right" "status status status"',
-        gridTemplateColumns: 'minmax(200px, 1fr) minmax(400px, 2fr) minmax(200px, 1fr)',
+        gridTemplateColumns: 'minmax(300px, 1.5fr) minmax(320px, 1.5fr) minmax(200px, 1fr)',
         gridTemplateRows: 'auto 1fr auto',
       };
 

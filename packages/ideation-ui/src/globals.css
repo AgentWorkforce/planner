@@ -96,9 +96,9 @@
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #0099cc;
 
-  /* Canvas Theme - Light (sandy/warm) */
-  --canvas-bg: #f5f0e8;
-  --canvas-bg-subtle: #ebe6de;
+  /* Canvas Theme - Light (cool grey sand - matches mockup) */
+  --canvas-bg: #f2f1ed;
+  --canvas-bg-subtle: #e6e3dd;
   --canvas-text-primary: #2d2d2d;
   --canvas-text-muted: #7a7a7a;
   --block-draft: #fbf8f2;
@@ -107,6 +107,16 @@
   --block-curated-border: #4a7c59;
   --canvas-accent: #4a7c59;
   --canvas-accent-light: #e8f0eb;
+
+  /* Session progress colors (light mode - subtle on warm cream) */
+  --session-new-bg: rgba(100, 116, 139, 0.12);
+  --session-new-border: rgba(100, 116, 139, 0.28);
+  --session-developing-bg: rgba(180, 100, 20, 0.1);
+  --session-developing-border: rgba(180, 100, 20, 0.25);
+  --session-maturing-bg: rgba(20, 140, 130, 0.1);
+  --session-maturing-border: rgba(20, 140, 130, 0.25);
+  --session-ready-bg: rgba(34, 140, 70, 0.1);
+  --session-ready-border: rgba(34, 140, 70, 0.25);
 }
 
 /**
@@ -199,6 +209,16 @@
     --block-curated-border: #4a7c59;
     --canvas-accent: #5a9c6a;
     --canvas-accent-light: #1e2a1e;
+
+    /* Session progress colors (dark mode - vibrant on dark) */
+    --session-new-bg: rgba(100, 116, 139, 0.3);
+    --session-new-border: rgba(100, 116, 139, 0.5);
+    --session-developing-bg: rgba(217, 119, 6, 0.25);
+    --session-developing-border: rgba(217, 119, 6, 0.45);
+    --session-maturing-bg: rgba(20, 184, 166, 0.25);
+    --session-maturing-border: rgba(20, 184, 166, 0.45);
+    --session-ready-bg: rgba(34, 197, 94, 0.25);
+    --session-ready-border: rgba(34, 197, 94, 0.45);
   }
 }
 
@@ -269,9 +289,9 @@ html.theme-light {
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #0099cc;
 
-  /* Canvas Theme - Light (sandy/warm) */
-  --canvas-bg: #f5f0e8;
-  --canvas-bg-subtle: #ebe6de;
+  /* Canvas Theme - Light (cool grey sand - matches mockup) */
+  --canvas-bg: #f2f1ed;
+  --canvas-bg-subtle: #e6e3dd;
   --canvas-text-primary: #2d2d2d;
   --canvas-text-muted: #7a7a7a;
   --block-draft: #fbf8f2;
@@ -280,6 +300,16 @@ html.theme-light {
   --block-curated-border: #4a7c59;
   --canvas-accent: #4a7c59;
   --canvas-accent-light: #e8f0eb;
+
+  /* Session progress colors (light mode - subtle on warm cream) */
+  --session-new-bg: rgba(100, 116, 139, 0.12);
+  --session-new-border: rgba(100, 116, 139, 0.28);
+  --session-developing-bg: rgba(180, 100, 20, 0.1);
+  --session-developing-border: rgba(180, 100, 20, 0.25);
+  --session-maturing-bg: rgba(20, 140, 130, 0.1);
+  --session-maturing-border: rgba(20, 140, 130, 0.25);
+  --session-ready-bg: rgba(34, 140, 70, 0.1);
+  --session-ready-border: rgba(34, 140, 70, 0.25);
 }
 
 html.theme-dark {
@@ -356,6 +386,16 @@ html.theme-dark {
   --block-curated-border: #4a7c59;
   --canvas-accent: #5a9c6a;
   --canvas-accent-light: #1e2a1e;
+
+  /* Session progress colors (dark mode - vibrant on dark) */
+  --session-new-bg: rgba(100, 116, 139, 0.3);
+  --session-new-border: rgba(100, 116, 139, 0.5);
+  --session-developing-bg: rgba(217, 119, 6, 0.25);
+  --session-developing-border: rgba(217, 119, 6, 0.45);
+  --session-maturing-bg: rgba(20, 184, 166, 0.25);
+  --session-maturing-border: rgba(20, 184, 166, 0.45);
+  --session-ready-bg: rgba(34, 197, 94, 0.25);
+  --session-ready-border: rgba(34, 197, 94, 0.45);
 }
 
 /* ===== Base Styles ===== */
@@ -489,6 +529,83 @@ body {
 
 .focus-mode-enter {
   animation: slide-in 0.3s ease-out;
+}
+
+/* ===== Physics Block Animations ===== */
+
+/* Pop-in animation for new blocks */
+@keyframes physics-block-pop-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.physics-block-pop-in {
+  animation: physics-block-pop-in 420ms ease-out;
+  transform-origin: center;
+}
+
+/* Pop-out animation for removed blocks */
+@keyframes physics-block-pop-out {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+.physics-block-pop-out {
+  animation: physics-block-pop-out 420ms ease-in forwards;
+  transform-origin: center;
+}
+
+/* Synonym swap animation for rotating titles */
+@keyframes synonym-swap {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.session-synonym {
+  display: inline-block;
+  animation: synonym-swap 260ms ease-out;
+}
+
+/* Session slide-out animation (for navigation transitions) */
+@keyframes session-slide-out {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: translateX(65vw) scale(0.8);
+    opacity: 0;
+  }
+}
+
+.session-slide-out {
+  animation: session-slide-out 500ms ease-out forwards;
 }
 
 /* Typography plugin - canvas theme overrides */

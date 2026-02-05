@@ -146,7 +146,7 @@ export function SpecialistsPanel({
             key={name}
             name={name}
             roleHint={roleHintMap.get(name)}
-            observations={understanding[name]}
+            observations={understanding[name] ?? {}}
           />
         ))}
       </div>

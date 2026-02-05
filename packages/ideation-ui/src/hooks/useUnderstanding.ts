@@ -45,7 +45,7 @@ export function useUnderstanding(
         // Extract active specialists from understanding keys
         const specialists = Object.keys(session.understanding).map((name) => ({
           name,
-          roleHint: extractRoleHint(session.understanding[name]),
+          roleHint: extractRoleHint(session.understanding[name] ?? {}),
         }));
         setActiveSpecialists(specialists);
       }
@@ -65,7 +65,7 @@ export function useUnderstanding(
       // Update active specialists from new understanding
       const specialists = Object.keys(newUnderstanding).map((name) => ({
         name,
-        roleHint: extractRoleHint(newUnderstanding[name]),
+        roleHint: extractRoleHint(newUnderstanding[name] ?? {}),
       }));
       setActiveSpecialists(specialists);
     },

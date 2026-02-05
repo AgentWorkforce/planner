@@ -85,7 +85,6 @@ export function FormingBlocksColumnExample() {
       <FormingBlocksColumn
         blocks={exampleBlocks}
         onBlockClick={(id) => console.log('Block clicked:', id)}
-        onBlockDragEnd={(id) => console.log('Block drag ended:', id)}
       />
     </div>
   );
@@ -124,7 +123,6 @@ export function FormingBlocksColumnManyBlocksExample() {
       <FormingBlocksColumn
         blocks={manyBlocks}
         onBlockClick={(id) => console.log('Block clicked:', id)}
-        onBlockDragEnd={(id) => console.log('Block drag ended:', id)}
       />
     </div>
   );

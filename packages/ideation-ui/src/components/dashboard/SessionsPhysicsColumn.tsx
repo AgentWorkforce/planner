@@ -1,11 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePhysicsEngine } from '@/hooks/usePhysicsEngine';
 import { useSessions } from '@/hooks/useSessions';
 import { useInitiatives } from '@/hooks/useInitiatives';
 import { SessionPhysicsBlock } from './SessionPhysicsBlock';
 import { InitiativeWells } from './InitiativeWells';
+import { NewSessionModal } from '@/components/sessions/NewSessionModal';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+
+/**
+ * Maximum number of sessions to display in physics view
+ */
+const MAX_VISIBLE_SESSIONS = 20;
 
 /**
  * Abandoned session threshold (7 days)
@@ -74,6 +81,14 @@ function getSessionSize(blockCount: number, updatedAt: string): number {
  */
 export function SessionsPhysicsColumn() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { sessions, loading, error } = useSessions();
+  const { initiatives } = useInitiatives();
+  const navigate = useNavigate();
+  const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
+
+  // Filter for active sessions only
+  const activeSessions = sessions.filter((s) => s.status === 'active');
+
   const { addBody, removeBody, updateBodyRadius, bodies, isReady } = usePhysicsEngine(containerRef, {
     edgeAttractionFilter: (id) => {
       // Apply edge attraction to abandoned sessions
@@ -81,22 +96,32 @@ export function SessionsPhysicsColumn() {
       return session ? isSessionAbandoned(session.updated_at) : false;
     },
   });
-  const { sessions, loading, error } = useSessions();
-  const { initiatives } = useInitiatives();
-  const navigate = useNavigate();
 
-  // Filter for active sessions only
-  const activeSessions = sessions.filter((s) => s.status === 'active');
+  // Sort and limit sessions for physics display
+  // Priority: block count (desc), then recency (desc)
+  const sortedSessions = useMemo(() => {
+    return [...activeSessions]
+      .sort((a, b) => {
+        // Sort by block count descending
+        const aBlocks = a.blocks?.length ?? 0;
+        const bBlocks = b.blocks?.length ?? 0;
+        if (bBlocks !== aBlocks) return bBlocks - aBlocks;
+
+        // Then by recency descending
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      })
+      .slice(0, MAX_VISIBLE_SESSIONS);
+  }, [activeSessions]);
 
   // Sync physics bodies with sessions array
   useEffect(() => {
     if (!isReady) return;
 
-    const currentIds = new Set(activeSessions.map((s) => s.id));
+    const currentIds = new Set(sortedSessions.map((s) => s.id));
     const physicsIds = new Set(bodies.keys());
 
     // Add new bodies for sessions that don't have physics bodies yet
-    activeSessions.forEach((session) => {
+    sortedSessions.forEach((session) => {
       if (!physicsIds.has(session.id)) {
         const blockCount = session.blocks?.length || 0;
         const size = getSessionSize(blockCount, session.updated_at);
@@ -109,7 +134,7 @@ export function SessionsPhysicsColumn() {
     });
 
     // Update body radius for sessions that changed size (e.g., became abandoned)
-    activeSessions.forEach((session) => {
+    sortedSessions.forEach((session) => {
       if (physicsIds.has(session.id)) {
         const blockCount = session.blocks?.length || 0;
         const newSize = getSessionSize(blockCount, session.updated_at);
@@ -123,7 +148,7 @@ export function SessionsPhysicsColumn() {
         removeBody(id);
       }
     });
-  }, [activeSessions, addBody, removeBody, updateBodyRadius, bodies, isReady]);
+  }, [sortedSessions, addBody, removeBody, updateBodyRadius, bodies, isReady]);
 
   return (
     <div className="h-full flex flex-col">
@@ -133,7 +158,12 @@ export function SessionsPhysicsColumn() {
           In-Progress ({activeSessions.length})
         </h2>
         <p className="text-xs text-[var(--canvas-text-muted)] mt-1">
-          {loading ? 'Loading sessions...' : `${activeSessions.length} active`}
+          {loading
+            ? 'Loading sessions...'
+            : activeSessions.length > MAX_VISIBLE_SESSIONS
+            ? `${activeSessions.length} active (showing ${MAX_VISIBLE_SESSIONS})`
+            : `${activeSessions.length} active`
+          }
         </p>
       </div>
 
@@ -168,14 +198,16 @@ export function SessionsPhysicsColumn() {
         {isReady && (
           <InitiativeWells
             bodies={bodies}
-            sessions={activeSessions}
+            sessions={sortedSessions}
             initiatives={initiatives}
           />
         )}
 
         {/* Render Session Blocks */}
-        {activeSessions.map((session) => {
-          const position = bodies.get(session.id) || { x: 0, y: 0, angle: 0, radius: 0 };
+        {sortedSessions.map((session) => {
+          const body = bodies.get(session.id);
+          if (!body) return null;
+
           const blockCount = session.blocks?.length || 0;
           const size = getSessionSize(blockCount, session.updated_at);
           const isAbandoned = isSessionAbandoned(session.updated_at);
@@ -189,14 +221,33 @@ export function SessionsPhysicsColumn() {
                 blocks: session.blocks,
                 updated_at: session.updated_at,
               }}
-              position={{ x: position.x, y: position.y }}
+              position={{ x: body.x, y: body.y }}
+              angle={body.angle}
               size={size}
               isAbandoned={isAbandoned}
+              blockCount={blockCount}
               onClick={() => navigate(`/ideation/session/${session.id}`)}
             />
           );
         })}
       </div>
+
+      {/* New Session Button */}
+      <div className="p-4">
+        <Button
+          variant="primary"
+          className="w-full"
+          onClick={() => setIsNewSessionModalOpen(true)}
+        >
+          → Start new ideation session
+        </Button>
+      </div>
+
+      {/* New Session Modal */}
+      <NewSessionModal
+        open={isNewSessionModalOpen}
+        onOpenChange={setIsNewSessionModalOpen}
+      />
     </div>
   );
 }
