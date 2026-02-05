@@ -1150,7 +1150,8 @@
         ],
         "maps_to_feature_ac": [
           "ac5"
-        ]
+        ],
+        "implementation_doc": "docs/flow/implementations/ideation-canvas-v2/cv2-019-progressive-revelation-implementation.md"
       },
       {
         "step_id": "cv2-020",
@@ -1414,7 +1415,8 @@
         ],
         "maps_to_feature_ac": [
           "ac6"
-        ]
+        ],
+        "implementation_doc": "docs/flow/implementations/ideation-canvas-v2/cv2-028-contextual-chat-implementation.md"
       },
       {
         "step_id": "cv2-029",
@@ -1868,7 +1870,8 @@
         ],
         "maps_to_feature_ac": [
           "ac14"
-        ]
+        ],
+        "implementation_doc": "docs/flow/implementations/ideation-canvas-v2/cv2-043-abandoned-session-implementation.md"
       },
       {
         "step_id": "cv2-044",
@@ -1997,7 +2000,11 @@
         ],
         "specification": {
           "note": "Use existing shared-ui package rather than creating new @plannr/ui-agent-status-bar package",
-          "reuses": ["Avatar", "Badge", "ThinkingIndicator"],
+          "reuses": [
+            "Avatar",
+            "Badge",
+            "ThinkingIndicator"
+          ],
           "path": "packages/shared-ui/src/components/StatusBar.tsx"
         }
       },
@@ -2221,7 +2228,8 @@
         ],
         "maps_to_feature_ac": [
           "ac26"
-        ]
+        ],
+        "implementation_doc": "docs/flow/implementations/ideation-canvas-v2/cv2-056-uncurate-verification.md"
       },
       {
         "step_id": "cv2-057",
@@ -2279,7 +2287,8 @@
         ],
         "maps_to_feature_ac": [
           "ac30"
-        ]
+        ],
+        "implementation_doc": "docs/flow/implementations/ideation-canvas-v2/cv2-058-merge-split-guidance.md"
       },
       {
         "step_id": "cv2-059",
