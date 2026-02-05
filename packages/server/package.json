@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@agent-relay/sdk": "^2.0.37",
+    "@plannr/errors": "*",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
