@@ -56,7 +56,13 @@ module.exports = {
           DEFAULT: 'var(--destructive)',
           foreground: 'var(--destructive-foreground)',
         },
-        border: 'var(--border)',
+        // Border system (shadcn + Mission Control extended)
+        border: {
+          DEFAULT: 'var(--border)', // shadcn compatible
+          subtle: 'var(--color-border-subtle)',
+          light: 'var(--color-border-light)',
+          medium: 'var(--color-border-medium)',
+        },
         input: 'var(--input)',
         ring: 'var(--ring)',
 
