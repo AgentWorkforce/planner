@@ -41,6 +41,20 @@ export function createConfigHandlers(services: TunerServices) {
     },
 
     /**
+     * GET /api/tuner/config/ideation
+     * Returns IdeationConfig for Ideation to consume.
+     */
+    getIdeationConfig: (_req: Request, res: Response) => {
+      try {
+        const config = services.config.getCurrentIdeationConfig();
+        res.json(config);
+      } catch (error) {
+        console.error('[Tuner API] Error getting ideation config:', error);
+        res.status(500).json({ error: 'Failed to get ideation config' });
+      }
+    },
+
+    /**
      * GET /api/tuner/config/version
      * Returns current config version numbers.
      */
