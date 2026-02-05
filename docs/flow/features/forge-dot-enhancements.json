@@ -530,7 +530,7 @@
           { "id": "ac3", "description": "Storage methods have integration tests" },
           { "id": "ac4", "description": "No circular dependencies introduced" },
           { "id": "ac5", "description": "Code review: no slop, follows existing patterns" }
-        ],
+        ]
       },
       {
         "step_id": "p2-001",
@@ -710,7 +710,7 @@
           { "id": "ac5", "description": "Timeout enforcement tests: timer, signals, cleanup" },
           { "id": "ac6", "description": "Integration test: full run with all knobs enabled" },
           { "id": "ac7", "description": "npm run typecheck passes" }
-        ],
+        ]
       },
       {
         "step_id": "p3-001",
@@ -836,7 +836,7 @@
           { "id": "ac2", "description": "Artifact dependency tests: validation, blocking, unblocking" },
           { "id": "ac3", "description": "Integration test: task with model selection and artifact deps" },
           { "id": "ac4", "description": "npm run typecheck passes" }
-        ],
+        ]
       },
       {
         "step_id": "p4-001",
@@ -967,7 +967,7 @@
           { "id": "ac3", "description": "Integration test: mock Tuner server, verify outcome emission" },
           { "id": "ac4", "description": "Startup test: TUNER_URL unset works (no errors)" },
           { "id": "ac5", "description": "npm run typecheck passes" }
-        ],
+        ]
       },
       {
         "step_id": "final-001",
@@ -1021,7 +1021,7 @@
           { "id": "ac4", "description": "Code follows existing patterns (no slop, no bloat)" },
           { "id": "ac5", "description": "Breaking changes documented (if any)" },
           { "id": "ac6", "description": "PR description includes summary of all changes" }
-        ],
+        ]
       }
     ]
   }

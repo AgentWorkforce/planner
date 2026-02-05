@@ -1,0 +1,49 @@
+{
+  "title": "Tuner REST API",
+  "summary": {
+    "goal": "HTTP endpoints for config distribution and outcome ingestion",
+    "acceptance_criteria": [
+      {
+        "id": "api1",
+        "description": "GET /api/tuner/config/forge returns ForgeExecutionConfig"
+      },
+      {
+        "id": "api2",
+        "description": "GET /api/tuner/config/planner returns PlannerConfig"
+      },
+      {
+        "id": "api3",
+        "description": "GET /api/tuner/config/version returns current versions"
+      },
+      {
+        "id": "api4",
+        "description": "POST /api/tuner/outcomes/task accepts TaskOutcome"
+      },
+      {
+        "id": "api5",
+        "description": "POST /api/tuner/outcomes/run accepts RunOutcome"
+      },
+      {
+        "id": "api6",
+        "description": "GET /api/tuner/insights/summary returns aggregate metrics"
+      },
+      {
+        "id": "api7",
+        "description": "GET /api/tuner/insights/drift returns active drift alerts"
+      },
+      {
+        "id": "api8",
+        "description": "POST /api/tuner/insights/drift/:id/acknowledge marks alert as acknowledged"
+      }
+    ]
+  },
+  "feature_id": "tuner-api",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-storage"
+  ]
+}

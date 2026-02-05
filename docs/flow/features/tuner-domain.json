@@ -1,0 +1,58 @@
+{
+  "title": "Tuner Domain Model",
+  "summary": {
+    "goal": "Define TypeScript types for config, outcomes, baselines, and drift alerts",
+    "acceptance_criteria": [
+      {
+        "id": "dom1",
+        "description": "ForgeExecutionConfig type with model_selection, budgets, retry, parallelism, confidence, language_time_multipliers"
+      },
+      {
+        "id": "dom2",
+        "description": "PlannerConfig type with complexity_weights, language_complexity_multipliers, decomposition"
+      },
+      {
+        "id": "dom3",
+        "description": "TaskOutcome type with run_id, task_id, step_id, model_used, outcome, attempts, duration, tokens, cost, error_category?, verification?, ac_results?"
+      },
+      {
+        "id": "dom3b",
+        "description": "VerificationResults type with: tests_passed?, tests_total?, build_passed?, type_check_passed?, lint_passed?"
+      },
+      {
+        "id": "dom3c",
+        "description": "ErrorCategory enum: syntax_error, test_failure, type_error, build_error, lint_error, timeout, runtime_error, unknown"
+      },
+      {
+        "id": "dom3d",
+        "description": "ACResult type with: ac_id, passed, evidence? (for automated AC verification)"
+      },
+      {
+        "id": "dom4",
+        "description": "RunOutcome type with aggregate metrics including verification_summary { tests_passed, tests_failed, build_passed, ac_met, ac_total }"
+      },
+      {
+        "id": "dom5",
+        "description": "TaskBaseline type with mean, stddev for duration/tokens, success_rate, verification_rate"
+      },
+      {
+        "id": "dom6",
+        "description": "ModelBaseline type with alpha, beta (Beta distribution params)"
+      },
+      {
+        "id": "dom7",
+        "description": "DriftAlert type with type, pattern, deviation_sigmas, severity"
+      },
+      {
+        "id": "dom8",
+        "description": "Zod schemas for all types with validation"
+      }
+    ]
+  },
+  "feature_id": "tuner-domain",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "critical",
+  "parent": "tuner-package",
+  "component": "tuner"
+}

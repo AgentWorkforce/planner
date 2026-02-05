@@ -1,0 +1,182 @@
+{
+  "feature_id": "ui-relay-messaging-backend",
+  "title": "Relay Messaging Backend Bridge",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": [
+    "relay-core"
+  ],
+  "summary": {
+    "goal": "Provide WebSocket proxy and REST endpoints for frontend to interact with relay channels",
+    "context": "Frontend cannot connect directly to relay daemon (Unix socket). Backend provides /ws/relay WebSocket endpoint that proxies to relay daemon, plus REST endpoints for channel operations.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "WebSocket endpoint /ws/relay proxies messages to relay daemon"
+      },
+      {
+        "id": "ac2",
+        "description": "User authentication passed through to relay (user entity)"
+      },
+      {
+        "id": "ac3",
+        "description": "GET /api/channels returns available channels for user"
+      },
+      {
+        "id": "ac4",
+        "description": "GET /api/channels/:id/messages returns message history"
+      },
+      {
+        "id": "ac5",
+        "description": "GET /api/channels/:id/presence returns online agents"
+      },
+      {
+        "id": "ac6",
+        "description": "Auto-create #plan-{id} channel when plan created"
+      },
+      {
+        "id": "ac7",
+        "description": "PlannerLead agent auto-joins plan channels"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "planner-core"
+    ],
+    "steps": [
+      {
+        "step_id": "urm-be001",
+        "title": "Create WebSocket proxy endpoint",
+        "scope": "planner-core",
+        "description": "Add WebSocket upgrade handler at /ws/relay that bridges frontend WebSocket to relay daemon. Use express-ws or similar. Authenticate user from session/token. Create relay user entity for the connection.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "/ws/relay accepts WebSocket upgrade"
+          },
+          {
+            "id": "ac2",
+            "description": "Connection authenticated via session cookie or token"
+          },
+          {
+            "id": "ac3",
+            "description": "User registered with relay as entityType: 'user'"
+          },
+          {
+            "id": "ac4",
+            "description": "Relay messages forwarded bidirectionally"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-be002",
+        "title": "Implement channel management",
+        "scope": "planner-core",
+        "description": "Create src/relay/channels.ts for channel operations. Create #planner channel on startup. Create #plan-{id} channel when plan created. Auto-join PlannerLead to channels.",
+        "dependencies": [
+          "urm-be001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "#planner channel exists after server startup"
+          },
+          {
+            "id": "ac2",
+            "description": "#plan-{id} channel created when plan created"
+          },
+          {
+            "id": "ac3",
+            "description": "Channel removed when plan deleted (optional)"
+          },
+          {
+            "id": "ac4",
+            "description": "getChannelsForUser(userId) returns list of accessible channels"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-be003",
+        "title": "Add channel REST endpoints",
+        "scope": "planner-core",
+        "description": "Add GET /api/channels (list), GET /api/channels/:id/messages (history), GET /api/channels/:id/presence (online members).",
+        "dependencies": [
+          "urm-be002"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "GET /api/channels returns [{ id, name, unread_count, last_message? }]"
+          },
+          {
+            "id": "ac2",
+            "description": "GET /api/channels/:id/messages returns [{ id, from, content, timestamp }] with pagination"
+          },
+          {
+            "id": "ac3",
+            "description": "GET /api/channels/:id/presence returns [{ id, name, entityType, status }]"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-be004",
+        "title": "Implement PlannerLead auto-spawn",
+        "scope": "planner-core",
+        "description": "On server startup, spawn PlannerLead agent if relay connected. Agent joins #planner and all existing plan channels. Uses existing relay-planning-agent infrastructure.",
+        "dependencies": [
+          "urm-be002"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "PlannerLead agent spawned on startup (if relay available)"
+          },
+          {
+            "id": "ac2",
+            "description": "Agent joins #planner channel"
+          },
+          {
+            "id": "ac3",
+            "description": "Agent joins existing #plan-{id} channels"
+          },
+          {
+            "id": "ac4",
+            "description": "Agent joins new plan channels when created"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-be005",
+        "title": "Add mock channel support",
+        "scope": "planner-core",
+        "description": "When relay unavailable, provide mock channel responses. Single #demo channel with simulated AI responses.",
+        "dependencies": [
+          "urm-be003"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Channels endpoint returns #demo channel when relay unavailable"
+          },
+          {
+            "id": "ac2",
+            "description": "Messages to #demo get mock AI responses"
+          },
+          {
+            "id": "ac3",
+            "description": "Presence shows 'Demo AI' in mock mode"
+          }
+        ]
+      }
+    ]
+  },
+  "parent": "ui-relay-messaging"
+}

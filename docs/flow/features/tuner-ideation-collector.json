@@ -1,0 +1,138 @@
+{
+  "title": "Ideation Outcome Collection",
+  "summary": {
+    "goal": "Extend OutcomeCollector to ingest IdeationOutcome and PlanQualitySignal, fire events for downstream processing",
+    "acceptance_criteria": [
+      {
+        "id": "icol1",
+        "description": "recordIdeationOutcome stores outcome and emits 'ideation_outcome_received' event via setImmediate"
+      },
+      {
+        "id": "icol2",
+        "description": "recordPlanQualitySignal stores signal and emits 'plan_quality_signal_received' event via setImmediate"
+      },
+      {
+        "id": "icol3",
+        "description": "Test-sourced outcomes (source='test') are stored but skip learning model updates"
+      },
+      {
+        "id": "icol4",
+        "description": "Fire-and-forget pattern: handlers return immediately, processing is async"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "icol001",
+        "title": "Add recordIdeationOutcome method",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/services/outcome-collector.ts with recordIdeationOutcome method following existing recordTaskOutcome pattern",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Stores outcome via this.storage.insertIdeationOutcome(outcome)"
+          },
+          {
+            "id": "ac2",
+            "description": "Emits 'ideation_outcome_received' event via setImmediate(() => this.emit(...))"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns { received: true } immediately"
+          },
+          {
+            "id": "ac4",
+            "description": "OutcomeCollector extends EventEmitter"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/outcome-collector.ts",
+            "pattern": "Store synchronously, emit async via setImmediate",
+            "reference": "Plan section 2.5"
+          }
+        }
+      },
+      {
+        "step_id": "icol002",
+        "title": "Add recordPlanQualitySignal method",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/services/outcome-collector.ts with recordPlanQualitySignal method",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Stores signal via this.storage.insertPlanQualitySignal(signal)"
+          },
+          {
+            "id": "ac2",
+            "description": "Emits 'plan_quality_signal_received' event via setImmediate"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns { received: true } immediately"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/outcome-collector.ts",
+            "pattern": "Store synchronously, emit async via setImmediate",
+            "reference": "Plan section 2.5"
+          }
+        }
+      },
+      {
+        "step_id": "icol003",
+        "title": "Test outcome collector",
+        "scope": "tuner",
+        "description": "Unit tests for new collector methods verifying storage and event emission",
+        "dependencies": [
+          "icol001",
+          "icol002"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "recordIdeationOutcome stores and emits event"
+          },
+          {
+            "id": "ac2",
+            "description": "recordPlanQualitySignal stores and emits event"
+          },
+          {
+            "id": "ac3",
+            "description": "Events emitted asynchronously (not inline)"
+          },
+          {
+            "id": "ac4",
+            "description": "source='test' outcomes are stored but flagged for skip in downstream"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/tuner/src/services/outcome-collector.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-collector",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-ideation-storage",
+    "tuner-outcome-collector"
+  ]
+}
