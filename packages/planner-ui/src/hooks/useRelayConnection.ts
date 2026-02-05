@@ -140,12 +140,13 @@ export function useRelayConnection(
             break;
 
           case 'message': {
+            // Transform wire protocol (body) to domain model (content)
             const msg: RelayMessage = {
               id: data.id || crypto.randomUUID(),
               from: data.from || 'unknown',
               fromName: data.fromName || data.from || 'Unknown',
               entityType: data.entityType || 'agent',
-              body: data.body || '',
+              content: data.body || '',
               timestamp: data.timestamp || new Date().toISOString(),
               data: data.data,
             };
@@ -154,13 +155,14 @@ export function useRelayConnection(
           }
 
           case 'channel_message': {
+            // Transform wire protocol (body, channel) to domain model (content, channelId)
             const msg: RelayMessage = {
               id: data.id || crypto.randomUUID(),
               from: data.from || 'unknown',
               fromName: data.fromName || data.from || 'Unknown',
               entityType: data.entityType || 'agent',
-              channel: data.channel,
-              body: data.body || '',
+              channelId: data.channel,
+              content: data.body || '',
               timestamp: data.timestamp || new Date().toISOString(),
               data: data.data,
             };
@@ -242,15 +244,17 @@ export function useRelayConnection(
   );
 
   const sendChannelMessage = useCallback(
-    (channelId: string, body: string, data?: Record<string, unknown>) => {
-      send({ type: 'send', channel: channelId, body, data });
+    (channelId: string, content: string, data?: Record<string, unknown>) => {
+      // Wire protocol expects 'body', transform from domain 'content'
+      send({ type: 'send', channel: channelId, body: content, data });
     },
     [send]
   );
 
   const sendDirectMessage = useCallback(
-    (to: string, body: string, data?: Record<string, unknown>) => {
-      send({ type: 'dm', to, body, data });
+    (to: string, content: string, data?: Record<string, unknown>) => {
+      // Wire protocol expects 'body', transform from domain 'content'
+      send({ type: 'dm', to, body: content, data });
     },
     [send]
   );

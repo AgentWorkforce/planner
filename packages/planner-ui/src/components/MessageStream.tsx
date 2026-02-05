@@ -118,8 +118,6 @@ function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
   const isAgent = message.entityType === 'agent';
   // Fallback for missing fromName (e.g., from REST API history)
   const displayName = message.fromName || message.from || 'Unknown';
-  // Handle both 'body' (WebSocket) and 'content' (REST API) fields
-  const messageBody = message.body || (message as unknown as { content?: string }).content || '';
 
   return (
     <div className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
@@ -153,7 +151,7 @@ function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
               : 'bg-bg-tertiary text-text-primary'
           }`}
         >
-          <MessageContent content={messageBody} />
+          <MessageContent content={message.content} />
         </div>
 
         {isOwn && (

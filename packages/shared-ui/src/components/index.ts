@@ -66,3 +66,18 @@ export {
   type AgentStatus,
   type StatusAction,
 } from "./StatusBar";
+
+// Messaging components
+export {
+  DateSeparator,
+  MessageBubble,
+  MessageList,
+  MessageInput,
+  type DateSeparatorProps,
+  type MessageBubbleProps,
+  type Message,
+  type MessageListProps,
+  type MessageInputProps,
+  type MessageStatus,
+  type ThreadMetadata,
+} from "./messaging";

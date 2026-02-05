@@ -74,7 +74,7 @@ export function useChannelMessages(
 
   // Send a message to the channel with optimistic update
   const send = useCallback(
-    (body: string, data?: Record<string, unknown>) => {
+    (content: string, data?: Record<string, unknown>) => {
       if (!channelIdRef.current || !connection.isConnected) return;
 
       // Optimistic update: add message immediately to UI
@@ -83,15 +83,15 @@ export function useChannelMessages(
         from: connection.userId || 'user',
         fromName: 'You',
         entityType: 'user',
-        channel: channelIdRef.current,
-        body,
+        channelId: channelIdRef.current,
+        content,
         timestamp: new Date().toISOString(),
         data,
       };
       addMessage(optimisticMessage);
 
       // Send to relay
-      connection.sendChannelMessage(channelIdRef.current, body, data);
+      connection.sendChannelMessage(channelIdRef.current, content, data);
     },
     [connection, addMessage]
   );
@@ -105,7 +105,7 @@ export function useChannelMessages(
   useEffect(() => {
     const unsubscribe = connection.onChannelMessage((message) => {
       // Only add messages for our channel
-      if (message.channel === channelIdRef.current) {
+      if (message.channelId === channelIdRef.current) {
         addMessage(message);
       }
     });

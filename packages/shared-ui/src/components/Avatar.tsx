@@ -48,12 +48,6 @@ function getInitials(name: string): string {
 }
 
 /**
- * Status colors using semantic CSS variables for theme compatibility.
- * Consuming apps should define these variables:
- * --color-status-online, --color-status-offline, --color-status-busy, --color-status-away
- * Falls back to Tailwind colors if variables are not defined.
- */
-/**
  * Entity type colors for messaging contexts.
  * Users get purple, agents get cyan.
  */
@@ -62,6 +56,12 @@ const entityTypeColors = {
   agent: "bg-[var(--color-accent-cyan,#00d9ff)]/20 text-[var(--color-accent-cyan,#00d9ff)]",
 };
 
+/**
+ * Status colors using semantic CSS variables for theme compatibility.
+ * Consuming apps should define these variables:
+ * --color-status-online, --color-status-offline, --color-status-busy, --color-status-away
+ * Falls back to Tailwind colors if variables are not defined.
+ */
 const statusColors = {
   online: "bg-[var(--color-status-online,#22c55e)]",
   offline: "bg-[var(--color-status-offline,#9ca3af)]",

@@ -32,7 +32,7 @@ interface ChannelResponse {
   unreadCount?: number;
   lastMessage?: {
     from: string;
-    body: string;
+    content: string;
     timestamp: number;
   };
 }
@@ -156,7 +156,7 @@ export function createChannelHandlers(storage: ChannelStorage) {
           // Query messages from relay client
           const relayMessages = await client.queryMessages({ limit });
 
-          // Filter to channel messages and transform
+          // Filter to channel messages and transform to canonical format
           const channelMessages = relayMessages
             .filter((msg) => msg.to === channelId || msg.channel === channelId)
             .map((msg) => ({
@@ -164,8 +164,8 @@ export function createChannelHandlers(storage: ChannelStorage) {
               from: msg.from,
               fromName: msg.from,
               entityType: 'agent' as const,
-              channel: channelId,
-              body: msg.body || '',
+              channelId: channelId,
+              content: msg.body || '',  // Transform wire 'body' to canonical 'content'
               timestamp: typeof msg.timestamp === 'number'
                 ? new Date(msg.timestamp).toISOString()
                 : msg.timestamp,
