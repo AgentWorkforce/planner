@@ -125,7 +125,14 @@ export async function executeTool(
         // Check if specialist already spawned
         const existing = session.active_specialists.find(s => s.name === name);
         if (existing) {
-          return { success: true, data: { agent_id: existing.agent_id, already_active: true } };
+          return {
+            success: true,
+            data: {
+              agent_id: existing.agent_id,
+              already_active: true,
+              message: `${name} specialist is already active for this session. Do NOT attempt to spawn them again. Proceed to respond to the user.`,
+            },
+          };
         }
 
         // Spawn via relay (or mock)
@@ -172,19 +179,4 @@ export async function executeTool(
     console.error(`[tool-executor] Error executing tool '${name}':`, error);
     return { success: false, error: message };
   }
-}
-
-// =============================================================================
-// Mock Mode Handler - FAILS LOUDLY
-// =============================================================================
-
-/**
- * Mock mode should fail, not silently return fake data.
- * This prevents hidden bugs where code appears to work but is using fake results.
- */
-export function getMockToolResult(name: string, _input: unknown): ToolResult {
-  return {
-    success: false,
-    error: `Mock mode: Tool '${name}' unavailable. Set ANTHROPIC_API_KEY to enable real execution.`,
-  };
 }
