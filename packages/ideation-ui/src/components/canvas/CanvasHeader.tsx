@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChevronIcon } from '@/components/icons/ChevronIcon';
 import { MenuIcon } from '@/components/icons/MenuIcon';
+import { ConfidenceBar } from '@/components/chat/ConfidenceBar';
+import { useConfidence } from '@/hooks/useConfidence';
 
 /**
  * Session info for the dropdown
@@ -25,16 +27,14 @@ export interface SpecialistPresence {
 /**
  * Props for CanvasHeader component
  */
-export interface CanvasHeaderProps {
+export interface SessionNavProps {
   sessionId: string;
   sessionTitle: string;
   sessions: SessionInfo[];
-  specialists?: SpecialistPresence[];
   onTitleChange?: (newTitle: string) => void;
   onSessionSwitch?: (sessionId: string) => void;
   onOpenUnderstanding?: () => void;
   onHandoff?: () => void;
-  onSpecialistClick?: (specialistName: string) => void;
   className?: string;
 }
 
@@ -172,50 +172,6 @@ function SessionTitleDropdown({
 }
 
 /**
- * SpecialistAvatars
- *
- * Displays presence indicators for active AI specialists.
- * Shows specialist avatars with status-based styling:
- * - idle: faded opacity
- * - thinking: pulsing animation
- * - observing: normal opacity
- * - contributing: ring highlight
- *
- * Clicking an avatar triggers onSpecialistClick callback,
- * which should open AI Understanding focused on that specialist.
- */
-interface SpecialistAvatarsProps {
-  specialists?: SpecialistPresence[];
-  onSpecialistClick?: (name: string) => void;
-}
-
-function SpecialistAvatars({ specialists, onSpecialistClick }: SpecialistAvatarsProps) {
-  if (!specialists || specialists.length === 0) return null;
-
-  return (
-    <div className="flex items-center gap-1 px-2 border-l border-r mx-2">
-      {specialists.map((specialist) => (
-        <button
-          key={specialist.name}
-          onClick={() => onSpecialistClick?.(specialist.name)}
-          className={cn(
-            'w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all',
-            'hover:scale-110 hover:shadow-md',
-            specialist.status === 'idle' && 'opacity-40',
-            specialist.status === 'thinking' && 'animate-pulse',
-            specialist.status === 'contributing' && 'ring-2 ring-primary',
-          )}
-          title={`${specialist.name}: ${specialist.status}`}
-          aria-label={`${specialist.name} specialist - ${specialist.status}`}
-        >
-          {specialist.avatar}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/**
  * MobileActionsMenu
  *
  * Dropdown menu for mobile header actions
@@ -282,70 +238,50 @@ function MobileActionsMenu({ onOpenUnderstanding, onHandoff }: MobileActionsMenu
 }
 
 /**
- * CanvasHeader
+ * SessionNav
  *
- * Header bar for the ideation canvas view.
+ * Navigation bar for the ideation canvas (fits in the N grid area).
  *
  * Features:
- * - Back button to navigate to /ideation dashboard
+ * - Circle back button (ArrowLeft icon)
  * - Session title with inline editing (double-click to edit)
  * - Session dropdown to switch between sessions
- * - Specialist presence indicators (shows active AI specialists)
- * - AI Understanding button to open understanding drawer
- * - Planner button to initiate handoff to planner
+ * - ConfidenceBar
+ * - AI Understanding button
+ * - Planner button (color coded by confidence)
  * - Mobile: Hamburger menu consolidates actions
  *
  * Layout:
- * - Desktop: `[← Back] [Session Title ▼] | [🏗️ 🎨 ⚙️] | [AI Understanding] [→ Planner]`
- * - Mobile: `[← Back] [Session Title] [☰]`
- *
- * @example
- * ```tsx
- * <CanvasHeader
- *   sessionId="123"
- *   sessionTitle="My Session"
- *   sessions={allSessions}
- *   specialists={[
- *     { name: 'Architect', avatar: '🏗️', status: 'thinking' },
- *     { name: 'Designer', avatar: '🎨', status: 'idle' }
- *   ]}
- *   onTitleChange={(title) => updateSession({ title })}
- *   onSessionSwitch={(id) => navigate(`/ideation/session/${id}/canvas`)}
- *   onOpenUnderstanding={() => setDrawerOpen(true)}
- *   onHandoff={() => setHandoffDialogOpen(true)}
- *   onSpecialistClick={(name) => openUnderstanding({ focusSpecialist: name })}
- * />
- * ```
+ * - Desktop: `[←] [Session Title ▼] [Confidence] | [AI Understanding] [→ Planner]`
+ * - Mobile: `[←] [Session Title] [☰]`
  */
-export function CanvasHeader({
+export function SessionNav({
   sessionId,
   sessionTitle,
   sessions,
-  specialists,
   onTitleChange,
   onSessionSwitch,
   onOpenUnderstanding,
   onHandoff,
-  onSpecialistClick,
   className,
-}: CanvasHeaderProps) {
-  const navigate = useNavigate();
+}: SessionNavProps) {
+  const { score, breakdown } = useConfidence(sessionId);
 
   return (
     <header
       className={cn(
-        'h-14 flex items-center justify-between px-2 md:px-4 bg-[var(--canvas-bg)]',
-        className
+        'flex items-center justify-between px-2 md:px-4 py-2',
+        className,
       )}
     >
       {/* Left section */}
       <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
         <button
-          onClick={() => navigate('/ideation')}
-          className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
-          aria-label="Back to dashboard"
+          onClick={() => window.history.back()}
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--canvas-bg-subtle)] transition-colors shrink-0"
+          aria-label="Go back"
         >
-          ← <span className="hidden sm:inline">Back</span>
+          <ArrowLeft className="w-4 h-4 text-[var(--canvas-text-primary)]" />
         </button>
 
         <SessionTitleDropdown
@@ -354,34 +290,39 @@ export function CanvasHeader({
           onSwitch={onSessionSwitch}
           onTitleChange={onTitleChange}
         />
+
+        <ConfidenceBar score={score} breakdown={breakdown} />
       </div>
 
-      {/* Center section - Specialist presence indicators (hidden on mobile) */}
-      <div className="hidden md:flex">
-        <SpecialistAvatars specialists={specialists} onSpecialistClick={onSpecialistClick} />
-      </div>
-
-      {/* Right section */}
-      {/* Desktop: Show both buttons */}
+      {/* Right section — desktop */}
       <div className="hidden md:flex items-center gap-2">
         <button
           onClick={onOpenUnderstanding}
-          className="px-3 py-1.5 text-sm rounded-md hover:bg-muted transition-colors"
+          className="px-3 py-1.5 text-sm rounded-md hover:bg-[var(--canvas-bg-subtle)] transition-colors text-[var(--canvas-text-primary)]"
         >
           AI Understanding
         </button>
         <button
           onClick={onHandoff}
-          className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className={cn(
+            'px-3 py-1.5 text-sm rounded-md text-white font-medium transition-colors',
+            score <= 40 && 'bg-error hover:bg-error/90',
+            score > 40 && score <= 60 && 'bg-warning hover:bg-warning/90',
+            score > 60 && 'bg-success hover:bg-success/90',
+          )}
         >
           → Planner
         </button>
       </div>
 
-      {/* Mobile: Show hamburger menu */}
+      {/* Mobile: hamburger menu */}
       <div className="md:hidden">
         <MobileActionsMenu onOpenUnderstanding={onOpenUnderstanding} onHandoff={onHandoff} />
       </div>
     </header>
   );
 }
+
+// Backwards compatibility aliases
+export { SessionNav as CanvasHeader };
+export type { SessionNavProps as CanvasHeaderProps };
