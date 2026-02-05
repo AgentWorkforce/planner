@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 // Plugin imports (relative paths to sibling packages)
 import { createPlannerService, type PlannerService } from '../../planner/src/index.js';
 import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
+import { createForgeService, type ForgeService } from '../../forge-core/src/index.js';
 
 // Relay infrastructure
 import {
@@ -45,6 +46,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../../planner.db');
 const IDEATION_DB_PATH = process.env.IDEATION_DB_PATH || path.resolve(__dirname, '../../../ideation.db');
+const FORGE_DB_PATH = process.env.FORGE_DB_PATH || path.resolve(__dirname, '../../../forge.db');
 
 // =============================================================================
 // Services
@@ -52,6 +54,7 @@ const IDEATION_DB_PATH = process.env.IDEATION_DB_PATH || path.resolve(__dirname,
 
 let plannerService: PlannerService;
 let ideationService: IdeationService;
+let forgeService: ForgeService;
 
 // =============================================================================
 // Main
@@ -67,6 +70,11 @@ async function start(): Promise<void> {
   ideationService = createIdeationService({ dbPath: IDEATION_DB_PATH });
   await ideationService.initialize();
   console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
+
+  // Initialize forge service
+  forgeService = createForgeService({ dbPath: FORGE_DB_PATH });
+  await forgeService.initialize();
+  console.log(`[forge] Initialized (database: ${FORGE_DB_PATH})`);
 
   // Create Express app
   const app = express();
@@ -87,6 +95,7 @@ async function start(): Promise<void> {
   // Mount plugin routers
   app.use('/api', plannerService.router);
   app.use('/api/ideation', ideationService.router);
+  app.use('/api/forge', forgeService.router);
 
   // Attempt relay connection (non-blocking on failure)
   const relayConfig = getRelayConfig();
@@ -153,6 +162,13 @@ async function start(): Promise<void> {
     console.log('  GET    /api/ideation/sessions/:id');
     console.log('  POST   /api/ideation/sessions/:id/messages');
     console.log('  GET    /api/ideation/sessions/:id/events (SSE)');
+    console.log('');
+    console.log('Forge endpoints:');
+    console.log('  GET    /api/forge/health');
+    console.log('  GET    /api/forge/runs');
+    console.log('  POST   /api/forge/runs');
+    console.log('  GET    /api/forge/runs/:id');
+    console.log('  GET    /api/forge/runs/:id/events (SSE)');
   });
 
   // Initialize WebSocket proxy for relay communication
@@ -188,6 +204,7 @@ async function start(): Promise<void> {
     // Shutdown services
     plannerService.shutdown();
     await ideationService.shutdown();
+    forgeService.shutdown();
 
     // Exit after cleanup
     process.exit(0);

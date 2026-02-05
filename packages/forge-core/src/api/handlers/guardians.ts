@@ -180,7 +180,7 @@ export function listGuardiansHandler(deps: GuardianHandlerDeps) {
 export function getGuardianHandler(deps: GuardianHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const guardianId = req.params.guardianId;
+      const guardianId = req.params.guardianId as string;
       if (!guardianId) {
         res.status(400).json({ error: 'guardianId is required' });
         return;
@@ -220,7 +220,7 @@ export function getGuardianHandler(deps: GuardianHandlerDeps) {
 export function spawnGuardianHandler(deps: GuardianHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const type = req.params.type;
+      const type = req.params.type as string;
       if (!type) {
         res.status(400).json({ error: 'type is required' });
         return;
@@ -295,7 +295,7 @@ export function spawnGuardianHandler(deps: GuardianHandlerDeps) {
 export function stopGuardianHandler(deps: GuardianHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const guardianId = req.params.guardianId;
+      const guardianId = req.params.guardianId as string;
       if (!guardianId) {
         res.status(400).json({ error: 'guardianId is required' });
         return;
@@ -346,7 +346,7 @@ export function stopGuardianHandler(deps: GuardianHandlerDeps) {
 export function getGuardianTrajectoryHandler(deps: GuardianHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const type = req.params.type;
+      const type = req.params.type as string;
       const { project_id } = req.query;
 
       if (!type) {
@@ -437,7 +437,7 @@ export function getGuardianTrajectoryHandler(deps: GuardianHandlerDeps) {
 export function recordObservationHandler(deps: GuardianHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const guardianId = req.params.guardianId;
+      const guardianId = req.params.guardianId as string;
       if (!guardianId) {
         res.status(400).json({ error: 'guardianId is required' });
         return;
@@ -503,7 +503,7 @@ export function recordObservationHandler(deps: GuardianHandlerDeps) {
 export function generateRetrospectiveHandler(deps: GuardianHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const guardianId = req.params.guardianId;
+      const guardianId = req.params.guardianId as string;
       if (!guardianId) {
         res.status(400).json({ error: 'guardianId is required' });
         return;

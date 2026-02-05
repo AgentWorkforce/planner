@@ -4,7 +4,7 @@
  * Provides typed HTTP methods for communicating with the Forge API.
  */
 
-export const FORGE_API_BASE = '/forge-api';
+export const FORGE_API_BASE = '/api/forge';
 
 /**
  * Custom error class for API errors

@@ -231,7 +231,7 @@ export function listRunsHandler(deps: RunHandlerDeps) {
 export function getRunHandler(deps: RunHandlerDeps) {
   return (req: Request, res: Response): void => {
     try {
-      const runId = req.params.id;
+      const runId = req.params.id as string;
 
       if (!runId) {
         res.status(400).json({ error: 'Run ID is required' });
