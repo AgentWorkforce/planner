@@ -125,7 +125,7 @@ export class BudgetService {
 
     // Emit trajectory event
     if (this.trajectoryCapture) {
-      this.trajectoryCapture.capture(runId, 'budget_initialized' as any, {
+      this.trajectoryCapture.capture(runId, 'budget_initialized', {
         tokens_allowed: tokensAllowed ?? null,
         cost_allowed_usd: costAllowedUsd ?? null,
       });
@@ -172,7 +172,7 @@ export class BudgetService {
     if (this.trajectoryCapture) {
       this.trajectoryCapture.capture(
         runId,
-        'budget_updated' as any,
+        'budget_updated',
         {
           task_id: taskId,
           tokens_used: usage.tokens ?? 0,
@@ -257,7 +257,7 @@ export class BudgetService {
 
     // Emit warning/critical events
     if (warningLevel !== 'none' && this.trajectoryCapture) {
-      this.trajectoryCapture.capture(runId, 'budget_warning' as any, {
+      this.trajectoryCapture.capture(runId, 'budget_warning', {
         warning_level: warningLevel,
         tokens_pct_used: tokensPctUsed,
         cost_pct_used: costPctUsed,

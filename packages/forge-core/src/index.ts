@@ -4,6 +4,7 @@ import { createForgeRouter } from './api/index.js';
 import { createTestExecutor } from './services/test-executor.js';
 import { createRunService, type OutcomeEmitter } from './services/run-service.js';
 import { createOrchestrator } from './services/orchestrator.js';
+import { TrajectoryCapture } from './services/trajectory-capture.js';
 import { loadForgeConfig, createDefaultConfig, type ForgeConfig } from './config/forge-config.js';
 import type { ForgeExecutionMode, SpawnTaskFn } from './services/agent-spawner.js';
 import type { TerminateAgentFn } from './services/recovery.js';
@@ -123,6 +124,9 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
   // Create storage
   const storage = createForgeStorage(dbPath);
 
+  // Create TrajectoryCapture (shared between RunService and MCP routes)
+  const trajectoryCapture = new TrajectoryCapture(storage);
+
   // Create HTTP-based outcome emitter if tuner URL is provided
   const outcomeEmitter: OutcomeEmitter | undefined = tunerUrl
     ? {
@@ -172,6 +176,7 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     // Create RunService
     const runService = createRunService({
       storage,
+      trajectoryCapture,
       outcomeEmitter,
     });
 
@@ -202,9 +207,10 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     console.log(`[ForgeService] ${source} mode executor ready`);
   }
 
-  // Create router with scheduleReadyTasks callback
+  // Create router with scheduleReadyTasks callback and trajectory capture (for MCP routes)
   const router = createForgeRouter({
     storage,
+    trajectoryCapture,
     scheduleReadyTasks,
   });
 

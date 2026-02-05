@@ -250,14 +250,14 @@ export class Orchestrator {
       taskId: task.task_id,
       runId: task.run_id,
       stepTitle: task.step_title,
-      stepDescription: undefined, // TODO: get from plan step
+      stepDescription: task.step_description,
       scope: task.scope,
-      ownerRole: undefined, // TODO: get from plan step
+      ownerRole: task.owner_role,
       workspacePath: task.workspace_path,
       cli: cliConfig?.cli ?? 'claude',
       model: recommendedModel,
       timeout: cliConfig?.timeout ?? executionPolicy.budgets.per_task_time_seconds,
-      acceptanceCriteria: undefined, // TODO: get from plan step
+      acceptanceCriteria: task.acceptance_criteria,
     };
 
     // Transition to running
@@ -371,7 +371,7 @@ export class Orchestrator {
       run_id: runId,
       task_id: task.task_id,
       step_id: task.step_id,
-      model_used: 'sonnet', // TODO: actual model
+      model_used: 'sonnet', // TODO: actual model (forge-agent-metrics)
       complexity_estimate: 'simple', // TODO: from plan
       outcome: 'success',
       attempts: tracker.attemptNumber,
@@ -380,6 +380,7 @@ export class Orchestrator {
       cost_usd: costUsd,
       confidence_score: confidence,
       timestamp: new Date().toISOString(),
+      source: 'production',
     };
 
     await this.runService.emitTaskOutcome(outcome);
@@ -414,7 +415,7 @@ export class Orchestrator {
       run_id: runId,
       task_id: task.task_id,
       step_id: task.step_id,
-      model_used: 'sonnet', // TODO: actual model
+      model_used: 'sonnet', // TODO: actual model (forge-agent-metrics)
       complexity_estimate: 'simple', // TODO: from plan
       outcome: 'failure',
       attempts: tracker.attemptNumber,
@@ -423,6 +424,7 @@ export class Orchestrator {
       cost_usd: 0,
       error_category: 'agent_failure',
       timestamp: new Date().toISOString(),
+      source: 'production',
     };
 
     await this.runService.emitTaskOutcome(outcome);
@@ -467,7 +469,10 @@ export class Orchestrator {
       total_duration_seconds: totalDurationSeconds,
       total_tokens: totalTokens,
       total_cost_usd: totalCostUsd,
+      replan_count: 0,       // TODO: wire to actual RunService counters (forge-replan-escalation-tracking)
+      escalation_count: 0,   // TODO: wire to actual RunService counters (forge-replan-escalation-tracking)
       timestamp: new Date().toISOString(),
+      source: 'production',
     };
 
     await this.runService.emitRunOutcome(outcome);
@@ -508,7 +513,10 @@ export class Orchestrator {
       total_duration_seconds: 0, // Unknown
       total_tokens: budget?.tokens_used ?? 0,
       total_cost_usd: budget?.cost_used_usd ?? 0,
+      replan_count: 0,       // TODO: wire to actual RunService counters (forge-replan-escalation-tracking)
+      escalation_count: 0,   // TODO: wire to actual RunService counters (forge-replan-escalation-tracking)
       timestamp: new Date().toISOString(),
+      source: 'production',
     };
 
     this.runService.emitRunOutcome(outcome).catch((err) => {

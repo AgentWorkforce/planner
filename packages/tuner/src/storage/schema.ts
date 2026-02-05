@@ -120,3 +120,14 @@ export const SCHEMA_STATEMENTS = [
     notes TEXT
   )`,
 ];
+
+/**
+ * Migration statements for existing databases.
+ * These use ALTER TABLE to add columns that may not exist yet.
+ * Each is wrapped in a try/catch at execution time since SQLite
+ * doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN.
+ */
+export const MIGRATION_STATEMENTS = [
+  `ALTER TABLE task_outcomes ADD COLUMN source TEXT DEFAULT 'production'`,
+  `ALTER TABLE run_outcomes ADD COLUMN source TEXT DEFAULT 'production'`,
+];

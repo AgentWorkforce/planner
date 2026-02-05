@@ -384,6 +384,8 @@ export const RunSchema = z.object({
   has_pending_gate: z.boolean(),
   /** DOT Framework execution policy (optional for backward compatibility) */
   execution_policy: ExecutionPolicySchema.optional(),
+  /** Workspace directory for agent execution (propagated to all tasks) */
+  workspace_path: z.string().optional(),
   started_at: z.string().datetime().optional(),
   completed_at: z.string().datetime().optional(),
   error: z.string().optional(),
@@ -423,6 +425,10 @@ export const TaskSchema = z.object({
   scope: z.string().optional(),
   /** Owner role from plan step (for CLI/model mapping) */
   owner_role: z.string().optional(),
+  /** Step description from plan step */
+  step_description: z.string().optional(),
+  /** Acceptance criteria from plan step */
+  acceptance_criteria: z.array(AcceptanceCriterionSchema).optional(),
   workspace_path: z.string().optional(),
   agent_id: z.string().optional(),
   current_attempt: z.number().int().optional(),
@@ -690,6 +696,8 @@ export type ActiveGuardian = z.infer<typeof ActiveGuardianSchema>;
 export interface CreateRunOptions {
   /** Optional execution policy for DOT Framework knobs */
   executionPolicy?: ExecutionPolicy;
+  /** Workspace directory for agent execution */
+  workspacePath?: string;
 }
 
 /**
@@ -704,6 +712,7 @@ export function createRun(forgePlan: ForgePlan, options?: CreateRunOptions): Run
     status: RunStatus.Pending,
     has_pending_gate: false,
     execution_policy: options?.executionPolicy,
+    workspace_path: options?.workspacePath,
     created_at: now,
     updated_at: now,
   };
@@ -713,7 +722,7 @@ export function createRun(forgePlan: ForgePlan, options?: CreateRunOptions): Run
 /**
  * Creates a new Task from a ForgeStep
  */
-export function createTask(runId: string, forgeStep: ForgeStep): Task {
+export function createTask(runId: string, forgeStep: ForgeStep, workspacePath?: string): Task {
   const now = new Date().toISOString();
   const task: Task = {
     task_id: crypto.randomUUID(),
@@ -724,6 +733,9 @@ export function createTask(runId: string, forgeStep: ForgeStep): Task {
     dependencies: forgeStep.dependencies,
     scope: forgeStep.scope,
     owner_role: forgeStep.owner_role,
+    workspace_path: workspacePath,
+    step_description: forgeStep.description,
+    acceptance_criteria: forgeStep.acceptance_criteria,
     created_at: now,
     updated_at: now,
   };

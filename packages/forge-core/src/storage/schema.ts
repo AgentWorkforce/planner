@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS runs (
   plan_version INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'paused', 'completed', 'failed', 'cancelled')),
   has_pending_gate INTEGER NOT NULL DEFAULT 0,
+  workspace_path TEXT,
   started_at TEXT,
   completed_at TEXT,
   error TEXT,
@@ -72,6 +73,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   scope TEXT,
   owner_role TEXT,
   workspace_path TEXT,
+  step_description TEXT,
+  acceptance_criteria TEXT,
   agent_id TEXT,
   current_attempt INTEGER,
   gate_id TEXT,
@@ -653,4 +656,17 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_TASK_METRICS_RUN_TIMESTAMP_INDEX,
   CREATE_TASK_METRICS_MODEL_OUTCOME_INDEX,
   CREATE_RUN_BUDGETS_TABLE,
+];
+
+/**
+ * Migration statements for existing databases.
+ * ALTER TABLE ADD COLUMN doesn't support IF NOT EXISTS in SQLite,
+ * so callers must catch "duplicate column" errors.
+ */
+export const MIGRATION_STATEMENTS = [
+  `ALTER TABLE tasks ADD COLUMN scope TEXT`,
+  `ALTER TABLE tasks ADD COLUMN owner_role TEXT`,
+  `ALTER TABLE runs ADD COLUMN workspace_path TEXT`,
+  `ALTER TABLE tasks ADD COLUMN step_description TEXT`,
+  `ALTER TABLE tasks ADD COLUMN acceptance_criteria TEXT`,
 ];

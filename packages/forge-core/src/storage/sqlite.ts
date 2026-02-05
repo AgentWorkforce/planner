@@ -18,6 +18,7 @@ import type {
   WorkspaceCleanup,
   AuditFinding,
   AttemptOutcome,
+  AcceptanceCriterion,
   GuardianEvent,
   GuardianConcernLevel,
   ActiveGuardian,
@@ -30,7 +31,7 @@ import type {
   DerivedPreference,
 } from '../domain/user-trajectory.js';
 import type { ForgeStorage, TrajectoryEventFilter, GuardianEventFilter } from './interface.js';
-import { ALL_SCHEMA_STATEMENTS } from './schema.js';
+import { ALL_SCHEMA_STATEMENTS, MIGRATION_STATEMENTS } from './schema.js';
 
 // ============================================
 // Safe JSON Parsing
@@ -63,6 +64,7 @@ interface RunRow {
   plan_version: number;
   status: string;
   has_pending_gate: number;
+  workspace_path: string | null;
   started_at: string | null;
   completed_at: string | null;
   error: string | null;
@@ -80,6 +82,8 @@ interface TaskRow {
   dependencies: string;
   scope: string | null;
   owner_role: string | null;
+  step_description: string | null;
+  acceptance_criteria: string | null;
   workspace_path: string | null;
   agent_id: string | null;
   current_attempt: number | null;
@@ -268,6 +272,19 @@ export class SqliteForgeStorage implements ForgeStorage {
    * Initialize database schema.
    */
   private initialize(): void {
+    // Run migrations first so existing tables get new columns
+    // before any indexes reference them.
+    for (const migration of MIGRATION_STATEMENTS) {
+      try {
+        this.db.exec(migration);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('duplicate column') && !msg.includes('no such table')) {
+          throw err;
+        }
+      }
+    }
+
     for (const statement of ALL_SCHEMA_STATEMENTS) {
       this.db.exec(statement);
     }
@@ -280,11 +297,11 @@ export class SqliteForgeStorage implements ForgeStorage {
   createRun(run: Run): Run {
     const stmt = this.db.prepare(`
       INSERT INTO runs (
-        run_id, plan_id, plan_version, status, has_pending_gate,
+        run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
         started_at, completed_at, error, document, created_at, updated_at
       )
       VALUES (
-        @run_id, @plan_id, @plan_version, @status, @has_pending_gate,
+        @run_id, @plan_id, @plan_version, @status, @has_pending_gate, @workspace_path,
         @started_at, @completed_at, @error, @document, @created_at, @updated_at
       )
     `);
@@ -294,6 +311,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       plan_version: run.plan_version,
       status: run.status,
       has_pending_gate: run.has_pending_gate ? 1 : 0,
+      workspace_path: run.workspace_path ?? null,
       started_at: run.started_at ?? null,
       completed_at: run.completed_at ?? null,
       error: run.error ?? null,
@@ -306,7 +324,7 @@ export class SqliteForgeStorage implements ForgeStorage {
 
   getRun(runId: string): Run | null {
     const stmt = this.db.prepare<string, RunRow>(`
-      SELECT run_id, plan_id, plan_version, status, has_pending_gate,
+      SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
              started_at, completed_at, error, document, created_at, updated_at
       FROM runs
       WHERE run_id = ?
@@ -362,7 +380,7 @@ export class SqliteForgeStorage implements ForgeStorage {
 
   listRuns(status?: RunStatus): Run[] {
     let sql = `
-      SELECT run_id, plan_id, plan_version, status, has_pending_gate,
+      SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
              started_at, completed_at, error, document, created_at, updated_at
       FROM runs
     `;
@@ -382,7 +400,7 @@ export class SqliteForgeStorage implements ForgeStorage {
 
   getActiveRuns(): Run[] {
     const stmt = this.db.prepare<[], RunRow>(`
-      SELECT run_id, plan_id, plan_version, status, has_pending_gate,
+      SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
              started_at, completed_at, error, document, created_at, updated_at
       FROM runs
       WHERE status IN ('running', 'paused')
@@ -400,11 +418,13 @@ export class SqliteForgeStorage implements ForgeStorage {
     const stmt = this.db.prepare(`
       INSERT INTO tasks (
         task_id, run_id, step_id, step_title, status, dependencies,
-        scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+        scope, owner_role, step_description, acceptance_criteria,
+        workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       )
       VALUES (
         @task_id, @run_id, @step_id, @step_title, @status, @dependencies,
-        @scope, @owner_role, @workspace_path, @agent_id, @current_attempt, @gate_id, @created_at, @updated_at
+        @scope, @owner_role, @step_description, @acceptance_criteria,
+        @workspace_path, @agent_id, @current_attempt, @gate_id, @created_at, @updated_at
       )
     `);
     stmt.run({
@@ -416,6 +436,8 @@ export class SqliteForgeStorage implements ForgeStorage {
       dependencies: JSON.stringify(task.dependencies),
       scope: task.scope ?? null,
       owner_role: task.owner_role ?? null,
+      step_description: task.step_description ?? null,
+      acceptance_criteria: task.acceptance_criteria ? JSON.stringify(task.acceptance_criteria) : null,
       workspace_path: task.workspace_path ?? null,
       agent_id: task.agent_id ?? null,
       current_attempt: task.current_attempt ?? null,
@@ -429,7 +451,8 @@ export class SqliteForgeStorage implements ForgeStorage {
   getTask(taskId: string): Task | null {
     const stmt = this.db.prepare<string, TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
-             scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+             scope, owner_role, step_description, acceptance_criteria,
+             workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE task_id = ?
     `);
@@ -493,7 +516,8 @@ export class SqliteForgeStorage implements ForgeStorage {
   listTasksByRun(runId: string): Task[] {
     const stmt = this.db.prepare<string, TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
-             scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+             scope, owner_role, step_description, acceptance_criteria,
+             workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE run_id = ?
       ORDER BY created_at ASC
@@ -528,7 +552,8 @@ export class SqliteForgeStorage implements ForgeStorage {
   getTaskByStepId(runId: string, stepId: string): Task | null {
     const stmt = this.db.prepare<[string, string], TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
-             scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+             scope, owner_role, step_description, acceptance_criteria,
+             workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE run_id = ? AND step_id = ?
     `);
@@ -1694,6 +1719,7 @@ export class SqliteForgeStorage implements ForgeStorage {
       plan_version: row.plan_version,
       status: row.status as RunStatus,
       has_pending_gate: row.has_pending_gate === 1,
+      workspace_path: row.workspace_path ?? undefined,
       started_at: row.started_at ?? undefined,
       completed_at: row.completed_at ?? undefined,
       error: row.error ?? undefined,
@@ -1712,6 +1738,10 @@ export class SqliteForgeStorage implements ForgeStorage {
       dependencies: safeJsonParse<string[]>(row.dependencies, [], `task ${row.task_id} dependencies`),
       scope: row.scope ?? undefined,
       owner_role: row.owner_role ?? undefined,
+      step_description: row.step_description ?? undefined,
+      acceptance_criteria: row.acceptance_criteria
+        ? safeJsonParse<AcceptanceCriterion[]>(row.acceptance_criteria, [], `task ${row.task_id} acceptance_criteria`)
+        : undefined,
       workspace_path: row.workspace_path ?? undefined,
       agent_id: row.agent_id ?? undefined,
       current_attempt: row.current_attempt ?? undefined,

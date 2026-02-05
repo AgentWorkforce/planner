@@ -47,6 +47,7 @@ export interface TaskOutcomeEmission {
   confidence_score?: number;
   error_category?: string;
   timestamp: string;
+  source?: 'test' | 'production' | 'training';
 }
 
 /**
@@ -62,7 +63,10 @@ export interface RunOutcomeEmission {
   total_duration_seconds: number;
   total_tokens: number;
   total_cost_usd: number;
+  replan_count: number;
+  escalation_count: number;
   timestamp: string;
+  source?: 'test' | 'production' | 'training';
 }
 
 /**

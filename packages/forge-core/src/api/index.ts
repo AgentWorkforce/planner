@@ -35,6 +35,7 @@ export {
   registerQuestionRoutes,
   type RegisterQuestionRoutesOptions,
 } from './routes/questions.js';
+export { registerMCPRoutes, type RegisterMCPRoutesOptions } from './routes/mcp.js';
 
 // ============================================
 // Request/Response Schemas

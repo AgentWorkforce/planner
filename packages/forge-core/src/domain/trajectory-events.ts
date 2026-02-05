@@ -67,6 +67,16 @@ export const TrajectoryEventType = {
   RetrospectiveTimeout: 'retrospective_timeout',
   RetrospectiveParseError: 'retrospective_parse_error',
   RetrospectiveValidationError: 'retrospective_validation_error',
+
+  // Recovery events
+  RecoveryStrategySelected: 'recovery_strategy_selected',
+  TaskEscalated: 'task_escalated',
+  TaskSkipped: 'task_skipped',
+
+  // Budget events
+  BudgetInitialized: 'budget_initialized',
+  BudgetUpdated: 'budget_updated',
+  BudgetWarning: 'budget_warning',
 } as const;
 
 export type TrajectoryEventType =
@@ -110,6 +120,12 @@ export const TrajectoryEventTypeSchema = z.enum([
   'retrospective_timeout',
   'retrospective_parse_error',
   'retrospective_validation_error',
+  'recovery_strategy_selected',
+  'task_escalated',
+  'task_skipped',
+  'budget_initialized',
+  'budget_updated',
+  'budget_warning',
 ]);
 
 // ============================================
@@ -464,6 +480,66 @@ export const GuardianTriggerReceivedPayloadSchema = z.object({
 export type GuardianTriggerReceivedPayload = z.infer<typeof GuardianTriggerReceivedPayloadSchema>;
 
 // ============================================
+// Recovery Event Payloads
+// ============================================
+
+export const RecoveryStrategySelectedPayloadSchema = z.object({
+  task_id: z.string().min(1),
+  attempt_number: z.number().int().positive(),
+  strategy: z.string().min(1),
+  error_message: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+export type RecoveryStrategySelectedPayload = z.infer<typeof RecoveryStrategySelectedPayloadSchema>;
+
+export const TaskEscalatedPayloadSchema = z.object({
+  task_id: z.string().min(1),
+  attempt_number: z.number().int().positive(),
+  error_message: z.string().optional(),
+  gate_id: z.string().uuid().optional(),
+});
+
+export type TaskEscalatedPayload = z.infer<typeof TaskEscalatedPayloadSchema>;
+
+export const TaskSkippedPayloadSchema = z.object({
+  task_id: z.string().min(1),
+  reason: z.string().optional(),
+  error_message: z.string().optional(),
+});
+
+export type TaskSkippedPayload = z.infer<typeof TaskSkippedPayloadSchema>;
+
+// ============================================
+// Budget Event Payloads
+// ============================================
+
+export const BudgetInitializedPayloadSchema = z.object({
+  tokens_allowed: z.number().nullable(),
+  cost_allowed_usd: z.number().nullable(),
+});
+
+export type BudgetInitializedPayload = z.infer<typeof BudgetInitializedPayloadSchema>;
+
+export const BudgetUpdatedPayloadSchema = z.object({
+  task_id: z.string(),
+  tokens_used: z.number(),
+  cost_usd: z.number(),
+  duration_ms: z.number().nullable().optional(),
+});
+
+export type BudgetUpdatedPayload = z.infer<typeof BudgetUpdatedPayloadSchema>;
+
+export const BudgetWarningPayloadSchema = z.object({
+  warning_level: z.string(),
+  tokens_pct_used: z.number().optional(),
+  cost_pct_used: z.number().optional(),
+  message: z.string().optional(),
+});
+
+export type BudgetWarningPayload = z.infer<typeof BudgetWarningPayloadSchema>;
+
+// ============================================
 // Payload Schema Map
 // ============================================
 
@@ -509,6 +585,14 @@ export const TrajectoryPayloadSchemas: Record<TrajectoryEventType, z.ZodType> = 
   [TrajectoryEventType.RetrospectiveTimeout]: RetrospectiveTimeoutPayloadSchema,
   [TrajectoryEventType.RetrospectiveParseError]: RetrospectiveParseErrorPayloadSchema,
   [TrajectoryEventType.RetrospectiveValidationError]: RetrospectiveValidationErrorPayloadSchema,
+  // Recovery events
+  [TrajectoryEventType.RecoveryStrategySelected]: RecoveryStrategySelectedPayloadSchema,
+  [TrajectoryEventType.TaskEscalated]: TaskEscalatedPayloadSchema,
+  [TrajectoryEventType.TaskSkipped]: TaskSkippedPayloadSchema,
+  // Budget events
+  [TrajectoryEventType.BudgetInitialized]: BudgetInitializedPayloadSchema,
+  [TrajectoryEventType.BudgetUpdated]: BudgetUpdatedPayloadSchema,
+  [TrajectoryEventType.BudgetWarning]: BudgetWarningPayloadSchema,
 };
 
 /**

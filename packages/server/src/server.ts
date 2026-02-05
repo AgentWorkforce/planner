@@ -75,11 +75,6 @@ async function start(): Promise<void> {
   await ideationService.initialize();
   console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
 
-  // Initialize forge service
-  forgeService = createForgeService({ dbPath: FORGE_DB_PATH });
-  await forgeService.initialize();
-  console.log(`[forge] Initialized (database: ${FORGE_DB_PATH})`);
-
   // Create Express app
   const app = express();
   app.use(cors());
@@ -96,10 +91,10 @@ async function start(): Promise<void> {
   const serverRouter = createServerRouter(storage);
   app.use('/api', serverRouter);
 
-  // Mount plugin routers (forge mounted after relay connection to detect mode)
+  // Mount plugin routers
   app.use('/api', plannerService.router);
   app.use('/api/ideation', ideationService.router);
-  app.use('/api/forge', forgeService.router);
+  // Forge router mounted after relay connection to detect mode (see below)
 
   // Attempt relay connection (non-blocking on failure)
   const relayConfig = getRelayConfig();

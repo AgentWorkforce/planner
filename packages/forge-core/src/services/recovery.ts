@@ -383,7 +383,7 @@ export class TaskFailureHandler {
     if (this.trajectoryCapture) {
       this.trajectoryCapture.capture(
         context.runId,
-        'recovery_strategy_selected' as any,
+        'recovery_strategy_selected',
         {
           task_id: context.task.task_id,
           attempt_number: context.attemptNumber,
@@ -520,7 +520,7 @@ export class TaskFailureHandler {
     if (this.trajectoryCapture) {
       this.trajectoryCapture.capture(
         context.runId,
-        'task_escalated' as any,
+        'task_escalated',
         {
           task_id: context.task.task_id,
           attempt_number: context.attemptNumber,
@@ -548,7 +548,7 @@ export class TaskFailureHandler {
     if (this.trajectoryCapture) {
       this.trajectoryCapture.capture(
         context.runId,
-        'task_skipped' as any,
+        'task_skipped',
         {
           task_id: context.task.task_id,
           reason: 'recovery_skip',

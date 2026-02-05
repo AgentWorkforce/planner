@@ -13,7 +13,7 @@ import type {
   ConfigVersion,
   InsightsSummary,
 } from './interface.js';
-import { SCHEMA_STATEMENTS } from './schema.js';
+import { SCHEMA_STATEMENTS, MIGRATION_STATEMENTS } from './schema.js';
 
 // ============================================================================
 // Row Types
@@ -132,6 +132,20 @@ export class SQLiteTunerStorage implements TunerStorage {
   }
 
   private initSchema(): void {
+    // Run migrations first so existing tables get new columns
+    // before indexes reference them. For fresh DBs, these fail
+    // harmlessly (table doesn't exist yet).
+    for (const migration of MIGRATION_STATEMENTS) {
+      try {
+        this.db.exec(migration);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('duplicate column') && !msg.includes('no such table')) {
+          throw err;
+        }
+      }
+    }
+
     for (const statement of SCHEMA_STATEMENTS) {
       this.db.exec(statement);
     }
