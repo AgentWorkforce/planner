@@ -10,20 +10,21 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5174,
+    port: 3003,
     proxy: {
-      // Forge API (Orchestrator backend)
-      '/forge-api': {
+      // Forge API routes (mounted at /api/forge in backend)
+      '/api/forge': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // WebSocket for forge real-time updates
       '/ws/forge': {
         target: 'ws://localhost:3001',
         ws: true,
       },
-      // Planner API (for plan data)
+      // Planner/Ideation API (same backend)
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3001',
         changeOrigin: true,
       },
     },
