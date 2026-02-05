@@ -92,7 +92,7 @@ export function FocusMode({ block, onClose, onCurate, onContentChange, children,
   return (
     <div className={cn('flex h-full focus-mode-enter', className)}>
       {/* Left: Block Detail Panel (60%) */}
-      <div className="flex-[0_0_60%] h-full overflow-y-auto border-r border-border-subtle bg-bg-primary p-6">
+      <div className="flex-[0_0_60%] h-full overflow-y-auto border-r border-border-subtle bg-[var(--canvas-bg)] p-6">
         {/* Header with title and actions */}
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -112,7 +112,7 @@ export function FocusMode({ block, onClose, onCurate, onContentChange, children,
           <div className="flex items-center gap-2">
             <button
               onClick={onCurate}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-2 px-6 py-2.5 bg-[var(--canvas-accent)] text-white font-semibold rounded-full shadow-md hover:shadow-lg hover:brightness-110 transition-all"
               aria-label="Curate block"
             >
               <Check className="w-4 h-4" />
@@ -165,15 +165,17 @@ export function FocusMode({ block, onClose, onCurate, onContentChange, children,
           />
         </div>
 
-        {/* Source context section */}
+        {/* Source context badges */}
         {block.sourceContext && (
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-text-primary uppercase tracking-wide mb-3">
-              Source Context
-            </h3>
-            <p className="text-sm text-text-muted bg-bg-secondary p-4 rounded-md border border-border-subtle">
-              {block.sourceContext}
-            </p>
+          <div className="mb-6 flex flex-wrap gap-2">
+            {block.sourceContext.split(',').map((item, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-[var(--canvas-bg-subtle)] text-[var(--canvas-text-muted)]"
+              >
+                {item.trim()}
+              </span>
+            ))}
           </div>
         )}
 
@@ -202,7 +204,7 @@ export function FocusMode({ block, onClose, onCurate, onContentChange, children,
       </div>
 
       {/* Right: Contextual Chat (40%) */}
-      <div className="flex-[0_0_40%] h-full flex flex-col bg-bg-primary">
+      <div className="flex-[0_0_40%] h-full flex flex-col bg-[var(--canvas-bg)]">
         {children}
       </div>
     </div>

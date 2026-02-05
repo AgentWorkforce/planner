@@ -113,8 +113,8 @@ export function BlockDetailPanel({
     setShowDeleteConfirm(false);
   };
 
-  // Format source context
-  const sourceText = [block.specialist, block.sourceContext].filter(Boolean).join(', ');
+  // Source context items as badges
+  const sourceItems = [block.specialist, block.sourceContext].filter(Boolean);
 
   return (
     <>
@@ -193,29 +193,29 @@ export function BlockDetailPanel({
         </div>
 
         {/* Source Context */}
-        {sourceText && (
-          <div className="px-4 py-2 border-t border-border-subtle bg-bg-secondary">
-            <p className="text-xs text-text-muted">
-              <span className="font-medium">Source:</span> {sourceText}
-            </p>
+        {sourceItems.length > 0 && (
+          <div className="px-4 py-2 border-t border-border-subtle flex flex-wrap gap-1.5">
+            {sourceItems.map((item, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-[var(--canvas-bg-subtle)] text-[var(--canvas-text-muted)]"
+              >
+                {item}
+              </span>
+            ))}
           </div>
         )}
 
         {/* Actions */}
         {block.status !== 'curated' && onCurate && (
-          <div className="p-4 border-t border-border-subtle flex justify-end bg-bg-primary">
+          <div className="p-4 border-t border-border-subtle flex justify-end">
             <button
               onClick={onCurate}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-md',
-                'bg-accent-cyan text-text-inverse',
-                'hover:bg-accent-hover transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-accent-cyan focus:ring-offset-2 focus:ring-offset-bg-primary'
-              )}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[var(--canvas-accent)] text-white font-semibold rounded-full shadow-md hover:shadow-lg hover:brightness-110 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--canvas-accent)] focus-visible:ring-offset-2"
               aria-label="Curate block"
             >
               <Check className="w-4 h-4" />
-              <span className="font-medium">Curate</span>
+              <span>Curate</span>
             </button>
           </div>
         )}

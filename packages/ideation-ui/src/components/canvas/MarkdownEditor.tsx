@@ -98,6 +98,14 @@ export function MarkdownEditor({
     setIsEditing((prev) => !prev);
   }, [isEditing, hasUnsavedChanges, handleSave]);
 
+  // Auto-resize textarea to fit content
+  const autoResize = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 200)}px`;
+  }, []);
+
   // Focus textarea when entering edit mode
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -105,8 +113,9 @@ export function MarkdownEditor({
       // Place cursor at end
       const len = textareaRef.current.value.length;
       textareaRef.current.setSelectionRange(len, len);
+      autoResize();
     }
-  }, [isEditing]);
+  }, [isEditing, autoResize]);
 
   return (
     <div className={cn('relative flex flex-col', className)}>
@@ -140,10 +149,10 @@ export function MarkdownEditor({
       {/* Editor or Preview */}
       <div
         className={cn(
-          'relative rounded-md border transition-colors',
+          'relative rounded-md transition-colors',
           isEditing
-            ? 'border-border-subtle bg-bg-secondary'
-            : 'border-border-subtle bg-bg-primary'
+            ? 'bg-[var(--block-draft)]'
+            : 'bg-[var(--canvas-bg)]'
         )}
         style={{ minHeight }}
       >
@@ -152,58 +161,34 @@ export function MarkdownEditor({
           <textarea
             ref={textareaRef}
             value={localContent}
-            onChange={(e) => handleContentChange(e.target.value)}
+            onChange={(e) => {
+              handleContentChange(e.target.value);
+              autoResize();
+            }}
             onBlur={handleBlur}
             className={cn(
-              'w-full h-full min-h-[200px] p-4 rounded-md resize-y',
+              'w-full p-4 rounded-md resize-none',
               'bg-transparent border-0',
               'text-text-primary placeholder:text-text-muted',
-              'focus:outline-none focus:ring-2 focus:ring-accent-cyan',
+              'focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-accent-cyan',
               'font-mono text-sm'
             )}
+            style={{ minHeight }}
             placeholder={placeholder}
             spellCheck="true"
           />
         ) : (
           // Preview mode: rendered markdown
           <div
-            className={cn(
-              'p-4 overflow-y-auto',
-              'prose prose-sm max-w-none',
-              'prose-headings:text-text-primary prose-p:text-text-primary',
-              'prose-strong:text-text-primary prose-code:text-text-primary',
-              'prose-ul:text-text-primary prose-ol:text-text-primary',
-              'prose-li:text-text-primary prose-a:text-accent-cyan',
-              'prose-blockquote:text-text-muted prose-blockquote:border-l-accent-cyan'
-            )}
+            className="p-4 overflow-y-auto prose prose-sm prose-canvas max-w-none"
             style={{ minHeight }}
           >
             {localContent ? (
               <ReactMarkdown
                 components={{
-                  // Customize code blocks
-                  code: (props) => {
-                    const { node, className, children, ...rest } = props;
-                    const isInline = !className?.includes('language-');
-                    return (
-                      <code
-                        {...rest}
-                        className={cn(
-                          className,
-                          isInline
-                            ? 'px-1.5 py-0.5 rounded bg-bg-secondary text-text-primary font-mono text-xs'
-                            : 'block p-3 rounded bg-bg-secondary text-text-primary font-mono text-sm overflow-x-auto'
-                        )}
-                      >
-                        {children}
-                      </code>
-                    );
-                  },
-                  // Customize links
                   a: ({ node, ...props }) => (
                     <a
                       {...props}
-                      className="text-accent-cyan hover:text-accent-hover underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     />

@@ -17,13 +17,15 @@ export function ChatInput({
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea
+  // Auto-resize textarea (min 3 lines, max 6 lines)
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      const maxHeight = 4 * 24; // 4 lines * ~24px per line
-      textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+      const lineHeight = 20; // ~20px per line at text-sm
+      const minHeight = 3 * lineHeight;
+      const maxHeight = 6 * lineHeight;
+      textarea.style.height = `${Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight))}px`;
     }
   }, [value]);
 
@@ -42,8 +44,15 @@ export function ChatInput({
   };
 
   return (
-    <div className="p-4 border-t border-border-subtle bg-bg-primary">
-      <div className="flex gap-2 items-end">
+    <div className="p-4">
+      <div
+        className={cn(
+          'relative rounded-xl bg-bg-secondary border border-border-subtle shadow-md',
+          'focus-within:ring-2 focus-within:ring-accent-cyan focus-within:border-accent-cyan/40',
+          'transition-all',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+      >
         <textarea
           ref={textareaRef}
           value={value}
@@ -51,12 +60,12 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          rows={1}
+          rows={3}
           className={cn(
-            'flex-1 resize-none rounded-lg border border-border-subtle bg-bg-secondary px-3 py-2',
+            'w-full resize-none bg-transparent px-4 py-3 pr-14',
             'text-sm text-text-primary placeholder:text-text-muted',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan',
-            'disabled:cursor-not-allowed disabled:opacity-50'
+            'focus:outline-none focus-visible:outline-none',
+            'disabled:cursor-not-allowed'
           )}
         />
         <Button
@@ -65,6 +74,7 @@ export function ChatInput({
           onClick={handleSend}
           disabled={!value.trim() || disabled}
           title="Send message"
+          className="absolute bottom-2 right-2"
         >
           <SendIcon size="md" />
         </Button>

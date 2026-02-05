@@ -45,7 +45,7 @@ function CuratedBlockCard({ block, onClick, onUncurate }: CuratedBlockCardProps)
   return (
     <div
       onClick={onClick}
-      className="p-3 rounded-lg cursor-pointer transition-all hover:shadow-md animate-in slide-in-from-left-2 fade-in duration-300"
+      className="p-3 rounded-lg cursor-pointer transition-all shadow-md hover:shadow-lg animate-in slide-in-from-left-2 fade-in duration-300"
       style={{
         backgroundColor: 'var(--block-curated)',
         borderLeft: '3px solid var(--block-curated-border)',
