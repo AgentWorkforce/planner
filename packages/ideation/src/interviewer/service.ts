@@ -13,7 +13,7 @@ import {
   sessionChannelId,
   isIdeationChannel,
   extractSessionPrefix,
-  LLM_CONFIG,
+  getLLMConfig,
 } from './config.js';
 import { getInterviewerPrompt, getWelcomeMessage } from './prompt.js';
 import { INTERVIEWER_TOOLS, type ToolResult } from './tools.js';
@@ -458,11 +458,12 @@ class InterviewerService {
       : INTERVIEWER_TOOLS;
 
     try {
-      console.log(`[Interviewer] Calling Anthropic API: model=${LLM_CONFIG.model}, messages=${messages.length}, tools=${tools.length}`);
+      const llmConfig = getLLMConfig();
+      console.log(`[Interviewer] Calling Anthropic API: model=${llmConfig.model}, messages=${messages.length}, tools=${tools.length}`);
       const startTime = Date.now();
       const response = await this.state.anthropic.messages.create({
-        model: LLM_CONFIG.model,
-        max_tokens: LLM_CONFIG.maxTokens,
+        model: llmConfig.model,
+        max_tokens: llmConfig.maxTokens,
         system: fullSystemPrompt,
         tools,
         messages,
@@ -520,8 +521,8 @@ class InterviewerService {
           console.log('[Interviewer] Calling Anthropic API for tool result continuation');
           const continueStartTime = Date.now();
           result = await this.state.anthropic.messages.create({
-            model: LLM_CONFIG.model,
-            max_tokens: LLM_CONFIG.maxTokens,
+            model: llmConfig.model,
+            max_tokens: llmConfig.maxTokens,
             system: fullSystemPrompt,
             tools,
             messages: [
@@ -567,8 +568,8 @@ class InterviewerService {
         console.log(`[Interviewer] ${reason}, making final call without tools`);
         // Use original messages WITHOUT the tool_use response (avoid tool_use/tool_result mismatch)
         const finalResult = await this.state.anthropic.messages.create({
-          model: LLM_CONFIG.model,
-          max_tokens: LLM_CONFIG.maxTokens,
+          model: llmConfig.model,
+          max_tokens: llmConfig.maxTokens,
           system: fullSystemPrompt + '\n\nIMPORTANT: You have already used tools to spawn specialists and update understanding. Now respond CONVERSATIONALLY to the user. Do NOT output XML, tool invocations, or function calls. Just speak naturally.',
           messages, // Original messages without the tool-heavy response
         });

@@ -16,9 +16,12 @@
   "dependencies": {
     "@agent-relay/sdk": "^2.0.37",
     "@anthropic-ai/sdk": "^0.39.0",
+    "@plannr/errors": "*",
+    "@plannr/storage-base": "*",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "tuner": "*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
