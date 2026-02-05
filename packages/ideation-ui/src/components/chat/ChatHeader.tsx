@@ -46,7 +46,7 @@ export function ChatHeader({ session }: ChatHeaderProps) {
   };
 
   return (
-    <header className="h-14 px-4 flex items-center justify-between bg-bg-primary shrink-0">
+    <header className="h-14 px-4 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-4 min-w-0">
         <h2 className="text-sm font-semibold text-text-primary truncate">
           {truncateTitle(session.source?.initial_intent ?? 'Untitled')}

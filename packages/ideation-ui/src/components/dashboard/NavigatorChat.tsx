@@ -82,7 +82,7 @@ export function NavigatorChat() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
-  const handleSend = (content: string) => {
+  const handleSend = async (content: string) => {
     // Add user message
     const userMessage: Message = {
       role: 'user',
@@ -91,17 +91,38 @@ export function NavigatorChat() {
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Simulate assistant response
+    // Call Navigator API
     setIsTyping(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/ideation/navigator/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: content }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(error.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
       const assistantMessage: Message = {
         role: 'assistant',
-        content: 'Navigator agent will be connected in the next phase. For now, you can use the suggestions below or browse sessions in the left panel.',
+        content: data.response,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${errorMessage}`,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleSuggestionClick = (suggestion: Suggestion) => {
@@ -111,9 +132,9 @@ export function NavigatorChat() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-bg-primary">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border-subtle">
+      <div className="flex items-center gap-2 px-4 py-3">
         <div className="w-8 h-8 rounded-full bg-accent-purple/20 flex items-center justify-center">
           <BrainIcon size="sm" className="text-accent-purple" />
         </div>
@@ -198,7 +219,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
           'max-w-[70%] rounded-lg px-4 py-2',
           isUser
             ? 'bg-accent-cyan/20 text-text-primary'
-            : 'bg-bg-tertiary text-text-primary'
+            : 'text-text-primary'
         )}
       >
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>

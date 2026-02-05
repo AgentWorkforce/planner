@@ -94,8 +94,9 @@ const EDGE_ATTRACTION_FORCE = 0.00012;
 
 /**
  * Random spawn offset from center (pixels)
+ * Reduced to keep initial spawns closer to center, avoiding edge collisions
  */
-const SPAWN_OFFSET = 120;
+const SPAWN_OFFSET = 80;
 
 /**
  * usePhysicsEngine
@@ -170,21 +171,22 @@ export function usePhysicsEngine(
     engineRef.current = engine;
 
     // Add wall boundaries at container edges
-    const wallThickness = 20;
+    // Walls are positioned outside the visible area to contain bodies
+    const wallThickness = 100; // Thick walls to prevent tunneling
     const walls = [
-      Bodies.rectangle(width / 2, -wallThickness / 2, width, wallThickness, {
+      Bodies.rectangle(width / 2, -wallThickness / 2, width + wallThickness * 2, wallThickness, {
         isStatic: true,
         label: 'wall-top',
       }),
-      Bodies.rectangle(width / 2, height + wallThickness / 2, width, wallThickness, {
+      Bodies.rectangle(width / 2, height + wallThickness / 2, width + wallThickness * 2, wallThickness, {
         isStatic: true,
         label: 'wall-bottom',
       }),
-      Bodies.rectangle(-wallThickness / 2, height / 2, wallThickness, height, {
+      Bodies.rectangle(-wallThickness / 2, height / 2, wallThickness, height + wallThickness * 2, {
         isStatic: true,
         label: 'wall-left',
       }),
-      Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height, {
+      Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height + wallThickness * 2, {
         isStatic: true,
         label: 'wall-right',
       }),

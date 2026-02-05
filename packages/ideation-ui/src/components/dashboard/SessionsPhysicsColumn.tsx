@@ -128,7 +128,7 @@ export function SessionsPhysicsColumn() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border-subtle">
+      <div className="p-4">
         <h2 className="text-sm font-medium text-text-primary">In-Progress Sessions</h2>
         <p className="text-xs text-text-muted mt-1">
           {loading ? 'Loading sessions...' : `${activeSessions.length} active`}
@@ -139,8 +139,7 @@ export function SessionsPhysicsColumn() {
       <div
         ref={containerRef}
         className={cn(
-          'relative flex-1 overflow-hidden',
-          'bg-bg-primary'
+          'relative flex-1 overflow-hidden'
         )}
       >
         {/* Error State */}
@@ -191,7 +190,7 @@ export function SessionsPhysicsColumn() {
               position={{ x: position.x, y: position.y }}
               size={size}
               isAbandoned={isAbandoned}
-              onClick={() => navigate(`/ideation/sessions/${session.id}`)}
+              onClick={() => navigate(`/ideation/session/${session.id}`)}
             />
           );
         })}

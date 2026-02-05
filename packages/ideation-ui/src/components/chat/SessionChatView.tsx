@@ -157,7 +157,7 @@ export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: Ses
       <div className="flex-1 overflow-y-auto relative">
         <ChatMessageList messages={transcript} />
         {isTyping && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-primary to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[var(--canvas-bg)] to-transparent">
             <TypingIndicator />
           </div>
         )}

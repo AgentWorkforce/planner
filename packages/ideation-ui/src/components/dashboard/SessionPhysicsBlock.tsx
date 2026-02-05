@@ -55,7 +55,7 @@ export interface SessionPhysicsBlockProps {
  *   }}
  *   position={{ x: 100, y: 100 }}
  *   size={80}
- *   onClick={() => navigate(`/ideation/sessions/${session.id}`)}
+ *   onClick={() => navigate(`/ideation/session/${session.id}`)}
  * />
  * ```
  */

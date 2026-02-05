@@ -334,7 +334,7 @@ export function CanvasHeader({
   return (
     <header
       className={cn(
-        'h-14 flex items-center justify-between px-2 md:px-4 border-b border-border bg-background',
+        'h-14 flex items-center justify-between px-2 md:px-4 bg-[var(--canvas-bg)]',
         className
       )}
     >

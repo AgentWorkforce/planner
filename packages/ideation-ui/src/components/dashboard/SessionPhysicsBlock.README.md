@@ -63,7 +63,7 @@ import { SessionPhysicsBlock } from '@/components/dashboard';
   }}
   position={{ x: 100, y: 100 }}
   size={80}
-  onClick={() => navigate(`/ideation/sessions/${session.id}`)}
+  onClick={() => navigate(`/ideation/session/${session.id}`)}
 />
 ```
 
@@ -78,7 +78,7 @@ import { SessionPhysicsBlock } from '@/components/dashboard';
 ### Navigation
 Clicking a session block navigates to:
 ```
-/ideation/sessions/{session.id}
+/ideation/session/{session.id}
 ```
 
 This loads the full session canvas view with:

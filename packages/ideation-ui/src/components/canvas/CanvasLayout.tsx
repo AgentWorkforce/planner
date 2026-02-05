@@ -43,35 +43,35 @@ export function CanvasLayout({
   className,
 }: CanvasLayoutProps) {
   return (
-    <div className={cn('flex flex-col md:flex-row h-full gap-0', className)}>
+    <div className={cn('flex flex-col md:flex-row h-full gap-0 bg-[var(--canvas-bg)]', className)}>
       {/* Mobile: Chat First | Desktop: Forming Blocks Left (30%) */}
       <div
-        className="flex-1 md:flex-[0_0_30%] h-auto md:h-full overflow-hidden bg-bg-tertiary md:border-r border-b md:border-b-0 border-border-subtle order-2 md:order-1"
+        className="flex-1 md:flex-[0_0_30%] h-auto md:h-full overflow-hidden order-2 md:order-1"
       >
-        <div className="block md:hidden">{chatSlot}</div>
-        <div className="hidden md:block">{formingBlocksSlot}</div>
+        <div className="block md:hidden h-full">{chatSlot}</div>
+        <div className="hidden md:block h-full">{formingBlocksSlot}</div>
       </div>
 
       {/* Mobile: Hidden | Desktop: Chat Center (45%) */}
       <div
-        className="hidden md:flex md:flex-[0_0_45%] h-full overflow-hidden bg-bg-primary order-1 md:order-2"
+        className="hidden md:flex md:flex-[0_0_45%] h-full overflow-hidden order-1 md:order-2"
       >
         {chatSlot}
       </div>
 
       {/* Mobile: Forming then Curated | Desktop: Curated Right (25%) */}
       <div
-        className="flex-1 md:flex-[0_0_25%] h-auto md:h-full overflow-hidden bg-bg-secondary md:border-l border-t md:border-t-0 border-border-subtle order-3"
+        className="flex-1 md:flex-[0_0_25%] h-auto md:h-full overflow-hidden order-3"
       >
         {/* Mobile: Show both columns stacked */}
-        <div className="block md:hidden">
-          <div className="border-b border-border-subtle bg-bg-tertiary">
+        <div className="block md:hidden h-full overflow-y-auto">
+          <div>
             {formingBlocksSlot}
           </div>
           {curatedBlocksSlot}
         </div>
         {/* Desktop: Show only curated */}
-        <div className="hidden md:block">{curatedBlocksSlot}</div>
+        <div className="hidden md:block h-full">{curatedBlocksSlot}</div>
       </div>
     </div>
   );

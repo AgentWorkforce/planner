@@ -103,9 +103,9 @@ export function SentToPlannerColumn({
   );
 
   return (
-    <div className={cn('h-full flex flex-col bg-bg-secondary', className)}>
+    <div className={cn('h-full flex flex-col', className)}>
       {/* Header */}
-      <div className="p-4 border-b border-border-subtle">
+      <div className="p-4">
         <h2 className="text-sm font-medium text-text-primary">
           Sent to Planner ({sessions.length})
         </h2>

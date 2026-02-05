@@ -123,7 +123,7 @@ export function FormingBlocksColumn({
   if (isMobile) {
     return (
       <div
-        className={cn('w-full overflow-y-auto bg-[var(--mockup-bg-primary)] p-3', className)}
+        className={cn('w-full overflow-y-auto bg-[var(--canvas-bg)] p-3', className)}
       >
         <div className="space-y-3">
           {filteredBlocks.length === 0 ? (
@@ -161,7 +161,7 @@ export function FormingBlocksColumn({
   return (
     <div
       ref={containerRef}
-      className={cn('relative w-full h-full overflow-hidden bg-[var(--mockup-bg-primary)]', className)}
+      className={cn('relative w-full h-full overflow-hidden bg-[var(--canvas-bg)]', className)}
     >
       {filteredBlocks.map((block) => {
         const position = bodies.get(block.id) || { x: 0, y: 0, angle: 0, radius: 0 };

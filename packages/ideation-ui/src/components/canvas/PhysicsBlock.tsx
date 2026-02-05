@@ -96,8 +96,9 @@ export function PhysicsBlock({
     const updatePosition = () => {
       if (element) {
         // Center the element on the physics body position
-        const left = position.x - size / 2;
-        const top = position.y - size / 2;
+        // Clamp to ensure block stays within visible bounds (at least partially visible)
+        const left = Math.max(0, position.x - size / 2);
+        const top = Math.max(0, position.y - size / 2);
 
         // Use transform for GPU-accelerated positioning
         element.style.transform = `translate(${left}px, ${top}px)`;
@@ -175,7 +176,7 @@ export function PhysicsBlock({
         opacity,
         transform: `scale(${scale})`,
         willChange: 'transform',
-        backgroundColor: 'var(--mockup-block-draft)',
+        backgroundColor: 'var(--block-draft)',
         borderRadius,
         borderStyle: 'solid',
         borderWidth: `${borderStyle.width}px`,

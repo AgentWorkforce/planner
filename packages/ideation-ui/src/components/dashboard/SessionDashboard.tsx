@@ -30,9 +30,9 @@ import { SentToPlannerColumn } from './SentToPlannerColumn';
  */
 export function SessionDashboard() {
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col bg-[var(--canvas-bg)]">
       {/* Header */}
-      <header className="h-14 flex items-center px-4 border-b border-border-subtle bg-bg-primary">
+      <header className="h-14 flex items-center px-4">
         <h1 className="text-xl font-semibold text-text-primary">Ideation Dashboard</h1>
       </header>
 
