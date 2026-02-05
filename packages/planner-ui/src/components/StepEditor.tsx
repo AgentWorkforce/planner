@@ -2,8 +2,11 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { EditableText } from './EditableText';
 import { EditableTextarea } from './EditableTextarea';
 import { DependencyIndicator, type ConnectedStep, type DependencyDirection } from './DependencyIndicator';
-import { ChevronIcon, TrashIcon, MessageIcon, CloseIcon, PlusIcon, ArchitectIcon, DesignerIcon, TesterIcon, SecurityIcon, DatabaseIcon, SettingsIcon } from './icons';
+import { ChevronIcon, TrashIcon, MessageIcon, ArchitectIcon, DesignerIcon, TesterIcon, SecurityIcon, DatabaseIcon, SettingsIcon } from './icons';
 import { StepSpecificationTabs } from './spec';
+import { AcceptanceCriteriaSection } from './step-editor/AcceptanceCriteriaSection';
+import { DependenciesSection } from './step-editor/DependenciesSection';
+import { ApprovalGateSection } from './step-editor/ApprovalGateSection';
 import { updateStepSpecification } from '@/api/client';
 import type { Step, DomainSpec } from '@/types';
 
@@ -231,10 +234,6 @@ export function StepEditor({
 
   const isEditable = !disabled && !saving;
 
-  const availableDeps = allSteps.filter(
-    (s) => s.step_id !== step.step_id && !s.dependencies.includes(step.step_id)
-  );
-
   return (
     <div
       className={`relative bg-bg-card rounded-lg border transition-colors ${
@@ -417,173 +416,26 @@ export function StepEditor({
                 </div>
 
                 {/* Dependencies */}
-                {(step.dependencies.length > 0 || (!disabled && availableDeps.length > 0)) && (
-                  <div className="mb-5">
-                    <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-                      Dependencies
-                    </label>
-                    {step.dependencies.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {step.dependencies.map((depId) => {
-                          const depStep = allSteps.find((s) => s.step_id === depId);
-                          return (
-                            <span
-                              key={depId}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-bg-elevated text-text-secondary text-xs rounded-md"
-                            >
-                              {depStep?.title || depId}
-                              {!disabled && (
-                                <button
-                                  type="button"
-                                  className="text-text-muted hover:text-error transition-colors"
-                                  onClick={() =>
-                                    handleUpdate(
-                                      'dependencies',
-                                      step.dependencies.filter((d) => d !== depId)
-                                    )
-                                  }
-                                  title="Remove dependency"
-                                >
-                                  <CloseIcon size="sm" />
-                                </button>
-                              )}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {!disabled && availableDeps.length > 0 && (
-                      <select
-                        className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-text-primary text-sm focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value && !step.dependencies.includes(e.target.value)) {
-                            handleUpdate('dependencies', [...step.dependencies, e.target.value]);
-                          }
-                        }}
-                      >
-                        <option value="">Add dependency...</option>
-                        {availableDeps.map((s) => (
-                          <option key={s.step_id} value={s.step_id}>
-                            {s.title}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                )}
+                <DependenciesSection
+                  step={step}
+                  allSteps={allSteps}
+                  onUpdate={onUpdate}
+                  disabled={!isEditable}
+                />
 
                 {/* Acceptance Criteria */}
-                <div className="mb-5">
-                  <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-                    Acceptance Criteria
-                  </label>
-                  <div className="space-y-1">
-                    {(step.acceptance_criteria || []).map((criterion) => (
-                      <div
-                        key={criterion.id}
-                        className="group flex items-center gap-3 px-3 py-2 bg-bg-secondary rounded-md hover:bg-bg-elevated transition-colors"
-                      >
-                        <span className="flex-shrink-0 w-5 h-5 rounded-full border-2 border-text-muted/50 flex items-center justify-center">
-                          <span className="w-2 h-2 rounded-full bg-transparent" />
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <EditableText
-                            value={criterion.description}
-                            onSave={(value) => {
-                              const updated = (step.acceptance_criteria || []).map((c) =>
-                                c.id === criterion.id ? { ...c, description: value } : c
-                              );
-                              handleUpdate('acceptance_criteria', updated);
-                            }}
-                            placeholder="Enter criterion..."
-                            disabled={!isEditable}
-                            className="text-sm"
-                          />
-                        </div>
-                        {criterion.type && (
-                          <span className="flex-shrink-0 px-2 py-0.5 text-xs bg-bg-tertiary text-text-muted rounded">
-                            {criterion.type}
-                          </span>
-                        )}
-                        {!disabled && (
-                          <button
-                            type="button"
-                            className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-text-muted hover:text-error transition-all"
-                            onClick={() => {
-                              const updated = (step.acceptance_criteria || []).filter(
-                                (c) => c.id !== criterion.id
-                              );
-                              handleUpdate('acceptance_criteria', updated);
-                            }}
-                            title="Remove criterion"
-                          >
-                            <CloseIcon size="sm" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {!disabled && (
-                    <button
-                      type="button"
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-accent-cyan hover:bg-accent-cyan/10 rounded-md transition-colors"
-                      onClick={() => {
-                        const newCriterion = {
-                          id: crypto.randomUUID(),
-                          description: '',
-                        };
-                        const updated = [...(step.acceptance_criteria || []), newCriterion];
-                        handleUpdate('acceptance_criteria', updated);
-                      }}
-                    >
-                      <PlusIcon size="sm" />
-                      Add Criterion
-                    </button>
-                  )}
-                </div>
+                <AcceptanceCriteriaSection
+                  step={step}
+                  onUpdate={onUpdate}
+                  disabled={!isEditable}
+                />
 
                 {/* Gate */}
-                <div className="pt-4 border-t border-border-subtle">
-                  <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-3">
-                    Approval Gate
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!step.gate}
-                      disabled={disabled}
-                      className="w-4 h-4 rounded border-border-subtle bg-bg-secondary text-accent-cyan focus:ring-accent-cyan/50"
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          handleUpdate('gate', { type: 'human_approval' });
-                        } else {
-                          handleUpdate('gate', undefined);
-                        }
-                      }}
-                    />
-                    <span className="text-sm text-text-primary">Require human approval before proceeding</span>
-                  </label>
-                  {step.gate && (
-                    <div className="mt-3 ml-7">
-                      <label className="block text-xs font-medium text-text-muted mb-1.5">
-                        Approver Role (optional)
-                      </label>
-                      <EditableText
-                        value={step.gate.approver_role || ''}
-                        onSave={(value) => {
-                          handleUpdate('gate', {
-                            ...step.gate,
-                            approver_role: value || undefined,
-                          });
-                        }}
-                        placeholder="e.g., tech-lead"
-                        disabled={!isEditable}
-                        className="text-sm max-w-xs"
-                      />
-                    </div>
-                  )}
-                </div>
+                <ApprovalGateSection
+                  step={step}
+                  onUpdate={onUpdate}
+                  disabled={!isEditable}
+                />
               </>
             }
           />
