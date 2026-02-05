@@ -38,6 +38,12 @@ export function createIdeationRouter(storage: IdeationStorage): Router {
    */
   router.post('/sessions/:id/abandon', handlers.abandonSession);
 
+  /**
+   * PATCH /sessions/:id - Update session fields (title, etc.)
+   * Body: { title?: string }
+   */
+  router.patch('/sessions/:id', handlers.updateSession);
+
   // ===========================================================================
   // Message Routes
   // ===========================================================================
@@ -79,6 +85,42 @@ export function createIdeationRouter(storage: IdeationStorage): Router {
   router.get('/sessions/:id/confidence', handlers.getConfidence);
 
   // ===========================================================================
+  // Block Routes
+  // ===========================================================================
+
+  /**
+   * GET /sessions/:id/blocks - List all blocks for a session
+   * Response: Block[]
+   */
+  router.get('/sessions/:id/blocks', handlers.listBlocks);
+
+  /**
+   * POST /sessions/:id/blocks - Create new block
+   * Body: { type, title, keyword, emoji, content?, confidence?, specialist?, sourceContext? }
+   * Response: Block (201)
+   */
+  router.post('/sessions/:id/blocks', handlers.createBlock);
+
+  /**
+   * PATCH /sessions/:id/blocks/:blockId - Update block fields
+   * Body: { title?, keyword?, emoji?, content?, confidence?, status? }
+   * Response: Block
+   */
+  router.patch('/sessions/:id/blocks/:blockId', handlers.updateBlock);
+
+  /**
+   * DELETE /sessions/:id/blocks/:blockId - Remove block
+   * Response: 204 No Content
+   */
+  router.delete('/sessions/:id/blocks/:blockId', handlers.deleteBlock);
+
+  /**
+   * POST /sessions/:id/blocks/:blockId/curate - Set block status to 'curated'
+   * Response: Block
+   */
+  router.post('/sessions/:id/blocks/:blockId/curate', handlers.curateBlock);
+
+  // ===========================================================================
   // SSE Routes
   // ===========================================================================
 
@@ -88,6 +130,17 @@ export function createIdeationRouter(storage: IdeationStorage): Router {
    */
   router.get('/sessions/:id/events', handlers.subscribeToEvents);
   router.get('/events', handlers.subscribeToEvents);
+
+  // ===========================================================================
+  // Navigator Routes
+  // ===========================================================================
+
+  /**
+   * POST /navigator/chat - Send message to Navigator agent
+   * Body: { message: string }
+   * Response: { response: string }
+   */
+  router.post('/navigator/chat', handlers.navigatorChat);
 
   return router;
 }

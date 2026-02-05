@@ -16,6 +16,7 @@ import type {
   UpdateUnderstandingInput,
   SendToPlannerInput,
   SpawnSpecialistInput,
+  UpdateSynthesisInput,
 } from './tools.js';
 
 // =============================================================================
@@ -124,7 +125,14 @@ export async function executeTool(
         // Check if specialist already spawned
         const existing = session.active_specialists.find(s => s.name === name);
         if (existing) {
-          return { success: true, data: { agent_id: existing.agent_id, already_active: true } };
+          return {
+            success: true,
+            data: {
+              agent_id: existing.agent_id,
+              already_active: true,
+              message: `${name} specialist is already active for this session. Do NOT attempt to spawn them again. Proceed to respond to the user.`,
+            },
+          };
         }
 
         // Spawn via relay (or mock)
@@ -143,6 +151,26 @@ export async function executeTool(
         return { success: true, data: { agent_id: agentId, name, focus } };
       }
 
+      case 'update_synthesis': {
+        const { session_id, idea_summary, specialist_perspectives } = input as UpdateSynthesisInput;
+
+        const session = await storage.getSession(session_id);
+        if (!session) {
+          return { success: false, error: `Session not found: ${session_id}` };
+        }
+
+        // Update synthesized field via storage
+        const updatedSession = await storage.updateSynthesis(session_id, {
+          idea_summary,
+          specialist_perspectives,
+        });
+
+        // Emit SSE event for UI update
+        ideationEvents.emitSessionEvent('session:synthesis_updated', updatedSession);
+
+        return { success: true, data: { updated: true } };
+      }
+
       default:
         return { success: false, error: `Unknown tool: ${name}` };
     }
@@ -150,46 +178,5 @@ export async function executeTool(
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[tool-executor] Error executing tool '${name}':`, error);
     return { success: false, error: message };
-  }
-}
-
-// =============================================================================
-// Mock Tool Results (for testing without LLM)
-// =============================================================================
-
-export function getMockToolResult(name: string, input: unknown): ToolResult {
-  switch (name) {
-    case 'start_session':
-      return { success: true, data: { session_id: `mock-session-${Date.now()}` } };
-
-    case 'read_session':
-      return {
-        success: true,
-        data: {
-          id: (input as ReadSessionInput).session_id,
-          status: 'active',
-          transcript: [],
-          understanding: {},
-          active_specialists: [],
-          planner_sends: [],
-        },
-      };
-
-    case 'add_message':
-      return { success: true, data: { message_id: `mock-msg-${Date.now()}` } };
-
-    case 'update_understanding':
-      return { success: true, data: { updated: true } };
-
-    case 'send_to_planner':
-      return { success: true, data: { plan_id: `mock-plan-${Date.now()}`, plan_version: 1 } };
-
-    case 'spawn_specialist': {
-      const { name } = input as SpawnSpecialistInput;
-      return { success: true, data: { agent_id: `mock-${name.toLowerCase()}-${Date.now()}` } };
-    }
-
-    default:
-      return { success: false, error: `Unknown tool: ${name}` };
   }
 }

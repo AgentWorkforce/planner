@@ -8,6 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import { createIdeationRouter } from './api/index.js';
 import { SQLiteIdeationStorage } from './storage/index.js';
+import { initNavigator } from './navigator/index.js';
 
 const PORT = process.env.IDEATION_PORT || 3001;
 const DB_PATH = process.env.IDEATION_DB_PATH || './ideation.db';
@@ -16,6 +17,14 @@ async function main() {
   // Initialize storage
   const storage = new SQLiteIdeationStorage(DB_PATH);
   await storage.initialize();
+
+  // Initialize Navigator service
+  try {
+    initNavigator({ storage });
+    console.log('[Ideation Server] Navigator service initialized');
+  } catch (error) {
+    console.warn('[Ideation Server] Navigator not available:', error instanceof Error ? error.message : error);
+  }
 
   // Create Express app
   const app = express();

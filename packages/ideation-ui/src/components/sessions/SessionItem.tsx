@@ -33,7 +33,7 @@ export function SessionItem({ session, isActive }: SessionItemProps) {
   const navigate = useNavigate();
 
   const handleClick = () => {
-    navigate(`/session/${session.id}`);
+    navigate(`/ideation/session/${session.id}`);
   };
 
   return (

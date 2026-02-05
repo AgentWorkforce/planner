@@ -93,13 +93,18 @@ When you identify a need for specific expertise, use spawn_specialist to bring i
 Spawn specialists LAZILY - only when the conversation reveals a specific need.
 Specialists are invisible to the user - their insights become YOUR questions.
 
+**CRITICAL**: If spawn_specialist returns "already_active: true", that specialist is ALREADY working. Do NOT attempt to spawn them again. Move on to respond to the user.
+
 ## Tools Available
 - start_session: Create a new brainstorming session
 - read_session: Get current session state with transcript and understanding
 - add_message: Record messages in the session transcript
 - update_understanding: Store insights formatted for planners (goals, constraints, requirements, risks, technical implications)
+- update_synthesis: Update the AI understanding synthesis (idea summary + specialist perspectives)
 - send_to_planner: When ready, send understanding to create a plan
 - spawn_specialist: Bring in specialist expertise on-demand
+
+**CRITICAL RESPONSE RULE**: After using any tools, you MUST ALWAYS respond with text to the user. Never end your turn with only tool calls. The user is waiting for your conversational response.
 
 ## Understanding Format
 When using update_understanding, structure insights for planners:
@@ -110,6 +115,20 @@ When using update_understanding, structure insights for planners:
 - What risks or concerns need addressing?
 
 The understanding document is YOUR PRIMARY OUTPUT. Make it comprehensive enough that a planner can create a detailed plan without needing the raw transcript.
+
+## Synthesis Updates
+Call update_synthesis to maintain the AI Understanding panel shown to users. Update this when:
+- After significant conversation turns that reveal new aspects of the idea
+- When specialists provide new insights or concerns
+- When the direction becomes clearer or confidence increases
+- Periodically (every 3-5 exchanges) to keep the synthesis fresh
+
+The synthesis should include:
+- idea_summary: A concise 2-3 sentence overview of what's being discussed
+- specialist_perspectives: For each active specialist, their:
+  - take: Key perspective on the idea (1-2 sentences)
+  - concerns: Array of specific concerns they've identified
+  - confidence: 'exploring' (just started), 'forming' (patterns emerging), or 'confident' (clear understanding)
 
 Remember: You are the friendly face of this system. The human should feel they're having a 1:1 conversation with a thoughtful facilitator, not interacting with a complex agent system.`;
 }
@@ -124,26 +143,3 @@ export function getWelcomeMessage(initialIntent: string): string {
 Let's start by understanding what you're looking to build. Can you tell me a bit more about what problem you're trying to solve?`;
 }
 
-// =============================================================================
-// Mock Response (when no API key)
-// =============================================================================
-
-export function getMockResponse(userMessage: string): string {
-  // Simple mock responses for testing
-  const lowerMessage = userMessage.toLowerCase();
-
-  if (lowerMessage.includes('done') || lowerMessage.includes('finished')) {
-    return "It sounds like we've covered a lot of ground. Would you like me to send what we've discussed to the planner to create a structured plan?";
-  }
-
-  if (lowerMessage.includes('yes') || lowerMessage.includes('sure')) {
-    return "Great! What other aspects should we consider? Are there any constraints or requirements we haven't discussed yet?";
-  }
-
-  if (lowerMessage.includes('no') || lowerMessage.includes("don't")) {
-    return "I understand. What would you like to focus on instead?";
-  }
-
-  // Default clarifying question
-  return "That's interesting. Can you tell me more about how you envision this working? What would the typical user experience look like?";
-}

@@ -133,6 +133,43 @@ describe('Ideation API', () => {
     });
   });
 
+  describe('PATCH /sessions/:id', () => {
+    it('updates session title', async () => {
+      const created = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Original Title' });
+
+      const res = await request(app)
+        .patch(`/api/ideation/sessions/${created.body.id}`)
+        .send({ title: 'Updated Title' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.source.initial_intent).toBe('Updated Title');
+    });
+
+    it('returns 404 for non-existent session', async () => {
+      const res = await request(app)
+        .patch('/api/ideation/sessions/non-existent')
+        .send({ title: 'Test' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Session not found');
+    });
+
+    it('returns 400 for invalid request body', async () => {
+      const created = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .patch(`/api/ideation/sessions/${created.body.id}`)
+        .send({ title: '' }); // Empty title is invalid
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Invalid request');
+    });
+  });
+
   // ==========================================================================
   // Messages
   // ==========================================================================
@@ -295,6 +332,270 @@ describe('Ideation API', () => {
       expect(res.body.error).toBe('Planner service unavailable');
     });
   });
+
+  // ==========================================================================
+  // Block CRUD
+  // ==========================================================================
+
+  describe('GET /sessions/:id/blocks', () => {
+    it('returns empty array for new session', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .get(`/api/ideation/sessions/${session.body.id}/blocks`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('returns 404 for non-existent session', async () => {
+      const res = await request(app)
+        .get('/api/ideation/sessions/non-existent/blocks');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Session not found');
+    });
+  });
+
+  describe('POST /sessions/:id/blocks', () => {
+    it('creates a block with required fields', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'feature',
+          title: 'User Authentication',
+          keyword: 'auth',
+          emoji: '🔐',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.id).toBeDefined();
+      expect(res.body.type).toBe('feature');
+      expect(res.body.title).toBe('User Authentication');
+      expect(res.body.keyword).toBe('auth');
+      expect(res.body.emoji).toBe('🔐');
+      expect(res.body.status).toBe('forming');
+      expect(res.body.confidence).toBe(0);
+      expect(res.body.specialist).toBe('user');
+      expect(res.body.sourceContext).toBe('user-created');
+      expect(res.body.content).toBe('');
+      expect(res.body.createdAt).toBeDefined();
+      expect(res.body.curatedAt).toBeNull();
+    });
+
+    it('creates a block with optional fields', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'entity',
+          title: 'User Model',
+          keyword: 'user',
+          emoji: '👤',
+          content: '## User Entity\n- id\n- email\n- password',
+          confidence: 75,
+          specialist: 'Architect',
+          sourceContext: 'turn-5',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.content).toBe('## User Entity\n- id\n- email\n- password');
+      expect(res.body.confidence).toBe(75);
+      expect(res.body.specialist).toBe('Architect');
+      expect(res.body.sourceContext).toBe('turn-5');
+    });
+
+    it('returns 400 for missing required fields', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'feature',
+          // Missing: title, keyword, emoji
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Invalid request');
+    });
+
+    it('returns 404 for non-existent session', async () => {
+      const res = await request(app)
+        .post('/api/ideation/sessions/non-existent/blocks')
+        .send({
+          type: 'feature',
+          title: 'Test',
+          keyword: 'test',
+          emoji: '🧪',
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Session not found');
+    });
+  });
+
+  describe('PATCH /sessions/:id/blocks/:blockId', () => {
+    it('updates block fields', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const created = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'feature',
+          title: 'Original',
+          keyword: 'orig',
+          emoji: '📝',
+        });
+
+      const res = await request(app)
+        .patch(`/api/ideation/sessions/${session.body.id}/blocks/${created.body.id}`)
+        .send({
+          title: 'Updated Title',
+          content: 'New content',
+          confidence: 50,
+          status: 'emerging',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.title).toBe('Updated Title');
+      expect(res.body.content).toBe('New content');
+      expect(res.body.confidence).toBe(50);
+      expect(res.body.status).toBe('emerging');
+      // Unchanged fields should remain
+      expect(res.body.keyword).toBe('orig');
+      expect(res.body.emoji).toBe('📝');
+    });
+
+    it('returns 404 for non-existent block', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .patch(`/api/ideation/sessions/${session.body.id}/blocks/non-existent`)
+        .send({ title: 'Updated' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Block not found');
+    });
+
+    it('returns 400 for invalid status value', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const created = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'feature',
+          title: 'Test',
+          keyword: 'test',
+          emoji: '🧪',
+        });
+
+      const res = await request(app)
+        .patch(`/api/ideation/sessions/${session.body.id}/blocks/${created.body.id}`)
+        .send({ status: 'curated' }); // Cannot set to 'curated' via PATCH
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Invalid request');
+    });
+  });
+
+  describe('DELETE /sessions/:id/blocks/:blockId', () => {
+    it('deletes a block', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const created = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'feature',
+          title: 'To Delete',
+          keyword: 'del',
+          emoji: '🗑️',
+        });
+
+      const res = await request(app)
+        .delete(`/api/ideation/sessions/${session.body.id}/blocks/${created.body.id}`);
+
+      expect(res.status).toBe(204);
+
+      // Verify block is gone
+      const blocks = await request(app)
+        .get(`/api/ideation/sessions/${session.body.id}/blocks`);
+
+      expect(blocks.body).toHaveLength(0);
+    });
+
+    it('returns 404 for non-existent block', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .delete(`/api/ideation/sessions/${session.body.id}/blocks/non-existent`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Block not found');
+    });
+  });
+
+  describe('POST /sessions/:id/blocks/:blockId/curate', () => {
+    it('sets block status to curated', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const created = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks`)
+        .send({
+          type: 'feature',
+          title: 'Ready Block',
+          keyword: 'ready',
+          emoji: '✅',
+        });
+
+      // Update to ready status first
+      await request(app)
+        .patch(`/api/ideation/sessions/${session.body.id}/blocks/${created.body.id}`)
+        .send({ status: 'ready' });
+
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks/${created.body.id}/curate`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('curated');
+      expect(res.body.curatedAt).toBeDefined();
+      expect(res.body.curatedAt).not.toBeNull();
+    });
+
+    it('returns 404 for non-existent block', async () => {
+      const session = await request(app)
+        .post('/api/ideation/sessions')
+        .send({ initial_intent: 'Test' });
+
+      const res = await request(app)
+        .post(`/api/ideation/sessions/${session.body.id}/blocks/non-existent/curate`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Block not found');
+    });
+  });
 });
 
 // =============================================================================
@@ -408,6 +709,11 @@ describe('Planner Handoff Integration', () => {
       expect(callArgs.understanding).toEqual({
         Architect: { patterns: ['REST', 'microservices'], confidence: 'confident' },
         Security: { concerns: ['authentication'], confidence: 'exploring' },
+        _blocks: {
+          observations: [],
+          keywords: [],
+          blocks: [],
+        },
       });
     });
 

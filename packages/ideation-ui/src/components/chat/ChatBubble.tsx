@@ -34,7 +34,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
           'max-w-[70%] rounded-lg px-4 py-2',
           isUser
             ? 'bg-accent-cyan/20 text-text-primary'
-            : 'bg-bg-tertiary text-text-primary'
+            : 'text-text-primary'
         )}
       >
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>

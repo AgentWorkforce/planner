@@ -1,5 +1,9 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../utils/cn";
+import type { EntityType } from "../types/messaging";
+
+// Re-export for convenience
+export type { EntityType };
 
 const avatarVariants = cva(
   "relative inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground font-medium overflow-hidden",
@@ -30,6 +34,8 @@ export interface AvatarProps
   alt?: string;
   /** Status indicator */
   status?: "online" | "offline" | "busy" | "away";
+  /** Entity type for color coding (user = purple, agent = cyan) */
+  entityType?: EntityType;
 }
 
 function getInitials(name: string): string {
@@ -47,6 +53,15 @@ function getInitials(name: string): string {
  * --color-status-online, --color-status-offline, --color-status-busy, --color-status-away
  * Falls back to Tailwind colors if variables are not defined.
  */
+/**
+ * Entity type colors for messaging contexts.
+ * Users get purple, agents get cyan.
+ */
+const entityTypeColors = {
+  user: "bg-[var(--color-accent-purple,#a855f7)]/20 text-[var(--color-accent-purple,#a855f7)]",
+  agent: "bg-[var(--color-accent-cyan,#00d9ff)]/20 text-[var(--color-accent-cyan,#00d9ff)]",
+};
+
 const statusColors = {
   online: "bg-[var(--color-status-online,#22c55e)]",
   offline: "bg-[var(--color-status-offline,#9ca3af)]",
@@ -63,13 +78,15 @@ export function Avatar({
   alt,
   size,
   status,
+  entityType,
   className,
   ...props
 }: AvatarProps) {
   const initials = name ? getInitials(name) : "?";
+  const entityColors = entityType ? entityTypeColors[entityType] : "";
 
   return (
-    <div className={cn(avatarVariants({ size }), className)} {...props}>
+    <div className={cn(avatarVariants({ size }), entityColors, className)} {...props}>
       {src ? (
         <img
           src={src}

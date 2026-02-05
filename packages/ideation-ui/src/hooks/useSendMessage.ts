@@ -8,6 +8,7 @@ interface UseSendMessageResult {
 
 export function useSendMessage(
   sessionId: string | undefined,
+  focusedBlockId?: string,
   onOptimisticAdd?: (message: TranscriptMessage) => void
 ): UseSendMessageResult {
   const [sending, setSending] = useState(false);
@@ -33,12 +34,12 @@ export function useSendMessage(
 
     setSending(true);
     try {
-      const result = await sendMessageRef.current(sessionId, content.trim());
+      const result = await sendMessageRef.current(sessionId, content.trim(), focusedBlockId);
       return result;
     } finally {
       setSending(false);
     }
-  }, [sessionId]);
+  }, [sessionId, focusedBlockId]);
 
   return {
     send,

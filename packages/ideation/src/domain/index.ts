@@ -62,3 +62,16 @@ export {
   type ConfidenceBreakdown,
   type AggregateConfidenceResult,
 } from './confidence.js';
+
+// Block
+export {
+  BlockStatus,
+  BlockSourceSchema,
+  UserEditSchema,
+  BlockSchema,
+  type BlockSource,
+  type UserEdit,
+  type Block,
+  createBlock,
+  createUserEdit,
+} from './block.js';

@@ -12,6 +12,7 @@ import type {
   ActiveSpecialist,
   PlannerSend,
   SessionSource,
+  Block,
 } from '../domain/index.js';
 
 export interface IdeationStorage {
@@ -41,6 +42,12 @@ export interface IdeationStorage {
    * Update session status.
    */
   updateSessionStatus(id: string, status: SessionStatus): Promise<Session>;
+
+  /**
+   * Update session fields.
+   * Currently supports updating title (stored as source.initial_intent).
+   */
+  updateSession(id: string, updates: { title?: string }): Promise<Session>;
 
   /**
    * Append a message to the session transcript.
@@ -73,6 +80,28 @@ export interface IdeationStorage {
    * Full payload snapshot for audit trail.
    */
   appendPlannerSend(sessionId: string, send: PlannerSend): Promise<Session>;
+
+  /**
+   * Update the entire blocks array for a session.
+   * Replaces all blocks with the provided array.
+   */
+  updateBlocks(sessionId: string, blocks: Block[]): Promise<Session>;
+
+  /**
+   * Update the synthesized AI understanding for a session.
+   * Updates the synthesized field with idea summary and specialist perspectives.
+   */
+  updateSynthesis(
+    sessionId: string,
+    synthesis: {
+      idea_summary: string;
+      specialist_perspectives: Record<string, {
+        take: string;
+        concerns: string[];
+        confidence: 'exploring' | 'forming' | 'confident';
+      }>;
+    }
+  ): Promise<Session>;
 
   // ==========================================================================
   // Lifecycle

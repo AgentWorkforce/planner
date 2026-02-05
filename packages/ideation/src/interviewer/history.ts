@@ -67,10 +67,22 @@ class ConversationHistoryStore {
 
   /**
    * Convert history to Anthropic message format.
+   * Ensures the message sequence is valid for Anthropic API:
+   * - First message must be from 'user'
+   * - Messages should alternate between user and assistant
    */
   getAnthropicMessages(channelId: string): Anthropic.MessageParam[] {
     const history = this.getHistory(channelId);
-    return history.map(msg => ({
+
+    // Anthropic API requires first message to be from user
+    // If history starts with assistant message, skip it
+    let messages = history;
+    if (messages.length > 0 && messages[0].role === 'assistant') {
+      console.warn('[History] Skipping initial assistant message - Anthropic requires user-first');
+      messages = messages.slice(1);
+    }
+
+    return messages.map(msg => ({
       role: msg.role,
       content: msg.content,
     }));

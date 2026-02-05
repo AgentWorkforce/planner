@@ -17,7 +17,12 @@ export type SessionEventType =
   | 'session:message'
   | 'session:understanding'
   | 'session:specialist'
-  | 'session:planner_send';
+  | 'session:planner_send'
+  | 'session:block_created'
+  | 'session:block_updated'
+  | 'session:block_deleted'
+  | 'session:block_curated'
+  | 'session:synthesis_updated';
 
 export interface SessionEvent {
   type: SessionEventType;
