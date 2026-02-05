@@ -106,10 +106,10 @@ export function SentToPlannerColumn({
     <div className={cn('h-full flex flex-col', className)}>
       {/* Header */}
       <div className="p-4">
-        <h2 className="text-sm font-medium text-text-primary">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)]">
           Sent to Planner ({sessions.length})
         </h2>
-        <p className="text-xs text-text-muted mt-1">
+        <p className="text-xs text-[var(--canvas-text-muted)] mt-1">
           Track handoff status
         </p>
       </div>

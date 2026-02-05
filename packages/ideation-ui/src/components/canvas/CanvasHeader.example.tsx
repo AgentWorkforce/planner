@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { CanvasHeader, type SessionInfo, type SpecialistPresence } from './CanvasHeader';
+import { CanvasHeader, type SessionInfo } from './CanvasHeader';
 
 /**
  * Example: CanvasHeader Component
@@ -19,13 +19,6 @@ const mockSessions: SessionInfo[] = [
   { id: '2', title: 'Mobile app MVP' },
   { id: '3', title: 'Marketing automation' },
   { id: '4', title: 'User onboarding flow' },
-];
-
-const mockSpecialists: SpecialistPresence[] = [
-  { name: 'Architect', avatar: '🏗️', status: 'thinking' },
-  { name: 'Designer', avatar: '🎨', status: 'idle' },
-  { name: 'Engineer', avatar: '⚙️', status: 'contributing' },
-  { name: 'Security', avatar: '🔐', status: 'observing' },
 ];
 
 export function CanvasHeaderExample() {
@@ -63,10 +56,6 @@ export function CanvasHeaderExample() {
     console.log('Initiating handoff to Planner...');
   };
 
-  const handleSpecialistClick = (specialistName: string) => {
-    console.log('Specialist clicked:', specialistName);
-  };
-
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-background">
@@ -74,12 +63,10 @@ export function CanvasHeaderExample() {
           sessionId={currentSessionId}
           sessionTitle={sessionTitles[currentSessionId]}
           sessions={updatedSessions}
-          specialists={mockSpecialists}
           onTitleChange={handleTitleChange}
           onSessionSwitch={handleSessionSwitch}
           onOpenUnderstanding={handleOpenUnderstanding}
           onHandoff={handleHandoff}
-          onSpecialistClick={handleSpecialistClick}
         />
 
         {/* Demo instructions */}

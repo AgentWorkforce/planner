@@ -1,9 +1,10 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
-import { CanvasLayout } from '@/components/canvas/CanvasLayout';
+import { IdeationGridLayout } from '@/components/canvas/IdeationGridLayout';
+import { IdeationStatusBar } from '@/components/canvas/IdeationStatusBar';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
 import { CuratedBlocksColumn } from '@/components/canvas/CuratedBlocksColumn';
-import { CanvasHeader, SessionInfo } from '@/components/canvas/CanvasHeader';
+import { SessionNav, type SessionInfo } from '@/components/canvas/CanvasHeader';
 import { FocusMode } from '@/components/canvas/FocusMode';
 import { AIUnderstandingDrawer } from '@/components/canvas/AIUnderstandingDrawer';
 import { HandoffDialog } from '@/components/canvas/HandoffDialog';
@@ -278,20 +279,7 @@ export function CanvasPage() {
   // Find the focused block if in focus mode
   const focusedBlock = focusedBlockId ? blocks.find((b) => b.id === focusedBlockId) : null;
 
-  // Common header component
-  const headerComponent = (
-    <CanvasHeader
-      sessionId={id}
-      sessionTitle={session.source?.initial_intent || 'Untitled Session'}
-      sessions={sessionInfoList}
-      onTitleChange={handleTitleChange}
-      onSessionSwitch={handleSessionSwitch}
-      onOpenUnderstanding={handleOpenUnderstanding}
-      onHandoff={handleHandoff}
-    />
-  );
-
-  // Session data for banner (needs updated_at and optional handoff fields)
+  // Session data for banner
   const sessionForBanner = session ? {
     updated_at: session.updated_at,
     lastHandoffAt: sessionWithV3Fields?.lastHandoffAt,
@@ -299,94 +287,84 @@ export function CanvasPage() {
     lastHandoffVersionId: sessionWithV3Fields?.lastHandoffVersionId,
   } : null;
 
-  // Common drawer and dialog components
-  const overlayComponents = (
-    <>
-      {/* AI Understanding Drawer */}
-      <AIUnderstandingDrawer
-        isOpen={isUnderstandingDrawerOpen}
-        onClose={() => setIsUnderstandingDrawerOpen(false)}
+  // Build the center content — focus mode wraps chat in FocusMode
+  const centerContent = focusedBlock ? (
+    <FocusMode
+      block={focusedBlock}
+      onClose={handleCloseFocus}
+      onCurate={handleCurateFocusedBlock}
+      onContentChange={handleContentChange}
+    >
+      <SessionChatView
         sessionId={id}
-        synthesized={sessionWithV3Fields?.synthesized}
+        focusedBlockId={focusedBlock.id}
+        focusedBlock={{
+          id: focusedBlock.id,
+          emoji: focusedBlock.emoji,
+          keyword: focusedBlock.keyword,
+        }}
       />
-
-      {/* Handoff Dialog */}
-      <HandoffDialog
-        isOpen={isHandoffDialogOpen}
-        onClose={() => setIsHandoffDialogOpen(false)}
-        onConfirm={handleHandoffConfirm}
-        blocks={blocks}
-      />
-    </>
+    </FocusMode>
+  ) : (
+    <SessionChatView sessionId={id} />
   );
 
-  // Render focus mode if a block is focused
-  if (focusedBlock) {
-    return (
-      <div className="h-screen flex flex-col">
-        {headerComponent}
-
-        {sessionForBanner && (
-          <ModifiedSinceHandoffBanner
-            session={sessionForBanner}
-            onDismiss={() => {}}
-          />
-        )}
-
-        <FocusMode
-          block={focusedBlock}
-          onClose={handleCloseFocus}
-          onCurate={handleCurateFocusedBlock}
-          onContentChange={handleContentChange}
-        >
-          <SessionChatView
-            sessionId={id}
-            focusedBlockId={focusedBlock.id}
-            focusedBlock={{
-              id: focusedBlock.id,
-              emoji: focusedBlock.emoji,
-              keyword: focusedBlock.keyword,
-            }}
-          />
-        </FocusMode>
-
-        {overlayComponents}
-      </div>
-    );
-  }
-
-  // Render normal 3-column canvas layout
-  return (
-    <div className="h-screen flex flex-col">
-      {headerComponent}
-
+  // Nav component with optional banner
+  const navContent = (
+    <>
+      <SessionNav
+        sessionId={id}
+        sessionTitle={session.source?.initial_intent || 'Untitled Session'}
+        sessions={sessionInfoList}
+        onTitleChange={handleTitleChange}
+        onSessionSwitch={handleSessionSwitch}
+        onOpenUnderstanding={handleOpenUnderstanding}
+        onHandoff={handleHandoff}
+      />
       {sessionForBanner && (
         <ModifiedSinceHandoffBanner
           session={sessionForBanner}
           onDismiss={() => {}}
         />
       )}
+    </>
+  );
 
-      <CanvasLayout
-        formingBlocksSlot={
+  return (
+    <div className="h-screen">
+      <IdeationGridLayout
+        nav={navContent}
+        leftPanel={
           <FormingBlocksColumn
             blocks={blocks}
             onBlockClick={handleBlockClick}
           />
         }
-        chatSlot={
-          <SessionChatView sessionId={id} />
-        }
-        curatedBlocksSlot={
+        center={centerContent}
+        rightPanel={
           <CuratedBlocksColumn
             blocks={blocks}
             onBlockClick={handleBlockClick}
             onUncurate={uncurateBlock}
           />
         }
+        statusBar={<IdeationStatusBar />}
+        focusMode={!!focusedBlock}
       />
 
-      {overlayComponents}
+      {/* Overlay components (drawers/dialogs) */}
+      <AIUnderstandingDrawer
+        isOpen={isUnderstandingDrawerOpen}
+        onClose={() => setIsUnderstandingDrawerOpen(false)}
+        sessionId={id}
+        synthesized={sessionWithV3Fields?.synthesized}
+      />
+      <HandoffDialog
+        isOpen={isHandoffDialogOpen}
+        onClose={() => setIsHandoffDialogOpen(false)}
+        onConfirm={handleHandoffConfirm}
+        blocks={blocks}
+      />
     </div>
   );
 }

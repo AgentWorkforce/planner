@@ -129,8 +129,10 @@ export function SessionsPhysicsColumn() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="p-4">
-        <h2 className="text-sm font-medium text-text-primary">In-Progress Sessions</h2>
-        <p className="text-xs text-text-muted mt-1">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)]">
+          In-Progress ({activeSessions.length})
+        </h2>
+        <p className="text-xs text-[var(--canvas-text-muted)] mt-1">
           {loading ? 'Loading sessions...' : `${activeSessions.length} active`}
         </p>
       </div>
