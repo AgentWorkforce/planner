@@ -1,5 +1,5 @@
 /**
- * Integration exports for Forge and Planner.
+ * Integration exports for Forge, Planner, and Ideation.
  */
 export {
   ForgeIntegration,
@@ -12,3 +12,9 @@ export {
   createPlannerIntegration,
   type PlannerIntegrationConfig,
 } from './planner-integration.js';
+
+export {
+  IdeationIntegration,
+  createIdeationIntegration,
+  type IdeationIntegrationConfig,
+} from './ideation-integration.js';

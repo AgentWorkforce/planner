@@ -8,8 +8,8 @@
  * - Reading insights
  */
 
-import type { TaskOutcome, RunOutcome } from '../domain/outcome.js';
-import type { ForgeExecutionConfig, PlannerConfig } from '../domain/config.js';
+import type { TaskOutcome, RunOutcome, IdeationOutcome, PlanQualitySignal } from '../domain/outcome.js';
+import type { ForgeExecutionConfig, PlannerConfig, IdeationConfig } from '../domain/config.js';
 import type { ModelBaseline } from '../domain/baseline.js';
 import type { DriftAlert } from '../domain/drift.js';
 
@@ -94,12 +94,36 @@ export class TunerClient {
   }
 
   /**
+   * Get current Ideation configuration.
+   */
+  async getIdeationConfig(): Promise<IdeationConfig> {
+    const response = await this.get('/api/tuner/config/ideation');
+    return response.json() as Promise<IdeationConfig>;
+  }
+
+  /**
    * Get current config versions.
    * Useful for checking if config has changed.
    */
   async getConfigVersion(): Promise<ConfigVersionResponse> {
     const response = await this.get('/api/tuner/config/version');
     return response.json() as Promise<ConfigVersionResponse>;
+  }
+
+  /**
+   * Submit an ideation outcome.
+   */
+  async submitIdeationOutcome(outcome: IdeationOutcome): Promise<OutcomeResponse> {
+    const response = await this.post('/api/tuner/outcomes/ideation', outcome);
+    return response.json() as Promise<OutcomeResponse>;
+  }
+
+  /**
+   * Submit a plan quality signal.
+   */
+  async submitPlanQualitySignal(signal: PlanQualitySignal): Promise<OutcomeResponse> {
+    const response = await this.post('/api/tuner/outcomes/plan-quality', signal);
+    return response.json() as Promise<OutcomeResponse>;
   }
 
   // ===========================================================================
