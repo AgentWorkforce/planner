@@ -111,6 +111,7 @@ export const TaskOutcomeSchema = z.object({
 
   // Metadata
   timestamp: z.string().datetime(),
+  source: z.enum(['test', 'production', 'training']).default('production'),
 });
 
 export type TaskOutcome = z.infer<typeof TaskOutcomeSchema>;
@@ -144,6 +145,7 @@ export const RunOutcomeSchema = z.object({
   escalation_count: z.number().int().nonnegative(),
 
   timestamp: z.string().datetime(),
+  source: z.enum(['test', 'production', 'training']).default('production'),
 });
 
 export type RunOutcome = z.infer<typeof RunOutcomeSchema>;

@@ -222,3 +222,19 @@ export {
   createTestExecutor,
   type TestExecutorConfig,
 } from './test-executor.js';
+
+// Agent spawner types (DI for agent lifecycle)
+export type {
+  SpawnTaskOptions,
+  SpawnTaskResult,
+  SpawnTaskFn,
+  IsSpawnerAvailableFn,
+  ForgeExecutionMode,
+} from './agent-spawner.js';
+
+// Orchestrator (real execution via RunService)
+export {
+  Orchestrator,
+  createOrchestrator,
+  type OrchestratorConfig,
+} from './orchestrator.js';

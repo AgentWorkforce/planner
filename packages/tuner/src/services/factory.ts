@@ -80,6 +80,12 @@ function wireEventHandlers(
   // When a task outcome is received:
   collector.on('task_outcome_received', (outcome) => {
     try {
+      // Skip learning for test outcomes — only store them
+      if (outcome.source === 'test') {
+        return;
+      }
+
+      // Production and training outcomes update learning models
       // 1. Update task baseline (for drift detection)
       baseline.updateBaseline(outcome);
 

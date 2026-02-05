@@ -27,12 +27,14 @@ export const SCHEMA_STATEMENTS = [
     lint_passed INTEGER,
     ac_results TEXT,
     timestamp TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    source TEXT DEFAULT 'production'
   )`,
 
   // Indexes for task_outcomes
   `CREATE INDEX IF NOT EXISTS idx_task_outcomes_run ON task_outcomes(run_id)`,
   `CREATE INDEX IF NOT EXISTS idx_task_outcomes_timestamp ON task_outcomes(timestamp)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_outcomes_source ON task_outcomes(source)`,
 
   // Run outcomes (aggregate data)
   `CREATE TABLE IF NOT EXISTS run_outcomes (
@@ -55,7 +57,8 @@ export const SCHEMA_STATEMENTS = [
     ac_met_count INTEGER DEFAULT 0,
     ac_total_count INTEGER DEFAULT 0,
     timestamp TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    source TEXT DEFAULT 'production'
   )`,
 
   // Task baselines (for drift detection)

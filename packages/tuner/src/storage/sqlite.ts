@@ -42,6 +42,7 @@ interface TaskOutcomeRow {
   lint_passed: number | null;
   ac_results: string | null;
   timestamp: string;
+  source: string;
 }
 
 interface RunOutcomeRow {
@@ -64,6 +65,7 @@ interface RunOutcomeRow {
   ac_met_count: number;
   ac_total_count: number;
   timestamp: string;
+  source: string;
 }
 
 interface TaskBaselineRow {
@@ -145,8 +147,8 @@ export class SQLiteTunerStorage implements TunerStorage {
         run_id, task_id, step_id, model_used, complexity_estimate, language_tier,
         outcome, error_category, attempts, duration_seconds, tokens_used, cost_usd,
         confidence_score, tests_passed, tests_total, tests_failed_count,
-        build_passed, type_check_passed, lint_passed, ac_results, timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        build_passed, type_check_passed, lint_passed, ac_results, timestamp, source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -170,7 +172,8 @@ export class SQLiteTunerStorage implements TunerStorage {
       outcome.verification?.type_check_passed !== undefined ? (outcome.verification.type_check_passed ? 1 : 0) : null,
       outcome.verification?.lint_passed !== undefined ? (outcome.verification.lint_passed ? 1 : 0) : null,
       outcome.ac_results ? JSON.stringify(outcome.ac_results) : null,
-      outcome.timestamp
+      outcome.timestamp,
+      outcome.source
     );
   }
 
@@ -226,6 +229,7 @@ export class SQLiteTunerStorage implements TunerStorage {
       verification,
       ac_results: acResults,
       timestamp: row.timestamp,
+      source: row.source as TaskOutcome['source'],
     };
   }
 
@@ -239,8 +243,8 @@ export class SQLiteTunerStorage implements TunerStorage {
         run_id, plan_id, outcome, tasks_total, tasks_succeeded, tasks_failed,
         total_duration_seconds, total_tokens, total_cost_usd, replan_count,
         escalation_count, tests_passed_count, tests_failed_count, builds_passed_count,
-        builds_failed_count, ac_met_count, ac_total_count, timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        builds_failed_count, ac_met_count, ac_total_count, timestamp, source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -261,7 +265,8 @@ export class SQLiteTunerStorage implements TunerStorage {
       outcome.verification_summary?.builds_failed_count ?? 0,
       outcome.verification_summary?.ac_met_count ?? 0,
       outcome.verification_summary?.ac_total_count ?? 0,
-      outcome.timestamp
+      outcome.timestamp,
+      outcome.source
     );
   }
 
@@ -299,6 +304,7 @@ export class SQLiteTunerStorage implements TunerStorage {
         ac_total_count: row.ac_total_count,
       },
       timestamp: row.timestamp,
+      source: row.source as RunOutcome['source'],
     };
   }
 

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 // Plugin imports (relative paths to sibling packages)
 import { createPlannerService, type PlannerService } from '../../planner/src/index.js';
 import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
-import { createForgeService, type ForgeService } from '../../forge-core/src/index.js';
+import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
 
 // Relay infrastructure
 import {
@@ -32,7 +32,11 @@ import {
   syncIdeationSessionChannels,
   planChannelMiddleware,
   qaChannelMiddleware,
+  isConnected,
 } from './relay/index.js';
+
+// Forge spawner
+import { spawnForgeTask, terminateForgeAgent } from './relay/forge-spawner.js';
 
 // Server API routes (relay-aware channel handlers)
 import { createServerRouter } from './api/routes.js';
@@ -71,11 +75,6 @@ async function start(): Promise<void> {
   await ideationService.initialize();
   console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
 
-  // Initialize forge service
-  forgeService = createForgeService({ dbPath: FORGE_DB_PATH });
-  await forgeService.initialize();
-  console.log(`[forge] Initialized (database: ${FORGE_DB_PATH})`);
-
   // Create Express app
   const app = express();
   app.use(cors());
@@ -92,10 +91,9 @@ async function start(): Promise<void> {
   const serverRouter = createServerRouter(storage);
   app.use('/api', serverRouter);
 
-  // Mount plugin routers
+  // Mount plugin routers (forge mounted after relay connection to detect mode)
   app.use('/api', plannerService.router);
   app.use('/api/ideation', ideationService.router);
-  app.use('/api/forge', forgeService.router);
 
   // Attempt relay connection (non-blocking on failure)
   const relayConfig = getRelayConfig();
@@ -110,6 +108,20 @@ async function start(): Promise<void> {
 
   const mode = getRelayMode();
   console.log(`[relay] Mode: ${mode}`);
+
+  // Initialize forge service (after relay connection to enable real mode)
+  const forgeMode: ForgeExecutionMode =
+    (process.env.FORGE_MODE as ForgeExecutionMode) || (isConnected() ? 'real' : 'test');
+
+  forgeService = createForgeService({
+    dbPath: FORGE_DB_PATH,
+    mode: forgeMode,
+    spawnTask: isConnected() ? spawnForgeTask : undefined,
+    terminateAgent: isConnected() ? terminateForgeAgent : undefined,
+  });
+  await forgeService.initialize();
+  app.use('/api/forge', forgeService.router);
+  console.log(`[forge] Initialized (database: ${FORGE_DB_PATH}, mode: ${forgeMode})`);
 
   // Initialize ideation bridge (routes relay messages to ideation package)
   initIdeationBridge();

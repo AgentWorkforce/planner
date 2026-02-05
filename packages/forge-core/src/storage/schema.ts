@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   step_title TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'queued', 'running', 'auditing', 'awaiting_approval', 'completed', 'failed', 'blocked')),
   dependencies TEXT NOT NULL DEFAULT '[]',
+  scope TEXT,
+  owner_role TEXT,
   workspace_path TEXT,
   agent_id TEXT,
   current_attempt INTEGER,

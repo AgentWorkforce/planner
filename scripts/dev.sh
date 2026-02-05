@@ -226,10 +226,10 @@ start_forge_frontend() {
 start_tuner() {
     stop_process "$TUNER_PID_FILE" "tuner"
 
-    # Check if port 3005 is in use
-    if lsof -i :3005 >/dev/null 2>&1; then
-        warn "Port 3005 already in use, attempting to free..."
-        lsof -ti :3005 | xargs kill -9 2>/dev/null || true
+    # Check if port 4002 is in use (tuner default port)
+    if lsof -i :4002 >/dev/null 2>&1; then
+        warn "Port 4002 already in use, attempting to free..."
+        lsof -ti :4002 | xargs kill -9 2>/dev/null || true
         sleep 1
     fi
 
@@ -240,8 +240,8 @@ start_tuner() {
 
     # Wait for server to be ready
     for i in {1..30}; do
-        if curl -s http://localhost:3005/api/health >/dev/null 2>&1; then
-            success "Tuner service running at http://localhost:3005"
+        if curl -s http://localhost:4002/health >/dev/null 2>&1; then
+            success "Tuner service running at http://localhost:4002"
             return 0
         fi
         sleep 1
@@ -315,8 +315,8 @@ show_status() {
     # Tuner service status
     if [ -f "$TUNER_PID_FILE" ]; then
         local pid=$(cat "$TUNER_PID_FILE")
-        if is_running "$pid" && curl -s http://localhost:3005/api/health >/dev/null 2>&1; then
-            success "Tuner: running (PID: $pid) at http://localhost:3005"
+        if is_running "$pid" && curl -s http://localhost:4002/health >/dev/null 2>&1; then
+            success "Tuner: running (PID: $pid) at http://localhost:4002"
         else
             warn "Tuner: not running"
         fi

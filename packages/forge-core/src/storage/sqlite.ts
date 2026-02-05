@@ -78,6 +78,8 @@ interface TaskRow {
   step_title: string;
   status: string;
   dependencies: string;
+  scope: string | null;
+  owner_role: string | null;
   workspace_path: string | null;
   agent_id: string | null;
   current_attempt: number | null;
@@ -398,11 +400,11 @@ export class SqliteForgeStorage implements ForgeStorage {
     const stmt = this.db.prepare(`
       INSERT INTO tasks (
         task_id, run_id, step_id, step_title, status, dependencies,
-        workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+        scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       )
       VALUES (
         @task_id, @run_id, @step_id, @step_title, @status, @dependencies,
-        @workspace_path, @agent_id, @current_attempt, @gate_id, @created_at, @updated_at
+        @scope, @owner_role, @workspace_path, @agent_id, @current_attempt, @gate_id, @created_at, @updated_at
       )
     `);
     stmt.run({
@@ -412,6 +414,8 @@ export class SqliteForgeStorage implements ForgeStorage {
       step_title: task.step_title,
       status: task.status,
       dependencies: JSON.stringify(task.dependencies),
+      scope: task.scope ?? null,
+      owner_role: task.owner_role ?? null,
       workspace_path: task.workspace_path ?? null,
       agent_id: task.agent_id ?? null,
       current_attempt: task.current_attempt ?? null,
@@ -425,7 +429,7 @@ export class SqliteForgeStorage implements ForgeStorage {
   getTask(taskId: string): Task | null {
     const stmt = this.db.prepare<string, TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
-             workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+             scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE task_id = ?
     `);
@@ -442,6 +446,14 @@ export class SqliteForgeStorage implements ForgeStorage {
     if (updates.status !== undefined) {
       fields.push('status = @status');
       values.status = updates.status;
+    }
+    if (updates.scope !== undefined) {
+      fields.push('scope = @scope');
+      values.scope = updates.scope ?? null;
+    }
+    if (updates.owner_role !== undefined) {
+      fields.push('owner_role = @owner_role');
+      values.owner_role = updates.owner_role ?? null;
     }
     if (updates.workspace_path !== undefined) {
       fields.push('workspace_path = @workspace_path');
@@ -481,7 +493,7 @@ export class SqliteForgeStorage implements ForgeStorage {
   listTasksByRun(runId: string): Task[] {
     const stmt = this.db.prepare<string, TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
-             workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+             scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE run_id = ?
       ORDER BY created_at ASC
@@ -516,7 +528,7 @@ export class SqliteForgeStorage implements ForgeStorage {
   getTaskByStepId(runId: string, stepId: string): Task | null {
     const stmt = this.db.prepare<[string, string], TaskRow>(`
       SELECT task_id, run_id, step_id, step_title, status, dependencies,
-             workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+             scope, owner_role, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
       FROM tasks
       WHERE run_id = ? AND step_id = ?
     `);
@@ -1698,6 +1710,8 @@ export class SqliteForgeStorage implements ForgeStorage {
       step_title: row.step_title,
       status: row.status as TaskStatus,
       dependencies: safeJsonParse<string[]>(row.dependencies, [], `task ${row.task_id} dependencies`),
+      scope: row.scope ?? undefined,
+      owner_role: row.owner_role ?? undefined,
       workspace_path: row.workspace_path ?? undefined,
       agent_id: row.agent_id ?? undefined,
       current_attempt: row.current_attempt ?? undefined,

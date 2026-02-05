@@ -419,8 +419,10 @@ export const TaskSchema = z.object({
   step_title: z.string().min(1),
   status: TaskStatusSchema,
   dependencies: z.array(z.string()),
-  /** Scope from plan step (for parallelism control) */
+  /** Scope from plan step (for parallelism control and repo mapping) */
   scope: z.string().optional(),
+  /** Owner role from plan step (for CLI/model mapping) */
+  owner_role: z.string().optional(),
   workspace_path: z.string().optional(),
   agent_id: z.string().optional(),
   current_attempt: z.number().int().optional(),
@@ -720,6 +722,8 @@ export function createTask(runId: string, forgeStep: ForgeStep): Task {
     step_title: forgeStep.title,
     status: TaskStatus.Pending,
     dependencies: forgeStep.dependencies,
+    scope: forgeStep.scope,
+    owner_role: forgeStep.owner_role,
     created_at: now,
     updated_at: now,
   };

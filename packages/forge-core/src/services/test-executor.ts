@@ -26,6 +26,8 @@ export interface TestExecutorConfig {
   modelId?: string;
   /** Complexity estimate for synthetic metrics (default: 'simple') */
   complexityEstimate?: string;
+  /** Outcome source tag (default: 'test') */
+  source?: string;
 }
 
 interface ResolvedConfig {
@@ -34,6 +36,7 @@ interface ResolvedConfig {
   maxDelayMs: number;
   modelId: string;
   complexityEstimate: string;
+  source: string;
 }
 
 /**
@@ -51,6 +54,7 @@ interface TunerTaskOutcome {
   tokens_used: number;
   cost_usd: number;
   timestamp: string;
+  source: string;
 }
 
 /**
@@ -69,6 +73,7 @@ interface TunerRunOutcome {
   replan_count: number;
   escalation_count: number;
   timestamp: string;
+  source: string;
 }
 
 export class TestExecutor {
@@ -83,6 +88,7 @@ export class TestExecutor {
       maxDelayMs: config.maxDelayMs ?? 300,
       modelId: config.modelId || 'claude-sonnet',
       complexityEstimate: config.complexityEstimate || 'simple',
+      source: config.source || 'test',
     };
   }
 
@@ -248,6 +254,7 @@ export class TestExecutor {
       tokens_used: tokensUsed,
       cost_usd: costUsd,
       timestamp: new Date().toISOString(),
+      source: this.config.source,
     };
 
     const res = await fetch(`${this.config.tunerUrl}/api/tuner/outcomes/task`, {
@@ -284,6 +291,7 @@ export class TestExecutor {
       replan_count: 0,
       escalation_count: 0,
       timestamp: new Date().toISOString(),
+      source: this.config.source,
     };
 
     const res = await fetch(`${this.config.tunerUrl}/api/tuner/outcomes/run`, {
