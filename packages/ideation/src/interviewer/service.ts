@@ -164,17 +164,17 @@ class InterviewerService {
 
     // Subscribe to relay state changes
     this.unsubscribeStateChange = relayOnStateChange((state: ClientState) => {
-      const wasConnected = this.state.relayConnected;
-      this.state.relayConnected = state === 'connected';
+      const wasConnected = this.state!.relayConnected;
+      this.state!.relayConnected = state === 'connected';
 
-      if (!wasConnected && this.state.relayConnected) {
+      if (!wasConnected && this.state!.relayConnected) {
         console.log('[Interviewer] Relay connected');
         this.announceStartup();
       }
     });
 
     // Check initial relay state
-    this.state.relayConnected = relayIsConnected();
+    this.state!.relayConnected = relayIsConnected();
 
     this.state.isActive = true;
     console.log(`[Interviewer] Initialized (relay=${getRelayMode()})`);
@@ -506,7 +506,7 @@ class InterviewerService {
           console.log(`[Interviewer] Tool ${toolUseBlock.name} result: ${JSON.stringify(toolResult).substring(0, 100)}`);
 
           // Track already_active responses and break if stuck in a loop
-          if (toolUseBlock.name === 'spawn_specialist' && toolResult?.data?.already_active) {
+          if (toolUseBlock.name === 'spawn_specialist' && (toolResult?.data as { already_active?: boolean })?.already_active) {
             alreadyActiveCount++;
             console.log(`[Interviewer] Specialist already active (count: ${alreadyActiveCount}/${maxAlreadyActive})`);
             if (alreadyActiveCount >= maxAlreadyActive) {

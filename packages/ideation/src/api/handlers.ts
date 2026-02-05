@@ -750,7 +750,9 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       }
     };
 
-    ideationEvents.on('session', handler);
+    // Use any cast to escape type augmentation from tuner's typed emitter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ideationEvents as any).on('session', handler);
     console.log(`[ideation-sse] Subscribed to session events`);
 
     // Keep-alive ping to prevent connection timeout

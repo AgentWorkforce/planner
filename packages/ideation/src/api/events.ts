@@ -4,7 +4,7 @@
  * Pub/sub for session changes to support SSE.
  */
 
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import type { Session } from '../domain/index.js';
 
 // =============================================================================
@@ -60,8 +60,11 @@ class IdeationEventEmitter extends EventEmitter {
     };
     const listenerCount = this.listenerCount('session');
     console.log(`[ideation-events] Emitting ${type} for session ${session.id}, listener count: ${listenerCount}`);
-    this.emit('session', event);
-    this.emit(type, event);
+    // Use any cast to escape type augmentation from tuner's typed emitter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as any).emit('session', event);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as any).emit(type, event);
   }
 }
 
