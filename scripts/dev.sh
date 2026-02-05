@@ -1,6 +1,6 @@
 #!/bin/bash
 # Development environment startup script
-# Manages: agent-relay daemon, backend API, frontend UI
+# Manages: agent-relay daemon, backend API, planner/ideation/forge UIs
 
 set -e
 
@@ -28,7 +28,7 @@ error() { echo -e "${RED}[dev]${NC} $1"; }
 
 # PID files for tracking our processes
 BACKEND_PID_FILE="$PROJECT_DIR/.dev-backend.pid"
-FRONTEND_PID_FILE="$PROJECT_DIR/.dev-frontend.pid"
+PLANNER_PID_FILE="$PROJECT_DIR/.dev-planner.pid"
 IDEATION_FRONTEND_PID_FILE="$PROJECT_DIR/.dev-ideation-frontend.pid"
 FORGE_FRONTEND_PID_FILE="$PROJECT_DIR/.dev-forge-frontend.pid"
 TUNER_PID_FILE="$PROJECT_DIR/.dev-tuner.pid"
@@ -112,7 +112,8 @@ start_backend() {
     fi
 
     log "Starting backend API server..."
-    npm run start --prefix "$PROJECT_DIR/packages/server" > "$PROJECT_DIR/.dev-backend.log" 2>&1 &
+    cd "$PROJECT_DIR"
+    npm run start -w server > "$PROJECT_DIR/.dev-backend.log" 2>&1 &
     local pid=$!
     echo "$pid" > "$BACKEND_PID_FILE"
 
@@ -129,9 +130,9 @@ start_backend() {
     return 1
 }
 
-# Start frontend
-start_frontend() {
-    stop_process "$FRONTEND_PID_FILE" "frontend"
+# Start planner UI
+start_planner() {
+    stop_process "$PLANNER_PID_FILE" "planner"
 
     # Check if port 3000 is in use
     if lsof -i :3000 >/dev/null 2>&1; then
@@ -140,23 +141,23 @@ start_frontend() {
         sleep 1
     fi
 
-    log "Starting frontend dev server..."
+    log "Starting planner UI dev server..."
     cd "$PROJECT_DIR/packages/planner-ui"
-    npm run dev > "$PROJECT_DIR/.dev-frontend.log" 2>&1 &
+    npm run dev > "$PROJECT_DIR/.dev-planner.log" 2>&1 &
     local pid=$!
-    echo "$pid" > "$FRONTEND_PID_FILE"
+    echo "$pid" > "$PLANNER_PID_FILE"
     cd "$PROJECT_DIR"
 
     # Wait for server to be ready
     for i in {1..30}; do
         if curl -s http://localhost:3000 >/dev/null 2>&1; then
-            success "Frontend running at http://localhost:3000"
+            success "Planner UI running at http://localhost:3000"
             return 0
         fi
         sleep 1
     done
 
-    error "Frontend failed to start. Check $PROJECT_DIR/.dev-frontend.log"
+    error "Planner UI failed to start. Check $PROJECT_DIR/.dev-planner.log"
     return 1
 }
 
@@ -234,7 +235,8 @@ start_tuner() {
     fi
 
     log "Starting tuner service..."
-    npm run start --prefix "$PROJECT_DIR/packages/tuner" > "$PROJECT_DIR/.dev-tuner.log" 2>&1 &
+    cd "$PROJECT_DIR"
+    npm run start -w tuner > "$PROJECT_DIR/.dev-tuner.log" 2>&1 &
     local pid=$!
     echo "$pid" > "$TUNER_PID_FILE"
 
@@ -277,8 +279,8 @@ show_status() {
     fi
 
     # Frontend status
-    if [ -f "$FRONTEND_PID_FILE" ]; then
-        local pid=$(cat "$FRONTEND_PID_FILE")
+    if [ -f "$PLANNER_PID_FILE" ]; then
+        local pid=$(cat "$PLANNER_PID_FILE")
         if is_running "$pid" && curl -s http://localhost:3000 >/dev/null 2>&1; then
             success "Planner UI: running (PID: $pid) at http://localhost:3000"
         else
@@ -335,7 +337,7 @@ case "${1:-start}" in
         start_relay
         start_backend
         start_tuner
-        start_frontend
+        start_planner
         start_ideation_frontend
         start_forge_frontend
         show_status
@@ -344,7 +346,7 @@ case "${1:-start}" in
         log "Logs:"
         log "  Backend:           tail -f $PROJECT_DIR/.dev-backend.log"
         log "  Tuner:             tail -f $PROJECT_DIR/.dev-tuner.log"
-        log "  Planner UI:        tail -f $PROJECT_DIR/.dev-frontend.log"
+        log "  Planner UI:        tail -f $PROJECT_DIR/.dev-planner.log"
         log "  Ideation UI:       tail -f $PROJECT_DIR/.dev-ideation-frontend.log"
         log "  Forge UI:          tail -f $PROJECT_DIR/.dev-forge-frontend.log"
         echo ""
@@ -353,7 +355,7 @@ case "${1:-start}" in
         log "Stopping development environment..."
         stop_process "$FORGE_FRONTEND_PID_FILE" "forge-frontend"
         stop_process "$IDEATION_FRONTEND_PID_FILE" "ideation-frontend"
-        stop_process "$FRONTEND_PID_FILE" "frontend"
+        stop_process "$PLANNER_PID_FILE" "planner"
         stop_process "$TUNER_PID_FILE" "tuner"
         stop_process "$BACKEND_PID_FILE" "backend"
         stop_relay
@@ -385,13 +387,13 @@ case "${1:-start}" in
             *) log "Usage: $0 backend [start|stop|restart|logs]" ;;
         esac
         ;;
-    frontend)
+    planner)
         case "${2:-start}" in
-            start) start_frontend ;;
-            stop) stop_process "$FRONTEND_PID_FILE" "frontend" ;;
-            restart) stop_process "$FRONTEND_PID_FILE" "frontend"; sleep 1; start_frontend ;;
-            logs) tail -f "$PROJECT_DIR/.dev-frontend.log" ;;
-            *) log "Usage: $0 frontend [start|stop|restart|logs]" ;;
+            start) start_planner ;;
+            stop) stop_process "$PLANNER_PID_FILE" "planner" ;;
+            restart) stop_process "$PLANNER_PID_FILE" "planner"; sleep 1; start_planner ;;
+            logs) tail -f "$PROJECT_DIR/.dev-planner.log" ;;
+            *) log "Usage: $0 planner [start|stop|restart|logs]" ;;
         esac
         ;;
     ideation)
@@ -426,7 +428,7 @@ case "${1:-start}" in
         echo "       $0 relay {start|stop|restart}"
         echo "       $0 backend {start|stop|restart|logs}"
         echo "       $0 tuner {start|stop|restart|logs}"
-        echo "       $0 frontend {start|stop|restart|logs}"
+        echo "       $0 planner {start|stop|restart|logs}"
         echo "       $0 ideation {start|stop|restart|logs}"
         echo "       $0 forge {start|stop|restart|logs}"
         exit 1
