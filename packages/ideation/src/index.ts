@@ -10,6 +10,7 @@
 import type { Router } from 'express';
 import { SQLiteIdeationStorage, type IdeationStorage } from './storage/index.js';
 import { createIdeationRouter } from './api/index.js';
+import { createHttpPlannerClient } from './api/planner-client.js';
 import { initInterviewer, stopInterviewer } from './interviewer/index.js';
 
 // =============================================================================
@@ -19,6 +20,8 @@ import { initInterviewer, stopInterviewer } from './interviewer/index.js';
 export interface IdeationServiceConfig {
   /** Path to SQLite database file */
   dbPath?: string;
+  /** Base URL of the planner API (enables send-to-planner) */
+  plannerUrl?: string;
 }
 
 export interface IdeationService {
@@ -47,7 +50,15 @@ export interface IdeationService {
 export function createIdeationService(config: IdeationServiceConfig = {}): IdeationService {
   const dbPath = config.dbPath || './ideation.db';
   const storage = new SQLiteIdeationStorage(dbPath);
-  const router = createIdeationRouter(storage);
+
+  // Create planner client if URL is configured (enables send-to-planner)
+  const plannerClient = config.plannerUrl
+    ? createHttpPlannerClient({ baseUrl: config.plannerUrl })
+    : undefined;
+
+  const router = createIdeationRouter(
+    plannerClient ? { storage, plannerClient } : storage
+  );
 
   return {
     router,

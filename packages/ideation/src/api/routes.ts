@@ -6,11 +6,11 @@
 
 import { Router } from 'express';
 import type { IdeationStorage } from '../storage/index.js';
-import { createHandlers } from './handlers.js';
+import { createHandlers, type HandlerConfig } from './handlers.js';
 
-export function createIdeationRouter(storage: IdeationStorage): Router {
+export function createIdeationRouter(config: IdeationStorage | HandlerConfig): Router {
   const router = Router();
-  const handlers = createHandlers(storage);
+  const handlers = createHandlers(config);
 
   // ===========================================================================
   // Session Routes

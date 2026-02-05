@@ -5,7 +5,7 @@
  * No Nugget entity - understanding is live state.
  */
 
-import Database from 'better-sqlite3';
+import { BaseSqliteStorage } from '@plannr/storage-base';
 import { randomUUID } from 'crypto';
 import type { IdeationStorage } from './interface.js';
 import type {
@@ -47,14 +47,23 @@ interface SessionRow {
 // SQLite Implementation
 // =============================================================================
 
-export class SQLiteIdeationStorage implements IdeationStorage {
-  private db: Database.Database;
-
+export class SQLiteIdeationStorage extends BaseSqliteStorage implements IdeationStorage {
   constructor(dbPath: string = ':memory:') {
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
+    super(dbPath);
   }
 
+  /**
+   * Base class abstract method - no-op for ideation since we use async initialize()
+   * The actual schema setup happens in the async initialize() method below.
+   */
+  protected initializeSchema(): void {
+    // No-op: ideation uses async initialize() called externally after construction
+  }
+
+  /**
+   * Initialize database schema asynchronously.
+   * Must be called after construction.
+   */
   async initialize(): Promise<void> {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS ideation_sessions (
