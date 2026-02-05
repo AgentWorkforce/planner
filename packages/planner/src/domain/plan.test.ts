@@ -221,7 +221,7 @@ describe('createPlanVersion', () => {
 
   it('should create a version with goal and context', () => {
     const planId = '123e4567-e89b-12d3-a456-426614174000';
-    const version = createPlanVersion(planId, 'Test goal', 'Test context');
+    const version = createPlanVersion(planId, 'Test goal', { context: 'Test context' });
 
     expect(version.summary.goal).toBe('Test goal');
     expect(version.summary.context).toBe('Test context');

@@ -9,6 +9,11 @@ import {
   generatePlanRef,
 } from '../../domain/workflow.js';
 import { notFound, badRequest } from '../middleware.js';
+import {
+  validatePlanDOTSync,
+  mergeValidationIntoResponse,
+} from '../middleware/dot-validation.js';
+import { summarizeComplexity } from '../../services/complexity-estimator.js';
 
 interface VersionParams {
   id: string;
@@ -156,10 +161,30 @@ export function createWorkflowHandlers(storage: PlanStorage) {
 
         const planRef = generatePlanRef(id, versionNum);
 
-        res.json({
+        // DOT Framework: Validate and log warnings at publish time
+        const validation = validatePlanDOTSync(updated);
+        if (validation.warnings.length > 0) {
+          console.log(`[workflow] Publishing plan ${id} v${versionNum} with DOT warnings:`, validation.warnings);
+        }
+
+        // DOT Framework: Include complexity summary for Forge/Tuner consumption
+        const complexitySummary = summarizeComplexity(updated.steps);
+
+        const response = {
           version: updated,
           plan_ref: planRef,
-        });
+          // DOT Framework: Include complexity summary for orchestrator
+          dot_summary: {
+            total_steps: complexitySummary.totalSteps,
+            complexity_distribution: complexitySummary.byLevel,
+            average_complexity: complexitySummary.averageScore,
+            max_complexity: complexitySummary.maxScore,
+            steps_requiring_decomposition: complexitySummary.stepsRequiringDecomposition.length,
+            steps_considering_decomposition: complexitySummary.stepsConsideringDecomposition.length,
+          },
+        };
+
+        res.json(mergeValidationIntoResponse(response, validation));
       } catch (err) {
         next(err);
       }

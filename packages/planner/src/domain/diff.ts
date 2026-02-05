@@ -73,7 +73,7 @@ export type JsonPatchOp = z.infer<typeof JsonPatchOpSchema>;
 
 /**
  * Creates a new version from an existing version.
- * Increments version number, sets status to draft, copies steps.
+ * Increments version number, sets status to draft, copies steps and config.
  */
 export function createVersionFrom(source: PlanVersion): PlanVersion {
   const now = new Date().toISOString();
@@ -83,6 +83,10 @@ export function createVersionFrom(source: PlanVersion): PlanVersion {
     status: PlanStatus.Draft,
     summary: { ...source.summary },
     steps: source.steps.map((s) => ({ ...s, dependencies: [...s.dependencies] })),
+    // Preserve decomposition config from previous version
+    decomposition_config: source.decomposition_config,
+    // Preserve understanding from previous version
+    understanding: source.understanding,
     created_at: now,
     updated_at: now,
   };

@@ -131,7 +131,7 @@ describe('SqliteStorage', () => {
     });
 
     it('should create and retrieve a version', () => {
-      const version = createPlanVersion(plan.plan_id, 'Test goal', 'Test context');
+      const version = createPlanVersion(plan.plan_id, 'Test goal', { context: 'Test context' });
       storage.createVersion(version);
 
       const retrieved = storage.getVersion(plan.plan_id, 1);
@@ -372,7 +372,7 @@ describe('SqliteStorage', () => {
       const version = createPlanVersion(
         plan.plan_id,
         'Goal with "quotes" and \'apostrophes\'',
-        'Context with\nnewlines\tand\ttabs'
+        { context: 'Context with\nnewlines\tand\ttabs' }
       );
       storage.createVersion(version);
 
