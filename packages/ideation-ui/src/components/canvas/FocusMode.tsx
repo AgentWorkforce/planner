@@ -24,6 +24,8 @@ export interface FocusModeBlock {
     range: { start: number; end: number };
     content: string;
     timestamp: string;
+    field?: string;
+    editedAt?: string;
   }>;
 }
 
@@ -188,10 +190,10 @@ export function FocusMode({ block, onClose, onCurate, onContentChange, children,
             <div className="space-y-2">
               {block.userEdits.slice(-3).map((edit, idx) => (
                 <div key={idx} className="text-xs text-text-muted bg-bg-tertiary rounded px-2 py-1">
-                  <span className="text-accent-yellow">{edit.field}</span>
+                  <span className="text-accent-yellow">{edit.field || 'content'}</span>
                   <span className="text-text-muted"> edited </span>
                   <span className="text-text-secondary">
-                    {new Date(edit.editedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(edit.editedAt || edit.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               ))}

@@ -1,0 +1,16 @@
+{
+  "feature_id": "ideation-doc-agent-tool",
+  "title": "cite_document Agent Tool",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "ideation-documents",
+  "component": "ideation-core",
+  "dependencies": [
+    "ideation-doc-storage",
+    "ideation-doc-analysis"
+  ],
+  "summary": {
+    "goal": "cite_document Agent Tool"
+  }
+}

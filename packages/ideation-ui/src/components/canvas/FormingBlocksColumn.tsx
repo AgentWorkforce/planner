@@ -31,7 +31,6 @@ export interface Block {
 export interface FormingBlocksColumnProps {
   blocks: Block[];
   onBlockClick?: (blockId: string) => void;
-  onBlockDragEnd?: (blockId: string) => void;
   className?: string;
 }
 
@@ -72,14 +71,12 @@ export interface FormingBlocksColumnProps {
  * <FormingBlocksColumn
  *   blocks={allBlocks}
  *   onBlockClick={(id) => console.log('Clicked', id)}
- *   onBlockDragEnd={(id) => console.log('Dragged', id)}
  * />
  * ```
  */
 export function FormingBlocksColumn({
   blocks,
   onBlockClick,
-  onBlockDragEnd,
   className,
 }: FormingBlocksColumnProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -156,7 +153,6 @@ export function FormingBlocksColumn({
                       position={{ x: size / 2 + 8, y: size / 2 + 8 }}
                       size={size}
                       onClick={() => onBlockClick?.(block.id)}
-                      onDragEnd={() => onBlockDragEnd?.(block.id)}
                     />
                   </div>
                 );
@@ -186,9 +182,9 @@ export function FormingBlocksColumn({
               key={block.id}
               block={block}
               position={{ x: position.x, y: position.y }}
+              angle={position.angle}
               size={size}
               onClick={() => onBlockClick?.(block.id)}
-              onDragEnd={() => onBlockDragEnd?.(block.id)}
             />
           );
         })}

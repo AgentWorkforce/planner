@@ -26,9 +26,9 @@ describe('useToast', () => {
     });
 
     expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0].title).toBe('Test Toast');
-    expect(result.current.toasts[0].description).toBe('Test Description');
-    expect(result.current.toasts[0].variant).toBe('success');
+    expect(result.current.toasts[0]!.title).toBe('Test Toast');
+    expect(result.current.toasts[0]!.description).toBe('Test Description');
+    expect(result.current.toasts[0]!.variant).toBe('success');
   });
 
   it('should auto-dismiss toast after duration', () => {
@@ -102,9 +102,9 @@ describe('useToast', () => {
     });
 
     expect(result.current.toasts).toHaveLength(3);
-    expect(result.current.toasts[0].title).toBe('Toast 1');
-    expect(result.current.toasts[1].title).toBe('Toast 2');
-    expect(result.current.toasts[2].title).toBe('Toast 3');
+    expect(result.current.toasts[0]!.title).toBe('Toast 1');
+    expect(result.current.toasts[1]!.title).toBe('Toast 2');
+    expect(result.current.toasts[2]!.title).toBe('Toast 3');
   });
 
   it('should use default values for optional fields', () => {
@@ -116,7 +116,7 @@ describe('useToast', () => {
       });
     });
 
-    const toast = result.current.toasts[0];
+    const toast = result.current.toasts[0]!;
     expect(toast.variant).toBe('info');
     expect(toast.duration).toBe(3000);
     expect(toast.description).toBeUndefined();
@@ -146,7 +146,7 @@ describe('useToast', () => {
     // Both hooks should see the same toast
     expect(result1.current.toasts).toHaveLength(1);
     expect(result2.current.toasts).toHaveLength(1);
-    expect(result1.current.toasts[0].id).toBe(result2.current.toasts[0].id);
+    expect(result1.current.toasts[0]!.id).toBe(result2.current.toasts[0]!.id);
   });
 
   it('should handle all toast variants', () => {
@@ -160,9 +160,9 @@ describe('useToast', () => {
     });
 
     expect(result.current.toasts).toHaveLength(4);
-    expect(result.current.toasts[0].variant).toBe('success');
-    expect(result.current.toasts[1].variant).toBe('error');
-    expect(result.current.toasts[2].variant).toBe('info');
-    expect(result.current.toasts[3].variant).toBe('warning');
+    expect(result.current.toasts[0]!.variant).toBe('success');
+    expect(result.current.toasts[1]!.variant).toBe('error');
+    expect(result.current.toasts[2]!.variant).toBe('info');
+    expect(result.current.toasts[3]!.variant).toBe('warning');
   });
 });

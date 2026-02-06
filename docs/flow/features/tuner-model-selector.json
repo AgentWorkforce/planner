@@ -1,0 +1,53 @@
+{
+  "title": "Model Selector (Thompson Sampling)",
+  "summary": {
+    "goal": "Learn optimal model selection using Thompson sampling multi-armed bandit with stability controls",
+    "acceptance_criteria": [
+      {
+        "id": "ms1",
+        "description": "selectModel checks hard rules first (from config)"
+      },
+      {
+        "id": "ms2",
+        "description": "Random model selected with probability = exploration_rate (during burn-in)"
+      },
+      {
+        "id": "ms3",
+        "description": "Thompson sampling samples from Beta(α,β) for each model"
+      },
+      {
+        "id": "ms4",
+        "description": "Model with highest sampled value is selected (after passing stability checks)"
+      },
+      {
+        "id": "ms5",
+        "description": "recordOutcome updates Beta distribution (α++ on success, β++ on failure)"
+      },
+      {
+        "id": "ms6",
+        "description": "New model/taskType/complexity starts with Beta(1,1) prior"
+      },
+      {
+        "id": "ms7",
+        "description": "sampleBeta uses Gamma distribution sampling trick"
+      },
+      {
+        "id": "ms8",
+        "description": "MIN_SAMPLES (30) required per arm before exploitation (use round-robin during burn-in)"
+      },
+      {
+        "id": "ms9",
+        "description": "Hysteresis: new model must have ≥15% higher probability than current to switch"
+      }
+    ]
+  },
+  "feature_id": "tuner-model-selector",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-outcome-collector"
+  ]
+}

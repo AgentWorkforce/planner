@@ -83,7 +83,7 @@ export function SessionUnderstandingTab({
             key={name}
             name={name}
             roleHint={roleHintMap.get(name)}
-            observations={understanding[name]}
+            observations={understanding[name] ?? {}}
             defaultExpanded={true}
           />
         ))}

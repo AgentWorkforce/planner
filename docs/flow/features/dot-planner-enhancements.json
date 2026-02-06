@@ -517,7 +517,7 @@
           { "id": "ac2", "description": "Existing domain tests pass without modification" },
           { "id": "ac3", "description": "New schemas can be imported and used in test file" },
           { "id": "ac4", "description": "Backward compatibility: existing Step/PlanVersion objects validate successfully" }
-        ],
+        ]
       },
       {
         "step_id": "dot-010",
@@ -705,7 +705,7 @@
           { "id": "ac5", "description": "Unit tests for validateContract with valid and invalid contracts" },
           { "id": "ac6", "description": "Unit tests for TunerClient with mock fetch" },
           { "id": "ac7", "description": "All tests pass" }
-        ],
+        ]
       },
       {
         "step_id": "dot-018",
@@ -884,7 +884,7 @@
           { "id": "ac4", "description": "Integration tests for depth validation with nested sub-plans" },
           { "id": "ac5", "description": "Backward compatibility: existing API clients work without changes" },
           { "id": "ac6", "description": "All tests pass" }
-        ],
+        ]
       },
       {
         "step_id": "dot-027",
@@ -1042,7 +1042,7 @@
           { "id": "ac4", "description": "TypeScript compilation succeeds with no errors" },
           { "id": "ac5", "description": "Package exports updated in index.ts" },
           { "id": "ac6", "description": "Existing tests still pass (no regressions)" }
-        ],
+        ]
       },
       {
         "step_id": "dot-034",
@@ -1059,7 +1059,7 @@
           { "id": "ac5", "description": "Zod schemas have meaningful error messages" },
           { "id": "ac6", "description": "No TODO comments without associated issue/task" },
           { "id": "ac7", "description": "Test names are descriptive and follow 'should X when Y' pattern" }
-        ],
+        ]
       }
     ]
   }

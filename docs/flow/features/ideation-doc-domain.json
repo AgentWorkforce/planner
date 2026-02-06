@@ -1,0 +1,12 @@
+{
+  "feature_id": "ideation-doc-domain",
+  "title": "Document Domain Model",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "ideation-documents",
+  "component": "ideation-core",
+  "summary": {
+    "goal": "Document Domain Model"
+  }
+}

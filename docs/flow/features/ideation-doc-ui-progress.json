@@ -1,0 +1,16 @@
+{
+  "feature_id": "ideation-doc-ui-progress",
+  "title": "Analysis Progress UI",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "ideation-documents",
+  "component": "ideation-ui",
+  "dependencies": [
+    "ideation-doc-ui-upload",
+    "ideation-doc-analysis"
+  ],
+  "summary": {
+    "goal": "Analysis Progress UI"
+  }
+}

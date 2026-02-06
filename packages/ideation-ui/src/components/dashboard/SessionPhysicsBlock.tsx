@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { PhysicsBlockBase, CONTENT_VISIBILITY_THRESHOLD } from '@/components/shared/PhysicsBlockBase';
 
 /**
  * Session interface matching the ideation backend
@@ -19,9 +18,32 @@ export interface SessionPhysicsBlockData {
 export interface SessionPhysicsBlockProps {
   session: SessionPhysicsBlockData;
   position: { x: number; y: number };
+  angle?: number; // Rotation angle from physics engine (in radians)
   size: number; // Derived from activity/importance
   isAbandoned?: boolean; // Whether the session is abandoned (> 7 days inactive)
+  blockCount?: number; // Number of blocks (used for color variation)
   onClick?: () => void;
+}
+
+/**
+ * Get CSS variable names for progress colors based on block count
+ * - 0 blocks: Cool blue-gray (just started)
+ * - 1-2 blocks: Amber/yellow (developing)
+ * - 3-4 blocks: Teal (maturing)
+ * - 5+ blocks: Green (ready for planner)
+ *
+ * Colors are defined in globals.css for both light and dark themes.
+ */
+function getProgressColor(blockCount: number): { bg: string; border: string } {
+  if (blockCount === 0) {
+    return { bg: 'var(--session-new-bg)', border: 'var(--session-new-border)' };
+  } else if (blockCount <= 2) {
+    return { bg: 'var(--session-developing-bg)', border: 'var(--session-developing-border)' };
+  } else if (blockCount <= 4) {
+    return { bg: 'var(--session-maturing-bg)', border: 'var(--session-maturing-border)' };
+  } else {
+    return { bg: 'var(--session-ready-bg)', border: 'var(--session-ready-border)' };
+  }
 }
 
 /**
@@ -62,45 +84,20 @@ export interface SessionPhysicsBlockProps {
 export function SessionPhysicsBlock({
   session,
   position,
+  angle = 0,
   size,
   isAbandoned = false,
+  blockCount: blockCountProp,
   onClick,
 }: SessionPhysicsBlockProps) {
-  const blockRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const blockCount = blockCountProp ?? (session.blocks?.length || 0);
+  const progressColors = getProgressColor(blockCount);
+  const showContent = size > CONTENT_VISIBILITY_THRESHOLD && !isAbandoned;
 
-  // Sync DOM position with physics body position
-  useEffect(() => {
-    const element = blockRef.current;
-    if (!element) return;
-
-    // Use requestAnimationFrame for smooth updates
-    const updatePosition = () => {
-      if (element) {
-        // Center the element on the physics body position
-        const left = position.x - size / 2;
-        const top = position.y - size / 2;
-
-        // Use transform for GPU-accelerated positioning
-        element.style.transform = `translate(${left}px, ${top}px)`;
-      }
-      animationFrameRef.current = requestAnimationFrame(updatePosition);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(updatePosition);
-
-    return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [position.x, position.y, size]);
+  // Calculate activity score for z-index (based on block count and recency)
+  const activityScore = Math.min(100, blockCount * 10 + 50);
 
   const title = session.source.initial_intent;
-
-  // Calculate block count
-  const blockCount = session.blocks?.length || 0;
 
   // Format last activity (relative time)
   const lastActivity = new Date(session.updated_at);
@@ -122,89 +119,42 @@ export function SessionPhysicsBlock({
   }
 
   return (
-    <>
-      <div
-        ref={blockRef}
-        onClick={onClick}
-        onMouseEnter={() => isAbandoned && setShowTooltip(true)}
-        onMouseLeave={() => isAbandoned && setShowTooltip(false)}
-        className={cn(
-          'absolute select-none',
-          'flex flex-col items-center justify-center',
-          'transition-all duration-200',
-          'cursor-pointer',
-          'rounded-lg',
-          isAbandoned
-            ? [
-                // Abandoned session styles
-                'opacity-40',
-                'hover:opacity-70',
-                'hover:scale-150',
-              ]
-            : [
-                // Active session styles
-                'p-3 gap-1',
-                'hover:shadow-lg hover:scale-105',
-              ]
-        )}
-        style={{
-          width: size,
-          height: size,
-          willChange: 'transform',
-          backgroundColor: 'var(--block-draft)',
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          borderColor: 'var(--block-draft-border)',
-        }}
-      >
-        {/* Only show content for non-abandoned sessions */}
-        {!isAbandoned && (
-          <>
-            {/* Session Title */}
-            <div className="text-xs font-medium text-[var(--canvas-text-primary)] text-center w-full px-1 line-clamp-2">
-              {title}
-            </div>
-
-            {/* Block Count Badge */}
-            {blockCount > 0 && (
-              <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--canvas-bg-subtle)] rounded-full">
-                <span className="text-xs text-[var(--canvas-text-muted)]">{blockCount} blocks</span>
-              </div>
-            )}
-
-            {/* Last Activity */}
-            <div className="text-[10px] text-[var(--canvas-text-muted)] mt-auto">
-              {activityLabel}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Tooltip for abandoned sessions */}
-      {isAbandoned && showTooltip && (
-        <div
-          className="absolute z-50 px-3 py-2 rounded-lg shadow-lg pointer-events-none"
-          style={{
-            left: position.x + size / 2 + 10,
-            top: position.y,
-            transform: 'translateY(-50%)',
-            backgroundColor: 'var(--block-draft)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            borderColor: 'var(--block-draft-border)',
-          }}
-        >
-          <div className="text-xs font-medium text-[var(--canvas-text-primary)] whitespace-nowrap">
+    <PhysicsBlockBase
+      id={session.id}
+      position={position}
+      angle={angle}
+      size={size}
+      activityScore={activityScore}
+      isAbandoned={isAbandoned}
+      onClick={onClick}
+      style={{
+        backgroundColor: isAbandoned ? 'var(--block-draft)' : progressColors.bg,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: isAbandoned ? 'var(--block-draft-border)' : progressColors.border,
+      }}
+      className={!isAbandoned ? 'flex flex-col items-center justify-center p-3 gap-1 rounded-lg hover:shadow-lg hover:scale-105' : 'rounded-lg'}
+    >
+      {showContent && (
+        <>
+          {/* Session Title */}
+          <div className="text-xs font-medium text-[var(--canvas-text-primary)] text-center w-full px-1 line-clamp-2">
             {title}
           </div>
-          <div className="text-[10px] text-[var(--canvas-text-muted)] mt-1">
-            Abandoned {activityLabel}
+
+          {/* Block Count Badge */}
+          {blockCount > 0 && (
+            <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--canvas-bg-subtle)] rounded-full">
+              <span className="text-xs text-[var(--canvas-text-muted)]">{blockCount} blocks</span>
+            </div>
+          )}
+
+          {/* Last Activity */}
+          <div className="text-[10px] text-[var(--canvas-text-muted)] mt-auto">
+            {activityLabel}
           </div>
-          <div className="text-[10px] text-[var(--canvas-accent)] mt-1">
-            Click to reactivate
-          </div>
-        </div>
+        </>
       )}
-    </>
+    </PhysicsBlockBase>
   );
 }

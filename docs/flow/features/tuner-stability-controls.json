@@ -1,0 +1,49 @@
+{
+  "title": "Stability Controls",
+  "summary": {
+    "goal": "Prevent parameter flapping with insufficient data using burn-in, rate limiting, hysteresis, and credible interval checks",
+    "acceptance_criteria": [
+      {
+        "id": "sc1",
+        "description": "BURN_IN_TRIALS (50) enforces round-robin during initial exploration"
+      },
+      {
+        "id": "sc2",
+        "description": "MIN_SAMPLES_PER_ARM (30) required before Thompson sampling exploitation"
+      },
+      {
+        "id": "sc3",
+        "description": "Rate limiting: config changes limited to once per COOL_DOWN_PERIOD (1 hour for model selection)"
+      },
+      {
+        "id": "sc4",
+        "description": "Hysteresis: IMPROVEMENT_MARGIN (15%) required before parameter switch"
+      },
+      {
+        "id": "sc5",
+        "description": "Credible interval check: 95% CI width must be < 0.10 before acting"
+      },
+      {
+        "id": "sc6",
+        "description": "StabilityConfig type with all thresholds (burn_in_trials, min_samples_per_arm, cool_down_ms, improvement_margin, max_ci_width)"
+      },
+      {
+        "id": "sc7",
+        "description": "checkStability() returns { canChange: boolean, reason?: string } explaining why change blocked"
+      },
+      {
+        "id": "sc8",
+        "description": "All stability decisions logged for debugging"
+      }
+    ]
+  },
+  "feature_id": "tuner-stability-controls",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-model-selector"
+  ]
+}

@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChevronIcon } from '@/components/icons/ChevronIcon';
 import { MenuIcon } from '@/components/icons/MenuIcon';
 import { ConfidenceBar } from '@/components/chat/ConfidenceBar';
 import { useConfidence } from '@/hooks/useConfidence';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 /**
  * Session info for the dropdown
@@ -265,6 +267,7 @@ export function SessionNav({
   onHandoff,
   className,
 }: SessionNavProps) {
+  const navigate = useNavigate();
   const { score, breakdown } = useConfidence(sessionId);
 
   return (
@@ -277,9 +280,9 @@ export function SessionNav({
       {/* Left section */}
       <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
         <button
-          onClick={() => window.history.back()}
+          onClick={() => navigate('/ideation')}
           className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--canvas-bg-subtle)] transition-colors shrink-0"
-          aria-label="Go back"
+          aria-label="Go back to dashboard"
         >
           <ArrowLeft className="w-4 h-4 text-[var(--canvas-text-primary)]" />
         </button>
@@ -296,6 +299,7 @@ export function SessionNav({
 
       {/* Right section — desktop */}
       <div className="hidden md:flex items-center gap-2">
+        <ThemeToggle />
         <button
           onClick={onOpenUnderstanding}
           className="px-3 py-1.5 text-sm rounded-md hover:bg-[var(--canvas-bg-subtle)] transition-colors text-[var(--canvas-text-primary)]"
@@ -315,8 +319,9 @@ export function SessionNav({
         </button>
       </div>
 
-      {/* Mobile: hamburger menu */}
-      <div className="md:hidden">
+      {/* Mobile: theme toggle + hamburger menu */}
+      <div className="md:hidden flex items-center gap-1">
+        <ThemeToggle />
         <MobileActionsMenu onOpenUnderstanding={onOpenUnderstanding} onHandoff={onHandoff} />
       </div>
     </header>

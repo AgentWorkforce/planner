@@ -59,7 +59,7 @@ prpm.lock
 .prompts/
 
 # Local docs (not tracked, except docs/flow/)
-docs/architecture/
-docs/artifacts/
-docs/design/
-docs/research/
+docs/*
+!docs/flow/
+!docs/flow/**
+docs/flow/**/.DS_Store

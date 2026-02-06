@@ -1,0 +1,537 @@
+{
+  "feature_id": "ui-relay-messaging-sidebar",
+  "title": "Messaging Sidebar Component",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": [
+    "ui-relay-messaging-backend"
+  ],
+  "summary": {
+    "goal": "Create persistent messaging sidebar with channel list, message stream, and input",
+    "context": "Replaces the modal ChatPanel with a persistent right sidebar. Similar to Slack or relay-dashboard messaging UX. Collapsible, shows channels, active channel messages, input with @mentions.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "Sidebar is fixed-width right panel (420px), not modal"
+      },
+      {
+        "id": "ac2",
+        "description": "Can be collapsed to icon strip (~48px wide)"
+      },
+      {
+        "id": "ac3",
+        "description": "Channel list at top with unread indicators"
+      },
+      {
+        "id": "ac4",
+        "description": "Message stream scrollable with auto-scroll on new messages"
+      },
+      {
+        "id": "ac5",
+        "description": "Message input at bottom with @mention support"
+      },
+      {
+        "id": "ac6",
+        "description": "Presence shown in channel header"
+      }
+    ]
+  },
+  "design_spec": {
+    "notes": "Adapts relay-dashboard messaging patterns to planner-ui Tailwind setup. Uses CSS variables from globals.css (bg-bg-*, text-text-*, accent-*, border-*). All components use Tailwind utility classes.",
+    "reuse_from_planner_ui": [
+      "ChatPanel.tsx - panel structure (fixed right-0, w-[420px], flex-col), header pattern, input form layout",
+      "ChatMessage.tsx - message bubble structure, typing indicator animation",
+      "AIConnectionBadge.tsx - connection status dot pattern (green/orange/red)",
+      "LoadingSpinner.tsx - for loading states",
+      "icons/ - ChevronLeft, Hash, MessageIcon, CloseIcon patterns"
+    ],
+    "copy_from_relay_dashboard": [
+      "ChannelSidebar.tsx - channel list structure, section headers ('Channels', 'Direct Messages'), unread badge styling",
+      "ChannelChat.tsx - message bubble positioning (isOwn ? flex-end : flex-start), timestamp formatting",
+      "MessageComposer.tsx - @mention autocomplete pattern (MentionAutocomplete), Enter/Shift+Enter handling",
+      "MessageList.tsx - auto-scroll logic (scrollContainerRef, messagesEndRef, useLayoutEffect)"
+    ],
+    "key_tailwind_classes": {
+      "sidebar_expanded": "fixed right-0 top-0 h-full w-[420px] bg-bg-secondary border-l border-border-subtle flex flex-col z-40",
+      "sidebar_collapsed": "fixed right-0 top-0 h-full w-12 bg-bg-secondary border-l border-border-subtle flex flex-col items-center py-4 z-40",
+      "channel_item": "px-4 py-2 flex items-center gap-2 hover:bg-bg-hover cursor-pointer",
+      "channel_item_active": "bg-bg-card border-l-2 border-accent-cyan",
+      "unread_badge": "bg-accent-cyan text-bg-deep text-xs font-semibold rounded-full px-2 min-w-[18px] text-center",
+      "message_user": "bg-accent-cyan/10 border border-accent-cyan/20 rounded-lg ml-12 mr-2 p-3",
+      "message_agent": "bg-bg-tertiary border border-border-subtle rounded-lg ml-2 mr-12 p-3",
+      "agent_avatar": "w-8 h-8 rounded-full bg-accent-purple flex items-center justify-center text-bg-deep text-sm font-medium",
+      "input_area": "bg-bg-tertiary border border-border-subtle rounded-lg focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50",
+      "send_button": "bg-accent-cyan text-bg-deep font-medium rounded-lg px-4 py-2 hover:shadow-glow-cyan transition-all",
+      "mention_popup": "absolute bottom-full mb-2 bg-bg-card border border-border-subtle rounded-lg shadow-modal max-h-48 overflow-y-auto",
+      "section_header": "text-xs text-text-muted uppercase tracking-wide px-4 py-2 font-semibold",
+      "connection_dot": "w-2 h-2 rounded-full",
+      "connection_connected": "bg-success",
+      "connection_disconnected": "bg-warning animate-pulse",
+      "connection_error": "bg-error"
+    },
+    "component_structure": {
+      "MessagingSidebar": "Root container. Props: isExpanded, onToggle. Renders ChannelList, ChannelHeader, MessageStream, MessageInput based on state.",
+      "ChannelList": "Two sections: 'Global' (#planner) and 'Plan Channels' (#plan-*). Maps channels array to ChannelItem buttons.",
+      "ChannelHeader": "Shows #channel-name, presence count ('3 online'), avatar stack (max 5 avatars, +N overflow).",
+      "MessageStream": "Scrollable div with messages array. Uses ref for auto-scroll. Handles scroll-to-load-more on scroll top.",
+      "MessageInput": "Textarea + send button. @mention triggers popup. Disabled when disconnected."
+    },
+    "state_management": {
+      "RelayProvider": "App-level context providing single shared WebSocket connection. Wraps entire app in main.tsx. Manages connection lifecycle, reconnection, and user identity.",
+      "useRelay": "Hook to access shared connection from RelayProvider. Returns { connection, isConnected, userId, displayName }. Components use this instead of useRelayConnection directly.",
+      "useRelayConnection": "(internal) Low-level hook used only by RelayProvider. Not called directly by components.",
+      "useChannels": "Fetches channel list, tracks activeChannel, unreadCounts. Receives connection from useRelay().",
+      "useChannelMessages": "Loads history via REST, appends from WebSocket. Receives connection from useRelay().",
+      "usePresence": "Fetches presence via REST, updates from WebSocket join/leave events. Receives connection from useRelay()."
+    }
+  },
+  "plan_implementation": {
+    "scopes": [
+      "planner-ui"
+    ],
+    "steps": [
+      {
+        "step_id": "urm-ui001",
+        "title": "Create useRelayConnection hook",
+        "scope": "planner-ui",
+        "description": "Hook that manages WebSocket connection to /ws/relay. Handles connect, reconnect, disconnect. Exposes connection status and send/receive methods.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "useRelayConnection() returns { status, connect, disconnect, send, onMessage }"
+          },
+          {
+            "id": "ac2",
+            "description": "Auto-reconnects on disconnect with backoff"
+          },
+          {
+            "id": "ac3",
+            "description": "Status: 'connecting' | 'connected' | 'disconnected' | 'error'"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui002",
+        "title": "Create useChannels hook",
+        "scope": "planner-ui",
+        "description": "Hook for channel operations. Fetches channel list, manages active channel, handles channel switching. Integrates with useRelayConnection for real-time updates.",
+        "dependencies": [
+          "urm-ui001"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "useChannels() returns { channels, activeChannel, setActiveChannel, unreadCounts }"
+          },
+          {
+            "id": "ac2",
+            "description": "Channels fetched from GET /api/channels"
+          },
+          {
+            "id": "ac3",
+            "description": "Unread counts update on new messages"
+          },
+          {
+            "id": "ac4",
+            "description": "Channel list updates when new channels created"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui003",
+        "title": "Create useChannelMessages hook",
+        "scope": "planner-ui",
+        "description": "Hook for messages in active channel. Loads history, appends new messages from WebSocket, handles pagination.",
+        "dependencies": [
+          "urm-ui001"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "useChannelMessages(channelId) returns { messages, sendMessage, loadMore, hasMore }"
+          },
+          {
+            "id": "ac2",
+            "description": "History loaded from GET /api/channels/:id/messages"
+          },
+          {
+            "id": "ac3",
+            "description": "New messages appended from WebSocket"
+          },
+          {
+            "id": "ac4",
+            "description": "Pagination loads older messages on scroll up"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui004",
+        "title": "Create usePresence hook",
+        "scope": "planner-ui",
+        "description": "Hook for presence in active channel. Shows who (agents, users) is online. Updates in real-time.",
+        "dependencies": [
+          "urm-ui001"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "usePresence(channelId) returns { members, onlineCount }"
+          },
+          {
+            "id": "ac2",
+            "description": "Presence loaded from GET /api/channels/:id/presence"
+          },
+          {
+            "id": "ac3",
+            "description": "Real-time updates on join/leave via WebSocket"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui005",
+        "title": "Create ChannelList component",
+        "scope": "planner-ui",
+        "description": "Collapsible list of channels. Shows #planner and #plan-{id} channels. Highlights active channel. Shows unread badges.",
+        "dependencies": [
+          "urm-ui002"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Renders list of channels"
+          },
+          {
+            "id": "ac2",
+            "description": "Active channel highlighted"
+          },
+          {
+            "id": "ac3",
+            "description": "Unread count badge shown per channel"
+          },
+          {
+            "id": "ac4",
+            "description": "Click switches active channel"
+          },
+          {
+            "id": "ac5",
+            "description": "Collapsible sections: Global (#planner), Plan channels"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui006",
+        "title": "Create ChannelHeader component",
+        "scope": "planner-ui",
+        "description": "Header for active channel. Shows channel name, presence count, and online member avatars (agents have distinct style).",
+        "dependencies": [
+          "urm-ui004"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Shows channel name (e.g., #plan-abc123)"
+          },
+          {
+            "id": "ac2",
+            "description": "Shows presence count (e.g., '3 online')"
+          },
+          {
+            "id": "ac3",
+            "description": "Shows avatar stack for online members"
+          },
+          {
+            "id": "ac4",
+            "description": "Agents have distinct avatar style (icon vs initials)"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui007",
+        "title": "Create MessageStream component",
+        "scope": "planner-ui",
+        "description": "Scrollable list of messages. Different styles for user vs agent messages. Markdown rendering for agent responses. Auto-scroll to bottom on new messages.",
+        "dependencies": [
+          "urm-ui003"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Renders message list from useChannelMessages"
+          },
+          {
+            "id": "ac2",
+            "description": "User messages right-aligned, agent messages left-aligned"
+          },
+          {
+            "id": "ac3",
+            "description": "Agent messages show agent name and avatar"
+          },
+          {
+            "id": "ac4",
+            "description": "Markdown rendered in message content"
+          },
+          {
+            "id": "ac5",
+            "description": "Auto-scrolls to bottom when new message arrives"
+          },
+          {
+            "id": "ac6",
+            "description": "Loads more messages on scroll to top"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui008",
+        "title": "Create MessageInput component",
+        "scope": "planner-ui",
+        "description": "Input for composing messages. Supports @mentions with autocomplete popup. Enter to send, Shift+Enter for newline.",
+        "dependencies": [
+          "urm-ui004"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Textarea input with send button"
+          },
+          {
+            "id": "ac2",
+            "description": "@mention triggers autocomplete popup"
+          },
+          {
+            "id": "ac3",
+            "description": "Autocomplete shows agents from presence"
+          },
+          {
+            "id": "ac4",
+            "description": "Selecting mention inserts @AgentName"
+          },
+          {
+            "id": "ac5",
+            "description": "Enter sends message, Shift+Enter for newline"
+          },
+          {
+            "id": "ac6",
+            "description": "Input disabled when disconnected"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui009",
+        "title": "Create MessagingSidebar component",
+        "scope": "planner-ui",
+        "description": "Main sidebar component composing ChannelList, ChannelHeader, MessageStream, and MessageInput. Supports collapsed/expanded state.",
+        "dependencies": [
+          "urm-ui005",
+          "urm-ui006",
+          "urm-ui007",
+          "urm-ui008"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Fixed width 420px in expanded state"
+          },
+          {
+            "id": "ac2",
+            "description": "Collapsed state shows icon strip ~48px"
+          },
+          {
+            "id": "ac3",
+            "description": "Toggle button to expand/collapse"
+          },
+          {
+            "id": "ac4",
+            "description": "Composes ChannelList, ChannelHeader, MessageStream, MessageInput"
+          },
+          {
+            "id": "ac5",
+            "description": "Connection status indicator in footer"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui010",
+        "title": "Integrate MessagingSidebar into Layout",
+        "scope": "planner-ui",
+        "description": "Add MessagingSidebar to app Layout. Replaces ChatPanel modal. Main content area adjusts width when sidebar expanded/collapsed.",
+        "dependencies": [
+          "urm-ui009"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "MessagingSidebar rendered in Layout"
+          },
+          {
+            "id": "ac2",
+            "description": "Main content shifts left when sidebar expanded"
+          },
+          {
+            "id": "ac3",
+            "description": "ChatPanel modal removed from codebase"
+          },
+          {
+            "id": "ac4",
+            "description": "Cmd+/ keyboard shortcut toggles sidebar"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui011",
+        "title": "Pass plan context to messages",
+        "scope": "planner-ui",
+        "description": "When in plan editor, include current plan ID and selected step in message context. PlannerLead uses this context for relevant responses.",
+        "dependencies": [
+          "urm-ui009"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Messages include planId when in plan editor"
+          },
+          {
+            "id": "ac2",
+            "description": "Messages include selectedStepId when step selected"
+          },
+          {
+            "id": "ac3",
+            "description": "Context displayed in input area (e.g., 'Discussing: Step 3')"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui012",
+        "title": "Add demo mode fallback",
+        "scope": "planner-ui",
+        "description": "When relay unavailable, show demo channel with mock messages. Indicate demo mode clearly. Still allows exploring UI.",
+        "dependencies": [
+          "urm-ui009"
+        ],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Demo mode shown when connection fails"
+          },
+          {
+            "id": "ac2",
+            "description": "#demo channel with simulated messages"
+          },
+          {
+            "id": "ac3",
+            "description": "Clear 'Demo Mode' indicator in sidebar"
+          },
+          {
+            "id": "ac4",
+            "description": "Messages to demo channel get mock AI responses"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui013",
+        "title": "Create RelayProvider context",
+        "scope": "planner-ui",
+        "description": "Create a React context that provides a single shared WebSocket connection for the entire app. Wrap App in main.tsx. The provider manages connection lifecycle and exposes connection state to all descendants via useRelay() hook.",
+        "dependencies": [
+          "urm-ui001"
+        ],
+        "owner_role": "frontend:Coder",
+        "status": "completed",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "RelayProvider context created in src/contexts/RelayContext.tsx"
+          },
+          {
+            "id": "ac2",
+            "description": "useRelay() returns { connection: UseRelayConnectionResult, isConnected, userId, displayName, isMock }"
+          },
+          {
+            "id": "ac3",
+            "description": "App wrapped with RelayProvider in main.tsx"
+          },
+          {
+            "id": "ac4",
+            "description": "Only ONE WebSocket connection created per browser session"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui014",
+        "title": "Integrate user identity with RelayProvider",
+        "scope": "planner-ui",
+        "description": "Use useCurrentUser() to get user identity. Generate stable userId (from useCurrentUser or sessionStorage fallback). Update useRelayConnection to accept optional userId param. Pass userId to ws-proxy via query param: /ws/relay?name=DisplayName&userId=user-id",
+        "dependencies": [
+          "urm-ui013"
+        ],
+        "owner_role": "frontend:Coder",
+        "status": "completed",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "useRelayConnection accepts optional userId param"
+          },
+          {
+            "id": "ac2",
+            "description": "RelayProvider passes useCurrentUser().user_id or sessionStorage fallback"
+          },
+          {
+            "id": "ac3",
+            "description": "WebSocket URL includes userId: /ws/relay?name=X&userId=Y"
+          },
+          {
+            "id": "ac4",
+            "description": "Relay logs show stable user ID (e.g., dev-user-001) not random user-*"
+          }
+        ]
+      },
+      {
+        "step_id": "urm-ui015",
+        "title": "Refactor consumers to use RelayProvider context",
+        "scope": "planner-ui",
+        "description": "Update MessagingSidebar and useAgentOrchestration to use useRelay() instead of calling useRelayConnection directly. Remove direct useRelayConnection imports from components.",
+        "dependencies": [
+          "urm-ui014"
+        ],
+        "owner_role": "frontend:Coder",
+        "status": "completed",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "MessagingSidebar uses useRelay() instead of useRelayConnection"
+          },
+          {
+            "id": "ac2",
+            "description": "useAgentOrchestration uses useRelay() instead of useRelayConnection"
+          },
+          {
+            "id": "ac3",
+            "description": "No component directly calls useRelayConnection (only RelayProvider does)"
+          },
+          {
+            "id": "ac4",
+            "description": "Browser shows single WebSocket connection in DevTools Network tab"
+          },
+          {
+            "id": "ac5",
+            "description": "Relay logs show stable user identity across page navigation"
+          }
+        ]
+      }
+    ]
+  },
+  "parent": "ui-relay-messaging"
+}

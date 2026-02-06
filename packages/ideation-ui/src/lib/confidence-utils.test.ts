@@ -285,14 +285,16 @@ describe('extractCategoryDetails', () => {
       {
         name: 'system_design',
         confidence: 88,
-        itemCount: 3, // mcp_tool_integration, component_architecture, confidence
+        itemCount: 2, // mcp_tool_integration, component_architecture (confidence not counted)
         hasRecommendations: false,
+        items: expect.any(Array),
       },
       {
         name: 'scalability',
         confidence: 79,
-        itemCount: 2, // specialist_spawning, confidence
+        itemCount: 1, // specialist_spawning (confidence not counted)
         hasRecommendations: false,
+        items: expect.any(Array),
       },
     ]);
   });
@@ -310,8 +312,8 @@ describe('extractCategoryDetails', () => {
     };
 
     const details = extractCategoryDetails(observations);
-    expect(details[0].hasRecommendations).toBe(true);
-    expect(details[1].hasRecommendations).toBe(false);
+    expect(details[0]!.hasRecommendations).toBe(true);
+    expect(details[1]!.hasRecommendations).toBe(false);
   });
 
   it('handles missing confidence gracefully', () => {
@@ -323,7 +325,7 @@ describe('extractCategoryDetails', () => {
     };
 
     const details = extractCategoryDetails(observations);
-    expect(details[0].confidence).toBe(0);
+    expect(details[0]!.confidence).toBe(0);
   });
 
   it('parses confidence from percentage strings', () => {
@@ -333,8 +335,8 @@ describe('extractCategoryDetails', () => {
     };
 
     const details = extractCategoryDetails(observations);
-    expect(details[0].confidence).toBe(75);
-    expect(details[1].confidence).toBe(88);
+    expect(details[0]!.confidence).toBe(75);
+    expect(details[1]!.confidence).toBe(88);
   });
 
   it('parses confidence from numeric values', () => {
@@ -344,8 +346,8 @@ describe('extractCategoryDetails', () => {
     };
 
     const details = extractCategoryDetails(observations);
-    expect(details[0].confidence).toBe(75);
-    expect(details[1].confidence).toBe(88);
+    expect(details[0]!.confidence).toBe(75);
+    expect(details[1]!.confidence).toBe(88);
   });
 
   it('returns empty array for observations with no categories', () => {

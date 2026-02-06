@@ -1,0 +1,51 @@
+{
+  "title": "CLI Interface",
+  "summary": {
+    "goal": "Command-line interface for running scenarios",
+    "acceptance_criteria": [
+      {
+        "id": "tcli1",
+        "description": "testbench run <scenario> - run single scenario"
+      },
+      {
+        "id": "tcli2",
+        "description": "testbench run --category <cat> - run all scenarios in category"
+      },
+      {
+        "id": "tcli3",
+        "description": "testbench run --all - run all scenarios"
+      },
+      {
+        "id": "tcli4",
+        "description": "testbench train --iterations N - training mode"
+      },
+      {
+        "id": "tcli5",
+        "description": "testbench report <file.json> - display results"
+      },
+      {
+        "id": "tcli6",
+        "description": "--mock flag for mock execution"
+      },
+      {
+        "id": "tcli7",
+        "description": "--output <file> to save results"
+      },
+      {
+        "id": "tcli8",
+        "description": "--timeout <minutes> to set execution timeout"
+      }
+    ]
+  },
+  "feature_id": "testbench-cli",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "testbench",
+  "component": "testbench",
+  "dependencies": [
+    "testbench-runner",
+    "testbench-verification",
+    "testbench-metrics"
+  ]
+}

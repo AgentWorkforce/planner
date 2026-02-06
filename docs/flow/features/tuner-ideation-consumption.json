@@ -1,0 +1,388 @@
+{
+  "title": "Ideation Config Consumption",
+  "summary": {
+    "goal": "Wire ideation package to read IdeationConfig from Tuner and use it for model selection, confidence calibration, specialist spawning, and readiness advisory. Emit IdeationOutcome on handoff.",
+    "acceptance_criteria": [
+      {
+        "id": "icon1",
+        "description": "Interviewer LLM config (model, max_tokens, temperature) driven by IdeationConfig with fallback to current hardcoded defaults"
+      },
+      {
+        "id": "icon2",
+        "description": "Confidence mapping (exploring/forming/confident values) driven by IdeationConfig.confidence_calibration"
+      },
+      {
+        "id": "icon3",
+        "description": "On session start, early_spawn_rules checked against initial_intent keywords; matching specialists spawned proactively"
+      },
+      {
+        "id": "icon4",
+        "description": "Deprioritized specialists show advisory note in spawn tool response but are NOT hard-blocked"
+      },
+      {
+        "id": "icon5",
+        "description": "send_to_planner tool response includes readiness advisory warnings when thresholds not met (conversation turns, specialist coverage, curated blocks)"
+      },
+      {
+        "id": "icon6",
+        "description": "Readiness warnings are ADVISORY only — handoff is never blocked"
+      },
+      {
+        "id": "icon7",
+        "description": "IdeationOutcome emitted to Tuner after every successful handoff to Planner (fire-and-forget)"
+      },
+      {
+        "id": "icon8",
+        "description": "Handoff succeeds even when Tuner is unreachable"
+      },
+      {
+        "id": "icon9",
+        "description": "All behaviors fall back to current hardcoded defaults when Tuner is down"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "ideation-core"
+    ],
+    "steps": [
+      {
+        "step_id": "icon001",
+        "title": "Initialize IdeationIntegration in ideation package",
+        "scope": "ideation-core",
+        "description": "In packages/ideation/src/index.ts or server.ts, initialize IdeationIntegration and pass config callback to InterviewerService",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "import { IdeationIntegration } from '@planner/tuner';"
+          },
+          {
+            "id": "ac2",
+            "description": "const tunerIntegration = new IdeationIntegration({ tunerUrl: process.env.TUNER_URL ?? 'http://localhost:4002' });"
+          },
+          {
+            "id": "ac3",
+            "description": "await tunerIntegration.initialize();"
+          },
+          {
+            "id": "ac4",
+            "description": "Pass tunerConfig: () => tunerIntegration.getConfig() to InterviewerService constructor"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/index.ts or src/server.ts",
+            "pattern": "Initialize during service startup",
+            "reference": "Plan section 3.3"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "icon002",
+        "title": "Replace hardcoded LLM config with tuner-driven config",
+        "scope": "ideation-core",
+        "description": "Modify packages/ideation/src/interviewer/config.ts to export getInterviewerLLMConfig(tunerConfig?) function instead of const LLM_CONFIG",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "export const LLM_DEFAULTS = { model: 'claude-sonnet-4-20250514', maxTokens: 4096, temperature: 0.7 };"
+          },
+          {
+            "id": "ac2",
+            "description": "export function getInterviewerLLMConfig(tunerConfig?: IdeationConfig) { if (!tunerConfig) return LLM_DEFAULTS; return { model: tunerConfig.interviewer.model, ... }; }"
+          },
+          {
+            "id": "ac3",
+            "description": "InterviewerService calls getInterviewerLLMConfig(this.tunerConfig()) when making Anthropic API calls"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/interviewer/config.ts",
+            "pattern": "Function replaces const, accepts tuner config",
+            "reference": "Plan section 4.1"
+          }
+        }
+      },
+      {
+        "step_id": "icon003",
+        "title": "Replace hardcoded confidence mapping with tuner-driven mapping",
+        "scope": "ideation-core",
+        "description": "Modify packages/ideation/src/domain/confidence.ts to export getConfidenceMap(tunerConfig?) function",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "export const CONFIDENCE_DEFAULTS = { exploring: 25, forming: 50, confident: 90 };"
+          },
+          {
+            "id": "ac2",
+            "description": "export function getConfidenceMap(tunerConfig?: IdeationConfig) { if (!tunerConfig) return CONFIDENCE_DEFAULTS; return { exploring: tunerConfig.confidence_calibration.exploring_value, ... }; }"
+          },
+          {
+            "id": "ac3",
+            "description": "Confidence computation functions receive tunerConfig parameter"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/domain/confidence.ts",
+            "pattern": "Function replaces const, accepts tuner config",
+            "reference": "Plan section 4.2"
+          }
+        }
+      },
+      {
+        "step_id": "icon004",
+        "title": "Implement early spawn rules on session start",
+        "scope": "ideation-core",
+        "description": "In packages/ideation/src/interviewer/service.ts, after session creation, check early_spawn_rules from tuner config and spawn matching specialists",
+        "dependencies": [
+          "icon001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "After session created, before first Interviewer response, check config.specialist_spawning.early_spawn_rules"
+          },
+          {
+            "id": "ac2",
+            "description": "For each rule, check if rule.topic_signals.some(signal => initial_intent.toLowerCase().includes(signal.toLowerCase()))"
+          },
+          {
+            "id": "ac3",
+            "description": "If match, spawn rule.specialists not in deprioritized list"
+          },
+          {
+            "id": "ac4",
+            "description": "Spawning is additive — Interviewer can still spawn others on-demand"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/interviewer/service.ts",
+            "pattern": "Proactive spawning based on learned patterns",
+            "reference": "Plan section 4.3"
+          }
+        }
+      },
+      {
+        "step_id": "icon005",
+        "title": "Add deprioritized specialist advisory",
+        "scope": "ideation-core",
+        "description": "In specialist spawn tool executor, check deprioritized list and include advisory note in tool response",
+        "dependencies": [
+          "icon001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "When Interviewer invokes spawn_specialist tool, check config.specialist_spawning.deprioritized"
+          },
+          {
+            "id": "ac2",
+            "description": "If specialist in deprioritized, add note: 'Note: {specialist} has had low contribution rates in recent sessions.'"
+          },
+          {
+            "id": "ac3",
+            "description": "Specialist is still spawned (NOT blocked)"
+          },
+          {
+            "id": "ac4",
+            "description": "Interviewer sees note, can relay to user or override"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/interviewer/tools.ts or tool-executor.ts",
+            "pattern": "Advisory note in tool response",
+            "reference": "Plan section 4.3"
+          }
+        }
+      },
+      {
+        "step_id": "icon006",
+        "title": "Add readiness advisory to send_to_planner tool",
+        "scope": "ideation-core",
+        "description": "In send_to_planner tool executor, check readiness advisory thresholds and include warnings in tool response when not met",
+        "dependencies": [
+          "icon001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Check session.transcript.length < advisory.min_conversation_turns"
+          },
+          {
+            "id": "ac2",
+            "description": "Check session.active_specialists.length < advisory.min_specialist_coverage"
+          },
+          {
+            "id": "ac3",
+            "description": "Check curatedBlocks.length < advisory.min_curated_blocks"
+          },
+          {
+            "id": "ac4",
+            "description": "For each unmet threshold, add warning to tool response"
+          },
+          {
+            "id": "ac5",
+            "description": "Warnings are ADVISORY only — handoff still proceeds"
+          },
+          {
+            "id": "ac6",
+            "description": "Interviewer sees warnings in tool response, can relay to user"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/interviewer/tools.ts or tool-executor.ts",
+            "pattern": "Advisory warnings in send_to_planner response",
+            "reference": "Plan section 4.4"
+          }
+        }
+      },
+      {
+        "step_id": "icon007",
+        "title": "Emit IdeationOutcome on handoff",
+        "scope": "ideation-core",
+        "description": "In packages/ideation/src/api/handlers.ts (sendToPlanner handler), emit IdeationOutcome to Tuner after successful planner handoff",
+        "dependencies": [
+          "icon001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "After successful planner response, call tunerIntegration.recordIdeationOutcome({ ... })"
+          },
+          {
+            "id": "ac2",
+            "description": "IdeationOutcome includes: session_id, plan_id, session_duration_seconds, conversation_turns, specialists_spawned, specialist_contributions, blocks_total, blocks_curated, blocks_user_edited, avg_block_confidence, is_first_send, send_number, understanding_field_count"
+          },
+          {
+            "id": "ac3",
+            "description": "Fire-and-forget: .catch(() => {}) to never fail handoff"
+          },
+          {
+            "id": "ac4",
+            "description": "Handoff succeeds even when Tuner is unreachable"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/api/handlers.ts",
+            "pattern": "Fire-and-forget outcome emission after handoff",
+            "reference": "Plan section 4.5"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "icon008",
+        "title": "Build buildSpecialistContributions helper",
+        "scope": "ideation-core",
+        "description": "Create helper function to build specialist_contributions object from session data",
+        "dependencies": [
+          "icon007"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Iterates session.active_specialists"
+          },
+          {
+            "id": "ac2",
+            "description": "For each specialist, counts observations_count, insights_queued, blocks_created"
+          },
+          {
+            "id": "ac3",
+            "description": "Gets final_confidence from specialist observation"
+          },
+          {
+            "id": "ac4",
+            "description": "Returns Record<string, SpecialistContribution>"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/ideation/src/api/handlers.ts or helpers.ts",
+            "pattern": "Helper function for outcome data assembly",
+            "reference": "Plan section 4.5"
+          }
+        }
+      },
+      {
+        "step_id": "icon009",
+        "title": "Verify fallback behavior",
+        "scope": "ideation-core",
+        "description": "Integration tests verifying ideation works identically with defaults when Tuner is unreachable",
+        "dependencies": [
+          "icon002",
+          "icon003",
+          "icon004",
+          "icon005",
+          "icon006",
+          "icon007"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "With TUNER_URL unset or Tuner down, ideation starts successfully"
+          },
+          {
+            "id": "ac2",
+            "description": "Interviewer uses LLM_DEFAULTS (model, temperature, maxTokens)"
+          },
+          {
+            "id": "ac3",
+            "description": "Confidence values use CONFIDENCE_DEFAULTS"
+          },
+          {
+            "id": "ac4",
+            "description": "No early spawn rules fire (empty list)"
+          },
+          {
+            "id": "ac5",
+            "description": "No deprioritized advisories (empty list)"
+          },
+          {
+            "id": "ac6",
+            "description": "No readiness warnings (default thresholds allow everything)"
+          },
+          {
+            "id": "ac7",
+            "description": "Handoff succeeds, IdeationOutcome emission fails silently"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/ideation/src/integration/tuner-fallback.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-consumption",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "ideation-core",
+  "dependencies": [
+    "tuner-ideation-integration-helper",
+    "ideation-lead"
+  ]
+}

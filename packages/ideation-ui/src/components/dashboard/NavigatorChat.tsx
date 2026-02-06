@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BrainIcon, LightbulbIcon } from '@/components/icons';
+import { BrainIcon } from '@/components/icons';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { NewSessionModal } from '@/components/sessions/NewSessionModal';
 import { useSessions } from '@/hooks/useSessions';
 import { cn } from '@/lib/utils';
 
@@ -10,19 +9,10 @@ import { cn } from '@/lib/utils';
  * NavigatorChat
  *
  * Center column of SessionDashboard showing Navigator agent meta-chat.
- * cv2-045 (Navigator meta-chat UI).
- *
- * Purpose:
- * - Help users decide what to work on today
- * - Surface high-priority or stalled sessions
- * - Suggest next actions based on session states
- * - Navigate to specific sessions or create new ones
  *
  * Features:
+ * - Continue links to recent sessions (above chat input)
  * - Chat interface with Navigator agent
- * - Context-aware suggestions
- * - Quick actions for session management
- * - Integration with session attention indicators
  */
 
 interface Message {
@@ -31,56 +21,25 @@ interface Message {
   timestamp: string;
 }
 
-interface Suggestion {
+interface RecentSession {
   id: string;
-  label: string;
-  icon?: 'continue' | 'new';
-  action?: () => void;
+  title: string;
 }
 
 export function NavigatorChat() {
   const navigate = useNavigate();
   const { sessions } = useSessions();
-  const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
-
-  // Generate suggestions from real session data
-  const suggestions = useMemo<Suggestion[]>(() => {
-    const result: Suggestion[] = [];
-
-    // Add suggestions for recent/active sessions (up to 2)
-    const recentSessions = sessions.slice(0, 2);
-    recentSessions.forEach((session) => {
-      const title = session.source?.initial_intent || 'Untitled session';
-      const shortTitle = title.length > 30 ? title.slice(0, 30) + '...' : title;
-      result.push({
-        id: session.id,
-        label: `Continue working on "${shortTitle}"`,
-        icon: 'continue',
-        action: () => navigate(`/ideation/session/${session.id}`),
-      });
-    });
-
-    return result;
-  }, [sessions, navigate]);
-
-  // Add "start new session" separately so it can reference modal state
-  const allSuggestions = useMemo<Suggestion[]>(() => [
-    ...suggestions,
-    {
-      id: 'new',
-      label: 'Start a new ideation session',
-      icon: 'new',
-      action: () => setIsNewSessionModalOpen(true),
-    },
-  ], [suggestions]);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'What would you like to work on today?',
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Get recent sessions for "Continue" list (up to 3)
+  const recentSessions = useMemo<RecentSession[]>(() => {
+    return sessions.slice(0, 3).map((session) => {
+      const title = session.source?.initial_intent || 'Untitled session';
+      const shortTitle = title.length > 40 ? title.slice(0, 40) + '...' : title;
+      return { id: session.id, title: shortTitle };
+    });
+  }, [sessions]);
 
   const handleSend = async (content: string) => {
     // Add user message
@@ -125,25 +84,8 @@ export function NavigatorChat() {
     }
   };
 
-  const handleSuggestionClick = (suggestion: Suggestion) => {
-    if (suggestion.action) {
-      suggestion.action();
-    }
-  };
-
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3">
-        <div className="w-8 h-8 rounded-full bg-accent-purple/20 flex items-center justify-center">
-          <BrainIcon size="sm" className="text-accent-purple" />
-        </div>
-        <div>
-          <h2 className="text-sm font-medium text-text-primary">Navigator</h2>
-          <p className="text-xs text-text-muted">Workflow guidance</p>
-        </div>
-      </div>
-
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4">
         {messages.map((message, index) => (
@@ -163,33 +105,36 @@ export function NavigatorChat() {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Suggestions - show after first message */}
-        {messages.length === 1 && !isTyping && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs text-text-muted mb-2">Suggested actions:</p>
-            {allSuggestions.map((suggestion) => (
-              <SuggestionButton
-                key={suggestion.id}
-                suggestion={suggestion}
-                onClick={() => handleSuggestionClick(suggestion)}
-              />
+      {/* Continue Section - above chat input */}
+      {recentSessions.length > 0 && messages.length === 0 && (
+        <div className="px-4 pb-2">
+          <p className="text-sm text-[var(--canvas-text-muted)] mb-2">Continue</p>
+          <div className="space-y-1">
+            {recentSessions.map((session) => (
+              <button
+                key={session.id}
+                onClick={() => navigate(`/ideation/session/${session.id}`)}
+                className={cn(
+                  'block w-full text-left text-sm',
+                  'text-[var(--canvas-text-primary)] hover:text-[var(--canvas-accent)]',
+                  'transition-colors'
+                )}
+              >
+                <span className="text-[var(--canvas-text-muted)] mr-2">└</span>
+                {session.title}
+              </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Chat input */}
       <ChatInput
         onSend={handleSend}
         placeholder="Ask Navigator for guidance..."
         disabled={false}
-      />
-
-      {/* New Session Modal */}
-      <NewSessionModal
-        open={isNewSessionModalOpen}
-        onOpenChange={setIsNewSessionModalOpen}
       />
     </div>
   );
@@ -233,38 +178,6 @@ function MessageBubble({ message }: MessageBubbleProps) {
         </span>
       </div>
     </div>
-  );
-}
-
-interface SuggestionButtonProps {
-  suggestion: Suggestion;
-  onClick: () => void;
-}
-
-function SuggestionButton({ suggestion, onClick }: SuggestionButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full flex items-center gap-2 px-3 py-2 rounded-lg',
-        'bg-bg-secondary hover:bg-bg-tertiary',
-        'border border-border-subtle hover:border-accent-cyan/30',
-        'text-left text-sm text-text-primary',
-        'transition-colors duration-200'
-      )}
-    >
-      {suggestion.icon === 'continue' && (
-        <div className="w-6 h-6 rounded-full bg-accent-cyan/20 flex items-center justify-center shrink-0">
-          <span className="text-xs">▶</span>
-        </div>
-      )}
-      {suggestion.icon === 'new' && (
-        <div className="w-6 h-6 rounded-full bg-accent-purple/20 flex items-center justify-center shrink-0">
-          <LightbulbIcon size="sm" className="text-accent-purple" />
-        </div>
-      )}
-      <span>{suggestion.label}</span>
-    </button>
   );
 }
 

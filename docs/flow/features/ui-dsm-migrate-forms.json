@@ -1,0 +1,11 @@
+{
+  "feature_id": "ui-dsm-migrate-forms",
+  "title": "Migrate Form Components",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "parent": "ui-design-system-migration",
+  "summary": {
+    "goal": "Migrate Form Components"
+  }
+}

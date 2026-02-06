@@ -1,0 +1,33 @@
+{
+  "title": "Outcome Collector Service",
+  "summary": {
+    "goal": "Ingest execution outcomes from Forge and trigger downstream processing",
+    "acceptance_criteria": [
+      {
+        "id": "oc1",
+        "description": "recordTaskOutcome stores outcome and triggers baseline update"
+      },
+      {
+        "id": "oc2",
+        "description": "recordTaskOutcome triggers model performance update"
+      },
+      {
+        "id": "oc3",
+        "description": "recordRunOutcome stores aggregate run data"
+      },
+      {
+        "id": "oc4",
+        "description": "Async processing doesn't block outcome acknowledgment"
+      }
+    ]
+  },
+  "feature_id": "tuner-outcome-collector",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "critical",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-storage"
+  ]
+}

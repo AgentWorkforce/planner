@@ -1,0 +1,30 @@
+{
+  "title": "Testbench Core Infrastructure",
+  "summary": {
+    "goal": "Package scaffolding, configuration, workspace management",
+    "acceptance_criteria": [
+      {
+        "id": "tc1",
+        "description": "packages/testbench created with TypeScript, Zod, commander"
+      },
+      {
+        "id": "tc2",
+        "description": "TestbenchConfig schema with service URLs, timeouts, workspace settings"
+      },
+      {
+        "id": "tc3",
+        "description": "WorkspaceManager creates/cleans isolated temp directories"
+      },
+      {
+        "id": "tc4",
+        "description": "testbench.config.ts loaded from cwd or defaults used"
+      }
+    ]
+  },
+  "feature_id": "testbench-core",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "testbench",
+  "component": "testbench"
+}

@@ -1,0 +1,15 @@
+{
+  "feature_id": "ideation-doc-analysis",
+  "title": "Chunk Analysis Agents",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "ideation-documents",
+  "component": "ideation-core",
+  "dependencies": [
+    "ideation-doc-chunking"
+  ],
+  "summary": {
+    "goal": "Chunk Analysis Agents"
+  }
+}

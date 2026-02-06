@@ -61,7 +61,7 @@ export function CanvasHeaderExample() {
       <div className="min-h-screen bg-background">
         <CanvasHeader
           sessionId={currentSessionId}
-          sessionTitle={sessionTitles[currentSessionId]}
+          sessionTitle={sessionTitles[currentSessionId] || ''}
           sessions={updatedSessions}
           onTitleChange={handleTitleChange}
           onSessionSwitch={handleSessionSwitch}

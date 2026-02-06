@@ -79,6 +79,20 @@ const INITIATIVES = {
     icon: '🔨',
     color: '#f97316',
   },
+  tuner: {
+    id: deterministicUUID('tuner-v1-initiative'),
+    name: 'Tuner v1',
+    description: 'Adaptive learning loop - baselines, drift detection, and model selection',
+    icon: '🎛️',
+    color: '#a855f7',
+  },
+  testbench: {
+    id: deterministicUUID('testbench-v1-initiative'),
+    name: 'Testbench v1',
+    description: 'End-to-end pipeline testing for Planner → Forge → Tuner',
+    icon: '🧪',
+    color: '#22d3ee',
+  },
 } as const;
 
 /**
@@ -87,6 +101,8 @@ const INITIATIVES = {
 function getInitiativeForFeature(featureId: string): keyof typeof INITIATIVES {
   if (featureId.startsWith('ideation-')) return 'ideation';
   if (featureId.startsWith('forge-')) return 'forge';
+  if (featureId.startsWith('tuner-')) return 'tuner';
+  if (featureId === 'testbench' || featureId.startsWith('testbench-')) return 'testbench';
   // Default to planner for planner-*, flow-*, and any other features
   return 'planner';
 }
@@ -429,7 +445,7 @@ function buildStepSpecification(
 
 async function migrate() {
   console.log('Starting migration from flow files to database...\n');
-  console.log(`Initiatives: ideation, planner, forge\n`);
+  console.log(`Initiatives: ideation, planner, forge, tuner, testbench\n`);
 
   // Read catalog
   const catalogPath = path.join(ROOT, 'docs/flow/catalog.json');
@@ -611,6 +627,8 @@ async function migrate() {
     ideation: 0,
     planner: 0,
     forge: 0,
+    tuner: 0,
+    testbench: 0,
   };
 
   // Second pass: import features

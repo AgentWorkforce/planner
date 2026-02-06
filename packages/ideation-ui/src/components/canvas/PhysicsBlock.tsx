@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { PhysicsBlockBase } from '@/components/shared/PhysicsBlockBase';
 import {
   getVisibilityLevel,
   isBlockInteractive,
@@ -31,23 +31,21 @@ export interface PhysicsBlockProps {
     userEdited?: boolean;
   };
   position: { x: number; y: number };
+  angle?: number; // Rotation angle from physics engine (in radians)
   size: number; // Derived from confidence/status
   onClick?: () => void;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
 }
 
 /**
  * PhysicsBlock
  *
- * Individual block component that renders as an absolutely positioned HTML div
- * synced with a physics body. Shows emoji + keyword based on status/confidence.
+ * Canvas block component that renders ideas/concepts as physics-enabled blocks.
+ * Uses PhysicsBlockBase for position/rotation sync and adds canvas-specific styling.
  *
  * Features:
- * - Position synced via requestAnimationFrame
  * - Size/opacity scales with confidence (0-100%)
- * - Draggable interaction (mouse down/up events)
  * - Status-based rendering (forming → emerging → developing → ready → curated)
+ * - Draggable via physics engine MouseConstraint
  * - GPU-accelerated transforms for smooth movement
  *
  * Size/Content by Status:
@@ -68,89 +66,27 @@ export interface PhysicsBlockProps {
  *     status: 'developing',
  *   }}
  *   position={{ x: 100, y: 100 }}
+ *   angle={0.1}
  *   size={60}
  *   onClick={() => console.log('Block clicked')}
- *   onDragStart={() => console.log('Drag started')}
- *   onDragEnd={() => console.log('Drag ended')}
  * />
  * ```
  */
 export function PhysicsBlock({
   block,
   position,
+  angle = 0,
   size,
   onClick,
-  onDragStart,
-  onDragEnd,
 }: PhysicsBlockProps) {
-  const blockRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const animationFrameRef = useRef<number | null>(null);
-
-  // Sync DOM position with physics body position
-  useEffect(() => {
-    const element = blockRef.current;
-    if (!element) return;
-
-    // Use requestAnimationFrame for smooth updates
-    const updatePosition = () => {
-      if (element) {
-        // Center the element on the physics body position
-        // Clamp to ensure block stays within visible bounds (at least partially visible)
-        const left = Math.max(0, position.x - size / 2);
-        const top = Math.max(0, position.y - size / 2);
-
-        // Use transform for GPU-accelerated positioning
-        element.style.transform = `translate(${left}px, ${top}px)`;
-      }
-      animationFrameRef.current = requestAnimationFrame(updatePosition);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(updatePosition);
-
-    return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [position.x, position.y, size]);
-
   // Determine visibility level and interactivity
   const visibilityLevel = getVisibilityLevel(block.confidence);
   const interactive = isBlockInteractive(block.confidence);
-
-  // Handle drag start (only for interactive blocks)
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (!interactive) return;
-      e.preventDefault();
-      setIsDragging(true);
-      onDragStart?.();
-    },
-    [onDragStart, interactive],
-  );
-
-  // Handle drag end
-  const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      onDragEnd?.();
-    }
-  }, [isDragging, onDragEnd]);
-
-  // Global mouse up listener (in case mouse leaves element while dragging)
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => window.removeEventListener('mouseup', handleMouseUp);
-    }
-  }, [isDragging, handleMouseUp]);
 
   // Calculate visual properties using utility functions
   const showKeyword = shouldShowKeyword(block.confidence, size);
   const showGlow = shouldShowGlow(block.confidence);
   const opacity = getBlockOpacity(block.confidence);
-  const scale = isDragging ? 1.05 : 1;
 
   // Border styling based on confidence (yellow → green gradient)
   const borderStyle = getBorderStyle(block.confidence);
@@ -159,23 +95,20 @@ export function PhysicsBlock({
   const boxShadow = getBoxShadow(showGlow, borderStyle.hue);
 
   return (
-    <div
-      ref={blockRef}
-      onMouseDown={handleMouseDown}
+    <PhysicsBlockBase
+      id={block.id}
+      position={position}
+      angle={angle}
+      size={size}
+      activityScore={block.confidence}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'absolute select-none',
         'flex flex-col items-center justify-center',
-        'transition-all duration-200',
         interactive ? 'cursor-pointer hover:shadow-lg' : 'cursor-default pointer-events-none',
         showGlow && 'animate-pulse',
       )}
       style={{
-        width: size,
-        height: size,
         opacity,
-        transform: `scale(${scale})`,
-        willChange: 'transform',
         backgroundColor: 'var(--block-draft)',
         borderRadius,
         borderStyle: 'solid',
@@ -218,6 +151,6 @@ export function PhysicsBlock({
           }}
         />
       )}
-    </div>
+    </PhysicsBlockBase>
   );
 }

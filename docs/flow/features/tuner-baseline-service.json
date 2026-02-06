@@ -1,0 +1,33 @@
+{
+  "title": "Baseline Service",
+  "summary": {
+    "goal": "Compute and maintain baselines for drift detection using exponential moving average",
+    "acceptance_criteria": [
+      {
+        "id": "bs1",
+        "description": "updateBaseline computes EMA with α=0.1 smoothing factor"
+      },
+      {
+        "id": "bs2",
+        "description": "First sample initializes baseline with zero stddev"
+      },
+      {
+        "id": "bs3",
+        "description": "getBaseline returns null if pattern has no history"
+      },
+      {
+        "id": "bs4",
+        "description": "normalizePattern extracts comparable pattern from task metadata"
+      }
+    ]
+  },
+  "feature_id": "tuner-baseline-service",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-outcome-collector"
+  ]
+}

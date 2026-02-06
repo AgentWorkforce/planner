@@ -1,0 +1,37 @@
+{
+  "title": "Scenario Definition & Library",
+  "summary": {
+    "goal": "Define scenario format and implement starter scenarios",
+    "acceptance_criteria": [
+      {
+        "id": "ts1",
+        "description": "Scenario schema: id, name, difficulty, goal, expected, verification"
+      },
+      {
+        "id": "ts2",
+        "description": "Expected schema: language_tier, complexity_level, step_count range, time range"
+      },
+      {
+        "id": "ts3",
+        "description": "Verification schema: type (script|test|http|file), commands, expectations"
+      },
+      {
+        "id": "ts4",
+        "description": "Scenarios loadable from scenarios/ directory"
+      },
+      {
+        "id": "ts5",
+        "description": "5+ starter scenarios: fizzbuzz, hello-cli, tic-tac-toe, todo-cli, calculator"
+      }
+    ]
+  },
+  "feature_id": "testbench-scenarios",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "testbench",
+  "component": "testbench",
+  "dependencies": [
+    "testbench-core"
+  ]
+}

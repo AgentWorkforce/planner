@@ -76,21 +76,6 @@ export function PhysicsBlockExample() {
     console.log('Block clicked:', blockId);
   };
 
-  const handleDragStart = (blockId: string) => {
-    console.log('Drag started:', blockId);
-    // In a real implementation, you might:
-    // - Disable physics for this body during drag
-    // - Update cursor style
-    // - Track drag state
-  };
-
-  const handleDragEnd = (blockId: string) => {
-    console.log('Drag ended:', blockId);
-    // In a real implementation, you might:
-    // - Re-enable physics
-    // - Apply impulse to nearby bodies ("shake neighbors")
-    // - Save new position to backend
-  };
 
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4">
@@ -127,10 +112,9 @@ export function PhysicsBlockExample() {
               key={block.id}
               block={block}
               position={{ x: body.x, y: body.y }}
+              angle={body.angle}
               size={size}
               onClick={() => handleBlockClick(block.id)}
-              onDragStart={() => handleDragStart(block.id)}
-              onDragEnd={() => handleDragEnd(block.id)}
             />
           );
         })}

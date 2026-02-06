@@ -33,31 +33,10 @@ describe('PhysicsBlock', () => {
   });
 
   it('renders tiny dot for forming blocks', () => {
-    const formingBlock = { ...mockBlock, status: 'forming' as const };
+    const formingBlock = { ...mockBlock, status: 'forming' as const, confidence: 20 };
     render(<PhysicsBlock {...defaultProps} block={formingBlock} />);
     expect(screen.queryByText('💡')).not.toBeInTheDocument();
     expect(screen.queryByText('Idea')).not.toBeInTheDocument();
-  });
-
-  it('calls onDragStart when mouse down', () => {
-    const onDragStart = vi.fn();
-    const { container } = render(
-      <PhysicsBlock {...defaultProps} onDragStart={onDragStart} />,
-    );
-    const block = container.firstChild as HTMLElement;
-    fireEvent.mouseDown(block);
-    expect(onDragStart).toHaveBeenCalledOnce();
-  });
-
-  it('calls onDragEnd when mouse up after dragging', () => {
-    const onDragEnd = vi.fn();
-    const { container } = render(
-      <PhysicsBlock {...defaultProps} onDragEnd={onDragEnd} />,
-    );
-    const block = container.firstChild as HTMLElement;
-    fireEvent.mouseDown(block);
-    fireEvent.mouseUp(block);
-    expect(onDragEnd).toHaveBeenCalledOnce();
   });
 
   it('calls onClick when clicked', () => {

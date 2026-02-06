@@ -1,0 +1,330 @@
+{
+  "title": "Ideation Config Generation",
+  "summary": {
+    "goal": "Extend ConfigWriter to generate IdeationConfig from baselines, gated by stability controls. Periodic regeneration.",
+    "acceptance_criteria": [
+      {
+        "id": "icg1",
+        "description": "generateIdeationConfig() returns DEFAULT_IDEATION_CONFIG when no baselines exist (zero data)"
+      },
+      {
+        "id": "icg2",
+        "description": "Confidence calibration: confident_value adjusted downward (min 70) when mean_questions_per_plan > 3 AND stability check passes"
+      },
+      {
+        "id": "icg3",
+        "description": "Specialist spawning: specialists with < 20% contribution rate added to deprioritized list when stability check passes"
+      },
+      {
+        "id": "icg4",
+        "description": "Readiness advisory: min_conversation_turns set to floor(mean_conversation_turns), clamped [3, 15]"
+      },
+      {
+        "id": "icg5",
+        "description": "Readiness advisory: min_specialist_coverage set to count of specialists with > 50% contribution rate, clamped [1, 4]"
+      },
+      {
+        "id": "icg6",
+        "description": "Every config change path goes through StabilityControls.checkStability() with ideation-specific parameter types"
+      },
+      {
+        "id": "icg7",
+        "description": "Config regenerated every 6 hours (ideation changes are slow)"
+      },
+      {
+        "id": "icg8",
+        "description": "saveConfig() persists ideation_config alongside forge_config and planner_config in config_versions"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "icg001",
+        "title": "Add generateIdeationConfig method to ConfigWriter",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/services/config-writer.ts with generateIdeationConfig() method. Returns defaults when no baselines, applies learning when stability controls pass.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Returns DEFAULT_IDEATION_CONFIG when baseline is null or sample_count === 0"
+          },
+          {
+            "id": "ac2",
+            "description": "Retrieves baseline via this.storage.getIdeationBaseline('session_quality')"
+          },
+          {
+            "id": "ac3",
+            "description": "Increments version and sets updated_at timestamp"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/config-writer.ts",
+            "pattern": "Similar to generateForgeConfig / generatePlannerConfig",
+            "reference": "Plan section 5.2"
+          }
+        }
+      },
+      {
+        "step_id": "icg002",
+        "title": "Implement confidence calibration logic",
+        "scope": "tuner",
+        "description": "In generateIdeationConfig, adjust confident_value downward when mean_questions_per_plan > 3, gated by stability check for ideation_confidence",
+        "dependencies": [
+          "icg001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Calls stabilityControls.checkStability({ parameterType: 'ideation_confidence', totalTrials: baseline.sample_count, ... })"
+          },
+          {
+            "id": "ac2",
+            "description": "Only adjusts if stabilityCheck.canChange (stability controls use standard burn-in=50)"
+          },
+          {
+            "id": "ac3",
+            "description": "If mean_questions_per_plan > 3, reduce confident_value proportionally (e.g., Math.round(mean_questions * 2))"
+          },
+          {
+            "id": "ac4",
+            "description": "confident_value never goes below 70"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "logic": "If plans still need many clarification questions despite high block confidence, the threshold is too generous. Lower it.",
+            "reference": "Plan section 5.2"
+          }
+        }
+      },
+      {
+        "step_id": "icg003",
+        "title": "Implement specialist deprioritization logic",
+        "scope": "tuner",
+        "description": "In generateIdeationConfig, build deprioritized list from specialists with < 20% contribution rate, gated by stability check for ideation_spawning",
+        "dependencies": [
+          "icg001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Calls stabilityControls.checkStability({ parameterType: 'ideation_spawning', ... })"
+          },
+          {
+            "id": "ac2",
+            "description": "Only updates if stabilityCheck.canChange"
+          },
+          {
+            "id": "ac3",
+            "description": "Iterates baseline.specialist_contribution_rates, adds to deprioritized if rate < 0.20"
+          },
+          {
+            "id": "ac4",
+            "description": "Requires min_samples_per_arm (30, standard threshold) sessions before deprioritizing"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "logic": "Specialists that rarely contribute useful content are deprioritized (not blocked, just advisory)",
+            "reference": "Plan section 5.2"
+          }
+        }
+      },
+      {
+        "step_id": "icg004",
+        "title": "Implement readiness advisory thresholds",
+        "scope": "tuner",
+        "description": "In generateIdeationConfig, set min_conversation_turns and min_specialist_coverage from baselines, gated by stability check for ideation_readiness",
+        "dependencies": [
+          "icg001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Calls stabilityControls.checkStability({ parameterType: 'ideation_readiness', ... })"
+          },
+          {
+            "id": "ac2",
+            "description": "Only updates if stabilityCheck.canChange"
+          },
+          {
+            "id": "ac3",
+            "description": "min_conversation_turns = Math.max(3, Math.min(15, Math.floor(baseline.mean_conversation_turns)))"
+          },
+          {
+            "id": "ac4",
+            "description": "min_specialist_coverage = count of specialists with contribution rate > 0.50, clamped [1, 4]"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "logic": "Set advisory thresholds based on observed patterns that correlate with lower downstream question counts",
+            "reference": "Plan section 5.2"
+          }
+        }
+      },
+      {
+        "step_id": "icg005",
+        "title": "Add getCurrentIdeationConfig method",
+        "scope": "tuner",
+        "description": "In ConfigWriter, add getCurrentIdeationConfig() that returns cached config or generates fresh one",
+        "dependencies": [
+          "icg001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Checks latest config_version for ideation_config"
+          },
+          {
+            "id": "ac2",
+            "description": "Returns cached if present, otherwise calls generateIdeationConfig()"
+          },
+          {
+            "id": "ac3",
+            "description": "Follows same pattern as getCurrentForgeConfig / getCurrentPlannerConfig"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/config-writer.ts",
+            "pattern": "Cached read with fallback to generate",
+            "reference": "Plan section 2.6"
+          }
+        }
+      },
+      {
+        "step_id": "icg006",
+        "title": "Extend saveConfig to persist ideation_config",
+        "scope": "tuner",
+        "description": "Modify saveConfig(forgeConfig, plannerConfig, notes?) to accept optional ideationConfig parameter and persist to config_versions.ideation_config",
+        "dependencies": [
+          "icg005"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Signature: saveConfig(forge, planner, ideation?, notes?)"
+          },
+          {
+            "id": "ac2",
+            "description": "Calls storage.insertConfigVersion with all three configs"
+          },
+          {
+            "id": "ac3",
+            "description": "ideation_config column stores JSON.stringify(ideationConfig) or NULL"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/config-writer.ts",
+            "pattern": "Extend existing saveConfig method",
+            "reference": "Plan section 2.6"
+          }
+        }
+      },
+      {
+        "step_id": "icg007",
+        "title": "Add periodic config regeneration",
+        "scope": "tuner",
+        "description": "In server.ts or factory.ts, add setInterval to regenerate configs every 6 hours, including ideation config",
+        "dependencies": [
+          "icg006"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "setInterval with 6 * 60 * 60 * 1000 ms interval"
+          },
+          {
+            "id": "ac2",
+            "description": "Calls generateIdeationConfig(), getCurrentForgeConfig(), getCurrentPlannerConfig()"
+          },
+          {
+            "id": "ac3",
+            "description": "Calls saveConfig(forge, planner, ideation, 'periodic regeneration')"
+          },
+          {
+            "id": "ac4",
+            "description": "Errors logged but don't crash server"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/server.ts",
+            "pattern": "setInterval with try/catch",
+            "reference": "Plan section 5.4"
+          }
+        }
+      },
+      {
+        "step_id": "icg008",
+        "title": "Test config generation logic",
+        "scope": "tuner",
+        "description": "Unit tests for generateIdeationConfig covering all learning paths and stability gates",
+        "dependencies": [
+          "icg002",
+          "icg003",
+          "icg004"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Returns defaults when baseline is null"
+          },
+          {
+            "id": "ac2",
+            "description": "Returns defaults when sample_count < 20 (burn-in)"
+          },
+          {
+            "id": "ac3",
+            "description": "Adjusts confident_value when mean_questions > 3 and stability check passes"
+          },
+          {
+            "id": "ac4",
+            "description": "Does NOT adjust confident_value when stability check blocks (cool-down, CI width, etc.)"
+          },
+          {
+            "id": "ac5",
+            "description": "Builds deprioritized list correctly from contribution rates"
+          },
+          {
+            "id": "ac6",
+            "description": "Sets readiness thresholds within clamped ranges"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/tuner/src/services/config-writer.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-config-generation",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-ideation-baseline-service",
+    "tuner-config-writer",
+    "tuner-stability-controls"
+  ]
+}

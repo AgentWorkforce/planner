@@ -161,10 +161,10 @@ Guide new users through initial setup.
 
     const newBlock: Block = {
       id: `${Date.now()}`,
-      type,
+      type: type ?? 'feature',
       title: keyword,
       keyword,
-      emoji,
+      emoji: emoji ?? '✨',
       status: 'draft',
       maturity,
       confidence,

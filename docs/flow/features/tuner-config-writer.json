@@ -1,0 +1,39 @@
+{
+  "title": "Config Writer Service",
+  "summary": {
+    "goal": "Generate updated config from learned parameters",
+    "acceptance_criteria": [
+      {
+        "id": "cw1",
+        "description": "generateForgeConfig produces valid ForgeExecutionConfig"
+      },
+      {
+        "id": "cw2",
+        "description": "generatePlannerConfig produces valid PlannerConfig"
+      },
+      {
+        "id": "cw3",
+        "description": "Exploration rate decays: max(0.02, 0.10 * exp(-n/1000))"
+      },
+      {
+        "id": "cw4",
+        "description": "Config versions are monotonically increasing"
+      },
+      {
+        "id": "cw5",
+        "description": "Previous config versions are retained for audit"
+      }
+    ]
+  },
+  "feature_id": "tuner-config-writer",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-baseline-service",
+    "tuner-model-selector",
+    "tuner-stability-controls"
+  ]
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { RefObject } from 'react';
-import { Engine, Bodies, Body, Composite, Events, Runner, World } from 'matter-js';
+import { Engine, Bodies, Body, Composite, Events, Runner, World, Mouse, MouseConstraint } from 'matter-js';
 
 /**
  * Physics body representation
@@ -149,6 +149,7 @@ export function usePhysicsEngine(
 ): UsePhysicsEngineReturn {
   const engineRef = useRef<Engine | null>(null);
   const runnerRef = useRef<Runner | null>(null);
+  const mouseConstraintRef = useRef<MouseConstraint | null>(null);
   const bodyMapRef = useRef<Map<string, Body>>(new Map());
   const initiativeMapRef = useRef<Map<string, string>>(new Map()); // bodyId -> initiativeId
   const [bodies, setBodies] = useState<Map<string, PhysicsBody>>(new Map());
@@ -192,6 +193,32 @@ export function usePhysicsEngine(
       }),
     ];
     World.add(engine.world, walls);
+
+    // Add mouse constraint for drag interaction
+    const mouse = Mouse.create(container as HTMLElement);
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse,
+      constraint: {
+        stiffness: 0.2,
+        render: { visible: false },
+      },
+    });
+    mouseConstraintRef.current = mouseConstraint;
+    World.add(engine.world, mouseConstraint);
+
+    // Jiggle other bodies when drag ends
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Events.on(mouseConstraint, 'enddrag', (event: any) => {
+      const draggedBody = event.body as Body | undefined;
+      const allBodies = Composite.allBodies(engine.world);
+      for (const body of allBodies) {
+        if (body.isStatic || body === draggedBody) continue;
+        Body.applyForce(body, body.position, {
+          x: (Math.random() - 0.5) * 0.001,
+          y: (Math.random() - 0.5) * 0.001,
+        });
+      }
+    });
 
     // Apply central attraction and initiative grouping forces each frame
     Events.on(engine, 'beforeUpdate', () => {
@@ -333,6 +360,10 @@ export function usePhysicsEngine(
         Runner.stop(runnerRef.current);
         runnerRef.current = null;
       }
+      if (mouseConstraintRef.current) {
+        World.remove(engine.world, mouseConstraintRef.current);
+        mouseConstraintRef.current = null;
+      }
       Engine.clear(engine);
       bodyMapRef.current.clear();
       initiativeMapRef.current.clear();
@@ -347,9 +378,8 @@ export function usePhysicsEngine(
       const container = containerRef.current;
       if (!engine || !container || !isReady) return;
 
-      // Skip if body already exists
+      // Skip if body already exists (expected during React StrictMode double-renders)
       if (bodyMapRef.current.has(options.id)) {
-        console.warn(`[usePhysicsEngine] Body with id "${options.id}" already exists`);
         return;
       }
 

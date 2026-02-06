@@ -1,0 +1,46 @@
+{
+  "title": "Tuner Config Integration",
+  "summary": {
+    "goal": "Wire Planner to read PlannerConfig from Tuner for complexity weights and limits",
+    "acceptance_criteria": [
+      {
+        "id": "ti1",
+        "description": "Planner reads TUNER_URL from env (optional, disabled by default)"
+      },
+      {
+        "id": "ti2",
+        "description": "If TUNER_URL set, fetches PlannerConfig on startup"
+      },
+      {
+        "id": "ti3",
+        "description": "Config refreshed every 5 minutes via setInterval"
+      },
+      {
+        "id": "ti4",
+        "description": "If Tuner unavailable, falls back to research-backed defaults"
+      },
+      {
+        "id": "ti5",
+        "description": "complexity_weights from config used in estimateComplexity"
+      },
+      {
+        "id": "ti6",
+        "description": "language_complexity_multipliers from config used for tier adjustment"
+      },
+      {
+        "id": "ti7",
+        "description": "decomposition limits from config used in limits enforcer"
+      }
+    ]
+  },
+  "feature_id": "planner-tuner-integration",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "dot-planner-enhancements",
+  "component": "planner-core",
+  "dependencies": [
+    "tuner-api",
+    "tuner-config-writer"
+  ]
+}
