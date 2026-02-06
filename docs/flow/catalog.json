@@ -90,12 +90,48 @@
         "list": "overflow-y-auto max-h-[45vh] divide-y divide-border-subtle",
         "footer": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-t border-border-subtle",
         "usage": ["ui-question-queue"]
+      },
+      "step-spec-tabs": {
+        "description": "Tabbed interface inside expanded step for spec domains",
+        "tabs": ["Details", "Architecture", "Design", "Testing", "Security"],
+        "tab_list": "flex gap-1 bg-transparent border-b border-border-subtle px-4",
+        "tab_trigger": "px-3 py-2 text-sm text-text-muted hover:text-text-secondary data-[state=active]:text-text-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-cyan",
+        "tab_content": "p-4",
+        "indicator_dot": "w-1.5 h-1.5 rounded-full bg-accent-cyan ml-1.5",
+        "usage": ["schema-ui-specification"]
+      },
+      "agent-observation-card": {
+        "description": "Collapsible card showing agent observations",
+        "card": "bg-bg-card border border-border-subtle rounded-lg overflow-hidden",
+        "header": "flex items-center justify-between px-4 py-3 bg-bg-tertiary border-b border-border-subtle cursor-pointer hover:bg-bg-secondary/50",
+        "body": "p-4 space-y-4",
+        "confidence_badges": {
+          "exploring": "bg-accent-purple/20 text-accent-purple",
+          "forming": "bg-warning/20 text-warning",
+          "confident": "bg-success/20 text-success"
+        },
+        "keyword_chip": "px-2 py-0.5 bg-accent-cyan/10 text-accent-cyan text-xs rounded",
+        "usage": ["schema-ui-understanding"]
       }
     },
     "icons": "Inline SVG, stroke-based, strokeWidth=2, currentColor, sizes: 14/16/20/24px"
   },
 
   "components": [
+    {
+      "id": "ideation-core",
+      "name": "Ideation Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod", "Relay"],
+      "path": "packages/ideation/",
+      "description": "Backend service for brainstorming facilitation, session management, and nugget crystallization. Transforms raw intent into refined understanding ready for planning."
+    },
+    {
+      "id": "ideation-ui",
+      "name": "Ideation UI",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui"],
+      "path": "packages/ideation-ui/",
+      "description": "Frontend application for human-initiated brainstorming sessions with Interviewer agent and real-time specialist observations."
+    },
     {
       "id": "planner-core",
       "name": "Planner Core API",
@@ -109,20 +145,65 @@
       "tech": ["TypeScript", "React"],
       "path": "packages/planner-ui/",
       "description": "Frontend application for plan creation, editing, approval workflow, and execution visibility"
+    },
+    {
+      "id": "tuner",
+      "name": "Tuner",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/tuner/",
+      "description": "Adaptive learning loop that observes Forge outcomes, builds baselines, detects drift, and learns optimal model selection via Thompson sampling. CLI-only, no UI."
+    },
+    {
+      "id": "forge-core",
+      "name": "Forge Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/forge-core/",
+      "description": "Orchestration engine for plan execution with budget enforcement, model selection, recovery strategies, and Tuner integration. Executes plans from Planner with observability via Trajectories."
+    },
+    {
+      "id": "testbench",
+      "name": "Testbench",
+      "tech": ["TypeScript", "Node.js", "commander", "Zod"],
+      "path": "packages/testbench/",
+      "description": "End-to-end pipeline testing for Planner → Forge → Tuner. Runs predefined scenarios, collects metrics, supports training mode for Tuner learning. CLI-only."
+    },
+    {
+      "id": "tend",
+      "name": "tend",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui", "Matter.js"],
+      "path": "packages/tend/",
+      "description": "Unified AI-native workspace merging ideation-ui, planner-ui, and forge-ui into a single three-column layout (The Now / Conversation / The Tree). Forked from ideation-ui. Earth-tone zen garden aesthetic."
     }
   ],
 
   "features": [
+    { "id": "ideation-package", "title": "Ideation Package", "type": "epic", "status": "approved", "priority": "critical", "component": "ideation-core", "design_reference": "docs/flow/features/ideation-package.json" },
+    { "id": "ideation-domain", "title": "Ideation Domain Model", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": [], "parent": "ideation-package" },
+    { "id": "ideation-storage", "title": "Ideation Storage Layer", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["ideation-domain"], "parent": "ideation-package" },
+    { "id": "ideation-api", "title": "Ideation REST API", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-storage"], "parent": "ideation-package" },
+    { "id": "ideation-lead", "title": "Interviewer Persistent Agent", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["ideation-api"], "parent": "ideation-package", "audit_note": "13/14 AC met. Gap: spawnAgent not wired to Interviewer initialization (int005a/int008a steps pending)" },
+    { "id": "ideation-specialists", "title": "Guardian Specialist Agents", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-lead"], "parent": "ideation-package" },
+    { "id": "ideation-planner-handoff", "title": "Planner Handoff Integration", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-lead", "ideation-specialists"], "parent": "ideation-package", "audit_note": "7/8 AC met. Gap: PlannerLead notification not implemented (hnd006 step pending)" },
+
+    { "id": "ideation-ui", "title": "Ideation UI Package", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-ui", "dependencies": ["ideation-api"], "design_reference": "docs/flow/features/ideation-ui.json" },
+    { "id": "ideation-ui-layout", "title": "Ideation Layout & Navigation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-list", "title": "Session List & Management", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-chat", "title": "Chat Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-specialists-panel", "title": "Specialists Panel", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-tabs", "title": "Session View Tab Navigation", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-ui-chat", "ideation-ui-specialists-panel"], "parent": "ideation-ui" },
+    { "id": "ideation-concrete-blocks", "title": "[SUPERSEDED] Concrete Blocks", "type": "feature", "status": "superseded", "priority": "archived", "superseded_by": "ideation-canvas-v2", "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"], "parent": "ideation-package" },
+    { "id": "ideation-canvas-v2", "title": "Ideation Canvas - Physics-Based Blocks", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-specialists", "ideation-domain", "ideation-api"], "parent": "ideation-package", "design_reference": "docs/design/ideation-canvas-ux.md", "note": "Supersedes ideation-concrete-blocks. Physics canvas, three-column layout, focus mode, dashboard with Navigator." },
+
     { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
-    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
-    { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved" },
+    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment", "dot-planner-enhancements"] },
+    { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved", "extended_by": ["dot-planner-enhancements"] },
     { "id": "domain-versioning", "title": "Versioning and Diffs", "type": "feature", "status": "approved" },
 
     { "id": "storage", "title": "Storage Layer", "type": "epic", "status": "approved" },
-    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
+    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
 
     { "id": "rest-api", "title": "REST API", "type": "epic", "status": "approved" },
-    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative"] },
+    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
     { "id": "api-workflow", "title": "Workflow Endpoints", "type": "feature", "status": "approved" },
     { "id": "api-change-requests", "title": "Change Request Endpoint", "type": "feature", "status": "approved" },
 
@@ -152,7 +233,7 @@
     { "id": "ui-change-request-ui", "title": "Change Request Handling", "type": "feature", "status": "approved" },
 
     { "id": "ui-ai-integration", "title": "AI Integration", "type": "epic", "status": "approved" },
-    { "id": "ui-ai-chat", "title": "AI Chat", "type": "feature", "status": "approved" },
+    { "id": "ui-ai-chat", "title": "AI Chat (Legacy)", "type": "feature", "status": "deprecated", "superseded_by": ["ui-relay-messaging", "ui-direct-messaging", "planner-lead-service"], "note": "ChatPanel removed - functionality now in MessagingSidebar" },
     { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" },
 
     { "id": "relay-integration", "title": "Agent Relay Integration", "type": "epic", "status": "approved" },
@@ -164,6 +245,8 @@
     { "id": "relay-ai-improvements", "title": "Connect Silent Improvements to Planning Agent", "type": "feature", "status": "approved" },
     { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "approved" },
     { "id": "relay-session-connect", "title": "On-Demand AI Session Connection", "type": "feature", "status": "approved", "audit_note": "All 8 implementation tasks completed - hook, badge, API, tests all implemented" },
+    { "id": "relay-plan-channel-hook", "title": "Plan Channel Creation Hook", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["relay-core", "ui-relay-messaging-backend"], "audit_note": "Implemented: Express middleware intercepts POST /api/plans, calls createPlanChannel + notifyNewPlan. 12 tests." },
+    { "id": "relay-dead-code-cleanup", "title": "Relay Module Dead Code Cleanup", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "component": "planner-core", "note": "Technical debt cleanup - remove ~20 unused exported functions from relay module" },
 
     { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "completed", "audit_note": "All 8 implementation steps complete. SSE endpoint, usePlanEvents hook with auto-reconnect, integrated into PlanEditorPage. 22 tests passing." },
 
@@ -205,13 +288,130 @@
     { "id": "ui-pipeline-view", "title": "Pipeline View", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"], "replaces": "ui-roadmap-view" },
 
     { "id": "ui-agent-orchestration", "title": "Agent Orchestration UX", "type": "epic", "status": "approved", "priority": "high", "dependencies": ["ui-relay-messaging", "planner-lead-service"], "design_reference": "docs/ux-agent-orchestration.md" },
-    { "id": "ui-status-bar", "title": "Agent Status Bar", "type": "feature", "status": "approved", "priority": "high", "dependencies": [] },
-    { "id": "ui-agent-avatars", "title": "Agent Avatar Components", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-status-bar"] },
+    { "id": "ui-status-bar", "title": "Agent Status Bar", "type": "feature", "status": "completed", "priority": "high", "dependencies": [] },
+    { "id": "ui-agent-avatars", "title": "Agent Avatar Components", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
     { "id": "ui-chat-bubbles", "title": "Agent Chat Bubbles", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-agent-avatars", "ui-question-queue"] },
     { "id": "ui-question-queue", "title": "Question Queue Management", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
     { "id": "ui-question-notification-bubble", "title": "Mini Question Notification Bubble", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-question-queue", "ui-agent-avatars", "ui-status-bar"] },
     { "id": "ui-user-trajectory", "title": "User Trajectory Integration", "type": "feature", "status": "in_progress", "priority": "medium", "dependencies": ["ui-question-queue", "ui-chat-bubbles"] },
 
-    { "id": "relay-agent-integration", "title": "Relay Agent Integration", "type": "feature", "status": "completed", "priority": "critical", "dependencies": ["relay-core"], "note": "MCP as unified interface for all agents. Relay for presence, planner-core for state.", "audit_note": "3 MCP tools (report_agent_status, ask_user_question, join_plan_channel), spawn flow updated with MCP context, /api/agents endpoint for merged presence+state, frontend hook updated." }
+    { "id": "relay-agent-integration", "title": "Relay Agent Integration", "type": "feature", "status": "completed", "priority": "critical", "dependencies": ["relay-core"], "note": "MCP as unified interface for all agents. Relay for presence, planner-core for state.", "audit_note": "3 MCP tools (report_agent_status, ask_user_question, join_plan_channel), spawn flow updated with MCP context, /api/agents endpoint for merged presence+state, frontend hook updated." },
+
+    { "id": "qa-channel-broadcast", "title": "Q&A Channel Broadcast", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-question-queue", "ui-relay-messaging"] },
+
+    { "id": "ui-direct-messaging", "title": "Direct Messaging Agents", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["ui-relay-messaging", "ui-status-bar", "ui-agent-avatars"] },
+
+    { "id": "schema-enrichment", "title": "PlanVersion Schema Enrichment", "type": "epic", "status": "draft", "priority": "critical", "dependencies": [], "extends": ["domain-plan", "storage-sqlite", "api-plan-crud"], "design_reference": ".context/planner-schema-enrichment.md" },
+    { "id": "schema-understanding", "title": "Understanding Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-specification", "title": "Specification Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-db-migration", "title": "Database Migration for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-understanding", "schema-specification"] },
+    { "id": "schema-api-endpoints", "title": "API Endpoints for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-db-migration"] },
+    { "id": "schema-ui-understanding", "title": "Understanding Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-ui-specification", "title": "Specification Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding & Specification", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+
+    { "id": "ideation-documents", "title": "Document Upload & Analysis", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-core", "dependencies": ["ideation-package"], "design_reference": "docs/flow/features/ideation-documents.json" },
+    { "id": "ideation-doc-domain", "title": "Document Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "ideation-documents" },
+    { "id": "ideation-doc-storage", "title": "Document Storage Layer", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-domain"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-api", "title": "Document Upload API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-chunking", "title": "Document Chunking Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-domain"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-analysis", "title": "Chunk Analysis Agents", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-chunking"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-synthesis", "title": "Document Insight Synthesis", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-analysis"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-agent-tool", "title": "cite_document Agent Tool", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage", "ideation-doc-analysis"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-interviewer-integration", "title": "Interviewer Document Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-synthesis", "ideation-doc-agent-tool", "ideation-lead"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-ui-upload", "title": "Document Upload UI", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-api"], "parent": "ideation-documents", "component": "ideation-ui" },
+    { "id": "ideation-doc-ui-progress", "title": "Analysis Progress UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-doc-ui-upload", "ideation-doc-analysis"], "parent": "ideation-documents", "component": "ideation-ui" },
+
+    { "id": "tuner-package", "title": "Tuner Package", "type": "epic", "status": "approved", "priority": "high", "component": "tuner", "design_reference": "docs/flow/features/tuner-package.json" },
+    { "id": "tuner-domain", "title": "Tuner Domain Model", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": [], "parent": "tuner-package" },
+    { "id": "tuner-storage", "title": "Tuner Storage Layer", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["tuner-domain"], "parent": "tuner-package" },
+    { "id": "tuner-api", "title": "Tuner REST API", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-storage"], "parent": "tuner-package" },
+    { "id": "tuner-outcome-collector", "title": "Outcome Collector Service", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["tuner-storage"], "parent": "tuner-package" },
+    { "id": "tuner-baseline-service", "title": "Baseline Service", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-outcome-collector"], "parent": "tuner-package" },
+    { "id": "tuner-drift-detector", "title": "Drift Detector Service", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-baseline-service"], "parent": "tuner-package" },
+    { "id": "tuner-model-selector", "title": "Model Selector (Thompson Sampling)", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-outcome-collector"], "parent": "tuner-package" },
+    { "id": "tuner-stability-controls", "title": "Stability Controls", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-model-selector"], "parent": "tuner-package", "note": "Burn-in, min samples, rate limiting, hysteresis, CI checks to prevent flapping" },
+    { "id": "tuner-config-writer", "title": "Config Writer Service", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-baseline-service", "tuner-model-selector", "tuner-stability-controls"], "parent": "tuner-package" },
+    { "id": "tuner-cli", "title": "Tuner CLI", "type": "feature", "status": "implemented", "priority": "medium", "dependencies": ["tuner-api"], "parent": "tuner-package", "audit_note": "CLI override command not fully implemented" },
+    { "id": "tuner-forge-integration", "title": "Forge Integration", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["tuner-api", "tuner-outcome-collector"], "parent": "tuner-package", "note": "Forge reads config, emits outcomes" },
+    { "id": "tuner-planner-integration", "title": "Planner Integration", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-api", "tuner-config-writer"], "parent": "tuner-package", "note": "Planner reads decomposition config" },
+
+    { "id": "tuner-ideation-domain", "title": "Ideation Domain Types", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-domain", "tuner-stability-controls"], "parent": "tuner-package", "component": "tuner", "note": "IdeationConfig, IdeationOutcome, PlanQualitySignal, IdeationBaseline schemas + ideation-specific stability constants" },
+    { "id": "tuner-ideation-storage", "title": "Ideation Storage Tables", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-domain", "tuner-storage"], "parent": "tuner-package", "component": "tuner", "note": "3 new tables + config_versions column extension" },
+    { "id": "tuner-ideation-api", "title": "Ideation API Endpoints", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-storage", "tuner-api"], "parent": "tuner-package", "component": "tuner", "note": "GET config/ideation, POST outcomes/ideation, POST outcomes/plan-quality, GET insights/ideation" },
+    { "id": "tuner-ideation-collector", "title": "Ideation Outcome Collection", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-storage", "tuner-outcome-collector"], "parent": "tuner-package", "component": "tuner", "note": "Extend OutcomeCollector with ideation/plan-quality ingestion + events" },
+    { "id": "tuner-ideation-baseline-service", "title": "Ideation Baseline Service", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-collector", "tuner-baseline-service"], "parent": "tuner-package", "component": "tuner", "note": "Correlates IdeationOutcome + PlanQualitySignal, builds baselines with Welford's algorithm" },
+    { "id": "tuner-ideation-config-generation", "title": "Ideation Config Generation", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-baseline-service", "tuner-config-writer", "tuner-stability-controls"], "parent": "tuner-package", "component": "tuner", "note": "ConfigWriter generates IdeationConfig from baselines, gated by stability controls" },
+    { "id": "tuner-ideation-integration-helper", "title": "Ideation Integration Helper", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-api"], "parent": "tuner-package", "component": "tuner", "note": "IdeationIntegration class + TunerClient extensions for ideation consumers" },
+    { "id": "tuner-ideation-consumption", "title": "Ideation Config Consumption", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-integration-helper", "ideation-lead"], "parent": "tuner-package", "component": "ideation-core", "note": "Wire ideation to read config, replace hardcoded values, emit outcomes on handoff" },
+    { "id": "tuner-planner-quality-signal", "title": "Planner Quality Signal Emission", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-api", "ideation-planner-handoff"], "parent": "tuner-package", "component": "planner-core", "note": "Planner emits PlanQualitySignal to Tuner on approval of ideation-sourced plans" },
+
+    { "id": "forge-dot-enhancements", "title": "Forge DOT Framework Enhancements", "type": "epic", "status": "draft", "priority": "critical", "component": "forge-core", "design_reference": "docs/flow/features/forge-dot-enhancements.json", "note": "Budget enforcement, model routing, retry ladder, confidence handling, parallelism, Tuner integration" },
+    { "id": "forge-execution-policy", "title": "Execution Policy Schema", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-budget-enforcement", "title": "Budget Enforcement Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-retry-ladder", "title": "Recovery Strategy Ladder", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-confidence-handling", "title": "Confidence Threshold Handling", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-parallelism-control", "title": "Parallelism Control Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-model-routing", "title": "Model Routing Rules", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-dependency-resolution", "title": "Dependency Resolution Enhancement", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-tuner-integration", "title": "Forge Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-execution-policy", "tuner-api", "tuner-outcome-collector"], "parent": "forge-dot-enhancements", "component": "forge-core", "note": "Reads config from Tuner, emits outcomes for learning" },
+    { "id": "forge-timeout-enforcement", "title": "Timeout Enforcement", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-execution-metrics", "title": "Task Execution Metrics Storage", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+
+    { "id": "dot-planner-enhancements", "title": "DOT Framework - Planner Enhancements", "type": "epic", "status": "draft", "priority": "critical", "component": "planner-core", "design_reference": "docs/flow/features/dot-planner-enhancements.json", "note": "Complexity estimation, language tier detection, step/depth limits, acceptance criteria generation, Tuner integration", "dependencies": ["tuner-package"] },
+    { "id": "planner-complexity-estimator", "title": "Complexity Estimator Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-language-detector", "title": "Language/Domain Tier Detector", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-limits-enforcer", "title": "Step & Depth Limits Enforcer", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["planner-tuner-integration"], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-contract-validator", "title": "Task Contract Validator", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-tuner-integration", "title": "Planner Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tuner-api", "tuner-config-writer"], "parent": "dot-planner-enhancements", "component": "planner-core", "note": "Read PlannerConfig from Tuner for complexity weights and decomposition limits" },
+
+    { "id": "planner-guardrails", "title": "Planning-Time Guardrails", "type": "epic", "status": "backlog", "priority": "medium", "component": "planner-core", "note": "Catches missing requirements BEFORE execution (security, testing, scope). Separate from Tuner which measures AFTER execution. See docs/architecture/02-decomposition-planner.md" },
+    { "id": "guardrails-schema", "title": "Guardrail Schema & Types", "type": "feature", "status": "backlog", "priority": "high", "dependencies": [], "parent": "planner-guardrails", "component": "planner-core" },
+    { "id": "guardrails-security", "title": "Security Guardrails", "type": "feature", "status": "backlog", "priority": "high", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "No auth on API, secrets in code, encryption missing" },
+    { "id": "guardrails-testing", "title": "Testing Guardrails", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "No tests for critical path, missing integration tests" },
+    { "id": "guardrails-scope", "title": "Scope Guardrails", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "Large blast radius, production data changes, many repos" },
+    { "id": "guardrails-approval-integration", "title": "Guardrails Approval Workflow Integration", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "Wire guardrails into plan approval flow" },
+
+    { "id": "testbench", "title": "End-to-End Pipeline Testbench", "type": "epic", "status": "draft", "priority": "high", "component": "testbench", "design_reference": "docs/flow/features/testbench.json", "dependencies": ["tuner-package", "forge-dot-enhancements", "dot-planner-enhancements"], "note": "Automated E2E testing of Planner → Forge → Tuner pipeline with scenario library and training mode" },
+    { "id": "testbench-core", "title": "Testbench Core Infrastructure", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-scenarios", "title": "Scenario Definition & Library", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-core"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-runner", "title": "Scenario Runner", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-core", "testbench-scenarios"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-verification", "title": "Verification Strategies", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-mock", "title": "Mock Execution Mode", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-metrics", "title": "Metrics Collection & Analysis", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-cli", "title": "CLI Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-runner", "testbench-verification", "testbench-metrics"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-reporting", "title": "Results Reporting", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["testbench-metrics", "testbench-cli"], "parent": "testbench", "component": "testbench" },
+
+    { "id": "forge-relay-integration", "title": "Forge Relay Integration (E2E Gaps)", "type": "feature", "status": "in_progress", "priority": "critical", "component": "forge-core", "parent": "forge-dot-enhancements", "note": "Wire MCP endpoints on main server, add forge MCP instructions to agent prompt, propagate workspace_path, fix RunOutcomeEmission schema, fix orchestrator TODOs. Plan: .claude/plans/merry-spinning-willow.md" },
+    { "id": "forge-prompt-engineering", "title": "Agent Prompt Engineering Refinement", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-relay-integration"], "parent": "forge-dot-enhancements", "component": "forge-core", "design_reference": "docs/flow/features/forge-prompt-engineering.json" },
+    { "id": "forge-agent-metrics", "title": "Real Agent Usage Metrics from Relay", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-relay-integration", "forge-execution-metrics"], "parent": "forge-dot-enhancements", "component": "forge-core", "design_reference": "docs/flow/features/forge-agent-metrics.json" },
+    { "id": "forge-replan-escalation-tracking", "title": "Replan & Escalation Count Tracking", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-retry-ladder", "forge-confidence-handling"], "parent": "forge-dot-enhancements", "component": "forge-core", "design_reference": "docs/flow/features/forge-replan-escalation-tracking.json" },
+
+    { "id": "trajectory-integration", "title": "Trajectory Integration Across Pipeline", "type": "epic", "status": "approved", "priority": "high", "dependencies": ["ideation-lead", "planner-lead-service"], "design_reference": "docs/flow/features/trajectory-integration.json", "note": "Record agent reasoning + use retrospectives as context for downstream agents" },
+    { "id": "trajectory-service", "title": "Shared Trajectory Service", "type": "feature", "status": "approved", "priority": "critical", "dependencies": [], "parent": "trajectory-integration", "component": "planner-core" },
+    { "id": "trajectory-interviewer-write", "title": "Interviewer Trajectory Recording", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["trajectory-service", "ideation-lead"], "parent": "trajectory-integration", "component": "ideation-core" },
+    { "id": "trajectory-planner-read-write", "title": "PlannerLead Trajectory Read + Write", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["trajectory-service", "trajectory-interviewer-write", "planner-lead-service"], "parent": "trajectory-integration", "component": "planner-core" },
+    { "id": "trajectory-forge-read", "title": "Forge Workers Read Planning Context", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["trajectory-service", "trajectory-planner-read-write"], "parent": "trajectory-integration", "component": "forge-core" },
+    { "id": "trajectory-spawned-agents", "title": "Spawned Agent Trajectory (Best-Effort)", "type": "feature", "status": "approved", "priority": "low", "dependencies": ["trajectory-service", "trajectory-forge-read"], "parent": "trajectory-integration", "component": "ideation-core" },
+    { "id": "trajectory-testbench-verification", "title": "Testbench Trajectory Verification", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["trajectory-service", "testbench-runner"], "parent": "trajectory-integration", "component": "testbench" },
+
+    { "id": "tend-app", "title": "tend: Unified Workspace App", "type": "epic", "status": "draft", "priority": "critical", "component": "tend", "design_reference": "docs/tend-implementation.md", "note": "Merges ideation-ui + planner-ui + forge-ui into single three-column workspace. Forked from ideation-ui. 8 build stages." },
+
+    { "id": "tend-scaffold", "title": "Fork & Scaffold tend Package", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "tend-app", "component": "tend", "note": "Stage 1a: Fork ideation-ui → packages/tend, update package.json, port, routing" },
+    { "id": "tend-theming", "title": "Earth-Tone Palette & Theming", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-scaffold"], "parent": "tend-app", "component": "tend", "note": "Stage 1b: Replace Mission Control tokens with sand/stone/moss/clay" },
+    { "id": "tend-project-tree", "title": "Right Column: Project Tree", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 2: Replace CuratedBlocksColumn with zoomable tree. Copy StepEditor from planner-ui." },
+    { "id": "tend-sheets", "title": "Detail Sheets (Slide-In Panels)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-project-tree"], "parent": "tend-app", "component": "tend", "note": "Stage 3: StepSheet + SheetContainer. Click step at STEP zoom → sheet slides in." },
+    { "id": "tend-conversation-core", "title": "Center Column: Conversation Pane", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 4a: Rename chat → conversation, add SystemEvent + ContextMarker, wire relay" },
+    { "id": "tend-agent-tabs", "title": "Conversation Agent Tabs", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 4b: AgentTabBar + AgentTab, channel-based message filtering" },
+    { "id": "tend-multiple-choice-input", "title": "Multiple-Choice Input Component", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 4c: New component for discrete option selection in input area" },
+    { "id": "tend-status-bar", "title": "Status Bar (Agent Dock)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 5a: Replace ideation StatusBar with planner-ui's (avatars, bubbles, progress)" },
+    { "id": "tend-reply-bar", "title": "Reply Bar (Pending Items)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-status-bar", "tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 5b: Compact pending question lines above chat input" },
+    { "id": "tend-project-entity", "title": "Backend: Project Entity & API", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-scaffold"], "parent": "tend-app", "component": "planner-core", "note": "Stage 6a: projects table + CRUD API + useProjectEvents composition hook" },
+    { "id": "tend-graduation-bridge", "title": "Graduation Bridge (Blocks → Steps)", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-project-entity", "tend-project-tree"], "parent": "tend-app", "note": "Stage 6b: POST /api/projects/:id/graduate + left→right animation" },
+    { "id": "tend-unified-interviewer", "title": "Unified Tend Interviewer Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-project-entity", "tend-conversation-core"], "parent": "tend-app", "note": "Stage 6c: Merge InterviewerService + PlannerLead, unified tools, context focus, trickle layer" },
+    { "id": "tend-dashboard", "title": "Dashboard & First Experience", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-project-entity", "tend-project-tree", "tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 7: Project list, AI overview, creation flow, empty states" },
+    { "id": "tend-polish-ux", "title": "UX Polish (Keyboard, Animations, Attention)", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tend-project-tree", "tend-conversation-core", "tend-status-bar"], "parent": "tend-app", "component": "tend", "note": "Stage 8a: Cmd+K palette, crystallizing animation, graduation animation, attention system" },
+    { "id": "tend-error-states", "title": "Error & Failure State UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tend-project-tree", "tend-conversation-core", "tend-status-bar"], "parent": "tend-app", "component": "tend", "note": "Stage 8b: Step/run failures, connection loss, agent stuck states" },
+    { "id": "tend-settings", "title": "Settings Page", "type": "feature", "status": "draft", "priority": "low", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 8c: /settings route with theme, timing, thresholds, defaults" }
   ]
 }

@@ -1,0 +1,163 @@
+{
+  "feature_id": "tend-project-entity",
+  "title": "Project Entity & API",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["tend-scaffold"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Create the backend project entity that links ideation sessions, plans, and forge runs into a single project.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "projects table created via migration with columns: id, name, owner_id, initiative_id, session_id, plan_id, run_id, config (JSONB), current_focus (JSONB), created_at, updated_at"
+      },
+      {
+        "id": "ac2",
+        "description": "GET /api/projects returns list of projects"
+      },
+      {
+        "id": "ac3",
+        "description": "POST /api/projects creates a project (also creates linked ideation session + plan)"
+      },
+      {
+        "id": "ac4",
+        "description": "GET /api/projects/:id returns project with linked entity summaries"
+      },
+      {
+        "id": "ac5",
+        "description": "PUT /api/projects/:id updates project fields (name, config, linked IDs)"
+      },
+      {
+        "id": "ac6",
+        "description": "POST /api/projects/:id/focus stores current_focus on project entity"
+      },
+      {
+        "id": "ac7",
+        "description": "config column stores ProjectConfig with scopes (workspace_path, remote_url, default_branch) and execution_policy (max_concurrent, timeout, retries, budget)"
+      },
+      {
+        "id": "ac8",
+        "description": "useProjectEvents composition hook subscribes to all 3 SSE streams (ideation, planner, forge) for a project"
+      },
+      {
+        "id": "ac9",
+        "description": "Frontend fetches project on ProjectPage mount and provides via ProjectContext"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is genuinely new backend work — the projects table doesn't exist today",
+        "It's the glue that links session_id (ideation), plan_id (planner), and run_id (forge) into one entity",
+        "The API follows existing patterns (Express + SQLite + Zod validation)",
+        "The useProjectEvents hook composes existing SSE hooks (useSessionEvents, usePlanEvents, useRunEvents) rather than creating a new SSE endpoint",
+        "ProjectConfig schema is new — defines scopes and execution_policy",
+        "current_focus is a JSONB column storing whatever the user is currently looking at (step_id, tree path, etc.)"
+      ],
+      "questions": [
+        "Should projects live in planner.db or a new tend.db?",
+        "Do we need a projects_users join table for multi-user access?",
+        "Should project creation auto-create session + plan or allow manual linking?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["backend", "frontend"],
+    "steps": [
+      {
+        "id": "pje01",
+        "title": "Create projects table migration",
+        "scope": "backend",
+        "description": "Follow migration pattern from packages/planner/src/storage/migrations/. Create projects table with columns: id (TEXT PRIMARY KEY), name (TEXT NOT NULL), owner_id, initiative_id, session_id, plan_id, run_id, config (JSONB), current_focus (JSONB), created_at, updated_at. Use BaseSqliteStorage migration system.",
+        "acceptance_criteria": ["ac1"]
+      },
+      {
+        "id": "pje02",
+        "title": "Create ProjectStorage class",
+        "scope": "backend",
+        "description": "Copy storage pattern from packages/planner/src/storage/plan-storage.ts. Extend BaseSqliteStorage with CRUD methods: list(), create(), getById(), update(), updateFocus(). Handle JSONB serialization for config and current_focus fields.",
+        "dependencies": ["pje01"],
+        "acceptance_criteria": ["ac1", "ac7"]
+      },
+      {
+        "id": "pje03",
+        "title": "Create Express router with 6 endpoints",
+        "scope": "backend",
+        "description": "Copy router pattern from packages/planner/src/routes.ts. Create GET /api/projects (list), POST /api/projects (create, auto-creates linked session+plan via ideation/planner APIs), GET /:id (get with linked entities), PUT /:id (update), POST /:id/focus (update current_focus), POST /:id/graduate (stub, completed in graduation-bridge feature).",
+        "dependencies": ["pje02"],
+        "acceptance_criteria": ["ac2", "ac3", "ac4", "ac5", "ac6"]
+      },
+      {
+        "id": "pje04",
+        "title": "Add Zod validation schemas",
+        "scope": "backend",
+        "description": "Copy validation pattern from packages/planner/src/validation/. Create CreateProjectRequest, UpdateProjectRequest, FocusRequest, ProjectConfig schemas. Export TypeScript types from Zod schemas for consistency.",
+        "dependencies": ["pje02"],
+        "acceptance_criteria": ["ac7"]
+      },
+      {
+        "id": "pje05",
+        "title": "Mount project router in server",
+        "scope": "backend",
+        "description": "Edit packages/server/src/server.ts. Import createProjectRouter, initialize ProjectStorage, mount at /api/projects following existing pattern (planner, ideation, forge routers).",
+        "dependencies": ["pje03", "pje04"],
+        "acceptance_criteria": ["ac2", "ac3", "ac4", "ac5", "ac6"]
+      },
+      {
+        "id": "pje06",
+        "title": "Create useProjectEvents composition hook",
+        "scope": "frontend",
+        "description": "Copy composition pattern from existing hooks. Create useProjectEvents(project) that composes useSessionEvents (ideation SSE), usePlanEvents (planner SSE), useRunEvents (forge SSE). No new SSE endpoint — pure frontend composition. Hook should update forming blocks, tree, and execution status from the three streams.",
+        "dependencies": ["pje05"],
+        "acceptance_criteria": ["ac8"]
+      },
+      {
+        "id": "pje07",
+        "title": "Create ProjectContext provider",
+        "scope": "frontend",
+        "description": "Copy context pattern from packages/planner-ui/src/contexts/PlanEditorContext.tsx. Create ProjectContext that fetches project via GET /api/projects/:id on mount, subscribes to SSE via useProjectEvents, provides project data + linked entities to children. Used by ProjectPage.",
+        "dependencies": ["pje06"],
+        "acceptance_criteria": ["ac9"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "new_table": "projects",
+      "api_prefix": "/api/projects",
+      "storage": "SQLite in planner.db (or new tend.db)",
+      "sse_strategy": "compose existing hooks, no new endpoint",
+      "config_schema": "ProjectConfig with scopes and execution_policy",
+      "schema": {
+        "id": "TEXT PRIMARY KEY",
+        "name": "TEXT NOT NULL",
+        "owner_id": "TEXT",
+        "initiative_id": "TEXT",
+        "session_id": "TEXT",
+        "plan_id": "TEXT",
+        "run_id": "TEXT",
+        "config": "JSONB (ProjectConfig)",
+        "current_focus": "JSONB",
+        "created_at": "TEXT",
+        "updated_at": "TEXT"
+      },
+      "project_config_schema": {
+        "scopes": {
+          "workspace_path": "string",
+          "remote_url": "string",
+          "default_branch": "string"
+        },
+        "execution_policy": {
+          "max_concurrent": "number",
+          "timeout": "number",
+          "retries": "number",
+          "budget": "number"
+        }
+      }
+    }
+  }
+}

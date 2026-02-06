@@ -1,0 +1,135 @@
+{
+  "feature_id": "tend-settings",
+  "title": "Settings Page",
+  "type": "feature",
+  "status": "draft",
+  "priority": "low",
+  "dependencies": ["tend-theming"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Add a settings page for global preferences and connection management.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "/settings route renders SettingsPage"
+      },
+      {
+        "id": "ac2",
+        "description": "Theme setting: Light / Dark / System with prefers-color-scheme respect"
+      },
+      {
+        "id": "ac3",
+        "description": "Status bar bubble timing: configurable (default blocking: 30s, normal: 15s, FYI: 8s)"
+      },
+      {
+        "id": "ac4",
+        "description": "Graduation threshold: configurable (default 65%), with note that Tuner adjusts over time"
+      },
+      {
+        "id": "ac5",
+        "description": "Cost visibility: toggle show/hide cost per step and per project"
+      },
+      {
+        "id": "ac6",
+        "description": "Execution defaults: max concurrent (default 5), timeout (default 300s), retries (default 3)"
+      },
+      {
+        "id": "ac7",
+        "description": "Relay connection: shows status, manual reconnect button"
+      },
+      {
+        "id": "ac8",
+        "description": "Settings persist to localStorage"
+      },
+      {
+        "id": "ac9",
+        "description": "Project-specific settings (scope→repo mapping, execution policy) live on project entity, not here"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Settings page is straightforward — no complex state management, just localStorage persistence",
+        "Accessible from dashboard or any project via /settings route",
+        "The key distinction: global settings here, project-specific settings on the project entity (accessible via conversation or project settings sheet in future)",
+        "The graduation threshold is a good example of Tuner integration — starts at default, Tuner adjusts over time based on user behavior",
+        "Theme setting uses same pattern as planner-ui and ideation-ui (class-based dark mode + prefers-color-scheme)",
+        "Relay connection status and manual reconnect provide debugging affordance"
+      ],
+      "questions": [
+        "Should settings be synced to backend for multi-device consistency?",
+        "Do we need a reset to defaults button?",
+        "Should we show advanced/developer settings separately?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["frontend"],
+    "steps": [
+      {
+        "id": "stg01",
+        "title": "Create SettingsPage with basic layout",
+        "scope": "frontend",
+        "description": "Create SettingsPage component at /settings route. Simple layout (not three-column — just centered content max-width). Sections: Appearance, Notifications, Ideation, Execution, Advanced. Copy settings page structure from planner-ui or create new. Use shadcn/ui components for form elements (Switch, Slider, Select).",
+        "acceptance_criteria": ["ac1"]
+      },
+      {
+        "id": "stg02",
+        "title": "Implement theme setting",
+        "scope": "frontend",
+        "description": "Copy theme toggle pattern from planner-ui and ideation-ui. Three options: Light, Dark, System (with prefers-color-scheme media query). Store in localStorage as 'theme'. Apply by toggling .theme-light / .theme-dark class on document root. System option detects prefers-color-scheme and applies appropriate class. Default: System (zen garden is light by default but respects OS preference).",
+        "dependencies": ["stg01"],
+        "acceptance_criteria": ["ac2"]
+      },
+      {
+        "id": "stg03",
+        "title": "Implement remaining settings",
+        "scope": "frontend",
+        "description": "Add settings: Status bar bubble timing (blocking: 30s, normal: 15s, FYI: 8s — three sliders), Graduation threshold (slider, default 65%, note: 'Tuner adjusts this over time'), Cost visibility (toggle, default hidden), Execution defaults (max concurrent: 5, timeout: 300s, retries: 3 — number inputs), Relay connection (status indicator, manual reconnect button — copy from planner-ui RelayContext connection status).",
+        "dependencies": ["stg01"],
+        "acceptance_criteria": ["ac3", "ac4", "ac5", "ac6", "ac7"]
+      },
+      {
+        "id": "stg04",
+        "title": "Persist all settings to localStorage",
+        "scope": "frontend",
+        "description": "Create useSettings hook for reactivity. Store settings object in localStorage key 'tend-settings'. Load on app init (wrap in SettingsProvider at app root). Settings schema matches context.settings_schema. On change, update localStorage and notify React Context consumers. Copy localStorage persistence pattern from planner-ui (sidebar state, view mode).",
+        "dependencies": ["stg02", "stg03"],
+        "acceptance_criteria": ["ac8"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "storage": "localStorage",
+      "route": "/settings",
+      "scope": "global settings only, project-specific on project entity",
+      "tuner_integration": "graduation threshold as future Tuner-controlled value",
+      "settings_schema": {
+        "theme": "light | dark | system",
+        "bubble_timing": {
+          "blocking": "number (default 30000ms)",
+          "normal": "number (default 15000ms)",
+          "fyi": "number (default 8000ms)"
+        },
+        "graduation_threshold": "number (default 0.65)",
+        "cost_visibility": "boolean (default false)",
+        "execution_defaults": {
+          "max_concurrent": "number (default 5)",
+          "timeout": "number (default 300)",
+          "retries": "number (default 3)"
+        }
+      },
+      "sections": [
+        "Appearance (theme)",
+        "Notifications (bubble timing)",
+        "Ideation (graduation threshold)",
+        "Execution (defaults)",
+        "Advanced (relay connection, cost visibility)"
+      ],
+      "persistence": "localStorage with useSettings hook for reactivity"
+    }
+  }
+}

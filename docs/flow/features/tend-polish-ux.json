@@ -1,0 +1,142 @@
+{
+  "feature_id": "tend-polish-ux",
+  "title": "UX Polish (Keyboard, Animations, Attention)",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["tend-project-tree", "tend-conversation-core", "tend-status-bar"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Polish UX with keyboard navigation, animations, and attention level consistency.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "Cmd+K / Ctrl+K opens command palette (adapted from planner-ui) searching tree nodes, steps, and projects"
+      },
+      {
+        "id": "ac2",
+        "description": "Tree crystallizing animation plays when steps first appear (characters resolve from noise to text)"
+      },
+      {
+        "id": "ac3",
+        "description": "Graduation animation: block shrinks in left column while step appears in right column (coordinated)"
+      },
+      {
+        "id": "ac4",
+        "description": "Workspace transition animations: columns slide in from edges when navigating between dashboard and project"
+      },
+      {
+        "id": "ac5",
+        "description": "All components respect the 3-tier attention level system: Level 1 (background, lower weight), Level 2 (foreground, normal weight), Level 3 (raised, card with shadow)"
+      },
+      {
+        "id": "ac6",
+        "description": "Typography does attention hierarchy — weight and size, not color. Color reserved for semantic meaning only."
+      },
+      {
+        "id": "ac7",
+        "description": "Reduced motion respected via prefers-reduced-motion media query"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "planner-ui already has a CommandPalette component — copy and adapt to search tree nodes + steps + projects (not just plans)",
+        "Animations are new: crystallizing (CSS keyframes with text scramble effect), graduation (coordinated Matter.js → CSS transition), workspace transitions (CSS slide)",
+        "The attention level system is a cross-cutting pattern — every component already built needs a consistency pass to ensure correct level assignment",
+        "Crystallizing animation: characters start as random symbols (@#$%&) and resolve to actual text over ~500ms",
+        "Graduation animation: coordinated via shared state — block receives 'graduating' class, triggers CSS shrink, step receives 'appearing' class, triggers CSS slide-in",
+        "Workspace transitions: page-level animations when navigating, using view transitions API or CSS transitions"
+      ],
+      "questions": [
+        "Should command palette show recent items or just search results?",
+        "Do we need animation preferences beyond prefers-reduced-motion?",
+        "Should attention levels be enforced via TypeScript or just convention?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["frontend"],
+    "steps": [
+      {
+        "id": "plx01",
+        "title": "Copy and adapt CommandPalette",
+        "scope": "frontend",
+        "description": "Copy packages/planner-ui/src/components/CommandPalette.tsx. Adapt search targets: tree nodes (scopes), steps (from current project), projects (from dashboard). Keep Cmd+K / Ctrl+K keyboard shortcut. Use fuzzy search pattern from planner-ui. Navigation: selecting item focuses/zooms to that tree node or navigates to project.",
+        "acceptance_criteria": ["ac1"]
+      },
+      {
+        "id": "plx02",
+        "title": "Implement tree crystallizing animation",
+        "scope": "frontend",
+        "description": "Create CSS keyframes for crystallizing effect. Characters start as random symbols (@#$%&*!) and resolve to actual text over 500ms. Apply to steps when first added to tree. Use data-attribute or CSS class to trigger. CSS-only implementation, no JS animation library. Store animation in globals.css.",
+        "acceptance_criteria": ["ac2"]
+      },
+      {
+        "id": "plx03",
+        "title": "Implement graduation animation",
+        "scope": "frontend",
+        "description": "Coordinated animation: when block graduates, add 'graduating' class to block (NowColumn) triggering CSS shrink transform. Simultaneously add 'appearing' class to newly created step (ProjectTree) triggering CSS slide-in from left. Duration: 400ms. Use shared state (block_id → step_id mapping) to coordinate timing. CSS transitions, no animation library.",
+        "acceptance_criteria": ["ac3"]
+      },
+      {
+        "id": "plx04",
+        "title": "Implement workspace transition animations",
+        "scope": "frontend",
+        "description": "Page-level animations when navigating between dashboard (/) and project (/projects/:id). Columns slide in from edges on enter. Try View Transitions API if browser support allows, fallback to CSS transitions. Use route change detection in React Router. Duration: 300ms. Store transitions in globals.css.",
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "plx05",
+        "title": "Attention level consistency pass",
+        "scope": "frontend",
+        "description": "Audit ALL components built so far (NowColumn, ProjectTree, ConversationPane, StatusBar, SystemEvent, ContextMarker, StepNode, etc.). Ensure correct attention level assignment: Level 1 (background: system events, timestamps, completed steps — lower weight, subtle), Level 2 (foreground: AI messages, active steps, context markers — normal weight), Level 3 (raised: blocking questions, action items — card with shadow). Typography-driven hierarchy (weight/size), NOT color.",
+        "dependencies": ["plx01", "plx02", "plx03", "plx04"],
+        "acceptance_criteria": ["ac5", "ac6"]
+      },
+      {
+        "id": "plx06",
+        "title": "Add prefers-reduced-motion support",
+        "scope": "frontend",
+        "description": "Add @media (prefers-reduced-motion: reduce) rules in globals.css. When user has reduced motion preference, disable: crystallizing animation, graduation animation, workspace transitions. Replace with instant state changes or simple fades. Test with macOS accessibility settings.",
+        "dependencies": ["plx02", "plx03", "plx04"],
+        "acceptance_criteria": ["ac7"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_command_palette": "planner-ui CommandPalette (adapt search targets)",
+      "animation_types": "crystallizing (new CSS), graduation (coordinated left→right), workspace transitions (CSS slide)",
+      "attention_levels": "Level 1 background, Level 2 foreground, Level 3 raised — typography-driven",
+      "animations": {
+        "crystallizing": {
+          "trigger": "step first appears in tree",
+          "effect": "characters resolve from @#$%& to actual text",
+          "duration": "500ms",
+          "implementation": "CSS keyframes with content switching"
+        },
+        "graduation": {
+          "trigger": "block graduates to step",
+          "effect": "block shrinks in left, step slides in from left in right",
+          "duration": "400ms coordinated",
+          "implementation": "shared graduating state + CSS transitions"
+        },
+        "workspace_transition": {
+          "trigger": "navigate between dashboard and project",
+          "effect": "columns slide in from edges",
+          "duration": "300ms",
+          "implementation": "CSS transitions or View Transitions API"
+        }
+      },
+      "attention_level_rules": {
+        "level_1": "background elements, lower font weight, muted",
+        "level_2": "foreground elements, normal font weight",
+        "level_3": "raised elements, card with shadow, slightly bolder"
+      },
+      "accessibility": "prefers-reduced-motion disables all animations"
+    }
+  }
+}
