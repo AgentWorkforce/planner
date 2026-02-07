@@ -68,88 +68,11 @@ export function App() {
   const { isCollapsed, togglePanel } = usePanelState();
   const location = useLocation();
   const { sessions } = useSessions();
-
-  // Command palette
   const commandPalette = useCommandPalette({ sessions });
 
-  // Mockup page bypasses IdeationLayout
-  if (location.pathname === '/mockup') {
-    return <MockupPage />;
-  }
+  // Legacy session routes need IdeationLayout with specialists panel
+  const isSessionPage = location.pathname.startsWith('/session/') && !location.pathname.includes('/canvas');
 
-  // Tend dashboard at root - new three-column layout
-  if (location.pathname === '/') {
-    return (
-      <>
-        <DashboardPage />
-        <CommandPalette
-          isOpen={commandPalette.isOpen}
-          query={commandPalette.query}
-          onQueryChange={commandPalette.setQuery}
-          selectedIndex={commandPalette.selectedIndex}
-          groupedActions={commandPalette.groupedActions}
-          onClose={commandPalette.close}
-          onExecuteAction={commandPalette.executeAction}
-          onSelectNext={commandPalette.selectNext}
-          onSelectPrevious={commandPalette.selectPrevious}
-          onExecuteSelected={commandPalette.executeSelected}
-        />
-        <Toaster />
-      </>
-    );
-  }
-
-  // Old ideation dashboard (keep for compatibility during transition)
-  if (location.pathname === '/ideation') {
-    return (
-      <>
-        <DashboardPage />
-        <CommandPalette
-          isOpen={commandPalette.isOpen}
-          query={commandPalette.query}
-          onQueryChange={commandPalette.setQuery}
-          selectedIndex={commandPalette.selectedIndex}
-          groupedActions={commandPalette.groupedActions}
-          onClose={commandPalette.close}
-          onExecuteAction={commandPalette.executeAction}
-          onSelectNext={commandPalette.selectNext}
-          onSelectPrevious={commandPalette.selectPrevious}
-          onExecuteSelected={commandPalette.executeSelected}
-        />
-        <Toaster />
-      </>
-    );
-  }
-
-  // Canvas page bypasses IdeationLayout (full-screen immersive experience)
-  if (location.pathname.includes('/canvas') || location.pathname.startsWith('/ideation/session/')) {
-    return (
-      <>
-        <Routes>
-          <Route path="/session/:id/canvas" element={<CanvasPage />} />
-          <Route path="/ideation/session/:id" element={<CanvasPage />} />
-        </Routes>
-        <CommandPalette
-          isOpen={commandPalette.isOpen}
-          query={commandPalette.query}
-          onQueryChange={commandPalette.setQuery}
-          selectedIndex={commandPalette.selectedIndex}
-          groupedActions={commandPalette.groupedActions}
-          onClose={commandPalette.close}
-          onExecuteAction={commandPalette.executeAction}
-          onSelectNext={commandPalette.selectNext}
-          onSelectPrevious={commandPalette.selectPrevious}
-          onExecuteSelected={commandPalette.executeSelected}
-        />
-        <Toaster />
-      </>
-    );
-  }
-
-  // Check if we're on a session page
-  const isSessionPage = location.pathname.startsWith('/session/');
-
-  // Render the appropriate panel based on current route
   const panel = isSessionPage ? (
     <Routes>
       <Route
@@ -164,11 +87,22 @@ export function App() {
   return (
     <>
       <Routes>
-        {/* Tend routes - new routing structure */}
+        {/* Dashboard */}
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/ideation" element={<DashboardPage />} />
+
+        {/* Canvas - full-screen immersive */}
+        <Route path="/session/:id/canvas" element={<CanvasPage />} />
+        <Route path="/ideation/session/:id" element={<CanvasPage />} />
+
+        {/* Tend routes */}
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/settings" element={<SettingsPage />} />
 
-        {/* Legacy routes using old IdeationLayout - CLEANUP: Remove these */}
+        {/* Development */}
+        <Route path="/mockup" element={<MockupPage />} />
+
+        {/* Legacy routes using IdeationLayout */}
         <Route path="/legacy" element={<HomePage />} />
         <Route path="/session/:id/*" element={
           <IdeationLayout
@@ -182,7 +116,6 @@ export function App() {
         } />
       </Routes>
 
-      {/* Global Command Palette */}
       <CommandPalette
         isOpen={commandPalette.isOpen}
         query={commandPalette.query}
@@ -195,8 +128,6 @@ export function App() {
         onSelectPrevious={commandPalette.selectPrevious}
         onExecuteSelected={commandPalette.executeSelected}
       />
-
-      {/* Global Toast Notifications */}
       <Toaster />
     </>
   );
