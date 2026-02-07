@@ -33,6 +33,19 @@ module.exports = {
           curated: 'var(--block-curated)',
           'curated-border': 'var(--block-curated-border)',
         },
+        // Phase Badge Colors (earth-tones)
+        moss: {
+          DEFAULT: 'var(--color-moss)',
+          foreground: 'var(--color-moss-foreground)',
+        },
+        clay: {
+          DEFAULT: 'var(--color-clay)',
+          foreground: 'var(--color-clay-foreground)',
+        },
+        brick: {
+          DEFAULT: 'var(--color-brick)',
+          foreground: 'var(--color-brick-foreground)',
+        },
       },
     },
   },

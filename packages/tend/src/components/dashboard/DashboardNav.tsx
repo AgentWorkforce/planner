@@ -15,7 +15,7 @@ export function DashboardNav({ className }: DashboardNavProps) {
   return (
     <div className={cn('flex items-center justify-between px-4 py-3', className)}>
       <h1 className="text-lg font-semibold text-[var(--canvas-text-primary)]">
-        Ideation Dashboard
+        Tend Dashboard
       </h1>
       <ThemeToggle />
     </div>

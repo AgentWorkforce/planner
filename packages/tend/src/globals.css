@@ -64,10 +64,13 @@
   --color-error: #b54a3a;
   --color-error-light: rgba(181, 74, 58, 0.15);
 
-  /* Earth-tone semantic colors (for agent status bar) */
-  --color-moss: #4a7c59;        /* working state - green */
-  --color-brick: #b54a3a;       /* blocked/error state - red */
-  --color-clay: #c4703e;        /* needs_input state - yellow/orange */
+  /* Earth-tone semantic colors (for agent status bar and phase badges) */
+  --color-moss: #4a7c59;        /* working state / ideation phase - green */
+  --color-moss-foreground: #ffffff;
+  --color-brick: #b54a3a;       /* blocked/error state / execution phase - red */
+  --color-brick-foreground: #ffffff;
+  --color-clay: #c4703e;        /* needs_input state / planning phase - yellow/orange */
+  --color-clay-foreground: #ffffff;
 
   /* Sidebar Colors */
   --color-sidebar-bg: #ece7dd;

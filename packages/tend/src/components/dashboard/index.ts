@@ -9,3 +9,5 @@ export { SessionsPhysicsColumn } from './SessionsPhysicsColumn';
 export { SessionPhysicsBlock } from './SessionPhysicsBlock';
 export { NavigatorChat } from './NavigatorChat';
 export { SentToPlannerColumn } from './SentToPlannerColumn';
+export { DashboardNav } from './DashboardNav';
+export { ProjectList } from './ProjectList';

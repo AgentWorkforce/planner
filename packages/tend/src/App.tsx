@@ -77,8 +77,30 @@ export function App() {
     return <MockupPage />;
   }
 
-  // New dashboard and canvas pages bypass old IdeationLayout (they have their own layouts)
-  if (location.pathname === '/' || location.pathname === '/ideation') {
+  // Tend dashboard at root - new three-column layout
+  if (location.pathname === '/') {
+    return (
+      <>
+        <DashboardPage />
+        <CommandPalette
+          isOpen={commandPalette.isOpen}
+          query={commandPalette.query}
+          onQueryChange={commandPalette.setQuery}
+          selectedIndex={commandPalette.selectedIndex}
+          groupedActions={commandPalette.groupedActions}
+          onClose={commandPalette.close}
+          onExecuteAction={commandPalette.executeAction}
+          onSelectNext={commandPalette.selectNext}
+          onSelectPrevious={commandPalette.selectPrevious}
+          onExecuteSelected={commandPalette.executeSelected}
+        />
+        <Toaster />
+      </>
+    );
+  }
+
+  // Old ideation dashboard (keep for compatibility during transition)
+  if (location.pathname === '/ideation') {
     return (
       <>
         <DashboardPage />
