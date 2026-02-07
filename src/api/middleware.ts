@@ -45,6 +45,13 @@ export function unprocessableEntity(message: string, details?: unknown): HttpErr
 }
 
 /**
+ * Conflict error helper (409).
+ */
+export function conflict(message: string, details?: unknown): HttpError {
+  return new HttpError(409, message, details);
+}
+
+/**
  * Error handling middleware.
  * Converts errors to consistent JSON responses.
  */

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
-const THEME_KEY = 'ideation-theme';
+const THEME_KEY = 'tend-theme';
 
 /**
  * Get the resolved theme (light or dark) based on system preference

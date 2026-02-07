@@ -150,3 +150,13 @@ export const ListProjectsQuerySchema = z.object({
 });
 
 export type ListProjectsQuery = z.infer<typeof ListProjectsQuerySchema>;
+
+/**
+ * Request schema for project graduation.
+ */
+export const GraduateProjectRequestSchema = z.object({
+  target: z.enum(['plan', 'forge']),
+  options: z.record(z.unknown()).optional(),
+});
+
+export type GraduateProjectRequest = z.infer<typeof GraduateProjectRequestSchema>;

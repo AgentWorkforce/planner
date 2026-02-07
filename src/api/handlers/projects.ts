@@ -1,11 +1,13 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { PlanStorage } from '../../storage/interface.js';
-import { notFound, badRequest } from '../middleware.js';
+import { notFound, badRequest, conflict } from '../middleware.js';
 import {
   CreateProjectRequestSchema,
   UpdateProjectRequestSchema,
   UpdateProjectFocusSchema,
   ListProjectsQuerySchema,
+  GraduateProjectRequestSchema,
+  CreatePlanRequestSchema,
 } from '../schemas.js';
 import { randomUUID } from 'node:crypto';
 
@@ -144,7 +146,7 @@ export function createProjectHandlers(storage: PlanStorage) {
     },
 
     /**
-     * POST /api/projects/:id/graduate - Stub for graduation bridge
+     * POST /api/projects/:id/graduate - Graduate project to plan or forge
      */
     graduate: (req: Request<IdParams>, res: Response, next: NextFunction) => {
       try {
@@ -153,9 +155,121 @@ export function createProjectHandlers(storage: PlanStorage) {
           throw notFound('Project');
         }
 
-        // TODO: Implement graduation logic
-        // This will bridge from ideation → planning → execution
-        res.status(501).json({ message: 'Not implemented yet' });
+        const parseResult = GraduateProjectRequestSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          throw badRequest(parseResult.error.errors[0]?.message || 'Invalid request body');
+        }
+
+        const { target, options } = parseResult.data;
+
+        // Handle graduation to plan
+        if (target === 'plan') {
+          // Check if already graduated to plan
+          if (existing.plan_id) {
+            throw conflict('Project has already been graduated to a plan');
+          }
+
+          // Require session_id for plan graduation
+          if (!existing.session_id) {
+            throw badRequest('Project must have a session_id to graduate to a plan');
+          }
+
+          const now = new Date().toISOString();
+
+          // Use a transaction to ensure atomicity
+          const result = storage.transaction(() => {
+            // Create a new plan for this project
+            const newPlan = {
+              plan_id: randomUUID(),
+              org_id: 'default', // Use default org for now
+              owner_user_id: existing.owner_id ?? undefined,
+              initiative_id: existing.initiative_id ?? undefined,
+              created_at: now,
+              updated_at: now,
+            };
+
+            const createdPlan = storage.createPlan(newPlan);
+
+            // Create initial version for the plan
+            const initialVersion = {
+              plan_id: createdPlan.plan_id,
+              version: 1,
+              status: 'draft' as const,
+              summary: {
+                goal: existing.name,
+                context: 'Graduated from ideation session',
+              },
+              steps: [],
+              created_at: now,
+              updated_at: now,
+            };
+
+            storage.createVersion(initialVersion);
+
+            // Update project with plan_id
+            const updated = storage.updateProject(req.params.id, {
+              plan_id: createdPlan.plan_id
+            });
+
+            if (!updated) {
+              throw notFound('Project');
+            }
+
+            return {
+              project: updated,
+              plan_id: createdPlan.plan_id
+            };
+          });
+
+          // TODO: Emit SSE event for 'project:graduated' to notify frontend
+          // Example: emitProjectEvent(existing.id, 'graduated', { target: 'plan', plan_id: result.plan_id });
+          console.log(`Project ${existing.id} graduated to plan ${result.plan_id}`);
+
+          res.json(result);
+          return;
+        }
+
+        // Handle graduation to forge
+        if (target === 'forge') {
+          // Check if already graduated to forge
+          if (existing.run_id) {
+            throw conflict('Project has already been graduated to a forge run');
+          }
+
+          // Require plan_id for forge graduation
+          if (!existing.plan_id) {
+            throw badRequest('Project must have a plan_id to graduate to forge');
+          }
+
+          // Use a transaction to ensure atomicity
+          const result = storage.transaction(() => {
+            // Create a forge run (stub for now - just generate run_id)
+            const runId = randomUUID();
+
+            // Update project with run_id
+            const updated = storage.updateProject(req.params.id, {
+              run_id: runId
+            });
+
+            if (!updated) {
+              throw notFound('Project');
+            }
+
+            return {
+              project: updated,
+              run_id: runId
+            };
+          });
+
+          // TODO: Emit SSE event for 'project:graduated' to notify frontend
+          // Example: emitProjectEvent(existing.id, 'graduated', { target: 'forge', run_id: result.run_id });
+          console.log(`Project ${existing.id} graduated to forge run ${result.run_id}`);
+
+          res.json(result);
+          return;
+        }
+
+        throw badRequest('Invalid graduation target');
       } catch (error) {
         next(error);
       }

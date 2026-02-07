@@ -64,3 +64,10 @@ export type {
 // Relay connection
 export { useRelayConnection } from './useRelayConnection';
 export type { UseRelayConnectionResult } from '@/types';
+
+// Theme
+export { useTheme } from './useTheme';
+
+// Settings
+export { useSettings } from './useSettings';
+export type { TendSettings } from './useSettings';

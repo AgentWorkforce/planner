@@ -4,6 +4,7 @@ import { TendLayout } from '@/components/layout/TendLayout';
 import { IdeationStatusBar } from '@/components/canvas/IdeationStatusBar';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
 import { ProjectTree } from '@/components/tree/ProjectTree';
+import { StepSheet } from '@/components/sheets/StepSheet';
 import { SessionNav, type SessionInfo } from '@/components/canvas/CanvasHeader';
 import { FocusMode } from '@/components/canvas/FocusMode';
 import { AIUnderstandingDrawer } from '@/components/canvas/AIUnderstandingDrawer';
@@ -61,6 +62,8 @@ export function CanvasPage() {
   const [isUnderstandingDrawerOpen, setIsUnderstandingDrawerOpen] = useState(false);
   // State for Handoff dialog
   const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
+  // State for selected step (sheet)
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
 
   const { session, loading: sessionLoading, error: sessionError } = useSession(id);
   const { blocks, loading: blocksLoading, curateBlock, uncurateBlock, updateBlock } = useBlocks(id || '');
@@ -343,8 +346,8 @@ export function CanvasPage() {
         center={centerContent}
         rightPanel={
           <ProjectTree
-            planId={undefined}
-            onStepSelect={(stepId) => console.log('Step selected:', stepId)}
+            planId={sessionWithV3Fields?.lastHandoffPlanId}
+            onStepSelect={setSelectedStepId}
           />
         }
         statusBar={<IdeationStatusBar />}
@@ -364,6 +367,15 @@ export function CanvasPage() {
         onConfirm={handleHandoffConfirm}
         blocks={blocks}
       />
+
+      {/* Step detail sheet */}
+      {sessionWithV3Fields?.lastHandoffPlanId && (
+        <StepSheet
+          stepId={selectedStepId}
+          planId={sessionWithV3Fields.lastHandoffPlanId}
+          onClose={() => setSelectedStepId(null)}
+        />
+      )}
     </div>
   );
 }
