@@ -4,6 +4,7 @@ import { LoadingSpinner } from '../LoadingSpinner';
 import { WorkSection } from './WorkSection';
 import { TreeBreadcrumb } from './TreeBreadcrumb';
 import { ArtifactsSection } from './ArtifactsSection';
+import { useProject } from '@/contexts';
 import type { Step, StepExecutionStatus } from '@/types/plan';
 
 /**
@@ -78,6 +79,17 @@ export function ProjectTree({
 }: ProjectTreeProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Try to get project context if available (not required)
+  let projectContext = null;
+  try {
+    projectContext = useProject();
+  } catch {
+    // Not inside ProjectProvider, that's ok
+  }
+
+  // Determine plan ID: prop takes precedence, fall back to context
+  const effectivePlanId = planId ?? projectContext?.project?.plan_id;
+
   // State for plan data
   const [steps, setSteps] = useState<StepWithExecution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +101,13 @@ export function ProjectTree({
   const [focusedStep, setFocusedStep] = useState<string | null>(null);
 
   const zoom = controlledZoom ?? internalZoom;
+
+  // Get current step title for breadcrumb (must be before early returns - rules of hooks)
+  const currentStepTitle = useMemo(() => {
+    if (!focusedStep) return null;
+    const step = steps.find((s) => s.step_id === focusedStep);
+    return step?.title || null;
+  }, [focusedStep, steps]);
 
   // Read zoom state from URL on mount
   useEffect(() => {
@@ -112,7 +131,7 @@ export function ProjectTree({
 
   // Fetch plan data
   useEffect(() => {
-    if (!planId) {
+    if (!effectivePlanId) {
       setLoading(false);
       return;
     }
@@ -120,7 +139,7 @@ export function ProjectTree({
     const fetchPlan = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/plans/${planId}/versions/latest`);
+        const res = await fetch(`/api/plans/${effectivePlanId}/versions/latest`);
         if (!res.ok) {
           throw new Error(`Failed to fetch plan: HTTP ${res.status}`);
         }
@@ -136,7 +155,7 @@ export function ProjectTree({
     };
 
     fetchPlan();
-  }, [planId]);
+  }, [effectivePlanId]);
 
   // Group steps by scope
   const stepsByScope = useMemo(() => {
@@ -217,7 +236,7 @@ export function ProjectTree({
   }
 
   // Empty state
-  if (!planId || steps.length === 0) {
+  if (!effectivePlanId || steps.length === 0) {
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center text-text-muted">
@@ -227,13 +246,6 @@ export function ProjectTree({
       </div>
     );
   }
-
-  // Get current step title for breadcrumb
-  const currentStepTitle = useMemo(() => {
-    if (!focusedStep) return null;
-    const step = steps.find((s) => s.step_id === focusedStep);
-    return step?.title || null;
-  }, [focusedStep, steps]);
 
   return (
     <div className={className}>
