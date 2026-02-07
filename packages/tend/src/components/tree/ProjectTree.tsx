@@ -4,7 +4,7 @@ import { LoadingSpinner } from '../LoadingSpinner';
 import { WorkSection } from './WorkSection';
 import { TreeBreadcrumb } from './TreeBreadcrumb';
 import { ArtifactsSection } from './ArtifactsSection';
-import { useProject } from '@/contexts';
+import { useOptionalProject } from '@/contexts';
 import type { Step, StepExecutionStatus } from '@/types/plan';
 
 /**
@@ -78,14 +78,7 @@ export function ProjectTree({
   className,
 }: ProjectTreeProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // Try to get project context if available (not required)
-  let projectContext = null;
-  try {
-    projectContext = useProject();
-  } catch {
-    // Not inside ProjectProvider, that's ok
-  }
+  const projectContext = useOptionalProject();
 
   // Determine plan ID: prop takes precedence, fall back to context
   const effectivePlanId = planId ?? projectContext?.project?.plan_id;

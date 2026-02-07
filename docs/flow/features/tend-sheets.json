@@ -2,7 +2,7 @@
   "feature_id": "tend-sheets",
   "title": "Add slide-in detail panels (sheets) for rich step editing",
   "type": "feature",
-  "status": "draft",
+  "status": "completed",
   "priority": "high",
   "dependencies": ["tend-project-tree"],
   "parent": "tend-app",

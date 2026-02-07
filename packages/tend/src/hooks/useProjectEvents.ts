@@ -77,6 +77,9 @@ export function useProjectEvents(
     reconnectAttemptsRef.current.set(source, 0);
   }, []);
 
+  // Ref to break circular dependency: handleSourceError needs connect, connect needs handleSourceError
+  const connectRef = useRef<(source: 'ideation' | 'planner' | 'forge', url: string) => void>(() => {});
+
   const handleSourceError = useCallback((source: 'ideation' | 'planner' | 'forge', url: string, err: Event) => {
     console.error(`[useProjectEvents] ${source} SSE error:`, err);
 
@@ -105,7 +108,7 @@ export function useProjectEvents(
 
       const timeoutId = setTimeout(() => {
         reconnectTimeoutsRef.current.delete(source);
-        connect(source, url);
+        connectRef.current(source, url);
       }, delay);
 
       reconnectTimeoutsRef.current.set(source, timeoutId);
@@ -181,6 +184,9 @@ export function useProjectEvents(
       });
     }
   }, [addEvent, handleSourceOpen, handleSourceError]);
+
+  // Keep connectRef in sync so handleSourceError always uses the latest connect
+  connectRef.current = connect;
 
   const cleanup = useCallback(() => {
     // Close all connections

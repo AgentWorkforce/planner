@@ -204,3 +204,13 @@ export function useProject(): ProjectContextValue {
   }
   return context;
 }
+
+/**
+ * useOptionalProject - Access project context without throwing
+ *
+ * Returns null when used outside ProjectProvider. Use this in components
+ * that may or may not be rendered within a ProjectProvider.
+ */
+export function useOptionalProject(): ProjectContextValue | null {
+  return useContext(ProjectContext);
+}
