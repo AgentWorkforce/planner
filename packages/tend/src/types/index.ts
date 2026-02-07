@@ -11,3 +11,8 @@ export type {
   ServerIncomingMessage,
   UseRelayConnectionResult,
 } from './relay';
+
+export type {
+  ProjectMessage,
+  AgentTab,
+} from './conversation';

@@ -26,6 +26,10 @@ export interface TranscriptMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  metadata?: {
+    options?: string[];
+    [key: string]: unknown;
+  };
 }
 
 export interface SessionWithDetails extends Session {

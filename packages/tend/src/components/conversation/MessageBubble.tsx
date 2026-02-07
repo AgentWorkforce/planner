@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
 import { BrainIcon } from '@/components/icons';
+import { MultipleChoiceInput } from './MultipleChoiceInput';
 
 interface MessageBubbleProps {
   message: TranscriptMessage;
+  onOptionSelect?: (value: string) => void;
 }
 
 function formatTime(timestamp: string): string {
@@ -11,8 +14,15 @@ function formatTime(timestamp: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onOptionSelect }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const [selectedOption, setSelectedOption] = useState<string | undefined>();
+  const hasOptions = message.metadata?.options && message.metadata.options.length > 0;
+
+  const handleOptionSelect = (value: string) => {
+    setSelectedOption(value);
+    onOptionSelect?.(value);
+  };
 
   return (
     <div
@@ -46,6 +56,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         >
           {formatTime(message.timestamp)}
         </span>
+
+        {/* Multiple Choice Input */}
+        {!isUser && hasOptions && message.metadata?.options && (
+          <MultipleChoiceInput
+            options={message.metadata.options}
+            onSelect={handleOptionSelect}
+            selected={selectedOption}
+            disabled={!!selectedOption}
+          />
+        )}
       </div>
     </div>
   );

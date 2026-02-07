@@ -19,13 +19,14 @@ interface ConversationMessagesProps {
   messages: MessageItem[];
   loading?: boolean;
   isTyping?: boolean;
+  onOptionSelect?: (value: string) => void;
 }
 
 function isContextMarker(message: MessageItem): message is ContextMarkerMessage {
   return 'type' in message && message.type === 'context_marker';
 }
 
-export function ConversationMessages({ messages, loading, isTyping }: ConversationMessagesProps) {
+export function ConversationMessages({ messages, loading, isTyping, onOptionSelect }: ConversationMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +68,7 @@ export function ConversationMessages({ messages, loading, isTyping }: Conversati
             />
           );
         }
-        return <MessageBubble key={index} message={message} />;
+        return <MessageBubble key={index} message={message} onOptionSelect={onOptionSelect} />;
       })}
       {isTyping && <TypingIndicator />}
       <div ref={bottomRef} />

@@ -7,3 +7,6 @@ export { TypingIndicator } from './TypingIndicator';
 export { ConfidenceBar } from './ConfidenceBar';
 export { SystemEvent } from './SystemEvent';
 export { ContextMarker } from './ContextMarker';
+export { MultipleChoiceInput } from './MultipleChoiceInput';
+export { AgentTab } from './AgentTab';
+export { AgentTabBar } from './AgentTabBar';

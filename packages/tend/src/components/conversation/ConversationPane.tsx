@@ -1,11 +1,13 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
+import { AgentTab } from '@/types/conversation';
 import { ConversationMessages } from './ConversationMessages';
 import { ConversationInput } from './ConversationInput';
 import { TypingIndicator } from './TypingIndicator';
+import { AgentTabBar } from './AgentTabBar';
 import { LoadingSpinner } from '@/components/ui';
 import { MessageSquare } from 'lucide-react';
 
@@ -25,7 +27,27 @@ export function ConversationPane({ sessionId, focusedBlockId, focusedBlock }: Co
   const { session, loading, error, refetch } = useSession(sessionId);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('all');
   const { send, sending } = useSendMessage(sessionId, focusedBlockId);
+
+  // Mock tabs - will be populated from relay messages in future
+  const tabs: AgentTab[] = useMemo(() => {
+    return [
+      { id: 'all', label: 'All', channel_id: 'all' },
+      // Additional tabs will appear dynamically when agents send messages
+      // For now this is a shell implementation
+    ];
+  }, []);
+
+  // Filter messages by active tab
+  const filteredMessages = useMemo(() => {
+    if (activeTab === 'all') {
+      return transcript;
+    }
+    // In the future, filter by channel_id when ProjectMessage interface is used
+    // For now, just return all messages
+    return transcript;
+  }, [activeTab, transcript]);
 
   // Handle real-time transcript updates
   const handleTranscriptUpdate = useCallback((messages: TranscriptMessage[]) => {
@@ -126,6 +148,15 @@ export function ConversationPane({ sessionId, focusedBlockId, focusedBlock }: Co
 
   return (
     <div className="flex flex-col h-full">
+      {/* Agent Tab Bar */}
+      {tabs.length > 1 && (
+        <AgentTabBar
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+      )}
+
       {/* Context Banner for Focus Mode */}
       {focusedBlockId && focusedBlock && (
         <div className="flex items-center justify-between px-4 py-3 bg-accent-cyan/10 border-b border-accent-cyan/20">
@@ -151,7 +182,7 @@ export function ConversationPane({ sessionId, focusedBlockId, focusedBlock }: Co
       )}
 
       <div className="flex-1 overflow-y-auto relative">
-        <ConversationMessages messages={transcript} />
+        <ConversationMessages messages={filteredMessages} />
         {isTyping && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[var(--canvas-bg)] to-transparent">
             <TypingIndicator />

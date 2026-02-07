@@ -71,3 +71,7 @@ export { useTheme } from './useTheme';
 // Settings
 export { useSettings } from './useSettings';
 export type { TendSettings } from './useSettings';
+
+// Question queue
+export { useQuestionQueue, questionToItem } from './useQuestionQueue';
+export type { ReplyItem, ReplyPriority, ReplyItemType } from './useQuestionQueue';
