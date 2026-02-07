@@ -1,0 +1,8 @@
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# Test databases
+test-*.db
+test-*.db-journal

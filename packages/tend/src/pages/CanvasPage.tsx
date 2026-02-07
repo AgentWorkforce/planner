@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { TendLayout } from '@/components/layout/TendLayout';
-import { IdeationStatusBar } from '@/components/canvas/IdeationStatusBar';
+import { StatusBar } from '@/components/status/StatusBar';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
 import { ProjectTree } from '@/components/tree/ProjectTree';
 import { StepSheet } from '@/components/sheets/StepSheet';
@@ -350,7 +350,7 @@ export function CanvasPage() {
             onStepSelect={setSelectedStepId}
           />
         }
-        statusBar={<IdeationStatusBar />}
+        statusBar={<StatusBar />}
         focusMode={!!focusedBlock}
       />
 

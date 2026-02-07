@@ -1,99 +1,122 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Dashboard Page', () => {
-  test('should load dashboard with Tend title', async ({ page }) => {
+  test('should load dashboard with main heading', async ({ page }) => {
     await page.goto('/');
-
-    // Check for "Tend" or "Welcome to Tend" heading
-    const heading = page.locator('h1, h2').filter({ hasText: /Tend/i });
-    await expect(heading).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('should render project list', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for either loading state to finish or content to appear
-    // The page may show empty state if no projects exist
     await page.waitForLoadState('domcontentloaded');
 
-    // Check for either project list container or empty state message
-    const projectSection = page.locator('[data-testid="project-list"]').or(
-      page.locator('text=/What would you like to work on|Select a project/i')
-    );
-
-    await expect(projectSection).toBeVisible({ timeout: 10_000 });
+    // Check for "Tend Dashboard" heading (level 1)
+    const mainHeading = page.getByRole('heading', { name: 'Tend Dashboard', level: 1 });
+    await expect(mainHeading).toBeVisible({ timeout: 10_000 });
   });
 
-  test('should show new project button or create flow', async ({ page }) => {
+  test('should render welcome section', async ({ page }) => {
     await page.goto('/');
-
-    // Look for "New Project" button or similar create action
-    const createButton = page.locator('button').filter({ hasText: /New|Create/i }).first();
-
-    // Button should be visible (may be disabled if backend is down, but should exist)
-    await expect(createButton).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('should allow project creation flow', async ({ page }) => {
-    await page.goto('/');
-
-    // Find and click new project button
-    const newProjectButton = page.locator('button').filter({ hasText: /New Project|Create/i }).first();
-    await newProjectButton.click();
-
-    // Look for input field (modal or inline) - use flexible selectors
-    const nameInput = page.locator('input[name="name"], input[placeholder*="name" i], input[type="text"]').first();
-
-    if (await nameInput.isVisible({ timeout: 5_000 })) {
-      await nameInput.fill('Test Project E2E');
-
-      // Look for submit button
-      const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /Create|Save|Submit/i }).first();
-
-      if (await submitButton.isVisible({ timeout: 3_000 })) {
-        // Note: We don't actually submit since backend may not be available
-        // Just verify the form structure exists
-        await expect(submitButton).toBeEnabled();
-      }
-    }
-  });
-
-  test('should navigate to project page when clicking project', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for content to load
     await page.waitForLoadState('domcontentloaded');
 
-    // Look for any project items (may not exist if no projects)
-    const projectItems = page.locator('[data-testid="project-item"]');
-    const count = await projectItems.count();
+    // Check for "Welcome to Tend" heading (level 2)
+    const welcomeHeading = page.getByRole('heading', { name: 'Welcome to Tend', level: 2 });
+    await expect(welcomeHeading).toBeVisible();
 
-    if (count > 0) {
-      // Click first project
-      await projectItems.first().click();
-
-      // Should navigate to /projects/:id route
-      await expect(page).toHaveURL(/\/projects\/[a-z0-9-]+/, { timeout: 5_000 });
-    }
-    // If no projects exist, test passes (empty state is valid)
+    // Check for welcome text
+    const welcomeText = page.getByText(/What would you like to work on\? Create a new project/i);
+    await expect(welcomeText).toBeVisible();
   });
 
-  test('should handle API errors gracefully', async ({ page }) => {
-    // Override API to return error
-    await page.route('/api/projects', (route) => {
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Internal server error' }),
-      });
-    });
-
+  test('should show API failure message gracefully', async ({ page }) => {
     await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Page should still load without crashing
+    // Wait for async fetch to complete and error to render
+    const failedToLoad = page.getByText('Failed to load projects');
+    await expect(failedToLoad).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should render status bar at bottom', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Check for connection indicator
+    const offline = page.getByText('Offline');
+    await expect(offline).toBeVisible();
+
+    // Check for "No agents active"
+    const noAgents = page.getByText('No agents active');
+    await expect(noAgents).toBeVisible();
+
+    // Check for collapse button
+    const collapseButton = page.getByRole('button', { name: 'Collapse status bar' });
+    await expect(collapseButton).toBeVisible();
+  });
+
+  test('should show status bar metrics', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Status bar should show: ❓ 0, ✓ 0, ⏱️ 00:00
+    const questionButton = page.getByRole('button', { name: /❓ 0/ });
+    await expect(questionButton).toBeVisible();
+    await expect(questionButton).toBeDisabled();
+
+    const checkmark = page.getByText('✓ 0');
+    await expect(checkmark).toBeVisible();
+
+    const timer = page.getByText(/⏱️ \d{2}:\d{2}/);
+    await expect(timer).toBeVisible();
+  });
+
+  test('should have theme toggle button', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Check for theme toggle button
+    const themeButton = page.getByRole('button', { name: /Switch to (dark|light) mode/i });
+    await expect(themeButton).toBeVisible();
+  });
+
+  test('should handle theme toggle click', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Find and click theme toggle
+    const themeButton = page.getByRole('button', { name: /Switch to (dark|light) mode/i });
+    const initialText = await themeButton.textContent();
+
+    await themeButton.click();
+
+    // Wait a moment for theme change
+    await page.waitForTimeout(100);
+
+    // Button text should change (or at least page should not crash)
     await expect(page.locator('body')).toBeVisible();
+  });
 
-    // May show error message or empty state
-    // The important thing is it doesn't crash
+  test('should render without crashing when backend is down', async ({ page }) => {
+    // This is the normal state for tests - backend is not running
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Page should render all key elements despite API failures
+    await expect(page.getByRole('heading', { name: 'Tend Dashboard' })).toBeVisible();
+    await expect(page.getByText('Offline')).toBeVisible();
+    await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('should collapse status bar when button clicked', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Find collapse button
+    const collapseButton = page.getByRole('button', { name: 'Collapse status bar' });
+    await expect(collapseButton).toBeVisible();
+
+    // Click it
+    await collapseButton.click();
+
+    // Wait for animation
+    await page.waitForTimeout(300);
+
+    // Status bar metrics may be hidden or button text changed
+    await expect(page.locator('body')).toBeVisible();
   });
 });

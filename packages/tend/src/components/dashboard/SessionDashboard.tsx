@@ -1,5 +1,5 @@
 import { TendLayout } from '../layout/TendLayout';
-import { IdeationStatusBar } from '../canvas/IdeationStatusBar';
+import { StatusBar } from '../status/StatusBar';
 import { DashboardNav } from './DashboardNav';
 import { SessionsPhysicsColumn } from './SessionsPhysicsColumn';
 import { NavigatorChat } from './NavigatorChat';
@@ -32,7 +32,7 @@ export function SessionDashboard() {
         leftPanel={<SessionsPhysicsColumn />}
         center={<NavigatorChat />}
         rightPanel={<SentToPlannerColumn sessions={[]} />}
-        statusBar={<IdeationStatusBar />}
+        statusBar={<StatusBar />}
       />
     </div>
   );
