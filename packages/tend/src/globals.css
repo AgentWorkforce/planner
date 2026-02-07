@@ -416,6 +416,15 @@ html.theme-dark {
   --session-ready-border: rgba(90, 156, 106, 0.5);
 }
 
+/* ===== Shorthand Variable Aliases ===== */
+/* For backward compatibility and convenience - map to canvas theme variables */
+:root,
+html.theme-light,
+html.theme-dark {
+  --text-primary: var(--canvas-text-primary);
+  --text-muted: var(--canvas-text-muted);
+}
+
 /* ===== Base Styles ===== */
 
 html,

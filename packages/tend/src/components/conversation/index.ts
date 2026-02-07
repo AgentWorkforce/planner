@@ -6,3 +6,4 @@ export { ConversationPane } from './ConversationPane';
 export { TypingIndicator } from './TypingIndicator';
 export { ConfidenceBar } from './ConfidenceBar';
 export { SystemEvent } from './SystemEvent';
+export { ContextMarker } from './ContextMarker';

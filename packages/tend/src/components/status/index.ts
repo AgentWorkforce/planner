@@ -9,3 +9,5 @@ export type { StatusBarSection } from './StatusBar';
 
 export { AgentAvatar } from './AgentAvatar';
 export type { AvatarSize } from './AgentAvatar';
+
+export { ConnectionIndicator } from './ConnectionIndicator';

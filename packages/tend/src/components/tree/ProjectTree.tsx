@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LoadingSpinner } from '../LoadingSpinner';
-import { StepNode } from './StepNode';
+import { WorkSection } from './WorkSection';
+import { TreeBreadcrumb } from './TreeBreadcrumb';
+import { ArtifactsSection } from './ArtifactsSection';
 import type { Step, StepExecutionStatus } from '@/types/plan';
 
 /**
@@ -226,39 +228,46 @@ export function ProjectTree({
     );
   }
 
+  // Get current step title for breadcrumb
+  const currentStepTitle = useMemo(() => {
+    if (!focusedStep) return null;
+    const step = steps.find((s) => s.step_id === focusedStep);
+    return step?.title || null;
+  }, [focusedStep, steps]);
+
   return (
     <div className={className}>
       <div className="flex flex-col gap-2 p-3">
+        {/* Breadcrumb navigation */}
+        <TreeBreadcrumb
+          projectName="Project"
+          scopeName={focusedScope}
+          stepTitle={zoom === 'step' ? currentStepTitle : null}
+          className="mb-2"
+        />
+
         <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted mb-2">
           Project Tree ({steps.length} steps, {stepsByScope.size} scopes)
         </h3>
 
-        {/* Render scopes */}
+        {/* Render scopes using WorkSection */}
         {Array.from(stepsByScope.entries()).map(([scope, scopeSteps]) => (
-          <div key={scope} className="mb-2">
-            <div className="px-3 py-2 bg-bg-elevated rounded-md">
-              <div className="font-medium text-sm text-text-primary">{scope}</div>
-              <div className="text-xs text-text-muted mt-1">
-                {scopeSteps.length} step{scopeSteps.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-
-            {/* Show steps when zoomed to scope or step level */}
-            {(zoom === 'scope' || zoom === 'step') && focusedScope === scope && (
-              <div className="mt-2 ml-2 space-y-1">
-                {scopeSteps.map((step) => (
-                  <StepNode
-                    key={step.step_id}
-                    step={step}
-                    executionStatus={step.execution?.status}
-                    onClick={() => handleStepClick(scope, step.step_id)}
-                    isFocused={focusedStep === step.step_id}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <WorkSection
+            key={scope}
+            scope={scope}
+            steps={scopeSteps}
+            isFocused={focusedScope === scope}
+            showSteps={(zoom === 'scope' || zoom === 'step') && focusedScope === scope}
+            onScopeClick={(s) => handleZoomChange('scope', s)}
+            onStepClick={handleStepClick}
+            focusedStepId={focusedStep}
+          />
         ))}
+
+        {/* Show artifacts when zoomed to step level */}
+        {zoom === 'step' && focusedStep && (
+          <ArtifactsSection stepId={focusedStep} className="mt-4" />
+        )}
       </div>
     </div>
   );

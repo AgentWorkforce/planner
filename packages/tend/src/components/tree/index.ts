@@ -7,3 +7,15 @@ export type { ProjectTreeProps, ZoomLevel, StepWithExecution } from './ProjectTr
 
 export { StepNode } from './StepNode';
 export type { StepNodeProps } from './StepNode';
+
+export { ScopeHeader } from './ScopeHeader';
+export type { ScopeHeaderProps } from './ScopeHeader';
+
+export { WorkSection } from './WorkSection';
+export type { WorkSectionProps } from './WorkSection';
+
+export { TreeBreadcrumb } from './TreeBreadcrumb';
+export type { TreeBreadcrumbProps } from './TreeBreadcrumb';
+
+export { ArtifactsSection } from './ArtifactsSection';
+export type { ArtifactsSectionProps } from './ArtifactsSection';

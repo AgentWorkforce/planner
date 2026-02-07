@@ -51,3 +51,16 @@ export type {
   AgentOrchestrationState,
   UseAgentOrchestrationResult,
 } from './useAgentOrchestration';
+
+// Question notifications
+export { useQuestionNotifications } from './useQuestionNotifications';
+export type {
+  Question,
+  QuestionNotification,
+  QuestionBlockingLevel,
+  QuestionStatus,
+} from './useQuestionNotifications';
+
+// Relay connection
+export { useRelayConnection } from './useRelayConnection';
+export type { UseRelayConnectionResult } from '@/types';

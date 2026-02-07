@@ -16,6 +16,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ChevronIcon } from '../icons/ChevronIcon';
 import { AgentAvatar } from './AgentAvatar';
+import { ConnectionIndicator } from './ConnectionIndicator';
 import type { Agent } from '../../hooks/useAgentOrchestration';
 
 export type StatusBarSection = 'context' | 'agents' | 'stats' | 'meta';
@@ -80,11 +81,6 @@ export function StatusBar({
 
   // Connection indicator (only shown when not connected)
   const showConnectionIndicator = connectionStatus !== 'connected';
-  const connectionIndicatorColor = {
-    disconnected: 'text-[var(--color-brick)]',
-    reconnecting: 'text-[var(--color-clay)]',
-    connected: 'text-[var(--color-moss)]',
-  }[connectionStatus];
 
   // Collapsed view
   if (isCollapsed) {
@@ -92,9 +88,7 @@ export function StatusBar({
       <div className={`fixed bottom-0 left-0 right-0 h-6 bg-[var(--canvas-bg)] border-t border-[var(--block-draft-border)] z-50 flex items-center justify-center gap-2 ${className}`}>
         {/* Connection indicator */}
         {showConnectionIndicator && (
-          <span className={`text-xs ${connectionIndicatorColor}`} title={connectionStatus}>
-            ●
-          </span>
+          <ConnectionIndicator status={connectionStatus} />
         )}
 
         {/* Agent avatars (small) */}
@@ -142,12 +136,7 @@ export function StatusBar({
       {/* Left section: Connection status */}
       <div className="flex items-center gap-2 shrink-0">
         {showConnectionIndicator && (
-          <div className="flex items-center gap-1.5">
-            <span className={`${connectionIndicatorColor} text-sm`}>●</span>
-            <span className="text-[var(--text-muted)] text-xs">
-              {connectionStatus === 'disconnected' ? 'Offline' : 'Reconnecting...'}
-            </span>
-          </div>
+          <ConnectionIndicator status={connectionStatus} />
         )}
       </div>
 

@@ -2,12 +2,27 @@ import { useRef, useEffect } from 'react';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
+import { ContextMarker } from './ContextMarker';
 import { Skeleton } from '@/components/ui';
 
+interface ContextMarkerMessage {
+  type: 'context_marker';
+  marker_type: 'focus_shift' | 'phase_change' | 'agent_switch';
+  label: string;
+  timestamp: string;
+  onClick?: () => void;
+}
+
+type MessageItem = TranscriptMessage | ContextMarkerMessage;
+
 interface ConversationMessagesProps {
-  messages: TranscriptMessage[];
+  messages: MessageItem[];
   loading?: boolean;
   isTyping?: boolean;
+}
+
+function isContextMarker(message: MessageItem): message is ContextMarkerMessage {
+  return 'type' in message && message.type === 'context_marker';
 }
 
 export function ConversationMessages({ messages, loading, isTyping }: ConversationMessagesProps) {
@@ -40,9 +55,20 @@ export function ConversationMessages({ messages, loading, isTyping }: Conversati
 
   return (
     <div ref={containerRef} className="p-4">
-      {messages.map((message, index) => (
-        <MessageBubble key={index} message={message} />
-      ))}
+      {messages.map((message, index) => {
+        if (isContextMarker(message)) {
+          return (
+            <ContextMarker
+              key={`marker-${index}`}
+              type={message.marker_type}
+              label={message.label}
+              timestamp={message.timestamp}
+              onClick={message.onClick}
+            />
+          );
+        }
+        return <MessageBubble key={index} message={message} />;
+      })}
       {isTyping && <TypingIndicator />}
       <div ref={bottomRef} />
     </div>
