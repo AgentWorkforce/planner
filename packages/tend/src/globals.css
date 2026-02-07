@@ -656,3 +656,117 @@ body {
   --tw-prose-th-borders: var(--block-draft-border);
   --tw-prose-td-borders: var(--block-draft-border);
 }
+
+/* ===== UX Polish Animations ===== */
+
+/* Tree crystallizing animation - characters resolve from noise to text */
+@keyframes crystallize {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.7;
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+.animate-crystallize {
+  animation: crystallize 500ms ease-out;
+}
+
+/* Graduation animation - block shrinks in left column */
+@keyframes graduate-shrink {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}
+
+.animate-graduate-shrink {
+  animation: graduate-shrink 400ms ease-in-out forwards;
+}
+
+/* Graduation animation - step appears in right column */
+@keyframes graduate-appear {
+  0% {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-graduate-appear {
+  animation: graduate-appear 400ms ease-out;
+}
+
+/* Workspace transition animations */
+@keyframes workspace-slide-in-left {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes workspace-slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-workspace-slide-in-left {
+  animation: workspace-slide-in-left 300ms ease-out;
+}
+
+.animate-workspace-slide-in-right {
+  animation: workspace-slide-in-right 300ms ease-out;
+}
+
+/* Enhanced reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-crystallize,
+  .animate-graduate-shrink,
+  .animate-graduate-appear,
+  .animate-workspace-slide-in-left,
+  .animate-workspace-slide-in-right,
+  .physics-block-pop-in,
+  .physics-block-pop-out,
+  .session-synonym,
+  .session-slide-out {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  /* Keep simple opacity transitions */
+  .animate-crystallize,
+  .animate-graduate-appear {
+    transition: opacity 150ms ease !important;
+  }
+}

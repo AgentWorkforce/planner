@@ -21,6 +21,14 @@ export { BoltIcon } from './BoltIcon';
 export { TargetIcon } from './TargetIcon';
 export { SearchIcon } from './SearchIcon';
 export { CommandIcon } from './CommandIcon';
+export { AlertCircleIcon } from './AlertCircleIcon';
+export { AlertTriangleIcon } from './AlertTriangleIcon';
+export { ClockIcon } from './ClockIcon';
+export { PlayIcon } from './PlayIcon';
+export { RefreshIcon } from './RefreshIcon';
+export { WifiOffIcon } from './WifiOffIcon';
+export { XIcon } from './XIcon';
+export { ZapIcon } from './ZapIcon';
 
 export type { IconProps, IconSize } from './types';
 export { iconSizes } from './types';

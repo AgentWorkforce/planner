@@ -75,3 +75,11 @@ export type { TendSettings } from './useSettings';
 // Question queue
 export { useQuestionQueue, questionToItem } from './useQuestionQueue';
 export type { ReplyItem, ReplyPriority, ReplyItemType } from './useQuestionQueue';
+
+// Forge events
+export { useForgeEvents } from './useForgeEvents';
+export type { ForgeEvent, UseForgeEventsOptions } from './useForgeEvents';
+
+// SSE reconnection
+export { useSSEReconnect } from './useSSEReconnect';
+export type { UseSSEReconnectOptions, UseSSEReconnectReturn } from './useSSEReconnect';
