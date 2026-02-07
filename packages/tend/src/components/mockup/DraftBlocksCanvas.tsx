@@ -259,7 +259,7 @@ export function DraftBlocksCanvas({
         type="button"
         onClick={onAddBlock}
         aria-label="Add developing block"
-        className="self-start rounded-2xl border border-[#e0dbd3] bg-white/70 px-4 py-2 text-lg font-semibold text-[#2d2d2d] shadow-sm transition hover:bg-white/90 hover:shadow"
+        className="self-start rounded-2xl border border-[var(--color-bg-tertiary)] bg-white/70 px-4 py-2 text-lg font-semibold text-[var(--color-text-primary)] shadow-sm transition hover:bg-white/90 hover:shadow"
         style={{ marginLeft: 'calc(20px - 1.5rem)' }}
       >
         +

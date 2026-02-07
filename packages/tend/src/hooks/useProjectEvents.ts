@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export interface ProjectEvent {
   type: 'ideation' | 'planner' | 'forge';
   event: string;       // e.g. 'block:created', 'plan:updated', 'task_completed'
-  data: any;
+  data: Record<string, unknown>;
   timestamp: string;
 }
 

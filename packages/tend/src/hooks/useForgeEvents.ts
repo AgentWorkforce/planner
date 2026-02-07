@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export interface ForgeEvent {
   type: string;
   timestamp: string;
-  data: any;
+  data: Record<string, unknown>;
 }
 
 export interface UseForgeEventsOptions {

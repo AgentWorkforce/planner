@@ -22,27 +22,27 @@ export function BlockDetailDrawer({ block, open, onClose, onApprove }: BlockDeta
           open ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#e0dbd3]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-bg-tertiary)]">
           <div className="flex items-center gap-2">
             {block && <span className="text-2xl">{block.emoji}</span>}
             <div>
-              <p className="text-sm font-semibold text-[#7a7a7a] uppercase tracking-wide">Block</p>
-              <h2 className="text-lg font-semibold text-[#2d2d2d]">{block?.title ?? 'Select a block'}</h2>
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">Block</p>
+              <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{block?.title ?? 'Select a block'}</h2>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 rounded hover:bg-[#f5f0e8] transition-colors" aria-label="Close drawer">
-            <CloseIcon className="text-[#7a7a7a]" />
+          <button type="button" onClick={onClose} className="p-2 rounded hover:bg-[var(--color-bg-deep)] transition-colors" aria-label="Close drawer">
+            <CloseIcon className="text-[var(--color-text-secondary)]" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4 text-sm text-[#2d2d2d] leading-relaxed space-y-4">
-          {block ? <ReactMarkdown>{block.content}</ReactMarkdown> : <p className="text-[#9a9a9a]">Select a block to see the mini-spec.</p>}
+        <div className="flex-1 overflow-y-auto px-4 py-4 text-sm text-[var(--color-text-primary)] leading-relaxed space-y-4">
+          {block ? <ReactMarkdown>{block.content}</ReactMarkdown> : <p className="text-[var(--color-text-muted)]">Select a block to see the mini-spec.</p>}
         </div>
         {isDraft && block && (
-          <div className="px-4 py-3 border-t border-[#e0dbd3] bg-white">
+          <div className="px-4 py-3 border-t border-[var(--color-bg-tertiary)] bg-white">
             <button
               type="button"
               onClick={() => onApprove(block.id)}
-              className="w-full bg-[#4a7c59] text-white rounded-lg py-2.5 font-medium hover:bg-[#3d6549] transition-colors"
+              className="w-full bg-[var(--color-moss)] text-white rounded-lg py-2.5 font-medium hover:bg-[var(--color-accent-hover)] transition-colors"
             >
               Approve
             </button>

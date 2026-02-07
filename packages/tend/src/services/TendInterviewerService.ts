@@ -10,12 +10,12 @@ import { ContextEnrichment, type ProjectContext, type Focus } from './ContextEnr
 
 export interface ToolCall {
   name: string;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
 }
 
 export interface InterviewerResponse {
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   tool_calls?: ToolCall[];
 }
 

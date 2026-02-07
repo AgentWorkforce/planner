@@ -15,9 +15,9 @@ export function FloatingInput({ onSend }: FloatingInputProps) {
 
   return (
     <div className="absolute bottom-4 left-4 right-4">
-      <div className="bg-white rounded-xl border border-[#e0dbd3] shadow-md focus-within:ring-2 focus-within:ring-[#4a7c59]/30 focus-within:border-[#4a7c59] transition-all">
+      <div className="bg-white rounded-xl border border-[var(--color-bg-tertiary)] shadow-md focus-within:ring-2 focus-within:ring-[var(--color-moss)]/30 focus-within:border-[var(--color-moss)] transition-all">
         <textarea
-          className="w-full h-20 px-4 py-3 resize-none bg-transparent text-[#2d2d2d] text-sm placeholder:text-[#9a9a9a] focus:outline-none"
+          className="w-full h-20 px-4 py-3 resize-none bg-transparent text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none"
           placeholder="Describe your idea..."
           rows={3}
           value={value}

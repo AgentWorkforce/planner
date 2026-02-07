@@ -55,7 +55,7 @@ export function MockupPage() {
 
       <div className="flex-1 flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-[#2d2d2d]">Brainstorming session</h1>
+          <h1 className="text-3xl font-semibold text-[var(--color-text-primary)]">Brainstorming session</h1>
         </div>
         <MinimalChat messages={messages} onSendMessage={addMessage} />
       </div>
