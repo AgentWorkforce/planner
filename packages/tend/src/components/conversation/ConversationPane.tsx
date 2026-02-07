@@ -3,13 +3,13 @@ import { useSession } from '@/hooks/useSession';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
-import { ChatMessageList } from './ChatMessageList';
-import { ChatInput } from './ChatInput';
+import { ConversationMessages } from './ConversationMessages';
+import { ConversationInput } from './ConversationInput';
 import { TypingIndicator } from './TypingIndicator';
 import { LoadingSpinner } from '@/components/ui';
 import { MessageSquare } from 'lucide-react';
 
-interface SessionChatViewProps {
+interface ConversationPaneProps {
   sessionId: string;
   /** Optional block ID for contextual chat mode */
   focusedBlockId?: string;
@@ -21,7 +21,7 @@ interface SessionChatViewProps {
   };
 }
 
-export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: SessionChatViewProps) {
+export function ConversationPane({ sessionId, focusedBlockId, focusedBlock }: ConversationPaneProps) {
   const { session, loading, error, refetch } = useSession(sessionId);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -29,12 +29,12 @@ export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: Ses
 
   // Handle real-time transcript updates
   const handleTranscriptUpdate = useCallback((messages: TranscriptMessage[]) => {
-    console.log(`[SessionChatView] handleTranscriptUpdate called with ${messages?.length || 0} messages`);
+    console.log(`[ConversationPane] handleTranscriptUpdate called with ${messages?.length || 0} messages`);
     setTranscript(messages);
     // Stop typing indicator when we receive a new assistant message
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant') {
-      console.log(`[SessionChatView] Received assistant message, stopping typing indicator`);
+      console.log(`[ConversationPane] Received assistant message, stopping typing indicator`);
       setIsTyping(false);
     }
   }, []);
@@ -151,7 +151,7 @@ export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: Ses
       )}
 
       <div className="flex-1 overflow-y-auto relative">
-        <ChatMessageList messages={transcript} />
+        <ConversationMessages messages={transcript} />
         {isTyping && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[var(--canvas-bg)] to-transparent">
             <TypingIndicator />
@@ -159,7 +159,7 @@ export function SessionChatView({ sessionId, focusedBlockId, focusedBlock }: Ses
         )}
       </div>
 
-      <ChatInput
+      <ConversationInput
         onSend={handleSend}
         disabled={sending || session.status === 'abandoned'}
         placeholder={getPlaceholder()}

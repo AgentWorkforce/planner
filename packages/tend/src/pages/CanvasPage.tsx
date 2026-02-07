@@ -3,13 +3,13 @@ import { useEffect, useState, useMemo } from 'react';
 import { TendLayout } from '@/components/layout/TendLayout';
 import { IdeationStatusBar } from '@/components/canvas/IdeationStatusBar';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
-import { CuratedBlocksColumn } from '@/components/canvas/CuratedBlocksColumn';
+import { ProjectTree } from '@/components/tree/ProjectTree';
 import { SessionNav, type SessionInfo } from '@/components/canvas/CanvasHeader';
 import { FocusMode } from '@/components/canvas/FocusMode';
 import { AIUnderstandingDrawer } from '@/components/canvas/AIUnderstandingDrawer';
 import { HandoffDialog } from '@/components/canvas/HandoffDialog';
 import { ModifiedSinceHandoffBanner } from '@/components/canvas/ModifiedSinceHandoffBanner';
-import { SessionChatView } from '@/components/chat/SessionChatView';
+import { ConversationPane } from '@/components/conversation/ConversationPane';
 import { useBlocks } from '@/hooks/useBlocks';
 import { useSession } from '@/hooks/useSession';
 import { useSessions } from '@/hooks/useSessions';
@@ -21,8 +21,8 @@ import { LoadingSpinner } from '@/components/ui';
  *
  * Main page for the ideation canvas view with three-column layout:
  * - Left: FormingBlocksColumn (physics-based blocks)
- * - Center: SessionChatView (existing chat component)
- * - Right: CuratedBlocksColumn (curated blocks)
+ * - Center: ConversationPane (existing chat component)
+ * - Right: ProjectTree (zoomable project tree)
  *
  * Features:
  * - Integrates existing chat UI into center column
@@ -35,9 +35,9 @@ import { LoadingSpinner } from '@/components/ui';
  * ┌─────────────────────────────────────────────────────┐
  * │ CanvasHeader (Back | Title | AI Understanding | →) │
  * ├──────────────┬─────────────────┬───────────────────┤
- * │   Forming    │      Chat       │     Curated       │
- * │   Blocks     │   (existing     │     Blocks        │
- * │  (physics)   │   component)    │   (vertical)      │
+ * │   Forming    │      Chat       │   Project Tree    │
+ * │   Blocks     │   (existing     │   (zoomable)      │
+ * │  (physics)   │   component)    │                   │
  * │              │                 │                   │
  * └──────────────┴─────────────────┴───────────────────┘
  * ```
@@ -295,7 +295,7 @@ export function CanvasPage() {
       onCurate={handleCurateFocusedBlock}
       onContentChange={handleContentChange}
     >
-      <SessionChatView
+      <ConversationPane
         sessionId={id}
         focusedBlockId={focusedBlock.id}
         focusedBlock={{
@@ -306,7 +306,7 @@ export function CanvasPage() {
       />
     </FocusMode>
   ) : (
-    <SessionChatView sessionId={id} />
+    <ConversationPane sessionId={id} />
   );
 
   // Nav component with optional banner
@@ -342,10 +342,9 @@ export function CanvasPage() {
         }
         center={centerContent}
         rightPanel={
-          <CuratedBlocksColumn
-            blocks={blocks}
-            onBlockClick={handleBlockClick}
-            onUncurate={uncurateBlock}
+          <ProjectTree
+            planId={undefined}
+            onStepSelect={(stepId) => console.log('Step selected:', stepId)}
           />
         }
         statusBar={<IdeationStatusBar />}

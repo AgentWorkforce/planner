@@ -64,6 +64,11 @@
   --color-error: #b54a3a;
   --color-error-light: rgba(181, 74, 58, 0.15);
 
+  /* Earth-tone semantic colors (for agent status bar) */
+  --color-moss: #4a7c59;        /* working state - green */
+  --color-brick: #b54a3a;       /* blocked/error state - red */
+  --color-clay: #c4703e;        /* needs_input state - yellow/orange */
+
   /* Sidebar Colors */
   --color-sidebar-bg: #ece7dd;
   --color-sidebar-border: rgba(45, 42, 36, 0.08);
@@ -101,6 +106,8 @@
   --canvas-bg-subtle: #ece7dd;
   --canvas-text-primary: #2d2a24;
   --canvas-text-muted: #9b9590;
+  --canvas-card-bg: #ffffff;
+  --canvas-card-bg-hover: rgba(45, 42, 36, 0.04);
   --block-draft: #fbf8f2;
   --block-draft-border: #e3ddd3;
   --block-curated: #fbf8f2;
@@ -167,6 +174,11 @@
     --color-error: #c45a4a;
     --color-error-light: rgba(196, 90, 74, 0.15);
 
+    /* Earth-tone semantic colors (for agent status bar) - Lighter for dark mode */
+    --color-moss: #5a9c6a;        /* working state - green */
+    --color-brick: #c45a4a;       /* blocked/error state - red */
+    --color-clay: #d4804e;        /* needs_input state - yellow/orange */
+
     /* Sidebar Colors */
     --color-sidebar-bg: #201e1a;
     --color-sidebar-border: rgba(232, 226, 216, 0.08);
@@ -204,6 +216,8 @@
     --canvas-bg-subtle: #201e1a;
     --canvas-text-primary: #e8e2d8;
     --canvas-text-muted: #706860;
+    --canvas-card-bg: #302c26;
+    --canvas-card-bg-hover: rgba(232, 226, 216, 0.04);
     --block-draft: #2d2a24;
     --block-draft-border: #3d3830;
     --block-curated: #2d2a24;
@@ -295,6 +309,8 @@ html.theme-light {
   --canvas-bg-subtle: #ece7dd;
   --canvas-text-primary: #2d2a24;
   --canvas-text-muted: #9b9590;
+  --canvas-card-bg: #ffffff;
+  --canvas-card-bg-hover: rgba(45, 42, 36, 0.04);
   --block-draft: #fbf8f2;
   --block-draft-border: #e3ddd3;
   --block-curated: #fbf8f2;

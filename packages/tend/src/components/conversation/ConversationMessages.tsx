@@ -1,16 +1,16 @@
 import { useRef, useEffect } from 'react';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
-import { ChatBubble } from './ChatBubble';
+import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { Skeleton } from '@/components/ui';
 
-interface ChatMessageListProps {
+interface ConversationMessagesProps {
   messages: TranscriptMessage[];
   loading?: boolean;
   isTyping?: boolean;
 }
 
-export function ChatMessageList({ messages, loading, isTyping }: ChatMessageListProps) {
+export function ConversationMessages({ messages, loading, isTyping }: ConversationMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +41,7 @@ export function ChatMessageList({ messages, loading, isTyping }: ChatMessageList
   return (
     <div ref={containerRef} className="p-4">
       {messages.map((message, index) => (
-        <ChatBubble key={index} message={message} />
+        <MessageBubble key={index} message={message} />
       ))}
       {isTyping && <TypingIndicator />}
       <div ref={bottomRef} />

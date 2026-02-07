@@ -7,7 +7,7 @@ import { Button } from '@/components/ui';
 import { SendIcon } from '@/components/icons';
 import { useState } from 'react';
 
-interface ChatHeaderProps {
+interface ConversationHeaderProps {
   session: SessionWithDetails;
 }
 
@@ -23,7 +23,7 @@ function getButtonColor(score: number): string {
   return 'bg-success hover:bg-success/90';
 }
 
-export function ChatHeader({ session }: ChatHeaderProps) {
+export function ConversationHeader({ session }: ConversationHeaderProps) {
   const navigate = useNavigate();
   const { score, breakdown } = useConfidence(session.id);
   const api = useIdeationApi();

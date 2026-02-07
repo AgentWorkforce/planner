@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrainIcon } from '@/components/icons';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { ConversationInput } from '@/components/conversation/ConversationInput';
 import { useSessions } from '@/hooks/useSessions';
 import { cn } from '@/lib/utils';
 
@@ -131,7 +131,7 @@ export function NavigatorChat() {
       )}
 
       {/* Chat input */}
-      <ChatInput
+      <ConversationInput
         onSend={handleSend}
         placeholder="Ask Navigator for guidance..."
         disabled={false}

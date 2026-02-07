@@ -1,5 +1,5 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { SessionChatView } from '@/components/chat';
+import { ConversationPane } from '@/components/conversation';
 import { SessionTabBar, SessionUnderstandingTab } from '@/components/session';
 import { useSession } from '@/hooks/useSession';
 import { useUnderstanding } from '@/hooks/useUnderstanding';
@@ -73,7 +73,7 @@ export function SessionPage() {
       />
       <div className={`flex-1 ${activeTab === 'understanding' ? 'overflow-y-auto' : 'overflow-hidden'}`}>
         {activeTab === 'chat' ? (
-          <SessionChatView sessionId={id} />
+          <ConversationPane sessionId={id} />
         ) : (
           <SessionUnderstandingTab
             understanding={understanding}

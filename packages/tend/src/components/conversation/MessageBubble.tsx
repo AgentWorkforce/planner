@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { TranscriptMessage } from '@/hooks/useIdeationApi';
 import { BrainIcon } from '@/components/icons';
 
-interface ChatBubbleProps {
+interface MessageBubbleProps {
   message: TranscriptMessage;
 }
 
@@ -11,7 +11,7 @@ function formatTime(timestamp: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function ChatBubble({ message }: ChatBubbleProps) {
+export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   return (

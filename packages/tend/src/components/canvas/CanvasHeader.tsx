@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChevronIcon } from '@/components/icons/ChevronIcon';
 import { MenuIcon } from '@/components/icons/MenuIcon';
-import { ConfidenceBar } from '@/components/chat/ConfidenceBar';
+import { ConfidenceBar } from '@/components/conversation/ConfidenceBar';
 import { useConfidence } from '@/hooks/useConfidence';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 

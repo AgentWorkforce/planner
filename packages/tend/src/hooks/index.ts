@@ -41,3 +41,13 @@ export type { Toast, ToastOptions, ToastVariant } from './useToast';
 // Project events
 export { useProjectEvents } from './useProjectEvents';
 export type { ProjectEvent } from './useProjectEvents';
+
+// Agent orchestration
+export { useAgentOrchestration } from './useAgentOrchestration';
+export type {
+  Agent,
+  AgentRole,
+  AgentState,
+  AgentOrchestrationState,
+  UseAgentOrchestrationResult,
+} from './useAgentOrchestration';

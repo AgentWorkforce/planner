@@ -3,17 +3,17 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui';
 import { SendIcon } from '@/components/icons';
 
-interface ChatInputProps {
+interface ConversationInputProps {
   onSend: (content: string) => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
-export function ChatInput({
+export function ConversationInput({
   onSend,
   disabled = false,
   placeholder = 'Type a message...',
-}: ChatInputProps) {
+}: ConversationInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
