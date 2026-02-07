@@ -37,3 +37,7 @@ export type { CommandAction } from './useCommandPalette';
 // Toast notifications
 export { useToast } from './useToast';
 export type { Toast, ToastOptions, ToastVariant } from './useToast';
+
+// Project events
+export { useProjectEvents } from './useProjectEvents';
+export type { ProjectEvent } from './useProjectEvents';

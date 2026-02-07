@@ -79,6 +79,12 @@ async function start(): Promise<void> {
     console.log('  POST   /api/plans/:id/versions/:version/submit');
     console.log('  POST   /api/plans/:id/versions/:version/approve');
     console.log('  POST   /api/plans/:id/versions/:version/publish');
+    console.log('  GET    /api/projects');
+    console.log('  POST   /api/projects');
+    console.log('  GET    /api/projects/:id');
+    console.log('  PUT    /api/projects/:id');
+    console.log('  POST   /api/projects/:id/focus');
+    console.log('  POST   /api/projects/:id/graduate');
     console.log('  GET    /api/health/relay');
     console.log('  GET    /api/channels');
     console.log('  GET    /api/channels/:id/messages');
