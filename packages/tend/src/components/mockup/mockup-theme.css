@@ -1,0 +1,105 @@
+:root {
+  --mockup-bg: #f2f1ed;
+  --mockup-bg-subtle: #e6e3dd;
+  --mockup-text: #2d2d2d;
+  --mockup-text-muted: #7a7a7a;
+  --mockup-text-light: #9a9a9a;
+
+  --mockup-user-bubble: #ffffff;
+  --mockup-user-bubble-shadow: rgba(0, 0, 0, 0.08);
+
+  --mockup-input-bg: #ffffff;
+  --mockup-input-border: #e0dbd3;
+  --mockup-input-focus: #4a7c59;
+
+  --mockup-block-draft: #fbf8f2;
+  --mockup-block-draft-border: #e3ddd3;
+  --mockup-block-approved: #ffffff;
+  --mockup-block-approved-border: #4a7c59;
+
+  --mockup-accent: #4a7c59;
+  --mockup-accent-light: #e8f0eb;
+
+  /* Canvas accent for glow effects (RGB format for alpha blending) */
+  --canvas-accent-rgb: 74, 124, 89; /* #4a7c59 in RGB */
+}
+
+.mockup-root {
+  background: var(--mockup-bg);
+  color: var(--mockup-text);
+}
+
+.mockup-canvas {
+  background: transparent;
+  border-radius: 1.5rem;
+  box-shadow: none;
+}
+
+.mockup-canvas-grid {
+  background-image: none;
+  background-size: auto;
+}
+
+@keyframes approveSlide {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(calc(20vw - 50%), -50%) scale(1.1);
+  }
+  100% {
+    transform: translate(calc(65vw), -50%) scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes blockPop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.mockup-block-pop {
+  animation: blockPop 420ms ease-out;
+  transform-origin: center;
+}
+
+@keyframes blockPopOut {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+
+.mockup-block-pop-out {
+  animation: blockPopOut 420ms ease-in forwards;
+  transform-origin: center;
+}
+
+@keyframes synonymSwap {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mockup-synonym {
+  display: inline-block;
+  animation: synonymSwap 260ms ease-out;
+}

@@ -29,6 +29,7 @@ error() { echo -e "${RED}[dev]${NC} $1"; }
 # PID files for tracking our processes
 BACKEND_PID_FILE="$PROJECT_DIR/.dev-backend.pid"
 FRONTEND_PID_FILE="$PROJECT_DIR/.dev-frontend.pid"
+TEND_PID_FILE="$PROJECT_DIR/.dev-tend.pid"
 
 # Check if a process is running
 is_running() {
@@ -157,6 +158,37 @@ start_frontend() {
     return 1
 }
 
+# Start tend
+start_tend() {
+    stop_process "$TEND_PID_FILE" "tend"
+
+    # Check if port 3004 is in use
+    if lsof -i :3004 >/dev/null 2>&1; then
+        warn "Port 3004 already in use, attempting to free..."
+        lsof -ti :3004 | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+
+    log "Starting tend dev server..."
+    cd "$PROJECT_DIR/packages/tend"
+    npm run dev > "$PROJECT_DIR/.dev-tend.log" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$TEND_PID_FILE"
+    cd "$PROJECT_DIR"
+
+    # Wait for server to be ready
+    for i in {1..30}; do
+        if curl -s http://localhost:3004 >/dev/null 2>&1; then
+            success "Tend running at http://localhost:3004"
+            return 0
+        fi
+        sleep 1
+    done
+
+    error "Tend failed to start. Check $PROJECT_DIR/.dev-tend.log"
+    return 1
+}
+
 # Show status
 show_status() {
     echo ""
@@ -194,6 +226,18 @@ show_status() {
         warn "Frontend: not running"
     fi
 
+    # Tend status
+    if [ -f "$TEND_PID_FILE" ]; then
+        local pid=$(cat "$TEND_PID_FILE")
+        if is_running "$pid" && curl -s http://localhost:3004 >/dev/null 2>&1; then
+            success "Tend: running (PID: $pid) at http://localhost:3004"
+        else
+            warn "Tend: not running"
+        fi
+    else
+        warn "Tend: not running"
+    fi
+
     echo ""
 }
 
@@ -205,16 +249,19 @@ case "${1:-start}" in
         start_relay
         start_backend
         start_frontend
+        start_tend
         show_status
         success "Development environment ready!"
         echo ""
         log "Logs:"
         log "  Backend:  tail -f $PROJECT_DIR/.dev-backend.log"
         log "  Frontend: tail -f $PROJECT_DIR/.dev-frontend.log"
+        log "  Tend:     tail -f $PROJECT_DIR/.dev-tend.log"
         echo ""
         ;;
     stop)
         log "Stopping development environment..."
+        stop_process "$TEND_PID_FILE" "tend"
         stop_process "$FRONTEND_PID_FILE" "frontend"
         stop_process "$BACKEND_PID_FILE" "backend"
         stop_relay
@@ -255,11 +302,21 @@ case "${1:-start}" in
             *) log "Usage: $0 frontend [start|stop|restart|logs]" ;;
         esac
         ;;
+    tend)
+        case "${2:-start}" in
+            start) start_tend ;;
+            stop) stop_process "$TEND_PID_FILE" "tend" ;;
+            restart) stop_process "$TEND_PID_FILE" "tend"; sleep 1; start_tend ;;
+            logs) tail -f "$PROJECT_DIR/.dev-tend.log" ;;
+            *) log "Usage: $0 tend [start|stop|restart|logs]" ;;
+        esac
+        ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}"
         echo "       $0 relay {start|stop|restart}"
         echo "       $0 backend {start|stop|restart|logs}"
         echo "       $0 frontend {start|stop|restart|logs}"
+        echo "       $0 tend {start|stop|restart|logs}"
         exit 1
         ;;
 esac
