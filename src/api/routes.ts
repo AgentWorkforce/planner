@@ -16,6 +16,7 @@ import { createInitiativeHandlers } from './handlers/initiatives.js';
 import { createQuestionHandlers } from './handlers/questions.js';
 import { createTrajectoryHandlers } from './handlers/trajectories.js';
 import { createAgentHandlers } from './handlers/agents.js';
+import { createProjectHandlers } from './handlers/projects.js';
 import { createOptionalMcpAuthMiddleware } from './middleware/mcp-auth.js';
 
 /**
@@ -39,6 +40,7 @@ export function createRouter(storage: PlanStorage): Router {
   const questionHandlers = createQuestionHandlers(storage);
   const trajectoryHandlers = createTrajectoryHandlers(storage);
   const agentHandlers = createAgentHandlers();
+  const projectHandlers = createProjectHandlers(storage);
   const mcpAuth = createOptionalMcpAuthMiddleware(storage);
 
   // Plan routes
@@ -133,6 +135,14 @@ export function createRouter(storage: PlanStorage): Router {
 
   // Agent routes (merged presence + state)
   router.get('/agents', agentHandlers.list);
+
+  // Project routes
+  router.get('/projects', projectHandlers.list);
+  router.post('/projects', projectHandlers.create);
+  router.get('/projects/:id', projectHandlers.get);
+  router.put('/projects/:id', projectHandlers.update);
+  router.post('/projects/:id/focus', projectHandlers.updateFocus);
+  router.post('/projects/:id/graduate', projectHandlers.graduate);
 
   return router;
 }

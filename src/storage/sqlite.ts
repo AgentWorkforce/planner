@@ -24,7 +24,7 @@ import type {
 } from '../domain/question.js';
 import { calculatePriorityScore } from '../domain/question.js';
 import type { DecisionEvent, TrajectoryEventFilter } from '../domain/trajectory.js';
-import type { PlanStorage, PlanWithAttentionData, Session, SessionStatus, PlanFilter } from './interface.js';
+import type { PlanStorage, PlanWithAttentionData, Session, SessionStatus, PlanFilter, Project, ProjectFilter } from './interface.js';
 import { ALL_SCHEMA_STATEMENTS } from './schema.js';
 import { runMigrations } from './migration.js';
 
@@ -173,6 +173,20 @@ interface TrajectoryEventRow {
   step_id: string | null;
   agent_trajectory_ref: string | null;
   timestamp: string;
+}
+
+interface ProjectRow {
+  id: string;
+  name: string;
+  owner_id: string | null;
+  initiative_id: string | null;
+  session_id: string | null;
+  plan_id: string | null;
+  run_id: string | null;
+  config: string | null;
+  current_focus: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface PlanWithAttentionRow {
@@ -1793,6 +1807,166 @@ export class SqliteStorage implements PlanStorage {
       step_id: row.step_id ?? undefined,
       agent_trajectory_ref: row.agent_trajectory_ref ?? undefined,
       timestamp: row.timestamp,
+    };
+  }
+
+  // ============================================
+  // Project operations
+  // ============================================
+
+  createProject(project: Project): Project {
+    const stmt = this.db.prepare(`
+      INSERT INTO projects (
+        id, name, owner_id, initiative_id, session_id, plan_id, run_id,
+        config, current_focus, created_at, updated_at
+      )
+      VALUES (
+        @id, @name, @owner_id, @initiative_id, @session_id, @plan_id, @run_id,
+        @config, @current_focus, @created_at, @updated_at
+      )
+    `);
+    stmt.run({
+      id: project.id,
+      name: project.name,
+      owner_id: project.owner_id ?? null,
+      initiative_id: project.initiative_id ?? null,
+      session_id: project.session_id ?? null,
+      plan_id: project.plan_id ?? null,
+      run_id: project.run_id ?? null,
+      config: project.config ? JSON.stringify(project.config) : null,
+      current_focus: project.current_focus ? JSON.stringify(project.current_focus) : null,
+      created_at: project.created_at,
+      updated_at: project.updated_at,
+    });
+    return project;
+  }
+
+  getProject(id: string): Project | null {
+    const stmt = this.db.prepare<string, ProjectRow>(`
+      SELECT id, name, owner_id, initiative_id, session_id, plan_id, run_id,
+             config, current_focus, created_at, updated_at
+      FROM projects
+      WHERE id = ?
+    `);
+    const row = stmt.get(id);
+    if (!row) return null;
+    return this.rowToProject(row);
+  }
+
+  updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>): Project | null {
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const values: Record<string, unknown> = { id, updated_at: now };
+
+    if (updates.name !== undefined) {
+      fields.push('name = @name');
+      values.name = updates.name;
+    }
+    if (updates.owner_id !== undefined) {
+      fields.push('owner_id = @owner_id');
+      values.owner_id = updates.owner_id ?? null;
+    }
+    if (updates.initiative_id !== undefined) {
+      fields.push('initiative_id = @initiative_id');
+      values.initiative_id = updates.initiative_id ?? null;
+    }
+    if (updates.session_id !== undefined) {
+      fields.push('session_id = @session_id');
+      values.session_id = updates.session_id ?? null;
+    }
+    if (updates.plan_id !== undefined) {
+      fields.push('plan_id = @plan_id');
+      values.plan_id = updates.plan_id ?? null;
+    }
+    if (updates.run_id !== undefined) {
+      fields.push('run_id = @run_id');
+      values.run_id = updates.run_id ?? null;
+    }
+    if (updates.config !== undefined) {
+      fields.push('config = @config');
+      values.config = updates.config ? JSON.stringify(updates.config) : null;
+    }
+    if (updates.current_focus !== undefined) {
+      fields.push('current_focus = @current_focus');
+      values.current_focus = updates.current_focus ? JSON.stringify(updates.current_focus) : null;
+    }
+
+    if (fields.length === 0) {
+      return this.getProject(id);
+    }
+
+    fields.push('updated_at = @updated_at');
+
+    const stmt = this.db.prepare(`
+      UPDATE projects
+      SET ${fields.join(', ')}
+      WHERE id = @id
+    `);
+    const result = stmt.run(values);
+    if (result.changes === 0) return null;
+    return this.getProject(id);
+  }
+
+  updateProjectFocus(id: string, focus: Record<string, unknown>): Project | null {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      UPDATE projects
+      SET current_focus = ?, updated_at = ?
+      WHERE id = ?
+    `);
+    const result = stmt.run(JSON.stringify(focus), now, id);
+    if (result.changes === 0) return null;
+    return this.getProject(id);
+  }
+
+  listProjects(filter?: ProjectFilter): Project[] {
+    const whereClauses: string[] = [];
+    const params: Record<string, unknown> = {};
+
+    if (filter?.owner_id) {
+      whereClauses.push('owner_id = @owner_id');
+      params.owner_id = filter.owner_id;
+    }
+    if (filter?.initiative_id) {
+      whereClauses.push('initiative_id = @initiative_id');
+      params.initiative_id = filter.initiative_id;
+    }
+
+    const sql = `
+      SELECT id, name, owner_id, initiative_id, session_id, plan_id, run_id,
+             config, current_focus, created_at, updated_at
+      FROM projects
+      ${whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''}
+      ORDER BY updated_at DESC
+    `;
+
+    const stmt = this.db.prepare<Record<string, unknown>, ProjectRow>(sql);
+    const rows = stmt.all(whereClauses.length > 0 ? params : {});
+    return rows.map((row) => this.rowToProject(row));
+  }
+
+  deleteProject(id: string): boolean {
+    const stmt = this.db.prepare(`
+      DELETE FROM projects
+      WHERE id = ?
+    `);
+    const result = stmt.run(id);
+    return result.changes > 0;
+  }
+
+  private rowToProject(row: ProjectRow): Project {
+    return {
+      id: row.id,
+      name: row.name,
+      owner_id: row.owner_id ?? null,
+      initiative_id: row.initiative_id ?? null,
+      session_id: row.session_id ?? null,
+      plan_id: row.plan_id ?? null,
+      run_id: row.run_id ?? null,
+      config: row.config ? (JSON.parse(row.config) as Record<string, unknown>) : null,
+      current_focus: row.current_focus ? (JSON.parse(row.current_focus) as Record<string, unknown>) : null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
     };
   }
 

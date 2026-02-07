@@ -25,6 +25,9 @@ export function runMigrations(db: Database.Database): void {
 
   // 4. Add metadata_json column to versions if missing
   migrateVersionsMetadata(db);
+
+  // 5. Ensure projects table exists (for tend project entity)
+  ensureProjectsTable(db);
 }
 
 /**
@@ -107,4 +110,28 @@ function migrateVersionsMetadata(db: Database.Database): void {
   if (!hasMetadata) {
     db.exec(`ALTER TABLE versions ADD COLUMN metadata_json TEXT`);
   }
+}
+
+/**
+ * Ensures the projects table exists.
+ * Projects link ideation sessions, plans, and forge runs into a unified entity.
+ */
+function ensureProjectsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      owner_id TEXT,
+      initiative_id TEXT,
+      session_id TEXT,
+      plan_id TEXT,
+      run_id TEXT,
+      config TEXT,
+      current_focus TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (initiative_id) REFERENCES initiatives(initiative_id) ON DELETE SET NULL,
+      FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE SET NULL
+    )
+  `);
 }
