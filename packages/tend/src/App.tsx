@@ -1,5 +1,5 @@
 import { Routes, Route, useParams, useLocation } from 'react-router-dom';
-import { IdeationLayout, Sidebar, TendLayout } from '@/components/layout';
+import { IdeationLayout, Sidebar } from '@/components/layout';
 import { HomePage } from '@/pages/HomePage';
 import { SessionPage } from '@/pages/SessionPage';
 import { MockupPage } from '@/pages/MockupPage';

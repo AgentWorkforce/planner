@@ -66,7 +66,7 @@ export function CanvasPage() {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
 
   const { session, loading: sessionLoading, error: sessionError } = useSession(id);
-  const { blocks, loading: blocksLoading, curateBlock, uncurateBlock, updateBlock } = useBlocks(id || '');
+  const { blocks, loading: blocksLoading, curateBlock, updateBlock } = useBlocks(id || '');
   const { sessions: allSessions } = useSessions();
   const { toast } = useToast();
 
