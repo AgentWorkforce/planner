@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SheetContainer } from './SheetContainer';
-import { LoadingSpinner } from '../LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { Step, PlanVersion, StepExecutionStatus } from '@/types/plan';
 
 /**

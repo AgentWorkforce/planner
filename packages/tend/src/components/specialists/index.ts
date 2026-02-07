@@ -5,4 +5,4 @@ export { AlertCount } from './AlertCount';
 export { SpecialistCard } from './SpecialistCard';
 export { SpecialistsPanel } from './SpecialistsPanel';
 export { SessionConfidenceBar } from './SessionConfidenceBar';
-export { getSpecialistIcon } from './getSpecialistIcon';
+export { getSpecialistIcon } from './get-specialist-icon';

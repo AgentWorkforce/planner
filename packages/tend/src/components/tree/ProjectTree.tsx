@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LoadingSpinner } from '../LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { WorkSection } from './WorkSection';
 import { TreeBreadcrumb } from './TreeBreadcrumb';
 import { ArtifactsSection } from './ArtifactsSection';
