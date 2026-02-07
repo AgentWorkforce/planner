@@ -123,7 +123,7 @@ export function PhysicsBlock({
           className="absolute top-0 right-0 w-2 h-2 rounded-full"
           style={{
             backgroundColor: 'var(--color-accent-cyan)',
-            boxShadow: '0 0 4px rgba(0, 217, 255, 0.4)',
+            boxShadow: '0 0 4px rgba(74, 124, 89, 0.4)',
           }}
           title="User edited"
         />
@@ -136,7 +136,7 @@ export function PhysicsBlock({
 
       {/* Keyword - shown for developing and above when size permits */}
       {showKeyword && (
-        <span className="text-[10px] text-[#7a7a7a] mt-0.5 truncate max-w-full px-1 uppercase tracking-wide">
+        <span className="text-[10px] text-text-muted mt-0.5 truncate max-w-full px-1 uppercase tracking-wide">
           {block.keyword}
         </span>
       )}
@@ -144,7 +144,7 @@ export function PhysicsBlock({
       {/* Tiny dot indicator for forming blocks */}
       {visibilityLevel === 'forming' && (
         <div
-          className="rounded-full bg-[#7a7a7a]"
+          className="rounded-full bg-text-muted"
           style={{
             width: Math.max(4, size / 5),
             height: Math.max(4, size / 5),

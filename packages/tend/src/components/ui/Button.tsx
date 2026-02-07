@@ -10,11 +10,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-bg-tertiary text-text-primary hover:bg-bg-hover",
-        primary: 'bg-accent-cyan text-bg-deep hover:shadow-glow-cyan focus-visible:shadow-glow-cyan',
+        primary: 'bg-accent-cyan text-bg-deep hover:shadow-lg',
         secondary: 'bg-bg-secondary text-text-primary hover:bg-bg-hover',
         ghost: "hover:bg-bg-hover text-text-secondary",
-        danger: 'bg-error text-white hover:shadow-[0_0_20px_rgba(255,71,87,0.3)]',
-        success: 'bg-success text-bg-deep hover:shadow-glow-green focus-visible:shadow-glow-green',
+        danger: 'bg-error text-white hover:shadow-lg',
+        success: 'bg-success text-bg-deep hover:shadow-lg',
         link: "text-accent-cyan underline-offset-4 hover:underline",
       },
       size: {

@@ -31,7 +31,7 @@ interface InitiativeWellData {
  * Parse hex color to rgba with alpha
  */
 function hexToRgba(hex: string | undefined, alpha: number): string {
-  if (!hex) return `rgba(100, 100, 255, ${alpha})`; // Default blue
+  if (!hex) return `rgba(74, 124, 89, ${alpha})`; // Default moss green
 
   // Remove # if present
   const cleanHex = hex.replace('#', '');
