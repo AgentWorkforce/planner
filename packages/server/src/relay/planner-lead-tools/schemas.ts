@@ -57,12 +57,29 @@ export const PLANNER_LEAD_TOOLS: Anthropic.Tool[] = [
         },
         scope: {
           type: 'string',
-          description: 'Optional scope (e.g., "backend", "frontend")',
+          description: 'Optional scope — infer from the project context (e.g., "ui", "networking", "storage", "rendering", "api", "testing")',
         },
         dependencies: {
           type: 'array',
           items: { type: 'string' },
           description: 'Optional array of step IDs this step depends on',
+        },
+        owner_role: {
+          type: 'string',
+          description: 'Optional owner role (e.g., "Coder", "Designer", "Architect")',
+        },
+        acceptance_criteria: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              description: { type: 'string' },
+              type: { type: 'string' },
+            },
+            required: ['id', 'description'],
+          },
+          description: 'Optional acceptance criteria for the step',
         },
       },
       required: ['plan_id', 'title'],
@@ -94,6 +111,45 @@ export const PLANNER_LEAD_TOOLS: Anthropic.Tool[] = [
           type: 'array',
           items: { type: 'string' },
           description: 'New dependencies array (optional)',
+        },
+        scope: {
+          type: 'string',
+          description: 'New scope — infer from the project context (e.g., "ui", "networking", "storage", "rendering", "api", "testing") (optional)',
+        },
+        owner_role: {
+          type: 'string',
+          description: 'New owner role (e.g., "Coder", "Designer", "Architect") (optional)',
+        },
+        acceptance_criteria: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              description: { type: 'string' },
+              type: { type: 'string' },
+            },
+            required: ['id', 'description'],
+          },
+          description: 'New acceptance criteria for the step (optional)',
+        },
+      },
+      required: ['plan_id', 'step_id'],
+    },
+  },
+  {
+    name: 'remove_step',
+    description: 'Remove a step from a draft plan. Only works on draft plans. Use when a step is unnecessary, duplicate, or should be consolidated into another step.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The ID of the plan containing the step',
+        },
+        step_id: {
+          type: 'string',
+          description: 'The ID of the step to remove',
         },
       },
       required: ['plan_id', 'step_id'],
@@ -271,6 +327,29 @@ export const PLANNER_LEAD_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['agent_id', 'plan_id'],
+    },
+  },
+  {
+    name: 'ask_domain_expert',
+    description:
+      'Ask the domain expert (Interviewer) a question about the plan context. The Interviewer has deep knowledge from the brainstorming session including understanding, specialist perspectives, and user decisions. Use this BEFORE ask_user_question for domain/technical questions. Only escalate to ask_user_question for decisions that truly need human input.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        plan_id: {
+          type: 'string',
+          description: 'The plan ID to ask about',
+        },
+        question: {
+          type: 'string',
+          description: 'The question to ask the domain expert',
+        },
+        context: {
+          type: 'string',
+          description: 'Optional additional context for the question',
+        },
+      },
+      required: ['plan_id', 'question'],
     },
   },
 ];

@@ -58,6 +58,7 @@ export async function executeReadPlan(
           scope: s.scope,
           dependencies: s.dependencies,
           owner_role: s.owner_role,
+          acceptance_criteria: s.acceptance_criteria,
         })),
       },
     };

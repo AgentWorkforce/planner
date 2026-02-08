@@ -41,6 +41,8 @@ export async function executeAddStep(
     };
     if (input.description !== undefined) newStep.description = input.description;
     if (input.scope !== undefined) newStep.scope = input.scope;
+    if (input.owner_role !== undefined) newStep.owner_role = input.owner_role;
+    if (input.acceptance_criteria !== undefined) newStep.acceptance_criteria = input.acceptance_criteria;
 
     const now = new Date().toISOString();
     const newVersion: PlanVersion = {
@@ -104,9 +106,9 @@ export async function executeEditStep(
       title: input.title ?? existingStep.title,
       dependencies: input.dependencies ?? existingStep.dependencies,
       description: input.description ?? existingStep.description,
-      scope: existingStep.scope,
-      owner_role: existingStep.owner_role,
-      acceptance_criteria: existingStep.acceptance_criteria,
+      scope: input.scope ?? existingStep.scope,
+      owner_role: input.owner_role ?? existingStep.owner_role,
+      acceptance_criteria: input.acceptance_criteria ?? existingStep.acceptance_criteria,
       gate: existingStep.gate,
       sub_plan_id: existingStep.sub_plan_id,
     };
@@ -133,6 +135,68 @@ export async function executeEditStep(
         step_id: input.step_id,
         title: updatedStep.title,
         message: `Updated step "${updatedStep.title}"`,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Execute remove_step tool.
+ */
+export async function executeRemoveStep(
+  input: { plan_id: string; step_id: string },
+  storage: PlanStorage
+): Promise<ToolResult> {
+  try {
+    const plan = findPlanByIdPrefix(storage, input.plan_id);
+    if (!plan) {
+      return { success: false, error: `Plan not found: ${input.plan_id}` };
+    }
+
+    const version = storage.getLatestVersion(plan.plan_id);
+    if (!version) {
+      return { success: false, error: `No version found for plan: ${plan.plan_id}` };
+    }
+
+    if (version.status !== 'draft') {
+      return { success: false, error: `Cannot remove steps from ${version.status} plan. Only draft plans can be modified.` };
+    }
+
+    const existingStepIndex = version.steps.findIndex((s: Step) => s.step_id === input.step_id);
+    if (existingStepIndex === -1) {
+      return { success: false, error: `Step not found: ${input.step_id}` };
+    }
+
+    const removedStep = version.steps[existingStepIndex]!;
+
+    // Remove step and clean up any references to it in dependencies
+    const updatedSteps = version.steps
+      .filter((_: Step, i: number) => i !== existingStepIndex)
+      .map((s: Step) => ({
+        ...s,
+        dependencies: s.dependencies.filter((d: string) => d !== input.step_id),
+      }));
+
+    const now = new Date().toISOString();
+    const newVersion: PlanVersion = {
+      ...version,
+      version: version.version + 1,
+      steps: updatedSteps,
+      updated_at: now,
+    };
+
+    storage.createVersion(newVersion);
+    emitPlanChange(plan.plan_id, newVersion.version, 'step_removed', input.step_id);
+
+    return {
+      success: true,
+      result: {
+        step_id: input.step_id,
+        title: removedStep.title,
+        message: `Removed step "${removedStep.title}" from plan`,
       },
     };
   } catch (error) {

@@ -1,7 +1,7 @@
 import { createContext, useContext, ReactNode, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
-import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion } from '@/api';
+import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion, getVersion } from '@/api';
 import { usePlanEvents } from '@/hooks';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { STORAGE_KEYS } from '@/config/storage-keys';
@@ -63,6 +63,9 @@ interface PlanEditorContextValue {
   handleWorkflowApprove: (approver: string) => Promise<void>;
   handleWorkflowPublish: () => Promise<void>;
 
+  // Version switching
+  switchVersion: (versionNumber: number) => Promise<void>;
+
   // Real-time sync
   isEventStreamConnected: boolean;
   eventStreamError: string | null;
@@ -82,6 +85,9 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState<PlanVersion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Track when user manually selects a version to prevent SSE overriding it
+  const pinnedVersionRef = useRef<number | null>(null);
 
   // Messaging sidebar collapsed state (persisted)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -136,6 +142,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
   const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refetchPlan = useCallback(async () => {
     if (!planId) return;
+    if (pinnedVersionRef.current !== null) return;
     try {
       const result = await getPlan(planId);
       // Update if fetched version is newer OR same version but updated more recently
@@ -196,6 +203,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     async function fetchPlan() {
       if (!planId) return;
 
+      pinnedVersionRef.current = null;
       setLoading(true);
       setError(null);
 
@@ -233,6 +241,19 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
 
     fetchComments();
   }, [planId, version?.version]);
+
+  // Switch to a specific version
+  const switchVersion = useCallback(async (versionNumber: number) => {
+    if (!planId) return;
+    try {
+      const result = await getVersion(planId, versionNumber);
+      pinnedVersionRef.current = versionNumber;
+      setVersion(result.version);
+      setPlan(result.plan);
+    } catch (err) {
+      console.error('[PlanEditorContext] Failed to switch version:', err);
+    }
+  }, [planId]);
 
   // Handler for updating a step
   const handleStepUpdate = useCallback(
@@ -430,6 +451,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     handleWorkflowSubmit,
     handleWorkflowApprove,
     handleWorkflowPublish,
+    switchVersion,
     isEventStreamConnected,
     eventStreamError,
     currentUser,

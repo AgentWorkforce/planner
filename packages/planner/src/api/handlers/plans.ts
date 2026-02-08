@@ -415,6 +415,9 @@ export function createPlanHandlers(storage: PlanStorage) {
         if (body.decomposition_config !== undefined) {
           newVersion.decomposition_config = body.decomposition_config;
         }
+        if (body.understanding !== undefined) {
+          newVersion.understanding = body.understanding;
+        }
 
         // DOT Framework: Enrich new/modified steps
         newVersion = enrichPlanVersionForUpdate(newVersion, latestVersion.steps);

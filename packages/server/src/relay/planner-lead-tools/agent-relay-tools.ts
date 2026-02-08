@@ -15,8 +15,10 @@ import type { ToolResult, SpawnAgentInput, MessageAgentInput } from './types.js'
 /**
  * Execute spawn_agent tool.
  * Spawns a worker agent via the relay daemon.
+ * When channelId is provided (e.g. #plan-abc123), the agent is pre-joined
+ * to the plan channel and gets MCP context about the plan.
  */
-export async function executeSpawnAgent(input: SpawnAgentInput): Promise<ToolResult> {
+export async function executeSpawnAgent(input: SpawnAgentInput, channelId?: string): Promise<ToolResult> {
   try {
     // Check if agent with this name already exists
     if (isAgentSpawned(input.name)) {
@@ -26,10 +28,18 @@ export async function executeSpawnAgent(input: SpawnAgentInput): Promise<ToolRes
       };
     }
 
+    // Extract planId from channel context for MCP integration and channel pre-join
+    let planId: string | undefined;
+    if (channelId) {
+      const match = channelId.match(/^#plan-([a-f0-9-]+)$/i);
+      planId = match?.[1];
+    }
+
     const result = await spawnAgent({
       name: input.name,
       task: input.task,
       cwd: input.cwd,
+      planId,
     });
 
     if (!result.success) {

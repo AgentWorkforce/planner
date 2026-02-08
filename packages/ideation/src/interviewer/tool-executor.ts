@@ -292,9 +292,25 @@ export async function executeTool(
         }));
 
         // Build payload for planner with graduated blocks as steps
+
+        // Use synthesized idea summary if available, fall back to initial intent
+        const goal = session.synthesized?.idea_summary ?? session.source.initial_intent;
+
+        // Build context from specialist perspectives if available
+        const perspectives = session.synthesized?.specialist_perspectives;
+        let context: string;
+        if (perspectives && Object.keys(perspectives).length > 0) {
+          const summaries = Object.entries(perspectives)
+            .map(([name, p]) => `${name}: ${p.take}`)
+            .join('. ');
+          context = summaries;
+        } else {
+          context = `Ideation session with ${blocksToGraduate.length} blocks ready for planning`;
+        }
+
         const payload = {
-          goal: session.source.initial_intent,
-          context: `Graduating ${blocksToGraduate.length} blocks from ideation session`,
+          goal,
+          context,
           source: { type: 'ideation' as const, session_id: session.id },
           understanding: {
             ...session.understanding,

@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePlanEditor } from '@/contexts/PlanEditorContext';
+import { listVersions } from '@/api';
+import { cn } from '@/lib/utils';
 import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
 import { EditableTextarea } from '@/components/EditableTextarea';
 import { WorkflowActions } from '@/components/WorkflowActions';
@@ -22,9 +25,33 @@ export function PlanEditorHeader({ activeTab }: PlanEditorHeaderProps) {
     handleWorkflowSubmit,
     handleWorkflowApprove,
     handleWorkflowPublish,
+    switchVersion,
   } = usePlanEditor();
 
+  const [versionPickerOpen, setVersionPickerOpen] = useState(false);
+  const [versionList, setVersionList] = useState<{ version: number; status: string }[]>([]);
+
   if (!version) return null;
+
+  const handleVersionClick = async () => {
+    if (!planId) return;
+    try {
+      const result = await listVersions(planId);
+      setVersionList(
+        result.versions
+          .map((v) => ({ version: v.version, status: v.status }))
+          .reverse()
+      );
+      setVersionPickerOpen(true);
+    } catch (err) {
+      console.error('Failed to load versions:', err);
+    }
+  };
+
+  const handleVersionSelect = async (versionNumber: number) => {
+    setVersionPickerOpen(false);
+    await switchVersion(versionNumber);
+  };
 
   return (
     <div className="border-b border-border-subtle">
@@ -109,7 +136,40 @@ export function PlanEditorHeader({ activeTab }: PlanEditorHeaderProps) {
               />
             </div>
             <div className="flex items-center gap-3 mt-2 text-sm text-text-muted">
-              <span>Version {version.version}</span>
+              <div className="relative">
+                <span
+                  className="cursor-pointer"
+                  onClick={handleVersionClick}
+                >
+                  Version {version.version}
+                </span>
+                {versionPickerOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setVersionPickerOpen(false)}
+                      aria-hidden="true"
+                    />
+                    <div className="absolute top-full left-0 mt-1 z-50 min-w-[160px] max-h-[240px] overflow-y-auto bg-bg-card border border-border-subtle rounded-md shadow-lg py-1">
+                      {versionList.map((v) => (
+                        <div
+                          key={v.version}
+                          className={cn(
+                            'px-3 py-1.5 text-sm cursor-pointer transition-colors flex items-center justify-between gap-3',
+                            v.version === version.version
+                              ? 'text-text-primary bg-bg-tertiary'
+                              : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+                          )}
+                          onClick={() => handleVersionSelect(v.version)}
+                        >
+                          <span>Version {v.version}</span>
+                          <span className="text-xs text-text-muted">{v.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
               {version.submitted_at && (
                 <>
                   <span className="text-text-dim">•</span>

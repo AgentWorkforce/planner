@@ -94,7 +94,7 @@ export {
   joinPlannerLeadToChannel,
   initPlannerLead,
   stopPlannerLead,
-  notifyNewPlan,
+  notifyPlanReady,
 } from './planner-lead.js';
 
 // Ideation bridge exports

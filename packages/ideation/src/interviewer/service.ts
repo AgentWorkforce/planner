@@ -269,6 +269,18 @@ class InterviewerService {
       return;
     }
 
+    // Handle plan channel messages (domain questions from PlannerLead)
+    if (data?.planContext === true && data?.sessionId) {
+      console.log(`[Interviewer] Plan channel message in ${channelId} for session ${data.sessionId}`);
+      await this.handlePlanChannelMessage(
+        channelId,
+        body,
+        from,
+        data.sessionId as string
+      );
+      return;
+    }
+
     if (!this.shouldHandleMessage(channelId, from)) {
       console.log(`[Interviewer] Skipping: shouldHandleMessage returned false for ${channelId} from ${from}`);
       return;
@@ -428,6 +440,133 @@ class InterviewerService {
       content: content.replace(/^(question|observation|concern):/i, '').trim(),
       priority,
     });
+  }
+
+  /**
+   * Handle a message from a plan channel (domain question from PlannerLead).
+   */
+  private async handlePlanChannelMessage(
+    planChannelId: string,
+    question: string,
+    fromAgent: string,
+    sessionId: string
+  ): Promise<void> {
+    if (!this.deps) {
+      console.error('[Interviewer] Cannot handle plan channel message: not initialized');
+      return;
+    }
+
+    const session = await this.deps.storage.getSession(sessionId);
+    if (!session) {
+      console.warn(`[Interviewer] Session not found for plan channel: ${sessionId}`);
+      this.sendPlanChannelResponse(planChannelId,
+        '[ESCALATE_TO_USER] I cannot find the brainstorming session context for this plan.');
+      return;
+    }
+
+    console.log(`[Interviewer] Generating domain answer for plan channel ${planChannelId}`);
+
+    const answer = await this.generateDomainAnswer(question, session);
+    this.sendPlanChannelResponse(planChannelId, answer);
+
+    // Narrate to user in session channel
+    const sessChannelId = sessionChannelId(sessionId);
+    const narration = 'The planning assistant asked about your project and I was able to help based on our brainstorming conversation.';
+    if (this.state?.relayConnected) {
+      sendChannelMessage(sessChannelId, narration);
+    }
+  }
+
+  /**
+   * Generate an answer to a domain question using session context.
+   */
+  private async generateDomainAnswer(
+    question: string,
+    session: {
+      source: { initial_intent: string };
+      understanding?: Record<string, unknown>;
+      synthesized?: {
+        idea_summary?: string;
+        specialist_perspectives?: Record<string, { take: string; concerns?: string[]; confidence?: number }>;
+      };
+      blocks?: Array<{ id: string; status: string; keyword?: string; content?: string }>;
+    }
+  ): Promise<string> {
+    if (!this.state?.anthropic) {
+      return '[ESCALATE_TO_USER] AI service unavailable — please answer this question directly.';
+    }
+
+    const understandingStr = session.understanding
+      ? JSON.stringify(session.understanding, null, 2)
+      : 'No understanding data available';
+
+    const perspectivesStr = session.synthesized?.specialist_perspectives
+      ? Object.entries(session.synthesized.specialist_perspectives)
+          .map(([name, p]) => `- ${name}: ${p.take}${p.concerns?.length ? ` (concerns: ${p.concerns.join(', ')})` : ''}`)
+          .join('\n')
+      : 'No specialist perspectives available';
+
+    const blocksStr = (session.blocks || [])
+      .filter(b => b.status === 'curated' || b.status === 'graduated')
+      .map(b => `- ${b.keyword || 'Untitled'}: ${b.content || ''}`)
+      .join('\n') || 'No curated blocks available';
+
+    const systemPrompt = `You are answering a domain question from the Planning Assistant about a plan created from the brainstorming session "${session.synthesized?.idea_summary || session.source.initial_intent}".
+
+## Your Session Knowledge
+
+### Understanding
+${understandingStr}
+
+### Specialist Perspectives
+${perspectivesStr}
+
+### Curated Blocks (key insights)
+${blocksStr}
+
+## Instructions
+Answer the Planning Assistant's question using ONLY the session knowledge above.
+Be concise and factual. Do not speculate beyond what the session data supports.
+If you genuinely cannot answer from this context, respond with exactly:
+[ESCALATE_TO_USER] followed by a rephrased version of the question suitable for the user.`;
+
+    try {
+      const llmConfig = await getLLMConfig();
+      const response = await this.state.anthropic.messages.create({
+        model: llmConfig.model,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: question }],
+      });
+
+      const textBlock = response.content.find(b => b.type === 'text');
+      return textBlock?.text || '[ESCALATE_TO_USER] Unable to generate answer.';
+    } catch (error) {
+      console.error('[Interviewer] Error generating domain answer:', error);
+      return '[ESCALATE_TO_USER] I encountered an error while trying to answer. Please answer this question directly.';
+    }
+  }
+
+  /**
+   * Send a response to a plan channel with proper agent identification.
+   */
+  private sendPlanChannelResponse(planChannelId: string, message: string): void {
+    if (!this.state?.relayConnected) {
+      console.warn(`[Interviewer] Cannot send plan channel response: relay not connected`);
+      return;
+    }
+
+    const isEscalation = message.startsWith('[ESCALATE_TO_USER]');
+    const sent = sendChannelMessage(planChannelId, message, {
+      fromAgent: INTERVIEWER_CONFIG.agentId,
+      type: isEscalation ? 'escalation' : 'domain_answer',
+    });
+
+    if (sent) {
+      console.log(`[Interviewer] ${isEscalation ? 'Escalation' : 'Domain answer'} sent to ${planChannelId}`);
+    } else {
+      console.warn(`[Interviewer] Failed to send response to ${planChannelId}`);
+    }
   }
 
   /**

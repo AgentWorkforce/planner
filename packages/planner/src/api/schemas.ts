@@ -96,6 +96,8 @@ export const CreateVersionRequestSchema = z.object({
   steps: z.array(StepSchema).optional(),
   /** DOT Framework: Decomposition limits and thresholds */
   decomposition_config: DecompositionConfigSchema.optional(),
+  /** Understanding from ideation session */
+  understanding: UnderstandingSchema.optional(),
 });
 
 export type CreateVersionRequest = z.infer<typeof CreateVersionRequestSchema>;

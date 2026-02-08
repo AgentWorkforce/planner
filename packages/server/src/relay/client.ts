@@ -264,7 +264,7 @@ export interface SpawnAgentOptions {
  * use relay's listConnectedAgents(). This map tracks spawn metadata for
  * agents we spawned from this process.
  */
-const spawnedAgents: Map<string, { pid?: number; spawnedAt: Date }> = new Map();
+const spawnedAgents: Map<string, { pid?: number; spawnedAt: Date; channelId?: string }> = new Map();
 
 /**
  * Build MCP context instructions for spawned agents.
@@ -376,11 +376,13 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
     });
 
     if (result.success) {
+      const channelId = options.planId ? `#plan-${options.planId}` : undefined;
       spawnedAgents.set(options.name, {
         pid: result.pid,
         spawnedAt: new Date(),
+        channelId,
       });
-      console.log(`[relay] Spawned agent ${options.name} with PID ${result.pid}`);
+      console.log(`[relay] Spawned agent ${options.name} with PID ${result.pid}${channelId ? ` (channel: ${channelId})` : ''}`);
 
       // Pre-join agent to plan channel for immediate communication
       if (options.planId) {
@@ -462,6 +464,14 @@ export function getSpawnedAgents(): Array<{ name: string; pid?: number; spawnedA
  */
 export function isAgentSpawned(name: string): boolean {
   return spawnedAgents.has(name);
+}
+
+/**
+ * Get the plan channel associated with a spawned agent.
+ * Returns undefined if the agent wasn't spawned with a plan context.
+ */
+export function getSpawnedAgentChannel(name: string): string | undefined {
+  return spawnedAgents.get(name)?.channelId;
 }
 
 // Re-export types

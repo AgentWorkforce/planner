@@ -12,7 +12,7 @@
  */
 
 import type Anthropic from '@anthropic-ai/sdk';
-import { onMessage, sendMessage, sendChannelMessage, isConnected, onStateChange, type ClientState } from './client.js';
+import { onMessage, sendMessage, sendChannelMessage, isConnected, onStateChange, isAgentSpawned, getSpawnedAgentChannel, type ClientState } from './client.js';
 import { getRelayMode } from './service.js';
 import { PLANNER_CHANNEL } from './channels.js';
 import { getAnthropicClient, hasApiKey, MODEL, MAX_TOKENS } from './anthropic-config.js';
@@ -22,6 +22,7 @@ import { addMessage, getHistory, type ConversationMessage } from './conversation
 import type { PlanStorage } from '../../../planner/src/storage/interface.js';
 import { emitAgentJoined, emitAgentStatusUpdate, emitAgentLeft, type AgentState, type AgentRole } from './agent-status.js';
 import { addToTrajectory, findSimilarQuestion, type TrajectoryEntry } from './user-trajectory.js';
+import { getSessionForPlanChannel } from './ideation-bridge.js';
 
 /** PlannerLead configuration */
 const PLANNER_LEAD_CONFIG = {
@@ -71,10 +72,22 @@ function extractPlanIdFromChannel(channelId: string): string | null {
 /**
  * Check if a message should be handled by PlannerLead.
  */
-function shouldHandleMessage(from: string, body: string, channelId?: string): boolean {
-  // Don't respond to our own messages
-  if (from === PLANNER_LEAD_CONFIG.name || from === 'Relay') {
+function shouldHandleMessage(from: string, body: string, channelId?: string, data?: Record<string, unknown>): boolean {
+  // Don't respond to our own messages — but DO accept Relay messages from the Interviewer
+  if (from === PLANNER_LEAD_CONFIG.name) {
     return false;
+  }
+  if (from === 'Relay') {
+    // Accept messages from the Interviewer in plan channels
+    if (data?.fromAgent === 'ideation-interviewer' && channelId?.startsWith('#plan-')) {
+      return true;
+    }
+    return false;
+  }
+
+  // Handle direct messages from agents we spawned (they reply to their spawner via DM)
+  if (!channelId && isAgentSpawned(from)) {
+    return true;
   }
 
   // Check if this is a channel we care about
@@ -98,7 +111,8 @@ function shouldHandleMessage(from: string, body: string, channelId?: string): bo
 async function generateResponse(
   channelId: string,
   userMessage: string,
-  planId: string | null
+  planId: string | null,
+  options?: { domainExpertAvailable?: boolean }
 ): Promise<string> {
   const client = getAnthropicClient();
 
@@ -121,6 +135,7 @@ async function generateResponse(
   const systemPrompt = getSystemPrompt({
     channelId,
     planId: planId || undefined,
+    domainExpertAvailable: options?.domainExpertAvailable,
   });
 
   try {
@@ -148,7 +163,8 @@ async function generateResponse(
           result = await executeTool(
             toolUse.name,
             toolUse.input as Record<string, unknown>,
-            storage
+            storage,
+            channelId
           );
         } else {
           result = getMockToolResult(
@@ -228,10 +244,67 @@ async function handleMessage(
   data?: Record<string, unknown>
 ): Promise<void> {
   // Extract channel from data or thread
-  const channelId = (data?.channel as string) || threadId;
+  let channelId = (data?.channel as string) || threadId;
 
-  if (!shouldHandleMessage(from, body, channelId)) {
+  if (!shouldHandleMessage(from, body, channelId, data)) {
     return;
+  }
+
+  // Handle Interviewer domain answers and escalations (before normal flow)
+  if (data?.fromAgent === 'ideation-interviewer' && channelId?.startsWith('#plan-')) {
+    const messageType = data?.type as string | undefined;
+
+    if (messageType === 'domain_answer') {
+      console.log(`[planner-lead] Received domain answer from Interviewer in ${channelId}`);
+      // Feed the answer back into the conversation and continue refining
+      addMessage(channelId, 'user', `[Domain Expert Response]: ${body}`);
+      const planId = extractPlanIdFromChannel(channelId);
+      const response = await generateResponse(
+        channelId,
+        `The domain expert has answered your question: "${body}". Continue refining the plan with this information.`,
+        planId,
+        { domainExpertAvailable: true }
+      );
+      addMessage(channelId, 'assistant', response);
+      sendChannelMessage(channelId, response);
+      return;
+    }
+
+    if (messageType === 'escalation') {
+      console.log(`[planner-lead] Received escalation from Interviewer in ${channelId}`);
+      // Interviewer couldn't answer — escalate to user via QA queue
+      const questionText = body.replace('[ESCALATE_TO_USER]', '').trim();
+      const planId = extractPlanIdFromChannel(channelId);
+      if (planId && storage) {
+        const { executeAskUserQuestion } = await import('./planner-lead-tools/question-tools.js');
+        await executeAskUserQuestion({
+          agent_id: agentId || 'planner-lead',
+          agent_role: 'planner-lead',
+          plan_id: planId,
+          text: questionText,
+          blocking_level: 'soft_block',
+        }, storage);
+        console.log(`[planner-lead] Escalated to user QA queue: ${questionText.slice(0, 80)}`);
+      }
+      return;
+    }
+
+    if (messageType === 'interviewer_joined') {
+      console.log(`[planner-lead] Interviewer joined plan channel ${channelId}`);
+      // Note in conversation history — domain expert is now available
+      addMessage(channelId, 'user', '[System] Domain expert (Interviewer) has joined this plan channel and can answer domain questions.');
+      return;
+    }
+  }
+
+  // For DMs from spawned agents, resolve their plan channel context
+  // so the conversation has proper plan context for tool use
+  if (!channelId && isAgentSpawned(from)) {
+    const agentChannel = getSpawnedAgentChannel(from);
+    if (agentChannel) {
+      channelId = agentChannel;
+      console.log(`[planner-lead] Resolved agent ${from} DM to channel ${channelId}`);
+    }
   }
 
   console.log(`[planner-lead] Handling message from ${from} in ${channelId || 'DM'}`);
@@ -259,25 +332,30 @@ async function handleMessage(
   }
 
   try {
+    // Check if domain expert is available for this channel
+    const hasDomainExpert = channelId?.startsWith('#plan-') ? !!getSessionForPlanChannel(channelId) : false;
+
     // Generate response
-    const response = await generateResponse(channelId || 'default', body, planId);
+    const response = await generateResponse(channelId || 'default', body, planId, { domainExpertAvailable: hasDomainExpert });
 
     // Add assistant response to history
     if (channelId) {
       addMessage(channelId, 'assistant', response);
     }
 
-    // Send response - use channel message for channels, direct message otherwise
-    const target = channelId || from;
+    // Send response - DM back to spawned agents, channel message for channels
     let sent: boolean;
-    if (target.startsWith('#')) {
-      sent = sendChannelMessage(target, response);
+    if (isAgentSpawned(from)) {
+      // Agent DMs get a DM reply (even though channelId was resolved for context)
+      sent = sendMessage(from, response, 'message');
+    } else if (channelId?.startsWith('#')) {
+      sent = sendChannelMessage(channelId, response);
     } else {
-      sent = sendMessage(target, response, 'message', undefined, threadId);
+      sent = sendMessage(from, response, 'message', undefined, threadId);
     }
 
     if (!sent) {
-      console.warn(`[planner-lead] Failed to send response to ${target}`);
+      console.warn(`[planner-lead] Failed to send response to ${isAgentSpawned(from) ? from : (channelId || from)}`);
     }
 
     // Return to idle state after processing
@@ -680,14 +758,14 @@ export const joinPlannerLeadToChannel = (_channelId: string): void => {
 };
 
 /**
- * Notify PlannerLead of a new plan creation.
- * This triggers PlannerLead to welcome the user and offer to help structure the plan.
+ * Notify PlannerLead of a plan that's ready for refinement.
+ * This triggers PlannerLead to review and improve the plan structure.
  */
-export async function notifyNewPlan(
+export async function notifyPlanReady(
   channelId: string,
   planId: string,
   goal: string,
-  context?: string
+  options?: { context?: string; stepCount?: number; source?: string }
 ): Promise<void> {
   if (!initialized || !storage) {
     console.log('[planner-lead] Cannot notify: not initialized');
@@ -699,23 +777,59 @@ export async function notifyNewPlan(
     return;
   }
 
-  console.log(`[planner-lead] New plan notification for ${planId} in ${channelId}`);
+  console.log(`[planner-lead] Plan ready notification for ${planId} in ${channelId}`);
 
-  // Synthesize a "new plan" prompt to trigger PlannerLead's response
-  const prompt = context
-    ? `A new plan has been created with goal: "${goal}". Context: ${context}. Please add 3-4 initial steps to achieve this goal using the add_step tool. For each step, provide a clear title and description.`
-    : `A new plan has been created with goal: "${goal}". Please add 3-4 initial steps to achieve this goal using the add_step tool. For each step, provide a clear title and description.`;
+  const stepCount = options?.stepCount ?? 0;
+  const context = options?.context;
+
+  let prompt: string;
+
+  if (stepCount === 0) {
+    prompt = context
+      ? `A new plan has been created with goal: "${goal}". Context: ${context}. Please read the plan, then add 3-4 initial steps to achieve this goal using the add_step tool. For each step, provide a clear title and description.`
+      : `A new plan has been created with goal: "${goal}". Please read the plan, then add 3-4 initial steps to achieve this goal using the add_step tool. For each step, provide a clear title and description.`;
+  } else {
+    prompt = `New input has arrived for this plan (goal: "${goal}"). The plan now contains ${stepCount} steps.
+
+Your job:
+
+1. READ the plan. Understand what the user is trying to accomplish — the nature of the work (bug fix, new feature, greenfield project, refactor, infrastructure, research, etc.) and its likely scale and complexity.
+
+2. ASSESS the steps as-given. Consider:
+   - Are these well-formed actionable steps, or loose ideas that need decomposition?
+   - Are there obvious gaps? (e.g., frontend changes with no API step, a deployment step with no testing step, database changes with no migration step)
+   - Are dependencies between steps implicit but unstated?
+   - Is the scope appropriate? A one-file bug fix needs 2-3 steps, not 15. A new application needs proper coverage across concerns.
+   - Do steps have the right granularity? A step like "build the backend" is too coarse. A step like "add semicolon to line 4" is too fine.
+
+3. ACT proportionally. Match your refinement to the complexity:
+   - For small fixes: minimal structure. Don't over-plan what takes an hour. Maybe just add a verification step.
+   - For moderate features: ensure dependencies are set, scopes are assigned, and nothing critical is missing.
+   - For large projects: ensure proper phasing, identify risks, add acceptance criteria to key steps, and flag anything that needs human decision before proceeding.
+
+4. INFER what you can. Set dependencies based on logical ordering. Add missing steps only where the gap is clear — don't invent work the user didn't ask for. For SCOPES: read the plan goal and step descriptions to understand what kind of project this is, then derive scopes from that domain. A macOS app has scopes like "ui", "networking", "persistence" — not "backend" and "frontend". A web app has "frontend", "api", "database". Always match the project's actual technology and domain.
+
+5. When uncertain about intent, USE ask_domain_expert first if a domain expert is available — they have deep context from the brainstorming session. Only use ask_user_question for decisions that genuinely need human judgment.
+
+Do not explain what you're about to do. Read the plan and start refining.`;
+  }
+
+  // Check if a domain expert (Interviewer) is available for this plan channel
+  const domainExpertAvailable = !!getSessionForPlanChannel(channelId);
+  if (domainExpertAvailable) {
+    console.log(`[planner-lead] Domain expert available for ${channelId}`);
+  }
 
   // Generate response using the AI
   const planIdPrefix = planId.slice(0, 8);
-  const response = await generateResponse(channelId, prompt, planIdPrefix);
+  const response = await generateResponse(channelId, prompt, planIdPrefix, { domainExpertAvailable });
 
   // Send response to the channel
   const sent = sendChannelMessage(channelId, response);
   if (sent) {
-    console.log(`[planner-lead] Welcome message sent to ${channelId}`);
+    console.log(`[planner-lead] Refinement message sent to ${channelId}`);
   } else {
-    console.warn(`[planner-lead] Failed to send welcome message to ${channelId}`);
+    console.warn(`[planner-lead] Failed to send refinement message to ${channelId}`);
   }
 }
 

@@ -28,6 +28,7 @@ export type AgentState = 'idle' | 'working' | 'needs_input' | 'error';
  */
 export type AgentRole =
   | 'planner-lead'
+  | 'interviewer'
   | 'architect'
   | 'ui-designer'
   | 'data-modeler'

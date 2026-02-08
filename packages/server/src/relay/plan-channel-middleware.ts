@@ -6,9 +6,9 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { createPlanChannel } from './channels.js';
+import { createPlanChannel, getPlanChannelId, channelExists } from './channels.js';
 import { isConnected } from './client.js';
-import { notifyNewPlan } from './planner-lead.js';
+import { notifyPlanReady } from './planner-lead.js';
 
 /**
  * Response body structure from POST /api/plans.
@@ -22,16 +22,37 @@ interface CreatePlanResponse {
       goal: string;
       context?: string;
     };
+    steps?: Array<unknown>;
   };
 }
 
 /**
- * Middleware that intercepts POST /api/plans responses.
- * On successful plan creation (201), creates the relay channel.
+ * Response body structure from POST /api/plans/:id/versions.
+ */
+interface VersionCreationResponse {
+  version: {
+    summary: {
+      goal: string;
+      context?: string;
+    };
+    steps?: Array<unknown>;
+  };
+}
+
+/**
+ * Middleware that intercepts POST /api/plans and POST /api/plans/:id/versions responses.
+ * On successful plan/version creation (201), creates/ensures the relay channel and notifies PlannerLead.
  */
 export function planChannelMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Only intercept POST /plans (plan creation)
-  if (req.method !== 'POST' || !req.path.match(/^\/plans\/?$/)) {
+  if (req.method !== 'POST') {
+    next();
+    return;
+  }
+
+  const isPlanCreation = req.path.match(/^\/plans\/?$/);
+  const isVersionCreation = req.path.match(/^\/plans\/([^/]+)\/versions\/?$/);
+
+  if (!isPlanCreation && !isVersionCreation) {
     next();
     return;
   }
@@ -41,40 +62,78 @@ export function planChannelMiddleware(req: Request, res: Response, next: NextFun
 
   // Override json to intercept the response
   res.json = function (body: unknown): Response {
-    // Check if this is a successful plan creation (201)
+    // Check if this is a successful creation (201)
     if (res.statusCode === 201 && body && typeof body === 'object') {
-      const data = body as CreatePlanResponse;
+      // Handle plan creation
+      if (isPlanCreation) {
+        const data = body as CreatePlanResponse;
+        const planId = data.plan?.plan_id;
+        const goal = data.version?.summary?.goal;
+        const context = data.version?.summary?.context;
+        const stepCount = data.version?.steps?.length ?? 0;
 
-      // Extract plan info
-      const planId = data.plan?.plan_id;
-      const goal = data.version?.summary?.goal;
-      const context = data.version?.summary?.context;
+        if (planId) {
+          // Create channel asynchronously (don't block response)
+          setImmediate(() => {
+            try {
+              if (!isConnected()) {
+                console.log(`[plan-channel-middleware] Skipping channel creation: relay not connected`);
+                return;
+              }
 
-      if (planId) {
-        // Create channel asynchronously (don't block response)
-        setImmediate(() => {
-          try {
-            if (!isConnected()) {
-              console.log(`[plan-channel-middleware] Skipping channel creation: relay not connected`);
-              return;
+              // Create the plan channel
+              const channelId = createPlanChannel(planId, goal);
+
+              if (channelId) {
+                console.log(`[plan-channel-middleware] Created channel ${channelId} for plan ${planId}`);
+
+                // Notify PlannerLead of the new plan
+                notifyPlanReady(channelId, planId, goal || 'New plan', { context, stepCount }).catch((err) => {
+                  console.error(`[plan-channel-middleware] Error notifying PlannerLead:`, err);
+                });
+              }
+            } catch (error) {
+              // Log but don't fail - channel creation is non-critical
+              console.error(`[plan-channel-middleware] Error creating channel:`, error);
             }
+          });
+        }
+      }
+      // Handle version creation
+      else if (isVersionCreation) {
+        const planId = isVersionCreation[1];
+        const data = body as VersionCreationResponse;
+        const goal = data.version?.summary?.goal;
+        const context = data.version?.summary?.context;
+        const stepCount = data.version?.steps?.length ?? 0;
 
-            // Create the plan channel
-            const channelId = createPlanChannel(planId, goal);
+        if (planId) {
+          // Ensure channel exists and notify asynchronously
+          setImmediate(() => {
+            try {
+              if (!isConnected()) {
+                console.log(`[plan-channel-middleware] Skipping notification: relay not connected`);
+                return;
+              }
 
-            if (channelId) {
-              console.log(`[plan-channel-middleware] Created channel ${channelId} for plan ${planId}`);
+              const channelId = getPlanChannelId(planId);
 
-              // Notify PlannerLead of the new plan
-              notifyNewPlan(channelId, planId, goal || 'New plan', context).catch((err) => {
+              // Create channel if it doesn't exist yet
+              if (!channelExists(channelId)) {
+                console.log(`[plan-channel-middleware] Creating missing channel ${channelId} for plan ${planId}`);
+                createPlanChannel(planId, goal);
+              }
+
+              // Notify PlannerLead of the updated plan
+              notifyPlanReady(channelId, planId, goal || 'Updated plan', { context, stepCount, source: 'version_creation' }).catch((err) => {
                 console.error(`[plan-channel-middleware] Error notifying PlannerLead:`, err);
               });
+            } catch (error) {
+              // Log but don't fail - channel operations are non-critical
+              console.error(`[plan-channel-middleware] Error in version creation handler:`, error);
             }
-          } catch (error) {
-            // Log but don't fail - channel creation is non-critical
-            console.error(`[plan-channel-middleware] Error creating channel:`, error);
-          }
-        });
+          });
+        }
       }
     }
 

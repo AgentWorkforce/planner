@@ -18,6 +18,8 @@ export interface AddStepInput {
   description?: string;
   scope?: string;
   dependencies?: string[];
+  owner_role?: string;
+  acceptance_criteria?: Array<{ id: string; description: string; type?: string }>;
 }
 
 /** Input type for edit_step */
@@ -27,6 +29,15 @@ export interface EditStepInput {
   title?: string;
   description?: string;
   dependencies?: string[];
+  scope?: string;
+  owner_role?: string;
+  acceptance_criteria?: Array<{ id: string; description: string; type?: string }>;
+}
+
+/** Input type for remove_step */
+export interface RemoveStepInput {
+  plan_id: string;
+  step_id: string;
 }
 
 /** Input type for spawn_agent */
@@ -68,4 +79,11 @@ export interface AskUserQuestionInput {
 export interface JoinPlanChannelInput {
   agent_id: string;
   plan_id: string;
+}
+
+/** Input type for ask_domain_expert */
+export interface AskDomainExpertInput {
+  plan_id: string;
+  question: string;
+  context?: string;
 }

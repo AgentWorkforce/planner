@@ -13,13 +13,15 @@ import {
   getClient,
   spawnAgent as serverSpawnAgent,
 } from './client.js';
+import { getPlanChannelId } from './channels.js';
+import { emitAgentJoined, emitAgentLeft } from './agent-status.js';
 import { createSpecialistSpawner } from '../../../ideation/src/relay/spawner.js';
 import {
   setConnectionState as setIdeationState,
   dispatchMessage as dispatchToIdeation,
   setSender as setIdeationSender,
 } from '../../../ideation/src/relay/index.js';
-import { isIdeationChannel, sessionChannelId, IDEATION_CHANNEL } from '../../../ideation/src/interviewer/config.js';
+import { isIdeationChannel, sessionChannelId, IDEATION_CHANNEL, INTERVIEWER_CONFIG } from '../../../ideation/src/interviewer/config.js';
 import { interviewer } from '../../../ideation/src/interviewer/service.js';
 import { ideationEvents } from '../../../ideation/src/api/events.js';
 import type { IdeationStorage } from '../../../ideation/src/storage/index.js';
@@ -28,9 +30,16 @@ import type { ClientState } from '@agent-relay/sdk';
 /** Track joined session channels for reconnection */
 const joinedSessionChannels = new Set<string>();
 
+/** Track plan channels the Interviewer has joined (planChannelId → sessionId) */
+const planChannelToSession = new Map<string, string>();
+
+/** Track joined plan channels for reconnection */
+const joinedPlanChannels = new Set<string>();
+
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeMessage: (() => void) | null = null;
 let unsubscribeSessionCreated: (() => void) | null = null;
+let unsubscribeBlocksGraduated: (() => void) | null = null;
 let bridgeInitialized = false;
 
 /**
@@ -83,18 +92,40 @@ export function initIdeationBridge(): void {
           client.joinChannel(channelId);
           console.log(`[ideation-bridge] Rejoined session channel ${channelId}`);
         }
+
+        // Rejoin plan channels
+        for (const channelId of joinedPlanChannels) {
+          client.joinChannel(channelId);
+          console.log(`[ideation-bridge] Rejoined plan channel ${channelId}`);
+        }
       }
     }
   });
 
-  // Subscribe to server relay messages and route ideation ones
+  // Subscribe to server relay messages and route ideation ones + plan channel ones
   unsubscribeMessage = onServerMessage((from, body, threadId, data) => {
     const channel = data?.channel as string | undefined;
 
-    // Only dispatch messages from ideation channels
+    // Route ideation channel messages
     if (channel && isIdeationChannel(channel)) {
       console.log(`[ideation-bridge] Routing message from ${from} on ${channel}`);
       dispatchToIdeation(from, body, threadId, { ...data, channel });
+      return;
+    }
+
+    // Route plan channel messages to Interviewer when registered
+    if (channel && planChannelToSession.has(channel)) {
+      // Don't route Interviewer's own messages back (prevent loops)
+      if (data?.fromAgent === INTERVIEWER_CONFIG.agentId) return;
+
+      const sessionId = planChannelToSession.get(channel)!;
+      console.log(`[ideation-bridge] Routing plan channel message from ${from} on ${channel} (session: ${sessionId})`);
+      dispatchToIdeation(from, body, threadId, {
+        ...data,
+        channel,
+        planContext: true,
+        sessionId,
+      });
     }
   });
 
@@ -135,6 +166,44 @@ export function initIdeationBridge(): void {
 
   ideationEvents.on('session:created', handleSessionCreated);
   unsubscribeSessionCreated = () => ideationEvents.off('session:created', handleSessionCreated);
+
+  // Subscribe to blocks_graduated events to join Interviewer to plan channel
+  const handleBlocksGraduated = (event: { data: { id: string; planner_sends: Array<{ result?: { plan_id?: string } }> } }) => {
+    if (!isServerRelayConnected()) return;
+
+    const session = event.data;
+    const latestSend = session.planner_sends[session.planner_sends.length - 1];
+    const planId = latestSend?.result?.plan_id;
+
+    if (!planId) {
+      console.log('[ideation-bridge] blocks_graduated: no plan_id in latest planner_send');
+      return;
+    }
+
+    const planChannelId = getPlanChannelId(planId);
+
+    // Join the plan channel
+    const relayClient = getClient();
+    if (relayClient) {
+      relayClient.joinChannel(planChannelId);
+      joinedPlanChannels.add(planChannelId);
+      planChannelToSession.set(planChannelId, session.id);
+      console.log(`[ideation-bridge] Joined plan channel ${planChannelId} for session ${session.id}`);
+    }
+
+    // Announce Interviewer presence in the plan channel
+    serverSendChannelMessage(planChannelId,
+      'Interviewer has joined this plan channel. I have context from the brainstorming session and can answer domain questions about this plan.',
+      { type: 'interviewer_joined', sessionId: session.id, fromAgent: INTERVIEWER_CONFIG.agentId }
+    );
+    console.log(`[ideation-bridge] Interviewer announcement sent to ${planChannelId}`);
+
+    // Register Interviewer as an active agent
+    emitAgentJoined(INTERVIEWER_CONFIG.agentId, 'interviewer', INTERVIEWER_CONFIG.displayName);
+  };
+
+  ideationEvents.on('session:blocks_graduated', handleBlocksGraduated);
+  unsubscribeBlocksGraduated = () => ideationEvents.off('session:blocks_graduated', handleBlocksGraduated);
 
   // Inject specialist spawner into Interviewer
   const specialistSpawner = createSpecialistSpawner({ spawnAgent: serverSpawnAgent });
@@ -191,10 +260,16 @@ export function stopIdeationBridge(): void {
     unsubscribeSessionCreated();
     unsubscribeSessionCreated = null;
   }
+  if (unsubscribeBlocksGraduated) {
+    unsubscribeBlocksGraduated();
+    unsubscribeBlocksGraduated = null;
+  }
 
   setIdeationState('disconnected');
   setIdeationSender(null);
   joinedSessionChannels.clear();
+  planChannelToSession.clear();
+  joinedPlanChannels.clear();
   bridgeInitialized = false;
   console.log('[ideation-bridge] Stopped');
 }
@@ -228,4 +303,12 @@ export async function syncIdeationSessionChannels(storage: IdeationStorage): Pro
   }
 
   console.log(`[ideation-bridge] Synced ${activeSessions.length} session channels`);
+}
+
+/**
+ * Get the session ID associated with a plan channel.
+ * Returns undefined if the Interviewer hasn't joined this plan channel.
+ */
+export function getSessionForPlanChannel(planChannelId: string): string | undefined {
+  return planChannelToSession.get(planChannelId);
 }
