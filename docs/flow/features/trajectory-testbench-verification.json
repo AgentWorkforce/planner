@@ -1,0 +1,69 @@
+{
+  "feature_id": "trajectory-testbench-verification",
+  "title": "Testbench Trajectory Verification",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["trajectory-service", "testbench-runner"],
+  "parent": "trajectory-integration",
+  "component": "testbench",
+
+  "summary": {
+    "goal": "Testbench collects and displays forge trajectory metrics after runs to verify trajectory capture is working.",
+    "acceptance_criteria": [
+      { "id": "tbv-ac1", "description": "ForgeClient has getTrajectory() method" },
+      { "id": "tbv-ac2", "description": "ForgeClient has getTrajectoryStats() method" },
+      { "id": "tbv-ac3", "description": "RunResult type includes trajectory_metrics field" },
+      { "id": "tbv-ac4", "description": "Runner collects trajectory metrics after forge run completes" },
+      { "id": "tbv-ac5", "description": "Mock runner provides mock trajectory metrics" },
+      { "id": "tbv-ac6", "description": "Console reporter displays trajectory metrics (completion_rate, retry_rate, event counts)" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Uses existing forge TrajectoryCapture API endpoints",
+        "Verifies forge execution trajectory exists and has expected events",
+        "Stats help evaluate run quality (completion rate, retries)"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["testbench"],
+    "steps": [
+      {
+        "step_id": "tbv001",
+        "title": "Add trajectory methods to ForgeClient",
+        "scope": "testbench",
+        "description": "Add getTrajectory() and getTrajectoryStats() to forge.ts"
+      },
+      {
+        "step_id": "tbv002",
+        "title": "Extend RunResult type",
+        "scope": "testbench",
+        "description": "Add trajectory_metrics field to types.ts"
+      },
+      {
+        "step_id": "tbv003",
+        "title": "Collect metrics in runner",
+        "scope": "testbench",
+        "description": "Call forge trajectory API after run completes"
+      },
+      {
+        "step_id": "tbv004",
+        "title": "Mock trajectory metrics",
+        "scope": "testbench",
+        "description": "Add mock trajectory metrics to mock.ts"
+      },
+      {
+        "step_id": "tbv005",
+        "title": "Display in console reporter",
+        "scope": "testbench",
+        "description": "Add trajectory metrics section to console output"
+      }
+    ]
+  }
+}

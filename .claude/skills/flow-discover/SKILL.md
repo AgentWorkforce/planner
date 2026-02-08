@@ -5,14 +5,15 @@ user-invocable: false
 ---
 # Discover: Codebase → Feature Catalog
 
-**Owns**: Creates `catalog.json` (with components) and feature `summary` sections from existing code.
+**Owns**: Creates `catalog.json` (with components) and feature `summary`, `understanding`, `context` sections from existing code.
 
 ## Purpose
 
 Analyze an existing codebase and map discovered features to the schema:
 - Detect project components (backend, frontend, database, etc.)
 - Traverse code to find what features exist
-- Infer feature boundaries and relationships
+- Extract understanding (patterns, decisions evident in code)
+- Infer context (decisions that were made)
 - Create catalog.json and feature files
 - Mark confidence levels appropriately
 
@@ -36,6 +37,8 @@ Analyze an existing codebase and map discovered features to the schema:
 - Add `"source": "discovered"` to feature metadata
 - Use existing docs/comments to inform goal/criteria where available
 - Mark uncertainty: if goal is unclear, write "INFERRED: ..." in goal field
+- Extract understanding from code patterns
+- Infer context from evident decisions
 - After writing: run flow-visualize to show results
 
 ## Workflow
@@ -78,14 +81,57 @@ For each component, look for feature boundaries in:
 - **Config/Feature flags**: Feature toggles, A/B tests
 - **Documentation**: README, docs/, inline comments
 
-### 2. Identify Feature Categories
+### 2. Extract Understanding
+
+As you analyze code, extract observations by role:
+
+**Architect observations**:
+- What patterns are used? (MVC, repository, service layer)
+- What tech stack decisions were made?
+- How are components structured?
+- What integration points exist?
+
+**Designer observations** (if UI exists):
+- What component library is used?
+- What styling approach? (CSS modules, Tailwind, styled-components)
+- What patterns are evident? (cards, tables, forms)
+
+**Tester observations**:
+- What test framework is used?
+- What's the test coverage pattern?
+- What's testable, what's tightly coupled?
+
+**Security observations**:
+- How is auth implemented?
+- What data validation exists?
+- What sensitive data is handled?
+
+### 3. Infer Context
+
+From evident decisions in the code, populate context:
+
+```json
+"context": {
+  "architect": {
+    "tech_stack": "TypeScript, Express, SQLite",
+    "api_style": "REST with Zod validation",
+    "storage": "JSONB for nested data, relational for queried fields"
+  },
+  "designer": {
+    "library": "shadcn/ui (detected from imports)",
+    "theme": "dark mode (CSS variables)"
+  }
+}
+```
+
+### 4. Identify Feature Categories
 
 Group related functionality into epics:
 - Authentication (login, register, password reset)
 - Payments (checkout, subscriptions, invoices)
 - Core functionality (what the app actually does)
 
-### 3. Draft Feature List
+### 5. Draft Feature List
 
 Before writing files, summarize findings:
 ```
@@ -105,7 +151,7 @@ Payments (2 features)
 Create catalog and feature files? [Y/n]
 ```
 
-### 4. Write Files
+### 6. Write Files
 
 On confirmation, create:
 
@@ -142,6 +188,29 @@ On confirmation, create:
       { "id": "ac1", "description": "INFERRED: User can log in with email/password" }
     ]
   },
+  "understanding": {
+    "architect": {
+      "observations": ["Uses JWT tokens", "Express middleware for auth", "Rate limiting present"],
+      "keywords": ["JWT", "middleware", "rate-limit"],
+      "references": ["src/middleware/auth.ts", "src/routes/auth.ts"],
+      "confidence": "confident"
+    },
+    "security": {
+      "observations": ["Password hashing with bcrypt", "Token rotation implemented"],
+      "concerns": ["No 2FA detected"],
+      "confidence": "forming"
+    }
+  },
+  "context": {
+    "architect": {
+      "auth_method": "JWT (discovered from code)",
+      "session_storage": "httpOnly cookies"
+    },
+    "security": {
+      "password_hashing": "bcrypt",
+      "token_expiry": "7 days (from config)"
+    }
+  },
   "plan_implementation": {
     "scopes": ["backend", "frontend", "database"],
     "steps": []
@@ -154,7 +223,7 @@ On confirmation, create:
 - Payments (frontend + backend + webhooks)
 - Real-time features (frontend + backend + messaging)
 
-### 5. Visualize Results
+### 7. Visualize Results
 
 After writing, run flow-visualize to show what was created.
 
@@ -209,20 +278,31 @@ Identify project components by scanning for:
 | `package.json` scripts | Build/deploy features |
 | `.env.example` | Configuration features |
 
+## Understanding Extraction Patterns
+
+| Code Pattern | Understanding Entry |
+|--------------|---------------------|
+| `import { z } from 'zod'` | architect: "Uses Zod for validation" |
+| `@Controller`, `@Get` decorators | architect: "NestJS/controller pattern" |
+| `prisma.*.findMany` | architect: "Prisma ORM for data access" |
+| `useQuery`, `useMutation` | architect: "React Query for server state" |
+| `tailwind.config` | designer: "Tailwind CSS for styling" |
+| `describe`, `it`, `expect` | tester: "Jest/Vitest testing" |
+
 ## Confidence Levels
 
 | Confidence | When | Marker |
 |------------|------|--------|
-| High | Found in docs + code matches | (none) |
-| Medium | Clear code pattern, no docs | "INFERRED: " |
-| Low | Ambiguous or incomplete | "UNCLEAR: " |
+| High | Found in docs + code matches | `"confident"` |
+| Medium | Clear code pattern, no docs | `"forming"` + "INFERRED: " |
+| Low | Ambiguous or incomplete | `"exploring"` + "UNCLEAR: " |
 
 ## Fits the Whole
 
 | Skill | Section |
 |-------|---------|
-| **flow-discover** | `summary` (from code) + `components` |
-| flow-brainstorm | `summary` (from ideas) |
+| **flow-discover** | `summary`, `understanding`, `context` (from code) + `components` |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
 | flow-planner | `plan_implementation` |
 | flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
@@ -237,3 +317,12 @@ After discovery:
 - Run `/flow audit` to verify code matches discovered docs
 - Run `/flow brainstorm` to add missing features
 - Run `/flow feature` to document user flows
+
+## Done When
+
+- Catalog exists with components
+- Each feature has: goal, acceptance criteria (even if inferred)
+- Understanding extracted from code patterns (at least architect role)
+- Context inferred from evident decisions
+- Confidence levels marked appropriately
+- Cross-component features have all scopes listed

@@ -159,7 +159,7 @@ export function SessionsPhysicsColumn() {
         </h2>
         <p className="text-xs text-[var(--canvas-text-muted)] mt-1">
           {loading
-            ? 'Loading sessions...'
+            ? 'Opening garden...'
             : activeSessions.length > MAX_VISIBLE_SESSIONS
             ? `${activeSessions.length} active (showing ${MAX_VISIBLE_SESSIONS})`
             : `${activeSessions.length} active`
@@ -178,7 +178,7 @@ export function SessionsPhysicsColumn() {
         {error && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-sm text-text-error">
-              <p>Failed to load sessions</p>
+              <p>Lost connection to garden</p>
               <p className="text-xs text-text-muted mt-1">{error.message}</p>
             </div>
           </div>

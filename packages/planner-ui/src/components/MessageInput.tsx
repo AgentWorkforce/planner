@@ -9,7 +9,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { SendIcon } from './icons';
 
 interface MessageInputProps {
-  onSend: (body: string, data?: Record<string, unknown>) => void;
+  onSend: (content: string, data?: Record<string, unknown>) => void;
   disabled?: boolean;
   placeholder?: string;
   planContext?: {

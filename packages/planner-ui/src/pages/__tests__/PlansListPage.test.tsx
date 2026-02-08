@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { PlansListPage } from '../PlansListPage';
 import type { PlanSummary, AttentionType } from '@/types';
 import type { PlansFilter } from '@/hooks/usePlansFilter';
+import type { PlansViewMode } from '@/hooks';
 
 // Mock API functions
 vi.mock('@/api', () => ({
@@ -20,46 +21,14 @@ vi.mock('@/hooks', () => ({
   useScopeGroupExpansion: vi.fn(),
   useFuzzySearch: vi.fn(),
   useInitiatives: vi.fn(),
-}));
-
-// Mock components to simplify testing
-vi.mock('@/components/NeedsAttentionSection', () => ({
-  NeedsAttentionSection: ({ plans }: { plans: PlanSummary[] }) => (
-    <div data-testid="needs-attention-section">
-      {plans.length > 0 && <div>Needs Attention: {plans.length}</div>}
-    </div>
-  ),
-}));
-
-vi.mock('@/components/WorkingOnSection', () => ({
-  WorkingOnSection: ({ plans }: { plans: PlanSummary[] }) => (
-    <div data-testid="working-on-section">
-      {plans.length > 0 && <div>Working On: {plans.length}</div>}
-    </div>
-  ),
+  useCurrentUser: vi.fn(() => ({
+    userId: 'test-user-id',
+    sessionId: 'test-session-id',
+  })),
 }));
 
 vi.mock('@/components/AttentionSkeleton', () => ({
   PlansListSkeleton: () => <div data-testid="plans-list-skeleton">Loading...</div>,
-}));
-
-vi.mock('@/components/CollapsibleSection', () => ({
-  CollapsibleSection: ({
-    title,
-    count,
-    children,
-  }: {
-    title: string;
-    count: number;
-    children: React.ReactNode;
-  }) => (
-    <div data-testid="collapsible-section">
-      <h2>
-        {title} {count !== undefined && `(${count})`}
-      </h2>
-      {children}
-    </div>
-  ),
 }));
 
 vi.mock('@/components/PlanCard', () => ({
@@ -70,22 +39,35 @@ vi.mock('@/components/PlanCard', () => ({
   ),
 }));
 
-vi.mock('@/components/ScopeGroup', () => ({
-  ScopeGroup: ({
-    scopeName,
-    plans,
-    isExpanded,
-    onToggle,
+vi.mock('@/components/PlanTable', () => ({
+  PlanTable: ({ plans }: { plans: PlanSummary[] }) => (
+    <div data-testid="plan-table">
+      {plans.map((plan) => (
+        <div key={plan.plan_id} data-testid="plan-table-row" data-plan-id={plan.plan_id}>
+          {plan.goal}
+        </div>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/SectionedPlanTable', () => ({
+  SectionedPlanTable: ({
+    scopeGroups,
+    sortedScopeNames,
   }: {
-    scopeName: string;
-    plans: PlanSummary[];
-    isExpanded: boolean;
-    onToggle: () => void;
+    scopeGroups: Map<string, PlanSummary[]>;
+    sortedScopeNames: string[];
+    isExpanded: (scope: string) => boolean;
+    onToggle: (scope: string) => void;
   }) => (
-    <div data-testid="scope-group" data-scope={scopeName}>
-      <button onClick={onToggle}>
-        {scopeName} ({plans.length}) - {isExpanded ? 'Expanded' : 'Collapsed'}
-      </button>
+    <div data-testid="sectioned-plan-table">
+      {sortedScopeNames.map((scope) => (
+        <div key={scope} data-testid="scope-section" data-scope={scope}>
+          <span>{scope}</span>
+          <span>({scopeGroups.get(scope)?.length || 0} plans)</span>
+        </div>
+      ))}
     </div>
   ),
 }));
@@ -94,15 +76,15 @@ vi.mock('@/components/plans/PlansToolbar', () => ({
   PlansToolbar: ({
     title,
     filter,
-    onFilterChange,
     viewMode,
+    onFilterChange,
     onViewModeChange,
   }: {
     title: string;
     filter: PlansFilter;
     onFilterChange: (filter: Partial<PlansFilter>) => void;
-    viewMode: 'list' | 'grouped';
-    onViewModeChange: (mode: 'list' | 'grouped') => void;
+    viewMode: PlansViewMode;
+    onViewModeChange: (mode: PlansViewMode) => void;
   }) => (
     <div data-testid="plans-toolbar">
       <h1>{title}</h1>
@@ -110,9 +92,11 @@ vi.mock('@/components/plans/PlansToolbar', () => ({
       <button onClick={() => onFilterChange({ initiative_id: 'init-1' })}>
         Filter: Initiative
       </button>
-      <button onClick={() => onViewModeChange('grouped')}>View: Grouped</button>
-      <div>Current Status: {filter.status}</div>
-      <div>Current View: {viewMode}</div>
+      <button onClick={() => onViewModeChange('table')}>View: Table</button>
+      <button onClick={() => onViewModeChange('sectioned')}>View: Sectioned</button>
+      <button onClick={() => onViewModeChange('cards')}>View: Cards</button>
+      <div data-testid="current-status">Current Status: {filter.status}</div>
+      <div data-testid="current-view">Current View: {viewMode}</div>
     </div>
   ),
 }));
@@ -157,9 +141,9 @@ function createMockPlanSummary(
   };
 }
 
-function renderWithRouter() {
+function renderWithRouter(initialEntries: string[] = ['/plans']) {
   return render(
-    <MemoryRouter initialEntries={['/plans']}>
+    <MemoryRouter initialEntries={initialEntries}>
       <PlansListPage />
     </MemoryRouter>
   );
@@ -169,8 +153,6 @@ describe('PlansListPage', () => {
   const mockSetFilter = vi.fn();
   const mockSetViewMode = vi.fn();
   const mockToggleExpansion = vi.fn();
-  const mockExpandAll = vi.fn();
-  const mockCollapseAll = vi.fn();
   const mockIsExpanded = vi.fn();
 
   const defaultFilter: PlansFilter = {
@@ -190,7 +172,7 @@ describe('PlansListPage', () => {
     });
 
     vi.mocked(usePlansViewMode).mockReturnValue({
-      viewMode: 'list',
+      viewMode: 'table',
       setViewMode: mockSetViewMode,
     });
 
@@ -203,8 +185,8 @@ describe('PlansListPage', () => {
     vi.mocked(useScopeGroupExpansion).mockReturnValue({
       isExpanded: mockIsExpanded,
       toggleExpansion: mockToggleExpansion,
-      expandAll: mockExpandAll,
-      collapseAll: mockCollapseAll,
+      expandAll: vi.fn(),
+      collapseAll: vi.fn(),
     });
 
     vi.mocked(useFuzzySearch).mockReturnValue([]);
@@ -240,13 +222,23 @@ describe('PlansListPage', () => {
       });
     });
 
+    it('passes title "My Plans" on /plans/my route', async () => {
+      vi.mocked(listPlans).mockResolvedValue({ plans: [] });
+
+      renderWithRouter(['/plans/my']);
+
+      await waitFor(() => {
+        expect(screen.getByText('My Plans')).toBeInTheDocument();
+      });
+    });
+
     it('passes filter to PlansToolbar', async () => {
       vi.mocked(listPlans).mockResolvedValue({ plans: [] });
 
       renderWithRouter();
 
       await waitFor(() => {
-        expect(screen.getByText('Current Status: all')).toBeInTheDocument();
+        expect(screen.getByTestId('current-status')).toHaveTextContent('Current Status: all');
       });
     });
 
@@ -256,7 +248,7 @@ describe('PlansListPage', () => {
       renderWithRouter();
 
       await waitFor(() => {
-        expect(screen.getByText('Current View: list')).toBeInTheDocument();
+        expect(screen.getByTestId('current-view')).toHaveTextContent('Current View: table');
       });
     });
   });
@@ -317,94 +309,6 @@ describe('PlansListPage', () => {
         expect(
           screen.getByText(/create your first plan using the/i)
         ).toBeInTheDocument();
-      });
-    });
-
-    it('does not show attention sections when no plans exist', async () => {
-      vi.mocked(listPlans).mockResolvedValue({ plans: [] });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('needs-attention-section')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('attention sections', () => {
-    it('renders NeedsAttentionSection when plans exist', async () => {
-      const plans = [createMockPlanSummary()];
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [plans[0]],
-        workingOn: [],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByTestId('needs-attention-section')).toBeInTheDocument();
-      });
-    });
-
-    it('renders WorkingOnSection when plans exist', async () => {
-      const plans = [createMockPlanSummary()];
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [],
-        workingOn: [plans[0]],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByTestId('working-on-section')).toBeInTheDocument();
-      });
-    });
-
-    it('passes correct plans to NeedsAttentionSection', async () => {
-      const plan1 = createMockPlanSummary({
-        plan_id: 'plan-1',
-        attention_types: ['awaiting_approval'],
-      });
-      const plan2 = createMockPlanSummary({ plan_id: 'plan-2' });
-      const plans = [plan1, plan2];
-
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [plan1],
-        workingOn: [],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByText('Needs Attention: 1')).toBeInTheDocument();
-      });
-    });
-
-    it('passes correct plans to WorkingOnSection', async () => {
-      const plan1 = createMockPlanSummary({
-        plan_id: 'plan-1',
-        attention_types: ['active'],
-      });
-      const plan2 = createMockPlanSummary({ plan_id: 'plan-2' });
-      const plans = [plan1, plan2];
-
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [],
-        workingOn: [plan1],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByText('Working On: 1')).toBeInTheDocument();
       });
     });
   });
@@ -538,13 +442,43 @@ describe('PlansListPage', () => {
   });
 
   describe('view mode toggle', () => {
-    it('displays plans in list view by default', async () => {
+    it('displays plans in table view by default', async () => {
       const plans = [
         createMockPlanSummary({ plan_id: 'plan-1', goal: 'Plan 1' }),
         createMockPlanSummary({ plan_id: 'plan-2', goal: 'Plan 2' }),
       ];
 
       vi.mocked(listPlans).mockResolvedValue({ plans });
+      vi.mocked(usePlansViewMode).mockReturnValue({
+        viewMode: 'table',
+        setViewMode: mockSetViewMode,
+      });
+      vi.mocked(useAttentionPlans).mockReturnValue({
+        needsAttention: [],
+        workingOn: [],
+        allOther: plans,
+      });
+
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('plan-table')).toBeInTheDocument();
+        const planRows = screen.getAllByTestId('plan-table-row');
+        expect(planRows).toHaveLength(2);
+      });
+    });
+
+    it('displays plans in cards view when viewMode is "cards"', async () => {
+      const plans = [
+        createMockPlanSummary({ plan_id: 'plan-1', goal: 'Plan 1' }),
+        createMockPlanSummary({ plan_id: 'plan-2', goal: 'Plan 2' }),
+      ];
+
+      vi.mocked(listPlans).mockResolvedValue({ plans });
+      vi.mocked(usePlansViewMode).mockReturnValue({
+        viewMode: 'cards',
+        setViewMode: mockSetViewMode,
+      });
       vi.mocked(useAttentionPlans).mockReturnValue({
         needsAttention: [],
         workingOn: [],
@@ -556,11 +490,11 @@ describe('PlansListPage', () => {
       await waitFor(() => {
         const planCards = screen.getAllByTestId('plan-card');
         expect(planCards).toHaveLength(2);
-        expect(screen.queryByTestId('scope-group')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('plan-table')).not.toBeInTheDocument();
       });
     });
 
-    it('displays plans in grouped view when viewMode is "grouped"', async () => {
+    it('displays plans in sectioned view when viewMode is "sectioned"', async () => {
       const plans = [
         createMockPlanSummary({
           plan_id: 'plan-1',
@@ -576,7 +510,7 @@ describe('PlansListPage', () => {
 
       vi.mocked(listPlans).mockResolvedValue({ plans });
       vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
+        viewMode: 'sectioned',
         setViewMode: mockSetViewMode,
       });
       vi.mocked(useAttentionPlans).mockReturnValue({
@@ -588,41 +522,17 @@ describe('PlansListPage', () => {
       renderWithRouter();
 
       await waitFor(() => {
-        expect(screen.getAllByTestId('scope-group')).toHaveLength(2);
+        expect(screen.getByTestId('sectioned-plan-table')).toBeInTheDocument();
+        const scopeSections = screen.getAllByTestId('scope-section');
+        expect(scopeSections).toHaveLength(2);
       });
     });
 
-    it('shows expand/collapse controls in grouped view', async () => {
-      const plans = [createMockPlanSummary({ scopes: ['frontend'] })];
-
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
-        setViewMode: mockSetViewMode,
-      });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [],
-        workingOn: [],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByText('Expand all')).toBeInTheDocument();
-        expect(screen.getByText('Collapse all')).toBeInTheDocument();
-      });
-    });
-
-    it('calls expandAll when Expand all clicked', async () => {
+    it('calls setViewMode when view mode button is clicked', async () => {
       const user = userEvent.setup();
-      const plans = [createMockPlanSummary({ scopes: ['frontend'] })];
+      const plans = [createMockPlanSummary()];
 
       vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
-        setViewMode: mockSetViewMode,
-      });
       vi.mocked(useAttentionPlans).mockReturnValue({
         needsAttention: [],
         workingOn: [],
@@ -632,36 +542,11 @@ describe('PlansListPage', () => {
       renderWithRouter();
 
       await waitFor(() => {
-        expect(screen.getByText('Expand all')).toBeInTheDocument();
+        expect(screen.getByText('View: Sectioned')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('Expand all'));
-      expect(mockExpandAll).toHaveBeenCalled();
-    });
-
-    it('calls collapseAll when Collapse all clicked', async () => {
-      const user = userEvent.setup();
-      const plans = [createMockPlanSummary({ scopes: ['frontend'] })];
-
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
-        setViewMode: mockSetViewMode,
-      });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [],
-        workingOn: [],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByText('Collapse all')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText('Collapse all'));
-      expect(mockCollapseAll).toHaveBeenCalled();
+      await user.click(screen.getByText('View: Sectioned'));
+      expect(mockSetViewMode).toHaveBeenCalledWith('sectioned');
     });
   });
 
@@ -712,8 +597,8 @@ describe('PlansListPage', () => {
     });
   });
 
-  describe('scope grouping', () => {
-    it('groups plans by scope in grouped view', async () => {
+  describe('scope grouping in sectioned view', () => {
+    it('groups plans by scope in sectioned view', async () => {
       const plans = [
         createMockPlanSummary({
           plan_id: 'plan-1',
@@ -729,7 +614,7 @@ describe('PlansListPage', () => {
 
       vi.mocked(listPlans).mockResolvedValue({ plans });
       vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
+        viewMode: 'sectioned',
         setViewMode: mockSetViewMode,
       });
       vi.mocked(useAttentionPlans).mockReturnValue({
@@ -741,8 +626,8 @@ describe('PlansListPage', () => {
       renderWithRouter();
 
       await waitFor(() => {
-        const scopeGroups = screen.getAllByTestId('scope-group');
-        expect(scopeGroups).toHaveLength(2);
+        const scopeSections = screen.getAllByTestId('scope-section');
+        expect(scopeSections).toHaveLength(2);
       });
     });
 
@@ -757,7 +642,7 @@ describe('PlansListPage', () => {
 
       vi.mocked(listPlans).mockResolvedValue({ plans });
       vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
+        viewMode: 'sectioned',
         setViewMode: mockSetViewMode,
       });
       vi.mocked(useAttentionPlans).mockReturnValue({
@@ -782,7 +667,7 @@ describe('PlansListPage', () => {
 
       vi.mocked(listPlans).mockResolvedValue({ plans });
       vi.mocked(usePlansViewMode).mockReturnValue({
-        viewMode: 'grouped',
+        viewMode: 'sectioned',
         setViewMode: mockSetViewMode,
       });
       vi.mocked(useAttentionPlans).mockReturnValue({
@@ -794,43 +679,16 @@ describe('PlansListPage', () => {
       renderWithRouter();
 
       await waitFor(() => {
-        const scopeGroups = screen.getAllByTestId('scope-group');
-        expect(scopeGroups).toHaveLength(3);
+        const scopeSections = screen.getAllByTestId('scope-section');
+        expect(scopeSections).toHaveLength(3);
       });
 
-      const scopeGroups = screen.getAllByTestId('scope-group');
+      const scopeSections = screen.getAllByTestId('scope-section');
 
       // Check order: alpha, zebra, Uncategorized
-      expect(scopeGroups[0].textContent).toContain('alpha');
-      expect(scopeGroups[1].textContent).toContain('zebra');
-      expect(scopeGroups[2].textContent).toContain('Uncategorized');
-    });
-  });
-
-  describe('All Plans section', () => {
-    it('shows count of all plans in section header', async () => {
-      const plans = [
-        createMockPlanSummary({ plan_id: 'plan-1' }),
-        createMockPlanSummary({ plan_id: 'plan-2' }),
-        createMockPlanSummary({ plan_id: 'plan-3' }),
-      ];
-
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [],
-        workingOn: [],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        // The collapsible section should be rendered
-        expect(screen.getByTestId('collapsible-section')).toBeInTheDocument();
-        // And it should contain the title and count
-        expect(screen.getByText(/All Plans/)).toBeInTheDocument();
-        expect(screen.getByText(/\(3\)/)).toBeInTheDocument();
-      });
+      expect(scopeSections[0]).toHaveAttribute('data-scope', 'alpha');
+      expect(scopeSections[1]).toHaveAttribute('data-scope', 'zebra');
+      expect(scopeSections[2]).toHaveAttribute('data-scope', 'Uncategorized');
     });
   });
 
@@ -866,39 +724,6 @@ describe('PlansListPage', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('plans-list-skeleton')).not.toBeInTheDocument();
         expect(screen.getByText('Test Plan')).toBeInTheDocument();
-      });
-    });
-
-    it('correctly categorizes plans across attention sections', async () => {
-      const plan1 = createMockPlanSummary({
-        plan_id: 'plan-1',
-        goal: 'Needs Attention',
-        attention_types: ['awaiting_approval'],
-      });
-      const plan2 = createMockPlanSummary({
-        plan_id: 'plan-2',
-        goal: 'Working On',
-        attention_types: ['active'],
-      });
-      const plan3 = createMockPlanSummary({
-        plan_id: 'plan-3',
-        goal: 'Regular Plan',
-      });
-      const plans = [plan1, plan2, plan3];
-
-      vi.mocked(listPlans).mockResolvedValue({ plans });
-      vi.mocked(useAttentionPlans).mockReturnValue({
-        needsAttention: [plan1],
-        workingOn: [plan2],
-        allOther: plans,
-      });
-
-      renderWithRouter();
-
-      await waitFor(() => {
-        expect(screen.getByText('Needs Attention: 1')).toBeInTheDocument();
-        expect(screen.getByText('Working On: 1')).toBeInTheDocument();
-        expect(screen.getByText('Regular Plan')).toBeInTheDocument();
       });
     });
   });

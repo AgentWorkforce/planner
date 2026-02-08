@@ -1,78 +1,92 @@
-import { CheckCircle2, UserPlus, UserMinus, GitBranch, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+export type SystemEventType = 'step_completed' | 'agent_decision' | 'context_shift' | 'phase_transition' | 'general';
 
-interface SystemEventProps {
-  type: 'focus_change' | 'agent_joined' | 'agent_left' | 'graduation' | 'status_change';
-  message: string;
-  timestamp: string;
-  metadata?: Record<string, any>;
+export interface SystemEventMetadata {
+  label: string;
+  value: string;
   onClick?: () => void;
 }
 
-function getIcon(type: SystemEventProps['type']) {
-  switch (type) {
-    case 'focus_change':
-      return <AlertCircle className="w-3 h-3" />;
-    case 'agent_joined':
-      return <UserPlus className="w-3 h-3" />;
-    case 'agent_left':
-      return <UserMinus className="w-3 h-3" />;
-    case 'graduation':
-      return <GitBranch className="w-3 h-3" />;
-    case 'status_change':
-      return <CheckCircle2 className="w-3 h-3" />;
-    default:
-      return null;
-  }
+export interface SystemEventProps {
+  type: SystemEventType;
+  content: string;
+  metadata?: SystemEventMetadata[];
+  timestamp: string;
 }
 
-function formatTimestamp(timestamp: string): string {
-  const now = new Date();
-  const eventTime = new Date(timestamp);
-  const diffMs = now.getTime() - eventTime.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-
-  if (diffMinutes < 1) return 'just now';
-  if (diffMinutes < 60) {
-    const minutes = diffMinutes;
-    const seconds = diffSeconds % 60;
-    return `${minutes}m ${seconds}s`;
-  }
-  if (diffHours < 24) {
-    const minutes = diffMinutes % 60;
-    return `${diffHours}h ${minutes}m`;
-  }
-  return eventTime.toLocaleDateString();
-}
-
-export function SystemEvent({ type, message, timestamp, metadata, onClick }: SystemEventProps) {
-  const formattedTime = formatTimestamp(timestamp);
+/**
+ * SystemEvent
+ *
+ * Compact inline system event marker. Attention level 1 - blends into background.
+ *
+ * Renders format: `┊ Step completed · 4m 12s · PR #43 created`
+ * - Uses ┊ as left border indicator
+ * - Middle dot (·) separates metadata items
+ * - Minimal vertical padding (py-1)
+ * - Blends into background with text-text-muted
+ * - Clickable metadata items get hover:text-accent-primary cursor-pointer
+ */
+export function SystemEvent({ content, metadata, timestamp }: SystemEventProps) {
+  const formattedTime = formatRelativeTime(timestamp);
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 py-2 px-4 group",
-        onClick && "cursor-pointer hover:bg-bg-subtle transition-colors"
-      )}
-      onClick={onClick}
-    >
-      <div className="flex-1 h-px bg-border-subtle" />
-      <span className="flex items-center gap-1.5 text-xs text-text-muted whitespace-nowrap font-normal">
-        <span className="text-text-muted/60">┊</span>
-        {getIcon(type)}
-        <span>{message}</span>
-        <span className="text-text-muted/60">·</span>
-        <span className="text-text-muted/80">{formattedTime}</span>
-        {metadata?.pr && (
-          <>
-            <span className="text-text-muted/60">·</span>
-            <span className="text-accent-cyan/80">PR #{metadata.pr}</span>
-          </>
-        )}
+    <div className="flex items-center gap-2 py-1 text-xs text-text-muted">
+      {/* Vertical bar indicator */}
+      <span className="text-border-subtle" aria-hidden="true">
+        ┊
       </span>
-      <div className="flex-1 h-px bg-border-subtle" />
+
+      {/* Content */}
+      <span>{content}</span>
+
+      {/* Separator */}
+      <span aria-hidden="true">·</span>
+
+      {/* Time */}
+      <span>{formattedTime}</span>
+
+      {/* Optional metadata items */}
+      {metadata && metadata.map((item, index) => (
+        <span key={index} className="flex items-center gap-2">
+          <span aria-hidden="true">·</span>
+          {item.onClick ? (
+            <button
+              onClick={item.onClick}
+              className="hover:text-accent-primary cursor-pointer transition-colors"
+            >
+              {item.label}: {item.value}
+            </button>
+          ) : (
+            <span>
+              {item.label}: {item.value}
+            </span>
+          )}
+        </span>
+      ))}
     </div>
   );
+}
+
+/**
+ * Format timestamp as relative time (e.g., "4m 12s", "2h 30m", "3d")
+ */
+function formatRelativeTime(timestamp: string): string {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffMs = now.getTime() - then.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 60) {
+    return `${diffSec}s`;
+  } else if (diffSec < 3600) {
+    const min = Math.floor(diffSec / 60);
+    const sec = diffSec % 60;
+    return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
+  } else if (diffSec < 86400) {
+    const hours = Math.floor(diffSec / 3600);
+    const min = Math.floor((diffSec % 3600) / 60);
+    return min > 0 ? `${hours}h ${min}m` : `${hours}h`;
+  } else {
+    const days = Math.floor(diffSec / 86400);
+    return `${days}d`;
+  }
 }

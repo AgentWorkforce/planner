@@ -1,0 +1,11 @@
+{
+  "feature_id": "ui-dsm-cleanup",
+  "title": "Cleanup Deprecated Components",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "parent": "ui-design-system-migration",
+  "summary": {
+    "goal": "Cleanup Deprecated Components"
+  }
+}

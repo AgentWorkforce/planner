@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { ChevronIcon } from '@/components/icons/ChevronIcon';
 
 interface TendLayoutProps {
   nav: ReactNode;
@@ -8,11 +9,14 @@ interface TendLayoutProps {
   center: ReactNode;
   statusBar?: ReactNode;
   focusMode?: boolean;
+  leftCollapsed?: boolean;
+  rightCollapsed?: boolean;
+  onToggleLeft?: () => void;
   className?: string;
 }
 
 /**
- * TendLayout - CSS Grid layout for tend workspace
+ * TendLayout - CSS Grid layout for tend application
  *
  * Desktop layout (normal):
  * +----------+------------------+----------+
@@ -45,26 +49,40 @@ export function TendLayout({
   center,
   statusBar,
   focusMode = false,
+  leftCollapsed = false,
+  rightCollapsed = false,
+  onToggleLeft,
   className,
 }: TendLayoutProps) {
-  const gridStyle = focusMode
-    ? {
+  const getGridStyle = () => {
+    if (focusMode) {
+      return {
         gridTemplateAreas: '"nav right" "center right" "status status"',
         gridTemplateColumns: 'minmax(400px, 3fr) minmax(200px, 1fr)',
         gridTemplateRows: 'auto 1fr auto',
-      }
-    : {
-        gridTemplateAreas:
-          '"left nav right" "left center right" "status status status"',
-        gridTemplateColumns: 'minmax(300px, 1.5fr) minmax(320px, 1.5fr) minmax(200px, 1fr)',
-        gridTemplateRows: 'auto 1fr auto',
       };
+    }
+
+    const leftCol = leftCollapsed ? '0px' : 'minmax(200px, 1fr)';
+    const rightCol = rightCollapsed ? '0px' : 'minmax(200px, 1fr)';
+    const centerCol = 'minmax(320px, 2.5fr)';
+
+    return {
+      gridTemplateAreas:
+        '"left nav right" "left center right" "status status status"',
+      gridTemplateColumns: `${leftCol} ${centerCol} ${rightCol}`,
+      gridTemplateRows: 'auto 1fr auto',
+    };
+  };
+
+  const gridStyle = getGridStyle();
 
   return (
     <div
       className={cn(
         'h-full w-full bg-[var(--canvas-bg)]',
-        'flex flex-col md:grid',
+        'flex flex-col md:grid md:transition-[grid-template-columns] md:duration-300 md:ease-in-out',
+        'relative',
         className,
       )}
       style={gridStyle}
@@ -79,10 +97,13 @@ export function TendLayout({
         className={cn(
           'order-3 md:order-none md:overflow-hidden',
           focusMode && 'hidden md:hidden',
+          leftCollapsed && 'md:opacity-0 md:pointer-events-none',
         )}
         style={{ gridArea: focusMode ? undefined : 'left' }}
       >
-        {leftPanel}
+        <div className="h-full md:transition-opacity md:duration-300">
+          {leftPanel}
+        </div>
       </div>
 
       {/* Center — chat / focus content */}
@@ -95,10 +116,15 @@ export function TendLayout({
 
       {/* Right Panel */}
       <div
-        className="order-4 md:order-none md:overflow-hidden"
+        className={cn(
+          'order-4 md:order-none md:overflow-hidden',
+          rightCollapsed && 'md:opacity-0 md:pointer-events-none',
+        )}
         style={{ gridArea: 'right' }}
       >
-        {rightPanel}
+        <div className="h-full md:transition-opacity md:duration-300">
+          {rightPanel}
+        </div>
       </div>
 
       {/* Status Bar */}
@@ -106,6 +132,23 @@ export function TendLayout({
         <div className="order-5 md:order-none" style={{ gridArea: 'status' }}>
           {statusBar}
         </div>
+      )}
+
+      {/* Left panel collapse toggle - only visible on desktop */}
+      {!focusMode && onToggleLeft && (
+        <button
+          onClick={onToggleLeft}
+          className={cn(
+            'hidden md:flex absolute top-1/2 -translate-y-1/2 z-10 w-5 h-10 items-center justify-center',
+            'rounded-r-md bg-bg-secondary border border-l-0 border-border-subtle',
+            'hover:bg-bg-tertiary transition-all duration-300',
+            'shadow-sm',
+            leftCollapsed ? 'left-0' : 'left-[calc((100%-16rem)/2.5)]',
+          )}
+          aria-label={leftCollapsed ? 'Show forming blocks' : 'Hide forming blocks'}
+        >
+          <ChevronIcon direction={leftCollapsed ? 'right' : 'left'} size="sm" />
+        </button>
       )}
     </div>
   );

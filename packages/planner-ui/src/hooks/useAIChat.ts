@@ -5,6 +5,7 @@ import {
   applySuggestion as apiApplySuggestion,
   createMockChatResponse,
 } from '@/api';
+import { STORAGE_KEYS } from '@/config/storage-keys';
 
 interface UseAIChatOptions {
   /** Initial open state */
@@ -51,18 +52,11 @@ interface UseAIChatResult {
  * - Error handling
  */
 /**
- * Get localStorage key for a plan's chat history
- */
-function getStorageKey(planId: string): string {
-  return `planner-chat-${planId}`;
-}
-
-/**
  * Load chat history from localStorage
  */
 function loadFromStorage(planId: string): ChatMessage[] {
   try {
-    const stored = localStorage.getItem(getStorageKey(planId));
+    const stored = localStorage.getItem(STORAGE_KEYS.chatHistory(planId));
     if (stored) {
       return JSON.parse(stored);
     }
@@ -77,7 +71,7 @@ function loadFromStorage(planId: string): ChatMessage[] {
  */
 function saveToStorage(planId: string, messages: ChatMessage[]): void {
   try {
-    localStorage.setItem(getStorageKey(planId), JSON.stringify(messages));
+    localStorage.setItem(STORAGE_KEYS.chatHistory(planId), JSON.stringify(messages));
   } catch {
     // Ignore storage errors (e.g., quota exceeded)
   }

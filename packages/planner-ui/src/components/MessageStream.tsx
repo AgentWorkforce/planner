@@ -7,6 +7,8 @@
 
 import { useRef, useEffect } from 'react';
 import type { RelayMessage } from '@/types';
+import { QAMessageCard } from './QAMessageCard';
+import { isQAMessage } from '@/types/relay';
 
 interface MessageStreamProps {
   messages: RelayMessage[];
@@ -30,7 +32,7 @@ export function MessageStream({
 
   if (isLoading && messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="flex gap-1">
           <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
           <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -42,7 +44,7 @@ export function MessageStream({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+      <div className="h-full flex flex-col items-center justify-center text-center p-4">
         <p className="text-text-secondary">No messages yet</p>
         <p className="text-sm text-text-muted mt-1">
           Start the conversation by sending a message below
@@ -55,12 +57,22 @@ export function MessageStream({
   const groupedMessages = groupMessagesByDate(messages);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="h-full overflow-y-auto p-4 space-y-4">
       {Object.entries(groupedMessages).map(([dateLabel, dateMessages]) => (
         <div key={dateLabel}>
           <DateSeparator label={dateLabel} />
           <div className="space-y-3 mt-3">
             {dateMessages.map((message, index) => {
+              // Check if this is a Q&A message
+              if (message.data && isQAMessage(message.data)) {
+                return (
+                  <div key={message.id} className="w-full flex justify-center">
+                    <QAMessageCard {...message.data} timestamp={message.timestamp} />
+                  </div>
+                );
+              }
+
+              // Regular chat message
               const prevMessage = index > 0 ? dateMessages[index - 1] : null;
               const showAvatar = !prevMessage || prevMessage.from !== message.from;
               const isOwn = message.from === currentUserId;
@@ -106,8 +118,6 @@ function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
   const isAgent = message.entityType === 'agent';
   // Fallback for missing fromName (e.g., from REST API history)
   const displayName = message.fromName || message.from || 'Unknown';
-  // Handle both 'body' (WebSocket) and 'content' (REST API) fields
-  const messageBody = message.body || (message as unknown as { content?: string }).content || '';
 
   return (
     <div className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
@@ -141,7 +151,7 @@ function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
               : 'bg-bg-tertiary text-text-primary'
           }`}
         >
-          <MessageContent content={messageBody} />
+          <MessageContent content={message.content} />
         </div>
 
         {isOwn && (

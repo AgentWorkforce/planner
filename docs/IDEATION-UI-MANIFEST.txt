@@ -1,0 +1,380 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║           IDEATION-UI BUILDING BLOCKS COMPREHENSIVE MAP                    ║
+║                                                                            ║
+║  Documentation for planning "Tend" unified app reuse & transformation     ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 DOCUMENTATION FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. IDEATION-UI-README.md (START HERE)
+   Quick reference, navigation guide, patterns summary
+   • Component location index (LEFT/CENTER/RIGHT)
+   • Hook table with file paths
+   • Core concepts (confidence → size, physics, SSE, focus mode)
+   • State management quick reference
+   • Common patterns with code examples
+   • Reusability scores for each component
+   • Architecture decision records
+   • Common pitfalls to avoid
+   • Testing strategy
+   • Next steps for Tend
+
+2. ideation-ui-components-map.md (PRIMARY REFERENCE)
+   Complete inventory of 80+ components, hooks, utilities
+   • Core Layout System (IdeationGridLayout, IdeationLayout)
+   • LEFT Column: FormingBlocksColumn, PhysicsBlock, PhysicsBlockBase
+   • CENTER Column: SessionChatView, ChatInput, FocusMode, MarkdownEditor
+   • RIGHT Column: CuratedBlocksColumn, SentToPlannerColumn
+   • STATUS BAR: IdeationStatusBar
+   • Hooks: usePhysicsEngine, useBlocks, useSession, useSessionEvents, etc.
+   • Contexts & State Management
+   • Pages & Routing
+   • Shared Components (Specialists, Icons)
+   • Utilities & Libraries
+   • File organization summary
+
+3. ideation-ui-tend-migration-notes.md (PRACTICAL GUIDE)
+   Actionable guidance for adapting patterns to Tend
+   • Quick navigation map (visual grid zones)
+   • Core systems to reuse (physics, SSE, chat, focus mode)
+   • State management best practices
+   • Dashboard view patterns
+   • Right panel specialists/experts
+   • Animations & transitions
+   • CSS variables & theming
+   • Key integration patterns
+   • API endpoints called
+   • Development notes
+   • Migration checklist
+   • Open questions for Tend design
+
+4. ideation-ui-architecture.md (TECHNICAL DEEP DIVE)
+   System design and implementation patterns
+   • High-level component tree
+   • Data flow diagrams
+   • Physics engine integration
+   • State management strategy (URL, localStorage, server)
+   • CSS architecture (variables, Tailwind, responsive)
+   • Responsive design strategy
+   • Performance optimizations
+   • Security & error handling
+   • Development workflow
+   • Summary
+
+🎯 QUICK NAVIGATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LAYOUT ZONES
+┌──────────────────────────────────────────────────────┐
+│  SessionNav (Header)                                 │ ← HEADER
+├──────────────┬──────────────────────┬────────────────┤
+│   LEFT       │      CENTER          │     RIGHT      │
+│ Forming      │  Chat View or        │   Curated      │
+│ Blocks       │  Focus Mode          │   Blocks       │
+│ (Physics)    │  (Centered)          │   (List)       │
+├──────────────┴──────────────────────┴────────────────┤
+│  IdeationStatusBar                                   │ ← STATUS BAR
+└──────────────────────────────────────────────────────┘
+
+COMPONENT FILES
+  LEFT    → components/canvas/FormingBlocksColumn.tsx
+          → components/canvas/PhysicsBlock.tsx
+          → components/shared/PhysicsBlockBase.tsx
+  
+  HEADER  → components/canvas/CanvasHeader.tsx
+  
+  CENTER  → components/chat/SessionChatView.tsx
+          → components/canvas/FocusMode.tsx
+  
+  RIGHT   → components/canvas/CuratedBlocksColumn.tsx
+  
+  STATUS  → components/canvas/IdeationStatusBar.tsx
+  
+  LAYOUT  → components/canvas/IdeationGridLayout.tsx
+
+📊 KEY METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Components by Category:
+  • Canvas (LEFT/CENTER/RIGHT):     12 components
+  • Chat:                            7 components
+  • Dashboard:                       6 components
+  • Layout:                          2 components
+  • Specialists/Experts:            10 components
+  • UI (shadcn wrappers):           12 components
+  • Icons (custom SVG):             20+ icons
+  ──────────────────────────────────
+  TOTAL COMPONENTS:                 80+
+
+Hooks:
+  • Data fetching:                   useBlocks, useSession, useSessions
+  • Real-time:                       useSessionEvents, useUnderstanding
+  • Physics:                         usePhysicsEngine
+  • Chat:                            useSendMessage, useConfidence
+  • UI State:                        usePanelState, useCommandPalette
+  • Theme/Settings:                  useTheme, useUserSettings
+  ──────────────────────────────────
+  TOTAL HOOKS:                       15+
+
+Files:
+  • .tsx components:                 50+
+  • .ts hooks/utilities:             20+
+  • Total source files:              80+
+
+🔄 DATA FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Browser ─→ Route (/ideation/session/:id) ─→ CanvasPage
+    ↓
+useBlocks ────→ GET /api/ideation/sessions/:id/blocks
+    ↓           └─ SSE /api/ideation/sessions/:id/events
+    │
+blocks[] ─→ FormingBlocksColumn
+    ├─ usePhysicsEngine ──→ Matter.js physics
+    ├─ PhysicsBlock × N
+    └─ PhysicsBlockBase (DOM position sync, 60fps)
+
+blocks[] ─→ CuratedBlocksColumn
+    └─ CuratedBlockCard × N
+
+useSessionEvents ────→ Transcript updates
+    ↓
+SessionChatView
+    ├─ ChatMessageList (scroll)
+    ├─ ChatBubble × N
+    ├─ ChatInput (compose)
+    └─ useSendMessage ──→ POST /api/ideation/sessions/:id/messages
+
+Focus Mode URL sync:
+    ?block=:id ↔ setSearchParams() ↔ FocusMode wrapper
+    ↓
+    FocusMode (60% detail + 40% chat side-by-side)
+
+⚙️  CORE SYSTEMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. PHYSICS ENGINE (usePhysicsEngine)
+   Library: matter-js
+   Features:
+     • Zero gravity (custom forces only)
+     • Central attraction: 0.00008 (drift to center)
+     • Initiative grouping: 0.00015 (cluster by initiative_id)
+     • Edge attraction: 0.00012 (for abandoned)
+     • Collision detection (circles)
+     • Wall boundaries (containment)
+     • Mouse constraint (draggable)
+   Desktop: Enabled
+   Mobile: Disabled (performance)
+
+2. REAL-TIME UPDATES (SSE)
+   Endpoint: EventSource /api/ideation/sessions/{id}/events
+   Events:
+     • session:block_created
+     • session:block_updated
+     • session:block_deleted
+     • session:transcript_updated
+     • session:understanding_updated
+     • session:status_changed
+   Reconnect: Exponential backoff (3s, 6s, 12s, cap)
+
+3. FOCUS MODE (URL + Component State)
+   Route: /ideation/session/:id?block=:blockId
+   Layout: 60% detail panel + 40% chat sidebar
+   Features:
+     • Editable markdown content
+     • Block metadata display
+     • Curate button (primary)
+     • Close button (exit focus)
+     • User edits timeline
+
+4. STATE MANAGEMENT
+   URL:          /ideation/session/:id?block=:blockId
+   LocalStorage: ideation-panel-collapsed, theme, user settings
+   Hooks:        blocks[], session, understanding, confidence
+   SSE:          Real-time updates for blocks, transcript, understanding
+
+🎨 THEMING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CSS Variables (globals.css):
+  --canvas-bg                 #1a1a1a (dark background)
+  --canvas-text-primary       #ffffff
+  --canvas-text-muted         #888888
+  --canvas-accent             #ff6b6b (buttons)
+  --block-draft               rgba(255, 107, 107, 0.1)
+  --block-draft-border        #ff6b6b
+  --block-curated             rgba(76, 175, 80, 0.1)
+  --block-curated-border      #4CAF50 (green)
+  --sidebar-width             280px
+  --specialists-panel-width   320px
+
+Animations:
+  physics-block-pop-in        (entry, 0.3s)
+  physics-block-pop-out       (exit, 0.2s)
+  focus-mode-enter            (fade in)
+  animate-pulse               (ready block glow)
+
+Confidence → Visual Representation:
+  0-30%    forming     tiny dot (20px)
+  30-60%   emerging    emoji only (40-60px)
+  60-90%   developing  emoji + keyword (60-80px)
+  90-100%  ready       full + glow (80-100px)
+  curated  -           right column (fixed)
+
+✅ REUSABILITY SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HIGHLY REUSABLE (80-90%):
+  ✓ PhysicsBlockBase          (position sync, rotation, animations)
+  ✓ PhysicsBlock              (add tendency styling, reuse logic)
+  ✓ ChatInput, ChatMessageList, ChatBubble
+  ✓ IdeationGridLayout        (3-column grid pattern)
+  ✓ FocusMode                 (detail + sidebar layout)
+  ✓ usePhysicsEngine          (Matter.js wrapper)
+
+MODERATELY REUSABLE (60-80%):
+  ~ SessionNav                (adapt header, keep breadcrumbs)
+  ~ CuratedBlocksColumn       (reuse layout, change styling)
+  ~ SpecialistsPanel → Expert panel (rename, adapt data)
+  ~ Block visibility utils    (adapt thresholds)
+
+DOMAIN-SPECIFIC (Rewrite for Tend):
+  ✗ useBlocks → useTendBlocks (endpoints, structure)
+  ✗ useSession → useTendSession
+  ✗ useSessionEvents → useTendEvents (event types)
+  ✗ SessionDashboard (ideation-specific)
+  ✗ NavigatorChat (domain-specific)
+
+🚀 GETTING STARTED WITH TEND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. READ THE DOCS
+   [] IDEATION-UI-README.md (this file + patterns)
+   [] ideation-ui-components-map.md (full inventory)
+   [] ideation-ui-tend-migration-notes.md (practical guide)
+   [] ideation-ui-architecture.md (deep dive)
+
+2. COPY REUSABLE COMPONENTS
+   [] PhysicsBlockBase → tend/components/shared/
+   [] PhysicsBlock → tend/components/canvas/
+   [] Chat components → tend/components/chat/
+   [] IdeationGridLayout → tend/components/canvas/
+   [] FocusMode → tend/components/canvas/
+
+3. ADAPT FOR TEND
+   [] Create useTendBlocks hook (based on useBlocks)
+   [] Create useTendSession hook
+   [] Create useTendEvents hook
+   [] Define Tend block structure & states
+   [] Adapt CSS variables for Tend colors
+   [] Create Tend API client
+
+4. IMPLEMENT FEATURES
+   [] Canvas layout (reuse IdeationGridLayout)
+   [] Block physics (reuse usePhysicsEngine)
+   [] Chat interface (reuse chat components)
+   [] Focus mode (reuse FocusMode)
+   [] Status bar (adapt IdeationStatusBar)
+
+5. TEST & ITERATE
+   [] Unit tests (blockVisibility, confidence, etc.)
+   [] Component tests (PhysicsBlock, ChatInput, etc.)
+   [] Hook tests (useTendBlocks, etc.)
+   [] E2E tests (user flows)
+
+📚 FILE STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+packages/ideation-ui/src/
+├── components/
+│   ├── canvas/
+│   │   ├── IdeationGridLayout.tsx
+│   │   ├── FormingBlocksColumn.tsx
+│   │   ├── PhysicsBlock.tsx
+│   │   ├── CuratedBlocksColumn.tsx
+│   │   ├── FocusMode.tsx
+│   │   ├── CanvasHeader.tsx (SessionNav)
+│   │   ├── IdeationStatusBar.tsx
+│   │   ├── AIUnderstandingDrawer.tsx
+│   │   ├── HandoffDialog.tsx
+│   │   ├── MarkdownEditor.tsx
+│   │   └── utils/blockVisibility.ts
+│   ├── chat/
+│   │   ├── SessionChatView.tsx
+│   │   ├── ChatInput.tsx
+│   │   ├── ChatMessageList.tsx
+│   │   ├── ChatBubble.tsx
+│   │   ├── TypingIndicator.tsx
+│   │   └── ConfidenceBar.tsx
+│   ├── dashboard/
+│   │   ├── SessionDashboard.tsx
+│   │   ├── SessionsPhysicsColumn.tsx
+│   │   ├── SessionPhysicsBlock.tsx
+│   │   ├── NavigatorChat.tsx
+│   │   ├── DashboardNav.tsx
+│   │   └── SentToPlannerColumn.tsx
+│   ├── specialists/
+│   │   ├── SpecialistsPanel.tsx
+│   │   ├── SpecialistCard.tsx
+│   │   ├── SessionConfidenceBar.tsx
+│   │   └── (indicators)
+│   ├── shared/
+│   │   └── PhysicsBlockBase.tsx
+│   ├── layout/
+│   │   ├── IdeationLayout.tsx
+│   │   ├── MainHeader.tsx
+│   │   └── Sidebar.tsx
+│   ├── ui/ (shadcn components)
+│   ├── icons/ (custom SVG)
+│   └── mockup/ (prototypes)
+├── hooks/
+│   ├── usePhysicsEngine.ts
+│   ├── useBlocks.ts
+│   ├── useSession.ts
+│   ├── useSessions.ts
+│   ├── useSendMessage.ts
+│   ├── useSessionEvents.ts
+│   ├── useUnderstanding.ts
+│   ├── useConfidence.ts
+│   ├── usePanelState.ts
+│   ├── useMediaQuery.ts
+│   ├── useCommandPalette.ts
+│   ├── useIdeationApi.ts
+│   ├── useToast.ts
+│   ├── useTheme.ts
+│   └── useUserSettings.ts
+├── lib/
+│   ├── blockVisibility.ts
+│   ├── confidence-utils.ts
+│   ├── category-utils.ts
+│   └── utils.ts
+├── pages/
+│   ├── CanvasPage.tsx
+│   ├── DashboardPage.tsx
+│   ├── SessionPage.tsx
+│   └── HomePage.tsx
+└── App.tsx
+
+📝 NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GENERATED: February 2026
+SCOPE: Ideation-UI comprehensive component inventory
+PURPOSE: Planning "Tend" unified app component reuse & adaptation
+COVERAGE: 80+ components, 15+ hooks, complete architecture
+
+DOCUMENTS CREATED:
+  ✓ /docs/IDEATION-UI-README.md (quick reference)
+  ✓ /docs/ideation-ui-components-map.md (primary inventory)
+  ✓ /docs/ideation-ui-tend-migration-notes.md (practical guide)
+  ✓ /docs/ideation-ui-architecture.md (technical details)
+  ✓ /docs/IDEATION-UI-MANIFEST.txt (this file)
+
+START WITH:
+  1. IDEATION-UI-README.md (overview)
+  2. ideation-ui-components-map.md (detailed reference)
+  3. ideation-ui-architecture.md (deep dive)
+  4. ideation-ui-tend-migration-notes.md (planning)
+
+═══════════════════════════════════════════════════════════════════════════════

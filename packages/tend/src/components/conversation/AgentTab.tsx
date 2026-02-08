@@ -1,73 +1,106 @@
-import { cn } from '@/lib/utils';
+/**
+ * AgentTab
+ *
+ * Individual tab button for an agent in the tab bar.
+ * Shows role emoji, agent name, activity indicator, and unread badge.
+ */
+
+interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  status: 'active' | 'completed' | 'blocked';
+  unreadCount?: number;
+}
 
 interface AgentTabProps {
-  label: string;
+  agent: Agent;
   isActive: boolean;
-  unreadCount?: number;
-  agentRole?: string;
   onClick: () => void;
 }
 
 /**
- * AgentTab - Individual tab showing agent icon, label, unread count badge
- *
- * Features:
- * - Active: bold text + moss underline
- * - Inactive: muted text, hover state
- * - Unread count badge when messages waiting
- * - Agent role indicator (optional)
- *
- * Usage:
- * <AgentTab
- *   label="Planning"
- *   isActive={true}
- *   unreadCount={3}
- *   agentRole="planner"
- *   onClick={() => console.log("Tab clicked")}
- * />
+ * Get emoji for agent role
  */
-export function AgentTab({
-  label,
-  isActive,
-  unreadCount,
-  agentRole,
-  onClick,
-}: AgentTabProps) {
+function getRoleEmoji(role: string): string {
+  const roleMap: Record<string, string> = {
+    coder: '⚙️',
+    architect: '📐',
+    designer: '🎨',
+    tester: '🧪',
+    security: '🔒',
+    database: '🗄️',
+  };
+
+  return roleMap[role.toLowerCase()] || '🤖';
+}
+
+/**
+ * Get status indicator styling
+ */
+function getStatusIndicator(status: Agent['status']) {
+  switch (status) {
+    case 'completed':
+      return {
+        color: 'bg-success',
+        title: 'Completed',
+      };
+    case 'blocked':
+      return {
+        color: 'bg-error',
+        title: 'Blocked',
+      };
+    case 'active':
+    default:
+      return {
+        color: 'bg-accent-primary',
+        title: 'Active',
+        pulse: true,
+      };
+  }
+}
+
+export function AgentTab({ agent, isActive, onClick }: AgentTabProps) {
+  const statusIndicator = getStatusIndicator(agent.status);
+  const roleEmoji = getRoleEmoji(agent.role);
+
   return (
     <button
       onClick={onClick}
-      className={cn(
-        'relative px-4 py-2 text-sm transition-colors',
-        'border-b-2 whitespace-nowrap',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-moss)]',
-        isActive
-          ? 'border-[var(--color-moss)] text-[var(--color-text-primary)] font-semibold'
-          : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]'
-      )}
-      role="tab"
-      aria-selected={isActive}
-      aria-label={`${label}${unreadCount ? ` (${unreadCount} unread)` : ''}`}
+      className={`
+        relative flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors
+        ${isActive
+          ? 'text-accent-primary border-b-2 border-accent-primary'
+          : 'text-text-secondary hover:text-text-primary border-b-2 border-transparent'
+        }
+      `}
     >
-      {/* Label */}
-      <span className="flex items-center gap-2">
-        {label}
-        {/* Agent role indicator (optional subtle icon) */}
-        {agentRole && !isActive && (
-          <span className="text-xs text-[var(--color-text-dim)]">
-            ({agentRole})
+      <div className="flex items-center gap-2">
+        {/* Role emoji */}
+        <span className="text-base" aria-hidden="true">
+          {roleEmoji}
+        </span>
+
+        {/* Agent name */}
+        <span>{agent.name}</span>
+
+        {/* Status indicator */}
+        <div className="relative">
+          <div
+            className={`w-2 h-2 rounded-full ${statusIndicator.color} ${
+              statusIndicator.pulse ? 'animate-pulse' : ''
+            }`}
+            title={statusIndicator.title}
+          />
+        </div>
+
+        {/* Unread badge */}
+        {agent.unreadCount && agent.unreadCount > 0 && (
+          <span className="px-1.5 py-0.5 text-xs rounded-full bg-accent-primary/20 text-accent-primary">
+            {agent.unreadCount}
           </span>
         )}
-      </span>
-
-      {/* Unread badge */}
-      {unreadCount && unreadCount > 0 && !isActive && (
-        <span
-          className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center rounded-full bg-[var(--color-clay)] text-[var(--color-text-inverse)] text-xs font-medium"
-          aria-label={`${unreadCount} unread messages`}
-        >
-          {unreadCount}
-        </span>
-      )}
+      </div>
     </button>
   );
 }

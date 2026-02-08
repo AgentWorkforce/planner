@@ -1,101 +1,71 @@
-import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { ScopeHeader } from './ScopeHeader';
 import { StepNode } from './StepNode';
-import type { StepWithExecution } from './ProjectTree';
+import type { TreeStep } from './ProjectTree';
 
-/**
- * Props for WorkSection component
- */
 export interface WorkSectionProps {
-  /** Scope name (e.g., repo/team/domain) */
   scope: string;
-  /** Steps in this scope */
-  steps: StepWithExecution[];
-  /** Whether this scope is currently focused */
-  isFocused?: boolean;
-  /** Whether to show steps (expanded state) */
-  showSteps?: boolean;
-  /** Callback when scope header is clicked */
-  onScopeClick?: (scope: string) => void;
-  /** Callback when a step is clicked */
-  onStepClick?: (scope: string, stepId: string) => void;
-  /** ID of currently focused step */
-  focusedStepId?: string | null;
-  /** Optional CSS class */
+  steps: TreeStep[];
+  isExpanded: boolean;
+  workspacePath?: string | null;
+  selectedStepId?: string;
+  focusedStepId?: string;
+  sheetOpen?: boolean;
+  onScopeClick?: () => void;
+  onStepClick?: (stepId: string) => void;
   className?: string;
 }
 
 /**
- * WorkSection
- *
- * Wraps a scope with its header and steps. Can be collapsed/expanded.
- * Used in ProjectTree to organize steps by scope (repo/team/domain).
+ * WorkSection - Groups StepNode components under a scope
  *
  * Features:
- * - Collapsible scope section with progress indicator
- * - Shows StepNode list when expanded
- * - Handles zoom interaction via callbacks
- * - Visual focus state for active scope
+ * - Collapsible via ScopeHeader
+ * - Shows step list when expanded
+ * - Compact layout for sidebar tree
  *
- * @example
- * ```tsx
- * <WorkSection
- *   scope="api-service"
- *   steps={[...]}
- *   isFocused={true}
- *   showSteps={true}
- *   onScopeClick={(scope) => zoomToScope(scope)}
- *   onStepClick={(scope, stepId) => selectStep(stepId)}
- * />
- * ```
+ * Behavior:
+ * - Collapsed at OVERVIEW level
+ * - Expanded at SCOPE/STEP level
  */
 export function WorkSection({
   scope,
   steps,
-  isFocused = false,
-  showSteps = false,
+  isExpanded,
+  workspacePath,
+  selectedStepId,
+  focusedStepId,
+  sheetOpen = false,
   onScopeClick,
   onStepClick,
-  focusedStepId,
-  className = '',
+  className,
 }: WorkSectionProps) {
-  const [isCollapsed, setIsCollapsed] = useState(!showSteps);
-
-  const handleHeaderClick = () => {
-    // Toggle collapse state
-    setIsCollapsed(!isCollapsed);
-    // Notify parent for zoom interaction
-    onScopeClick?.(scope);
-  };
-
-  const handleStepClick = (stepId: string) => {
-    onStepClick?.(scope, stepId);
-  };
-
-  const shouldShowSteps = showSteps || !isCollapsed;
-
   return (
-    <div className={`mb-2 ${className}`}>
-      {/* Scope header with progress */}
-      <ScopeHeader
-        scope={scope}
-        steps={steps}
-        isFocused={isFocused}
-        onClick={handleHeaderClick}
-      />
+    <div className={cn('space-y-1', className)}>
+      {/* Scope header */}
+      <ScopeHeader scope={scope} steps={steps} isExpanded={isExpanded} workspacePath={workspacePath} onClick={onScopeClick} />
 
-      {/* Step list (when expanded) */}
-      {shouldShowSteps && (
-        <div className="mt-2 ml-2 space-y-1">
-          {steps.map((step) => (
-            <StepNode
-              key={step.step_id}
-              step={step}
-              executionStatus={step.execution?.status}
-              onClick={() => handleStepClick(step.step_id)}
-              isFocused={focusedStepId === step.step_id}
-            />
-          ))}
+      {/* Step list (only when expanded) */}
+      {isExpanded && (
+        <div className="ml-4 space-y-0.5">
+          {steps.length === 0 ? (
+            <div className="px-2 py-2 text-xs text-text-muted">No steps in this scope</div>
+          ) : (
+            steps.map((step) => {
+              const isFocused = focusedStepId === step.step_id;
+              const isFocusedAwaitingClick = isFocused && !sheetOpen;
+
+              return (
+                <StepNode
+                  key={step.step_id}
+                  step={step}
+                  isSelected={selectedStepId === step.step_id && sheetOpen}
+                  isFocusedAwaitingClick={isFocusedAwaitingClick}
+                  onClick={() => onStepClick?.(step.step_id)}
+                />
+              );
+            })
+          )}
         </div>
       )}
     </div>

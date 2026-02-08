@@ -1,20 +1,21 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { TendLayout } from '@/components/layout/TendLayout';
-import { StatusBar } from '@/components/status/StatusBar';
+import { IdeationStatusBar } from '@/components/canvas/IdeationStatusBar';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
-import { ProjectTree } from '@/components/tree/ProjectTree';
-import { StepSheet } from '@/components/sheets/StepSheet';
+import { CuratedBlocksColumn } from '@/components/canvas/CuratedBlocksColumn';
 import { SessionNav, type SessionInfo } from '@/components/canvas/CanvasHeader';
 import { FocusMode } from '@/components/canvas/FocusMode';
 import { AIUnderstandingDrawer } from '@/components/canvas/AIUnderstandingDrawer';
 import { HandoffDialog } from '@/components/canvas/HandoffDialog';
 import { ModifiedSinceHandoffBanner } from '@/components/canvas/ModifiedSinceHandoffBanner';
-import { ConversationPane } from '@/components/conversation/ConversationPane';
+import { ConversationPane } from '@/components/conversation';
 import { useBlocks } from '@/hooks/useBlocks';
 import { useSession } from '@/hooks/useSession';
 import { useSessions } from '@/hooks/useSessions';
 import { useToast } from '@/hooks/useToast';
+import { useConfidence } from '@/hooks/useConfidence';
+import { specialistsToPresences } from '@/lib/specialist-utils';
 import { LoadingSpinner } from '@/components/ui';
 
 /**
@@ -22,8 +23,8 @@ import { LoadingSpinner } from '@/components/ui';
  *
  * Main page for the ideation canvas view with three-column layout:
  * - Left: FormingBlocksColumn (physics-based blocks)
- * - Center: ConversationPane (existing chat component)
- * - Right: ProjectTree (zoomable project tree)
+ * - Center: SessionChatView (existing chat component)
+ * - Right: CuratedBlocksColumn (curated blocks)
  *
  * Features:
  * - Integrates existing chat UI into center column
@@ -36,9 +37,9 @@ import { LoadingSpinner } from '@/components/ui';
  * ┌─────────────────────────────────────────────────────┐
  * │ CanvasHeader (Back | Title | AI Understanding | →) │
  * ├──────────────┬─────────────────┬───────────────────┤
- * │   Forming    │      Chat       │   Project Tree    │
- * │   Blocks     │   (existing     │   (zoomable)      │
- * │  (physics)   │   component)    │                   │
+ * │   Forming    │      Chat       │     Curated       │
+ * │   Blocks     │   (existing     │     Blocks        │
+ * │  (physics)   │   component)    │   (vertical)      │
  * │              │                 │                   │
  * └──────────────┴─────────────────┴───────────────────┘
  * ```
@@ -62,13 +63,18 @@ export function CanvasPage() {
   const [isUnderstandingDrawerOpen, setIsUnderstandingDrawerOpen] = useState(false);
   // State for Handoff dialog
   const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
-  // State for selected step (sheet)
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
 
   const { session, loading: sessionLoading, error: sessionError } = useSession(id);
-  const { blocks, loading: blocksLoading, curateBlock, updateBlock } = useBlocks(id || '');
+  const { blocks, loading: blocksLoading, curateBlock, uncurateBlock, updateBlock } = useBlocks(id || '');
   const { sessions: allSessions } = useSessions();
   const { toast } = useToast();
+  const { score: overallConfidence } = useConfidence(id);
+
+  // Map active specialists to status bar presence
+  const specialists = useMemo(
+    () => specialistsToPresences(session?.active_specialists ?? []),
+    [session?.active_specialists]
+  );
 
   // Map all sessions to SessionInfo format for dropdown - MUST be before early returns
   const sessionInfoList: SessionInfo[] = useMemo(() => {
@@ -107,7 +113,7 @@ export function CanvasPage() {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
         <LoadingSpinner size="lg" />
-        <p className="text-text-muted mt-4">Loading canvas...</p>
+        <p className="text-text-muted mt-4">Opening conversation...</p>
       </div>
     );
   }
@@ -116,7 +122,7 @@ export function CanvasPage() {
   if (sessionError) {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
-        <p className="text-error mb-4">Failed to load session</p>
+        <p className="text-error mb-4">Lost connection to session</p>
         <p className="text-text-muted text-sm">{sessionError.message}</p>
       </div>
     );
@@ -126,7 +132,7 @@ export function CanvasPage() {
   if (!id || !session) {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
-        <p className="text-text-primary text-lg mb-2">Session not found</p>
+        <p className="text-text-primary text-lg mb-2">Session has withered</p>
         <p className="text-text-muted text-sm">
           The session you're looking for doesn't exist or has been deleted.
         </p>
@@ -234,16 +240,6 @@ export function CanvasPage() {
     navigate(`/ideation/session/${sessionId}`);
   };
 
-  // Handler for opening understanding drawer
-  const handleOpenUnderstanding = () => {
-    setIsUnderstandingDrawerOpen(true);
-  };
-
-  // Handler for handoff to planner
-  const handleHandoff = () => {
-    setIsHandoffDialogOpen(true);
-  };
-
   // Handler for handoff confirmation
   const handleHandoffConfirm = async (options: import('@/components/canvas/HandoffDialog').HandoffOptions) => {
     console.log('[CanvasPage] Handoff confirmed with options:', options);
@@ -321,8 +317,6 @@ export function CanvasPage() {
         sessions={sessionInfoList}
         onTitleChange={handleTitleChange}
         onSessionSwitch={handleSessionSwitch}
-        onOpenUnderstanding={handleOpenUnderstanding}
-        onHandoff={handleHandoff}
       />
       {sessionForBanner && (
         <ModifiedSinceHandoffBanner
@@ -345,12 +339,13 @@ export function CanvasPage() {
         }
         center={centerContent}
         rightPanel={
-          <ProjectTree
-            planId={sessionWithV3Fields?.lastHandoffPlanId}
-            onStepSelect={setSelectedStepId}
+          <CuratedBlocksColumn
+            blocks={blocks}
+            onBlockClick={handleBlockClick}
+            onUncurate={uncurateBlock}
           />
         }
-        statusBar={<StatusBar />}
+        statusBar={<IdeationStatusBar specialists={specialists} overallConfidence={overallConfidence} />}
         focusMode={!!focusedBlock}
       />
 
@@ -367,15 +362,6 @@ export function CanvasPage() {
         onConfirm={handleHandoffConfirm}
         blocks={blocks}
       />
-
-      {/* Step detail sheet */}
-      {sessionWithV3Fields?.lastHandoffPlanId && (
-        <StepSheet
-          stepId={selectedStepId}
-          planId={sessionWithV3Fields.lastHandoffPlanId}
-          onClose={() => setSelectedStepId(null)}
-        />
-      )}
     </div>
   );
 }

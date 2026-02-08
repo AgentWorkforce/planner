@@ -26,18 +26,65 @@ beforeAll(() => {
 // Mock the useInitiatives hook
 vi.mock('@/hooks/useInitiatives');
 
+// Mock the useActiveChannels hook to avoid RelayProvider requirement
+vi.mock('@/hooks/useActiveChannels', () => ({
+  useActiveChannels: () => ({
+    activeChannels: [],
+    isLoading: false,
+    hasUnreadMessages: () => false,
+  }),
+}));
+
+// Mock the useCommandPalette hook
+vi.mock('@/hooks/useCommandPalette', () => ({
+  useCommandPalette: () => ({
+    open: vi.fn(),
+    close: vi.fn(),
+    isOpen: false,
+  }),
+}));
+
+// Mock the useSidebarState hook
+vi.mock('@/hooks/useSidebarState', () => ({
+  useSidebarState: () => ({
+    isInitiativeExpanded: () => false,
+    toggleInitiativeExpanded: vi.fn(),
+  }),
+}));
+
+// Mock the useTheme hook
+vi.mock('@/hooks/useTheme', () => ({
+  useTheme: () => ({
+    effectiveTheme: 'dark',
+    toggleTheme: vi.fn(),
+  }),
+}));
+
 // Import SidebarProvider for wrapping components
 import { SidebarProvider } from '@/components/ui/sidebar';
 
-// Mock the icons
-vi.mock('@/components/icons', () => ({
-  DashboardIcon: ({ size }: { size?: string }) => <div data-testid="dashboard-icon" data-size={size} />,
-  PlansIcon: ({ size }: { size?: string }) => <div data-testid="plans-icon" data-size={size} />,
-  PipelineIcon: ({ size }: { size?: string }) => <div data-testid="pipeline-icon" data-size={size} />,
-  InitiativesIcon: () => <div data-testid="initiatives-icon" />,
-  SettingsIcon: ({ size }: { size?: string }) => <div data-testid="settings-icon" data-size={size} />,
-  PlusIcon: ({ size }: { size?: string }) => <div data-testid="plus-icon" data-size={size} />,
-}));
+// Mock the icons - use importOriginal to get all exports, then override specific ones for testability
+vi.mock('@/components/icons', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  // Create a simple icon component factory for test IDs
+  const createMockIcon = (name: string) => ({ size }: { size?: string }) => (
+    <div data-testid={`${name.toLowerCase()}-icon`} data-size={size} />
+  );
+  return {
+    ...actual,
+    PlansIcon: createMockIcon('plans'),
+    PipelineIcon: createMockIcon('pipeline'),
+    InitiativesIcon: createMockIcon('initiatives'),
+    SettingsIcon: createMockIcon('settings'),
+    PlusIcon: createMockIcon('plus'),
+    SearchIcon: createMockIcon('search'),
+    ChevronRightIcon: createMockIcon('chevron-right'),
+    ChevronDownIcon: createMockIcon('chevron-down'),
+    ChannelIcon: createMockIcon('channel'),
+    SunIcon: createMockIcon('sun'),
+    MoonIcon: createMockIcon('moon'),
+  };
+});
 
 describe('AppSidebar', () => {
   const mockInitiatives: Initiative[] = [
@@ -121,19 +168,19 @@ describe('AppSidebar', () => {
       });
     });
 
-    it('renders Dashboard navigation item', () => {
+    it('renders Initiatives navigation item', () => {
       renderAppSidebar();
 
-      const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
-      expect(dashboardLink).toBeInTheDocument();
-      expect(dashboardLink).toHaveAttribute('href', '/');
-      expect(screen.getByTestId('dashboard-icon')).toBeInTheDocument();
+      const initiativesLink = screen.getByRole('link', { name: /initiatives/i });
+      expect(initiativesLink).toBeInTheDocument();
+      expect(initiativesLink).toHaveAttribute('href', '/initiatives');
+      expect(screen.getByTestId('initiatives-icon')).toBeInTheDocument();
     });
 
-    it('renders Plans navigation item', () => {
+    it('renders All Plans navigation item', () => {
       renderAppSidebar();
 
-      const plansLink = screen.getByRole('link', { name: /plans/i });
+      const plansLink = screen.getByRole('link', { name: /all plans/i });
       expect(plansLink).toBeInTheDocument();
       expect(plansLink).toHaveAttribute('href', '/plans');
       expect(screen.getByTestId('plans-icon')).toBeInTheDocument();
@@ -155,6 +202,20 @@ describe('AppSidebar', () => {
       expect(settingsLink).toBeInTheDocument();
       expect(settingsLink).toHaveAttribute('href', '/settings');
       expect(screen.getByTestId('settings-icon')).toBeInTheDocument();
+    });
+
+    it('renders New Plan button', () => {
+      renderAppSidebar();
+
+      // New Plan is a button (SidebarMenuButton with onClick), not a link
+      expect(screen.getByText('New Plan')).toBeInTheDocument();
+    });
+
+    it('renders Search button', () => {
+      renderAppSidebar();
+
+      expect(screen.getByText('Search')).toBeInTheDocument();
+      expect(screen.getByTestId('search-icon')).toBeInTheDocument();
     });
   });
 
@@ -184,7 +245,6 @@ describe('AppSidebar', () => {
 
       const newButton = screen.getByTitle('New Initiative');
       expect(newButton).toBeInTheDocument();
-      expect(screen.getByTestId('plus-icon')).toBeInTheDocument();
     });
 
     it('renders New Initiative button that is clickable', async () => {
@@ -247,38 +307,6 @@ describe('AppSidebar', () => {
       expect(screen.getByText('Q1 Goals')).toBeInTheDocument();
       expect(screen.getByText('Product Launch')).toBeInTheDocument();
     });
-
-    it('renders initiative links with correct hrefs', () => {
-      vi.spyOn(useInitiativesHook, 'useInitiatives').mockReturnValue({
-        initiatives: mockInitiatives,
-        isLoading: false,
-        error: null,
-        refresh: vi.fn(),
-      });
-
-      renderAppSidebar();
-
-      const q1GoalsLink = screen.getByRole('link', { name: /q1 goals/i });
-      expect(q1GoalsLink).toHaveAttribute('href', '/initiatives/init-1');
-
-      const productLaunchLink = screen.getByRole('link', { name: /product launch/i });
-      expect(productLaunchLink).toHaveAttribute('href', '/initiatives/init-2');
-    });
-
-    it('renders initiative color indicators', () => {
-      vi.spyOn(useInitiativesHook, 'useInitiatives').mockReturnValue({
-        initiatives: mockInitiatives,
-        isLoading: false,
-        error: null,
-        refresh: vi.fn(),
-      });
-
-      const { container } = renderAppSidebar();
-
-      // Find colored dots (these have inline styles with backgroundColor)
-      const colorDots = container.querySelectorAll('.h-3.w-3.rounded-full');
-      expect(colorDots.length).toBeGreaterThanOrEqual(2);
-    });
   });
 
   describe('active route highlighting', () => {
@@ -291,25 +319,17 @@ describe('AppSidebar', () => {
       });
     });
 
-    it('highlights Dashboard when on root route', () => {
-      renderAppSidebar('/');
-
-      const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
-      // The SidebarMenuButton with isActive prop applies styling
-      expect(dashboardLink.closest('[data-active]')).toBeTruthy();
-    });
-
     it('highlights Plans when on /plans route', () => {
       renderAppSidebar('/plans');
 
-      const plansLink = screen.getByRole('link', { name: /plans/i });
+      const plansLink = screen.getByRole('link', { name: /all plans/i });
       expect(plansLink.closest('[data-active]')).toBeTruthy();
     });
 
     it('highlights Plans when on nested plan route', () => {
       renderAppSidebar('/plans/plan-123');
 
-      const plansLink = screen.getByRole('link', { name: /plans/i });
+      const plansLink = screen.getByRole('link', { name: /all plans/i });
       expect(plansLink.closest('[data-active]')).toBeTruthy();
     });
 
@@ -327,36 +347,29 @@ describe('AppSidebar', () => {
       expect(settingsLink.closest('[data-active]')).toBeTruthy();
     });
 
-    it('highlights initiative when on initiative route', () => {
-      renderAppSidebar('/initiatives/init-1');
+    it('highlights Initiatives when on /initiatives route', () => {
+      renderAppSidebar('/initiatives');
 
-      const initiativeLink = screen.getByRole('link', { name: /q1 goals/i });
-      expect(initiativeLink.closest('[data-active]')).toBeTruthy();
+      const initiativesLink = screen.getByRole('link', { name: /initiatives/i });
+      expect(initiativesLink.closest('[data-active]')).toBeTruthy();
     });
   });
 
-  describe('initiatives with plan counts', () => {
-    it('does not show plan count badge when count is 0', () => {
-      const initiativesWithoutPlans: Initiative[] = [
-        {
-          ...mockInitiatives[0],
-          // Assuming the component handles plan_count via extended type
-        },
-      ];
-
+  describe('theme toggle', () => {
+    beforeEach(() => {
       vi.spyOn(useInitiativesHook, 'useInitiatives').mockReturnValue({
-        initiatives: initiativesWithoutPlans,
+        initiatives: [],
         isLoading: false,
         error: null,
         refresh: vi.fn(),
       });
+    });
 
+    it('renders theme toggle button', () => {
       renderAppSidebar();
 
-      // The component checks for plan_count > 0, but our mock doesn't have that field
-      // So no badge should be shown
-      const q1GoalsText = screen.getByText('Q1 Goals');
-      expect(q1GoalsText).toBeInTheDocument();
+      // In dark mode, it shows "Light Mode" option
+      expect(screen.getByText('Light Mode')).toBeInTheDocument();
     });
   });
 

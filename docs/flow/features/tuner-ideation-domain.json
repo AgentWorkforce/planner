@@ -1,0 +1,222 @@
+{
+  "title": "Ideation Domain Types",
+  "summary": {
+    "goal": "Define IdeationConfig, IdeationOutcome, PlanQualitySignal, and IdeationBaseline domain types with Zod schemas, defaults, and ideation-specific stability constants",
+    "acceptance_criteria": [
+      {
+        "id": "idom1",
+        "description": "IdeationConfig schema with: interviewer { model, max_tokens, temperature }, specialist_spawning { early_spawn_rules[], deprioritized[] }, confidence_calibration { exploring_value, forming_value, confident_value }, readiness_advisory { min_conversation_turns, min_specialist_coverage, min_curated_blocks }, version, updated_at"
+      },
+      {
+        "id": "idom2",
+        "description": "DEFAULT_IDEATION_CONFIG matches current hardcoded values: model='claude-sonnet-4-20250514', maxTokens=4096, temperature=0.7, exploring=25, forming=50, confident=90"
+      },
+      {
+        "id": "idom3",
+        "description": "IdeationOutcome schema with: session_id, plan_id, session_duration_seconds, conversation_turns, specialists_spawned[], specialist_contributions{}, blocks_total, blocks_curated, blocks_user_edited, avg_block_confidence, is_first_send, send_number, understanding_field_count, timestamp, source"
+      },
+      {
+        "id": "idom4",
+        "description": "PlanQualitySignal schema with: plan_id, session_id, questions_asked, questions_hard_blocking, versions_before_approval, improvements_suggested, improvements_accepted, blocks_received, blocks_mapped_to_steps, time_to_approval_seconds (nullable), timestamp, source"
+      },
+      {
+        "id": "idom5",
+        "description": "IdeationBaseline schema with: pattern, mean_questions_per_plan, stddev_questions, mean_versions_before_approval, stddev_versions, mean_block_utilization, stddev_block_utilization, mean_conversation_turns, stddev_conversation_turns, specialist_contribution_rates{}, Welford m2 fields, sample_count, last_updated"
+      },
+      {
+        "id": "idom6",
+        "description": "Extend parameterType union with: ideation_model, ideation_confidence, ideation_spawning, ideation_readiness. Uses standard cool-down default (24h via getCoolDownPeriod switch default)."
+      },
+      {
+        "id": "idom7",
+        "description": "Same stability thresholds as all other packages: burn-in=50, min_samples=30, max_ci_width=0.10, improvement_margin=0.15. Use testbench for training data if ideation needs to hit burn-in faster."
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "idom001",
+        "title": "Create IdeationConfig schema and defaults",
+        "scope": "tuner",
+        "description": "Create packages/tuner/src/domain/ideation-config.ts with Zod schemas for IdeationConfig, InterviewerConfig, SpecialistSpawning, ConfidenceCalibration, ReadinessAdvisory, and SpawnRule. Export DEFAULT_IDEATION_CONFIG with current hardcoded values.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "IdeationConfigSchema exports type and const DEFAULT_IDEATION_CONFIG"
+          },
+          {
+            "id": "ac2",
+            "description": "Defaults match: model='claude-sonnet-4-20250514', max_tokens=4096, temperature=0.7, exploring=25, forming=50, confident=90"
+          },
+          {
+            "id": "ac3",
+            "description": "All nested schemas (Interviewer, SpecialistSpawning, etc.) have defaults"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/domain/ideation-config.ts",
+            "pattern": "Zod schema → z.infer → DEFAULT constant",
+            "reference": "Plan section 1.1"
+          }
+        }
+      },
+      {
+        "step_id": "idom002",
+        "title": "Create IdeationOutcome schema",
+        "scope": "tuner",
+        "description": "Create packages/tuner/src/domain/ideation-outcome.ts with IdeationOutcomeSchema and SpecialistContributionSchema. Covers session metrics, specialist activity, block metrics, handoff context.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "IdeationOutcomeSchema includes session_id, plan_id, duration, conversation_turns"
+          },
+          {
+            "id": "ac2",
+            "description": "SpecialistContributionSchema has observations_count, insights_queued, blocks_created, final_confidence"
+          },
+          {
+            "id": "ac3",
+            "description": "specialist_contributions is z.record(z.string(), SpecialistContributionSchema)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/domain/ideation-outcome.ts",
+            "pattern": "Zod schema → z.infer",
+            "reference": "Plan section 1.2"
+          }
+        }
+      },
+      {
+        "step_id": "idom003",
+        "title": "Create PlanQualitySignal schema",
+        "scope": "tuner",
+        "description": "Create packages/tuner/src/domain/plan-quality-signal.ts with PlanQualitySignalSchema. Measures clarification burden, revision burden, block utilization from Planner approval.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "PlanQualitySignalSchema includes plan_id, session_id, questions_asked, questions_hard_blocking"
+          },
+          {
+            "id": "ac2",
+            "description": "Schema includes versions_before_approval, improvements_suggested, improvements_accepted"
+          },
+          {
+            "id": "ac3",
+            "description": "Schema includes blocks_received, blocks_mapped_to_steps, time_to_approval_seconds (nullable)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/domain/plan-quality-signal.ts",
+            "pattern": "Zod schema → z.infer",
+            "reference": "Plan section 1.3"
+          }
+        }
+      },
+      {
+        "step_id": "idom004",
+        "title": "Create IdeationBaseline schema",
+        "scope": "tuner",
+        "description": "Create packages/tuner/src/domain/ideation-baseline.ts with IdeationBaselineSchema. Follows EMA + Welford pattern, includes specialist_contribution_rates.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Schema includes mean/stddev fields for questions, versions, block_utilization, conversation_turns"
+          },
+          {
+            "id": "ac2",
+            "description": "Schema includes specialist_contribution_rates as z.record(z.string(), z.number())"
+          },
+          {
+            "id": "ac3",
+            "description": "Schema includes Welford m2 fields for variance tracking"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/domain/ideation-baseline.ts",
+            "pattern": "Follows TaskBaseline pattern with Welford state",
+            "reference": "Plan section 1.4"
+          }
+        }
+      },
+      {
+        "step_id": "idom005",
+        "title": "Extend stability config with ideation parameters",
+        "scope": "tuner",
+        "description": "Extend parameterType union in stability.ts with ideation types. No ideation-specific thresholds — uses same DEFAULT_STABILITY_CONFIG as Forge/Planner. The existing getCoolDownPeriod() default case maps unknown types to model_selection_ms (24h), which is appropriate for all ideation parameters.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "parameterType union extended with 'ideation_model' | 'ideation_confidence' | 'ideation_spawning' | 'ideation_readiness'"
+          },
+          {
+            "id": "ac2",
+            "description": "No changes to DEFAULT_STABILITY_CONFIG scalar values (burn_in=50, min_samples=30, max_ci_width=0.10)"
+          },
+          {
+            "id": "ac3",
+            "description": "getCoolDownPeriod() default case handles new types via fallthrough to model_selection_ms (24h)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/domain/stability.ts",
+            "pattern": "Extend parameterType union only, no new constants",
+            "reference": "Plan section 1.5"
+          }
+        }
+      },
+      {
+        "step_id": "idom006",
+        "title": "Export all ideation domain types",
+        "scope": "tuner",
+        "description": "Add exports to packages/tuner/src/domain/index.ts for all new ideation types and schemas",
+        "dependencies": [
+          "idom001",
+          "idom002",
+          "idom003",
+          "idom004",
+          "idom005"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "All new schemas and types exported from domain/index.ts"
+          },
+          {
+            "id": "ac2",
+            "description": "TypeScript builds without errors"
+          }
+        ]
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-domain",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-domain",
+    "tuner-stability-controls"
+  ]
+}

@@ -1,9 +1,14 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { EditableText } from './EditableText';
 import { EditableTextarea } from './EditableTextarea';
 import { DependencyIndicator, type ConnectedStep, type DependencyDirection } from './DependencyIndicator';
-import { ChevronIcon, TrashIcon, MessageIcon, CloseIcon, PlusIcon } from './icons';
-import type { Step } from '@/types';
+import { ChevronIcon, TrashIcon, MessageIcon, ArchitectIcon, DesignerIcon, TesterIcon, SecurityIcon, DatabaseIcon, SettingsIcon } from './icons';
+import { StepSpecificationTabs } from './spec';
+import { AcceptanceCriteriaSection } from './step-editor/AcceptanceCriteriaSection';
+import { DependenciesSection } from './step-editor/DependenciesSection';
+import { ApprovalGateSection } from './step-editor/ApprovalGateSection';
+import { updateStepSpecification } from '@/api/client';
+import type { Step, DomainSpec } from '@/types';
 
 const COMMON_ROLES = [
   'backend:Coder',
@@ -76,6 +81,8 @@ function OwnerRoleSelector({ value, onChange, disabled }: OwnerRoleSelectorProps
 interface StepEditorProps {
   step: Step;
   allSteps: Step[];
+  /** Plan ID for specification updates */
+  planId: string;
   onUpdate: (stepId: string, updates: Partial<Step>) => Promise<void>;
   onDelete: (stepId: string) => Promise<void>;
   disabled?: boolean;
@@ -94,6 +101,7 @@ interface StepEditorProps {
 export function StepEditor({
   step,
   allSteps,
+  planId,
   onUpdate,
   onDelete,
   disabled = false,
@@ -107,6 +115,7 @@ export function StepEditor({
 }: StepEditorProps) {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const specUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Compute dependency info for indicators
   const { incomingSteps, outgoingSteps, hasCrossScopeIncoming, hasCrossScopeOutgoing } = useMemo(() => {
@@ -184,11 +193,46 @@ export function StepEditor({
     setConfirmDelete(false);
   }, []);
 
-  const isEditable = !disabled && !saving;
+  // Debounced specification update handler (300ms delay)
+  const handleSpecUpdate = useCallback(
+    (domain: string, spec: DomainSpec) => {
+      // Clear any pending update
+      if (specUpdateTimerRef.current) {
+        clearTimeout(specUpdateTimerRef.current);
+      }
 
-  const availableDeps = allSteps.filter(
-    (s) => s.step_id !== step.step_id && !s.dependencies.includes(step.step_id)
+      // Debounce the API call
+      specUpdateTimerRef.current = setTimeout(async () => {
+        setSaving(true);
+        try {
+          await updateStepSpecification(planId, step.step_id, domain, spec);
+
+          // Update local state
+          const isDelete = Object.keys(spec).length === 0;
+          let newSpecification = { ...step.specification };
+
+          if (isDelete) {
+            // Remove the domain entirely
+            delete newSpecification[domain];
+          } else {
+            // Update/add the domain
+            newSpecification[domain] = spec;
+          }
+
+          await onUpdate(step.step_id, {
+            specification: Object.keys(newSpecification).length > 0 ? newSpecification : undefined,
+          });
+        } catch (error) {
+          console.error('Failed to update specification:', error);
+        } finally {
+          setSaving(false);
+        }
+      }, 300);
+    },
+    [planId, step.step_id, step.specification, onUpdate]
   );
+
+  const isEditable = !disabled && !saving;
 
   return (
     <div
@@ -234,6 +278,35 @@ export function StepEditor({
             disabled={!isEditable}
             className="text-sm font-medium text-text-primary"
           />
+        </div>
+
+        {/* Specification domain indicators - fixed width so scope doesn't shift */}
+        <div className="flex-shrink-0 flex items-center gap-0.5 min-w-[60px] justify-end">
+          {Object.entries(step.specification || {}).map(([domain, spec]) => {
+            const hasContent = spec && typeof spec === 'object' && Object.keys(spec).length > 0;
+            // Map domain names to icons
+            const normalizedDomain = domain.toLowerCase();
+            let IconComponent = SettingsIcon;
+            if (normalizedDomain === 'architecture') IconComponent = ArchitectIcon;
+            else if (normalizedDomain === 'design') IconComponent = DesignerIcon;
+            else if (normalizedDomain === 'model') IconComponent = DatabaseIcon;
+            else if (normalizedDomain === 'testing') IconComponent = TesterIcon;
+            else if (normalizedDomain === 'security') IconComponent = SecurityIcon;
+
+            return (
+              <span
+                key={domain}
+                className={`p-0.5 transition-opacity ${
+                  hasContent
+                    ? 'opacity-100 text-text-secondary'
+                    : 'opacity-30 text-text-dim'
+                }`}
+                title={domain.charAt(0).toUpperCase() + domain.slice(1)}
+              >
+                <IconComponent size="xs" />
+              </span>
+            );
+          })}
         </div>
 
         {step.scope && (
@@ -295,219 +368,77 @@ export function StepEditor({
 
       {isExpanded && (
         <div className="px-4 pb-4 pt-4 border-t border-border-subtle">
-          {/* Description */}
-          <div className="mb-5">
-            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-              Description
-            </label>
-            <EditableTextarea
-              value={step.description || ''}
-              onSave={(value) => handleUpdate('description', value)}
-              placeholder="Describe what needs to be done..."
-              disabled={!isEditable}
-              rows={3}
-            />
-          </div>
-
-          {/* Scope & Owner Role - side by side */}
-          <div className="grid grid-cols-2 gap-6 mb-5">
-            <div>
-              <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-                Scope
-              </label>
-              <div className="px-3 py-2 bg-bg-secondary rounded-md">
-                <EditableText
-                  value={step.scope || ''}
-                  onSave={(value) => handleUpdate('scope', value)}
-                  placeholder="e.g., api-service, frontend"
-                  disabled={!isEditable}
-                  className="text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-                Owner Role
-              </label>
-              <OwnerRoleSelector
-                value={step.owner_role || ''}
-                onChange={(value) => handleUpdate('owner_role', value)}
-                disabled={!isEditable}
-              />
-            </div>
-          </div>
-
-          {/* Dependencies */}
-          {(step.dependencies.length > 0 || (!disabled && availableDeps.length > 0)) && (
-            <div className="mb-5">
-              <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-                Dependencies
-              </label>
-              {step.dependencies.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {step.dependencies.map((depId) => {
-                    const depStep = allSteps.find((s) => s.step_id === depId);
-                    return (
-                      <span
-                        key={depId}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-bg-elevated text-text-secondary text-xs rounded-md"
-                      >
-                        {depStep?.title || depId}
-                        {!disabled && (
-                          <button
-                            type="button"
-                            className="text-text-muted hover:text-error transition-colors"
-                            onClick={() =>
-                              handleUpdate(
-                                'dependencies',
-                                step.dependencies.filter((d) => d !== depId)
-                              )
-                            }
-                            title="Remove dependency"
-                          >
-                            <CloseIcon size="sm" />
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
+          <StepSpecificationTabs
+            step={step}
+            isEditable={isEditable}
+            onSpecUpdate={handleSpecUpdate}
+            detailsContent={
+              <>
+                {/* Description */}
+                <div className="mb-5">
+                  <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
+                    Description
+                  </label>
+                  <EditableTextarea
+                    value={step.description || ''}
+                    onSave={(value) => handleUpdate('description', value)}
+                    placeholder="Describe what needs to be done..."
+                    disabled={!isEditable}
+                    rows={3}
+                  />
                 </div>
-              )}
-              {!disabled && availableDeps.length > 0 && (
-                <select
-                  className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-text-primary text-sm focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50 outline-none transition-colors"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value && !step.dependencies.includes(e.target.value)) {
-                      handleUpdate('dependencies', [...step.dependencies, e.target.value]);
-                    }
-                  }}
-                >
-                  <option value="">Add dependency...</option>
-                  {availableDeps.map((s) => (
-                    <option key={s.step_id} value={s.step_id}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
 
-          {/* Acceptance Criteria */}
-          <div className="mb-5">
-            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-              Acceptance Criteria
-            </label>
-            <div className="space-y-1">
-              {(step.acceptance_criteria || []).map((criterion) => (
-                <div
-                  key={criterion.id}
-                  className="group flex items-center gap-3 px-3 py-2 bg-bg-secondary rounded-md hover:bg-bg-elevated transition-colors"
-                >
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full border-2 border-text-muted/50 flex items-center justify-center">
-                    <span className="w-2 h-2 rounded-full bg-transparent" />
-                  </span>
-                  <div className="flex-1 min-w-0">
+                {/* Scope & Owner Role - side by side */}
+                <div className="grid grid-cols-2 gap-6 mb-5">
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
+                      Scope
+                    </label>
                     <EditableText
-                      value={criterion.description}
-                      onSave={(value) => {
-                        const updated = (step.acceptance_criteria || []).map((c) =>
-                          c.id === criterion.id ? { ...c, description: value } : c
-                        );
-                        handleUpdate('acceptance_criteria', updated);
-                      }}
-                      placeholder="Enter criterion..."
+                      value={step.scope || ''}
+                      onSave={(value) => handleUpdate('scope', value)}
+                      placeholder="e.g., api-service, frontend"
                       disabled={!isEditable}
                       className="text-sm"
                     />
                   </div>
-                  {criterion.type && (
-                    <span className="flex-shrink-0 px-2 py-0.5 text-xs bg-bg-tertiary text-text-muted rounded">
-                      {criterion.type}
-                    </span>
-                  )}
-                  {!disabled && (
-                    <button
-                      type="button"
-                      className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-text-muted hover:text-error transition-all"
-                      onClick={() => {
-                        const updated = (step.acceptance_criteria || []).filter(
-                          (c) => c.id !== criterion.id
-                        );
-                        handleUpdate('acceptance_criteria', updated);
-                      }}
-                      title="Remove criterion"
-                    >
-                      <CloseIcon size="sm" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {!disabled && (
-              <button
-                type="button"
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-accent-cyan hover:bg-accent-cyan/10 rounded-md transition-colors"
-                onClick={() => {
-                  const newCriterion = {
-                    id: crypto.randomUUID(),
-                    description: '',
-                  };
-                  const updated = [...(step.acceptance_criteria || []), newCriterion];
-                  handleUpdate('acceptance_criteria', updated);
-                }}
-              >
-                <PlusIcon size="sm" />
-                Add Criterion
-              </button>
-            )}
-          </div>
 
-          {/* Gate */}
-          <div className="pt-4 border-t border-border-subtle">
-            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-3">
-              Approval Gate
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!step.gate}
-                disabled={disabled}
-                className="w-4 h-4 rounded border-border-subtle bg-bg-secondary text-accent-cyan focus:ring-accent-cyan/50"
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    handleUpdate('gate', { type: 'human_approval' });
-                  } else {
-                    handleUpdate('gate', undefined);
-                  }
-                }}
-              />
-              <span className="text-sm text-text-primary">Require human approval before proceeding</span>
-            </label>
-            {step.gate && (
-              <div className="mt-3 ml-7">
-                <label className="block text-xs font-medium text-text-muted mb-1.5">
-                  Approver Role (optional)
-                </label>
-                <div className="px-3 py-2 bg-bg-secondary rounded-md max-w-xs">
-                  <EditableText
-                    value={step.gate.approver_role || ''}
-                    onSave={(value) => {
-                      handleUpdate('gate', {
-                        ...step.gate,
-                        approver_role: value || undefined,
-                      });
-                    }}
-                    placeholder="e.g., tech-lead"
-                    disabled={!isEditable}
-                    className="text-sm"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
+                      Owner Role
+                    </label>
+                    <OwnerRoleSelector
+                      value={step.owner_role || ''}
+                      onChange={(value) => handleUpdate('owner_role', value)}
+                      disabled={!isEditable}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+
+                {/* Dependencies */}
+                <DependenciesSection
+                  step={step}
+                  allSteps={allSteps}
+                  onUpdate={onUpdate}
+                  disabled={!isEditable}
+                />
+
+                {/* Acceptance Criteria */}
+                <AcceptanceCriteriaSection
+                  step={step}
+                  onUpdate={onUpdate}
+                  disabled={!isEditable}
+                />
+
+                {/* Gate */}
+                <ApprovalGateSection
+                  step={step}
+                  onUpdate={onUpdate}
+                  disabled={!isEditable}
+                />
+              </>
+            }
+          />
         </div>
       )}
     </div>

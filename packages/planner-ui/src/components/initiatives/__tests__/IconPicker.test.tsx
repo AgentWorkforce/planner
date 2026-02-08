@@ -149,11 +149,12 @@ describe('IconPicker', () => {
     expect(label).toHaveAttribute('for', 'custom-emoji');
   });
 
-  it('displays all emojis in a 4-column grid', () => {
+  it('displays all emojis in a flex wrap layout', () => {
     const { container } = render(<IconPicker value="🚀" onChange={vi.fn()} />);
 
-    const grid = container.querySelector('.grid.grid-cols-4');
-    expect(grid).toBeInTheDocument();
+    // Implementation uses flex flex-wrap gap-1.5 for emoji buttons
+    const emojiContainer = container.querySelector('.flex.flex-wrap');
+    expect(emojiContainer).toBeInTheDocument();
   });
 
   it('handles multiple character emojis in custom input', async () => {

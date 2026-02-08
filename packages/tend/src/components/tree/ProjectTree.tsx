@@ -1,279 +1,258 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { WorkSection } from './WorkSection';
+import { cn } from '@/lib/utils';
 import { TreeBreadcrumb } from './TreeBreadcrumb';
-import { ArtifactsSection } from './ArtifactsSection';
-import { useOptionalProject } from '@/contexts';
-import type { Step, StepExecutionStatus } from '@/types/plan';
+import { WorkSection } from './WorkSection';
+import { SheetContainer } from '../sheets/SheetContainer';
+import { StepSheet } from '../sheets/StepSheet';
+import {
+  orderScopes,
+  topologicalSort,
+  orderStepsWithStatusOverlay,
+} from '@/utils/tree-ordering';
 
-/**
- * Zoom levels for project tree navigation
- * - OVERVIEW: All scopes visible with progress bars
- * - SCOPE: One scope expanded showing StepNode list
- * - STEP: Full step detail visible (future - will use sheets)
- */
 export type ZoomLevel = 'overview' | 'scope' | 'step';
 
+export interface TreeStep {
+  step_id: string;
+  title: string;
+  scope?: string;
+  description?: string;
+  dependencies: string[];
+  owner_role?: string;
+  execution_status?: 'pending' | 'running' | 'done' | 'blocked' | 'failed';
+  source_block_id?: string;
+  /** Signal provenance — links step back to cultivate signals (future) */
+  provenance?: Array<{ signal_id: string; source: string; created_at: string }>;
+  created_at?: string;
+  metadata?: Record<string, unknown>;
+  acceptance_criteria?: Array<{ id: string; description: string; type?: string }>;
+}
+
 /**
- * Props for ProjectTree component
+ * Maps scope names to workspace paths for display
+ * Convention: scope name corresponds to packages/{scope}/
  */
+function getScopeWorkspacePath(scope: string): string | null {
+  if (!scope || scope === 'default') return null;
+  return `packages/${scope}/`;
+}
+
 export interface ProjectTreeProps {
-  /** Plan ID to display */
-  planId?: string;
-  /** Current zoom level */
-  zoomLevel?: ZoomLevel;
-  /** Callback when zoom level changes */
-  onZoomChange?: (level: ZoomLevel) => void;
-  /** Callback when a step is selected */
-  onStepSelect?: (stepId: string) => void;
-  /** Optional CSS class */
+  steps: TreeStep[];
+  projectName?: string;
   className?: string;
+  onStepUpdate?: (stepId: string, updates: Partial<TreeStep>) => Promise<void>;
+  onSendMessage?: (message: string, stepContext: { step_id: string; title: string }) => void;
 }
 
 /**
- * Execution info overlay (will be populated by forge later)
- */
-export interface StepWithExecution extends Step {
-  execution?: {
-    status: StepExecutionStatus;
-    started_at?: string;
-    completed_at?: string;
-    error?: string;
-  };
-}
-
-/**
- * ProjectTree
+ * ProjectTree - Zoomable project work tree organized by scope
  *
- * Replaces CuratedBlocksColumn with a zoomable project tree showing work
- * organized by scope (repo/team/domain).
+ * Manages three zoom levels:
+ * - OVERVIEW: All scopes collapsed, showing scope headers only
+ * - SCOPE: One scope expanded showing all steps
+ * - STEP: One step focused (highlight only, detail deferred to sheets)
+ *
+ * URL params:
+ * - ?zoom=overview|scope|step
+ * - &focus=scope-id or scope-id.step-id
  *
  * Features:
- * - Three zoom levels: OVERVIEW, SCOPE, STEP
- * - URL param sync: ?zoom=overview|scope|step&focus=scope-id.step-id
- * - Hierarchical navigation via breadcrumbs
- * - Real-time execution status overlay (when forge is running)
- *
- * Layout at each zoom level:
- * - OVERVIEW: Scope headers with progress bars (collapsed)
- * - SCOPE: One scope expanded showing StepNode list
- * - STEP: Full step detail (future - uses sheets)
- *
- * @example
- * ```tsx
- * <ProjectTree
- *   planId="plan-123"
- *   zoomLevel="scope"
- *   onZoomChange={(level) => console.log(level)}
- *   onStepSelect={(stepId) => console.log(stepId)}
- * />
- * ```
+ * - Breadcrumb navigation at top
+ * - Scope grouping with progress bars
+ * - Compact step nodes with status indicators
+ * - Click handlers for zoom transitions
  */
-export function ProjectTree({
-  planId,
-  zoomLevel: controlledZoom,
-  onZoomChange,
-  onStepSelect,
-  className,
-}: ProjectTreeProps) {
+export function ProjectTree({ steps, projectName = 'Project', className, onStepUpdate, onSendMessage }: ProjectTreeProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const projectContext = useOptionalProject();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Determine plan ID: prop takes precedence, fall back to context
-  const effectivePlanId = planId ?? projectContext?.project?.plan_id;
+  const zoom = (searchParams.get('zoom') || 'overview') as ZoomLevel;
+  const focus = searchParams.get('focus') || '';
 
-  // State for plan data
-  const [steps, setSteps] = useState<StepWithExecution[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  // Parse focus string: "scope-id" or "scope-id.step-id"
+  const [focusedScope, focusedStep] = focus.split('.');
 
-  // Zoom state - sync with URL params
-  const [internalZoom, setInternalZoom] = useState<ZoomLevel>('overview');
-  const [focusedScope, setFocusedScope] = useState<string | null>(null);
-  const [focusedStep, setFocusedStep] = useState<string | null>(null);
+  // Group steps by scope and apply topological sorting + status overlay
+  const scopedSteps = steps.reduce((acc, step) => {
+    const scope = step.scope || 'default';
+    if (!acc[scope]) {
+      acc[scope] = [];
+    }
+    acc[scope].push(step);
+    return acc;
+  }, {} as Record<string, TreeStep[]>);
 
-  const zoom = controlledZoom ?? internalZoom;
+  // Apply ordering to each scope's steps: topological sort, then status overlay
+  const orderedScopedSteps = Object.entries(scopedSteps).reduce((acc, [scope, scopeSteps]) => {
+    const topoSorted = topologicalSort(scopeSteps);
+    const withStatusOverlay = orderStepsWithStatusOverlay(topoSorted);
+    acc[scope] = withStatusOverlay;
+    return acc;
+  }, {} as Record<string, TreeStep[]>);
 
-  // Get current step title for breadcrumb (must be before early returns - rules of hooks)
-  const currentStepTitle = useMemo(() => {
-    if (!focusedStep) return null;
+  // Order scopes by activity level
+  const scopes = orderScopes(orderedScopedSteps);
+
+  const handleZoomChange = useCallback(
+    (newZoom: ZoomLevel, newFocus?: string) => {
+      const params = new URLSearchParams();
+      params.set('zoom', newZoom);
+      if (newFocus) {
+        params.set('focus', newFocus);
+      }
+      setSearchParams(params);
+    },
+    [setSearchParams]
+  );
+
+  const handleScopeClick = useCallback(
+    (scopeId: string) => {
+      if (zoom === 'overview') {
+        // Expand scope
+        handleZoomChange('scope', scopeId);
+      } else if (zoom === 'scope' && focusedScope === scopeId) {
+        // Collapse back to overview
+        handleZoomChange('overview');
+      } else {
+        // Switch to different scope
+        handleZoomChange('scope', scopeId);
+      }
+    },
+    [zoom, focusedScope, handleZoomChange]
+  );
+
+  const handleStepClick = useCallback(
+    (scopeId: string, stepId: string) => {
+      const focusKey = `${scopeId}.${stepId}`;
+      const currentFocus = searchParams.get('focus');
+      const currentZoom = searchParams.get('zoom');
+
+      if (currentZoom === 'step' && currentFocus === focusKey) {
+        // Already focused on this step - open sheet
+        setSheetOpen(true);
+      } else {
+        // First click - just zoom to step
+        handleZoomChange('step', focusKey);
+      }
+    },
+    [handleZoomChange, searchParams]
+  );
+
+  const handleCloseSheet = useCallback(() => {
+    setSheetOpen(false);
+    // Keep zoom at STEP level when closing sheet
+  }, []);
+
+  const handleBreadcrumbClick = useCallback(
+    (level: 'project' | 'scope' | 'step') => {
+      if (level === 'project') {
+        handleZoomChange('overview');
+      } else if (level === 'scope') {
+        handleZoomChange('scope', focusedScope);
+      }
+      // If level === 'step', do nothing (already at step)
+    },
+    [handleZoomChange, focusedScope]
+  );
+
+  // Determine breadcrumb data
+  const breadcrumbSegments: Array<{ label: string; level: 'project' | 'scope' | 'step'; active: boolean }> = [
+    { label: projectName, level: 'project', active: zoom === 'overview' },
+  ];
+
+  if (zoom === 'scope' || zoom === 'step') {
+    breadcrumbSegments.push({
+      label: focusedScope || 'Unknown Scope',
+      level: 'scope',
+      active: zoom === 'scope',
+    });
+  }
+
+  if (zoom === 'step' && focusedStep) {
     const step = steps.find((s) => s.step_id === focusedStep);
-    return step?.title || null;
-  }, [focusedStep, steps]);
-
-  // Read zoom state from URL on mount
-  useEffect(() => {
-    const zoomParam = searchParams.get('zoom') as ZoomLevel | null;
-    const focusParam = searchParams.get('focus');
-
-    if (zoomParam && ['overview', 'scope', 'step'].includes(zoomParam)) {
-      setInternalZoom(zoomParam);
-    }
-
-    if (focusParam) {
-      const parts = focusParam.split('.');
-      if (parts.length === 1) {
-        setFocusedScope(parts[0]);
-      } else if (parts.length === 2) {
-        setFocusedScope(parts[0]);
-        setFocusedStep(parts[1]);
-      }
-    }
-  }, [searchParams]);
-
-  // Fetch plan data
-  useEffect(() => {
-    if (!effectivePlanId) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchPlan = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/plans/${effectivePlanId}/versions/latest`);
-        if (!res.ok) {
-          throw new Error(`Failed to fetch plan: HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        setSteps(data.data.steps || []);
-        setError(null);
-      } catch (err) {
-        console.error('[ProjectTree] Failed to fetch plan:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error'));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPlan();
-  }, [effectivePlanId]);
-
-  // Group steps by scope
-  const stepsByScope = useMemo(() => {
-    const grouped = new Map<string, StepWithExecution[]>();
-
-    for (const step of steps) {
-      const scope = step.scope || 'unscoped';
-      if (!grouped.has(scope)) {
-        grouped.set(scope, []);
-      }
-      grouped.get(scope)!.push(step);
-    }
-
-    return grouped;
-  }, [steps]);
-
-  // Handle zoom changes
-  const handleZoomChange = (newZoom: ZoomLevel, scope?: string, stepId?: string) => {
-    setInternalZoom(newZoom);
-
-    if (scope) {
-      setFocusedScope(scope);
-    }
-    if (stepId) {
-      setFocusedStep(stepId);
-    }
-
-    // Update URL params
-    const params = new URLSearchParams();
-    params.set('zoom', newZoom);
-
-    if (scope && stepId) {
-      params.set('focus', `${scope}.${stepId}`);
-    } else if (scope) {
-      params.set('focus', scope);
-    }
-
-    setSearchParams(params);
-
-    // Notify parent
-    onZoomChange?.(newZoom);
-  };
-
-  // Handle step selection
-  const handleStepClick = (scope: string, stepId: string) => {
-    if (zoom === 'overview') {
-      // Zoom to scope level
-      handleZoomChange('scope', scope);
-    } else if (zoom === 'scope') {
-      // Zoom to step level (or open sheet - future implementation)
-      handleZoomChange('step', scope, stepId);
-      onStepSelect?.(stepId);
-    }
-  };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="flex flex-col items-center gap-3">
-          <LoadingSpinner size="lg" />
-          <p className="text-sm text-text-muted">Loading project tree...</p>
-        </div>
-      </div>
-    );
+    breadcrumbSegments.push({
+      label: step?.title || 'Unknown Step',
+      level: 'step',
+      active: true,
+    });
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="text-center">
-          <p className="text-error mb-2">Failed to load project tree</p>
-          <p className="text-sm text-text-muted">{error.message}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Empty state
-  if (!effectivePlanId || steps.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="text-center text-text-muted">
-          <p className="text-lg font-medium">No plan selected</p>
-          <p className="text-sm mt-2">Select a project to view its tree</p>
-        </div>
-      </div>
-    );
-  }
+  // Find the currently selected step for the sheet
+  const selectedStep = focusedStep ? steps.find((s) => s.step_id === focusedStep) : undefined;
 
   return (
-    <div className={className}>
-      <div className="flex flex-col gap-2 p-3">
-        {/* Breadcrumb navigation */}
-        <TreeBreadcrumb
-          projectName="Project"
-          scopeName={focusedScope}
-          stepTitle={zoom === 'step' ? currentStepTitle : null}
-          className="mb-2"
-        />
+    <>
+      <div className={cn('flex flex-col h-full overflow-hidden', className)}>
+        {/* Breadcrumb */}
+        <div className="flex-shrink-0 px-3 py-2 border-b border-border-subtle">
+          <TreeBreadcrumb segments={breadcrumbSegments} onSegmentClick={handleBreadcrumbClick} />
+        </div>
 
-        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted mb-2">
-          Project Tree ({steps.length} steps, {stepsByScope.size} scopes)
-        </h3>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {zoom === 'overview' && (
+            <div className="space-y-2">
+              {scopes.map((scope) => (
+                <WorkSection
+                  key={scope}
+                  scope={scope}
+                  steps={orderedScopedSteps[scope] || []}
+                  isExpanded={false}
+                  workspacePath={getScopeWorkspacePath(scope)}
+                  onScopeClick={() => handleScopeClick(scope)}
+                  onStepClick={(stepId) => handleStepClick(scope, stepId)}
+                />
+              ))}
+            </div>
+          )}
 
-        {/* Render scopes using WorkSection */}
-        {Array.from(stepsByScope.entries()).map(([scope, scopeSteps]) => (
-          <WorkSection
-            key={scope}
-            scope={scope}
-            steps={scopeSteps}
-            isFocused={focusedScope === scope}
-            showSteps={(zoom === 'scope' || zoom === 'step') && focusedScope === scope}
-            onScopeClick={(s) => handleZoomChange('scope', s)}
-            onStepClick={handleStepClick}
-            focusedStepId={focusedStep}
-          />
-        ))}
+          {zoom === 'scope' && focusedScope && (
+            <div>
+              <WorkSection
+                scope={focusedScope}
+                steps={orderedScopedSteps[focusedScope] || []}
+                isExpanded={true}
+                workspacePath={getScopeWorkspacePath(focusedScope)}
+                onScopeClick={() => handleScopeClick(focusedScope)}
+                onStepClick={(stepId) => handleStepClick(focusedScope, stepId)}
+              />
+            </div>
+          )}
 
-        {/* Show artifacts when zoomed to step level */}
-        {zoom === 'step' && focusedStep && (
-          <ArtifactsSection stepId={focusedStep} className="mt-4" />
-        )}
+          {zoom === 'step' && focusedStep && focusedScope && (
+            <div>
+              <WorkSection
+                scope={focusedScope}
+                steps={orderedScopedSteps[focusedScope] || []}
+                isExpanded={true}
+                workspacePath={getScopeWorkspacePath(focusedScope)}
+                selectedStepId={focusedStep}
+                focusedStepId={focusedStep}
+                sheetOpen={sheetOpen}
+                onScopeClick={() => handleScopeClick(focusedScope)}
+                onStepClick={(stepId) => handleStepClick(focusedScope, stepId)}
+              />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Step detail sheet */}
+      {selectedStep && (
+        <SheetContainer
+          isOpen={sheetOpen}
+          onClose={handleCloseSheet}
+          title="Step Details"
+        >
+          <StepSheet
+            step={selectedStep}
+            onUpdate={onStepUpdate}
+            onSendMessage={onSendMessage}
+          />
+        </SheetContainer>
+      )}
+    </>
   );
 }

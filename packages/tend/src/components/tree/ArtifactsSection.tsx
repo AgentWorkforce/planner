@@ -1,64 +1,33 @@
-/**
- * Props for ArtifactsSection component
- */
+import { cn } from '@/lib/utils';
+
 export interface ArtifactsSectionProps {
-  /** Step ID to show artifacts for */
-  stepId: string;
-  /** Optional CSS class */
+  artifacts?: Array<{ id: string; name: string; type: string }>;
   className?: string;
 }
 
 /**
- * ArtifactsSection
+ * ArtifactsSection - Shell for future artifact display
  *
- * Shell/placeholder for future artifact links related to a step.
- * Will display PRs, commits, issues, and other forge-generated artifacts.
+ * Currently shows:
+ * - "No artifacts yet" when empty
+ * - Hidden when no artifacts
  *
- * Future implementation will:
- * - Fetch artifacts from forge API via /api/forge/steps/:stepId/artifacts
- * - Display links to GitHub PRs, commits, issues
- * - Show artifact status (pending, success, failed)
- * - Group by artifact type
- *
- * Current state: Empty state with placeholder message
- *
- * @example
- * ```tsx
- * <ArtifactsSection stepId="step-123" />
- * ```
+ * Will be populated later by forge integration with:
+ * - Test results
+ * - Generated files
+ * - PR links
+ * - Documentation
  */
-export function ArtifactsSection({
-  stepId: _stepId,
-  className = '',
-}: ArtifactsSectionProps) {
-  // TODO: Fetch artifacts from forge API
-  // const artifacts = useFetchArtifacts(_stepId);
+export function ArtifactsSection({ artifacts = [], className }: ArtifactsSectionProps) {
+  // Hidden when no artifacts
+  if (artifacts.length === 0) {
+    return null;
+  }
 
   return (
-    <div className={`p-3 ${className}`}>
-      {/* Section header */}
-      <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted mb-2">
-        Artifacts
-      </h3>
-
-      {/* Empty state */}
-      <div className="px-3 py-6 bg-bg-elevated border border-border-subtle rounded-md text-center">
-        <p className="text-sm text-text-muted">
-          No artifacts yet
-        </p>
-        <p className="text-xs text-text-dim mt-1">
-          PRs, commits, and issues will appear here when forge runs this step
-        </p>
-      </div>
-
-      {/* Future: Artifact list */}
-      {/* {artifacts.length > 0 && (
-        <div className="space-y-2">
-          {artifacts.map((artifact) => (
-            <ArtifactCard key={artifact.id} artifact={artifact} />
-          ))}
-        </div>
-      )} */}
+    <div className={cn('px-3 py-2 border-t border-border-subtle', className)}>
+      <h3 className="text-xs font-medium uppercase tracking-wider text-text-secondary mb-2">Artifacts</h3>
+      <div className="text-xs text-text-muted">No artifacts yet</div>
     </div>
   );
 }

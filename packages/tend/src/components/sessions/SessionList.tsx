@@ -27,7 +27,7 @@ export function SessionList() {
   if (error) {
     return (
       <div className="p-4 text-center">
-        <p className="text-error text-sm mb-2">Failed to load sessions</p>
+        <p className="text-error text-sm mb-2">Lost connection to garden</p>
         <Button variant="ghost" size="sm" onClick={refetch}>
           Retry
         </Button>

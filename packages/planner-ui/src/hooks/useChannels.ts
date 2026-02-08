@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { get } from '@/api/client';
+import { getUserId } from '@/lib/identity';
 import type { Channel, PresenceEntry, UseChannelsResult } from '@/types';
 import type { UseRelayConnectionResult } from '@/types';
 
@@ -33,13 +34,26 @@ export function useChannels(
   const joinedChannelsRef = useRef(joinedChannels);
   joinedChannelsRef.current = joinedChannels;
 
+  // Track pending joins to prevent duplicate join requests before server confirms
+  const pendingJoinsRef = useRef<Set<string>>(new Set());
+
   // Fetch channels from REST API
   const fetchChannels = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const url = planId ? `/channels?planId=${planId}` : '/channels';
+      // Get userId for DM channel fetching (same source as createDmChannel)
+      const userId = getUserId();
+
+      // Build query params
+      // Use activeOnly=true to get #planner, active plan channels, and DMs only
+      const params = new URLSearchParams();
+      params.append('activeOnly', 'true');
+      if (planId) params.append('planId', planId);
+      if (userId) params.append('userId', userId);
+
+      const url = `/channels?${params.toString()}`;
       const response = await get<ChannelsResponse>(url);
       setChannels(response.channels);
     } catch (err) {
@@ -55,7 +69,9 @@ export function useChannels(
     (channelId: string) => {
       if (!connection.isConnected) return;
       if (joinedChannelsRef.current.has(channelId)) return;
+      if (pendingJoinsRef.current.has(channelId)) return; // Already joining
 
+      pendingJoinsRef.current.add(channelId);
       connection.joinChannel(channelId);
     },
     [connection]
@@ -75,6 +91,8 @@ export function useChannels(
   // Handle join confirmations
   useEffect(() => {
     const unsubscribe = connection.onJoined((channelId: string, _members: PresenceEntry[]) => {
+      // Clear pending state now that join is confirmed
+      pendingJoinsRef.current.delete(channelId);
       setJoinedChannels((prev) => {
         const next = new Set(prev);
         next.add(channelId);
@@ -103,16 +121,25 @@ export function useChannels(
     fetchChannels();
   }, [fetchChannels]);
 
+  // Reset channel state on disconnect (server forgets membership on reconnect)
+  useEffect(() => {
+    if (!connection.isConnected) {
+      pendingJoinsRef.current.clear();
+      setJoinedChannels(new Set());
+    }
+  }, [connection.isConnected]);
+
   // Auto-join plan channel when connected and planId is available
   useEffect(() => {
     if (connection.isConnected && planId && channels.length > 0) {
       // Find the plan-specific channel
       const planChannel = channels.find((ch) => ch.type === 'plan' && ch.planId === planId);
-      if (planChannel && !joinedChannelsRef.current.has(planChannel.id)) {
-        connection.joinChannel(planChannel.id);
+      if (planChannel) {
+        // Use the join function which handles deduplication via pendingJoinsRef
+        join(planChannel.id);
       }
     }
-  }, [connection, planId, channels]);
+  }, [connection.isConnected, planId, channels, join]);
 
   return {
     channels,

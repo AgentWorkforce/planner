@@ -1,0 +1,165 @@
+{
+  "feature_id": "forge-retrospective",
+  "title": "Agent Retrospective Prompting",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "forge-core",
+  "dependencies": ["forge-trajectory-capture", "forge-relay-integration", "forge-mcp-tools"],
+
+  "summary": {
+    "goal": "When an agent completes a task, prompt it for a retrospective reflection that captures summary, approach, decisions, challenges, learnings, and confidence. This structured reflection becomes part of the trajectory.",
+    "acceptance_criteria": [
+      { "id": "fr-ac1", "description": "Forgemaster injects retrospective prompt after agent signals completion via report_complete" },
+      { "id": "fr-ac2", "description": "Retrospective captures: summary, approach, decisions[], challenges[], learnings[], suggestions[], confidence" },
+      { "id": "fr-ac3", "description": "Agent response parsed and stored in trajectory as 'retrospective_recorded' event" },
+      { "id": "fr-ac4", "description": "Decision entries in retrospective linked to inline record_decision tool calls" },
+      { "id": "fr-ac5", "description": "Retrospective viewable in timeline and trajectory export" },
+      { "id": "fr-ac6", "description": "Confidence score (0-1) informs future task assignment" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Retrospective happens before agent exit, while context is fresh",
+        "Structured format enables querying across retrospectives",
+        "Confidence score is self-reported but useful for patterns",
+        "Uses relay message to inject prompt into running agent"
+      ],
+      "patterns": [
+        "Post-task reflection prompt injection via relay",
+        "Structured output parsing (JSON format)",
+        "Trajectory aggregation"
+      ],
+      "keywords": ["retrospective", "reflection", "structured-output"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "retrospective_format": "{ summary: string, approach: string, decisions: [{ question, chosen, reasoning }], challenges: string[], learnings: string[], suggestions: string[], confidence: number (0-1) }",
+      "trigger": "After agent calls report_complete, before release"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fr-s1",
+        "title": "Define retrospective schema",
+        "scope": "forge-core",
+        "description": "Define Zod schema for retrospective data",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RetrospectiveSchema: { summary, approach, decisions: [{ question, chosen, reasoning }], challenges[], learnings[], suggestions[], confidence: number }" },
+          { "id": "ac2", "description": "confidence is 0-1 range" },
+          { "id": "ac3", "description": "Export type from schema" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/trajectory.ts",
+          "pattern_description": "Use Zod schema pattern"
+        }
+      },
+      {
+        "step_id": "fr-s2",
+        "title": "Create retrospective prompt template",
+        "scope": "forge-core",
+        "description": "Template for prompting agent to provide retrospective",
+        "dependencies": ["fr-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Prompt asks agent to reflect on completed task" },
+          { "id": "ac2", "description": "Prompt specifies JSON output format matching RetrospectiveSchema" },
+          { "id": "ac3", "description": "Template is configurable per project" }
+        ],
+        "specification": {
+          "architecture": {
+            "template_example": "Now that you've completed the task, please provide a brief retrospective in the following JSON format: { summary: '...', approach: '...', decisions: [...], challenges: [...], learnings: [...], suggestions: [...], confidence: 0.0-1.0 }"
+          }
+        }
+      },
+      {
+        "step_id": "fr-s3",
+        "title": "Implement retrospective injection after completion with timeout handling",
+        "scope": "forge-core",
+        "description": "Send retrospective prompt to agent after report_complete with explicit timeout behavior",
+        "dependencies": ["fr-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Listen for report_complete MCP tool call" },
+          { "id": "ac2", "description": "Before marking agent for release, send retrospective prompt via relay message" },
+          { "id": "ac3", "description": "Wait for agent response (timeout: 30 seconds)" },
+          { "id": "ac4", "description": "On timeout: store trajectory event 'retrospective_timeout' with reason, task still completes successfully" },
+          { "id": "ac5", "description": "retrospective_timeout event includes: task_id, timeout_duration, agent_last_message" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration": "Hook in report_complete handler in forge-mcp-tools",
+            "timeout": "30 seconds for retrospective response",
+            "timeout_handling": "Store explicit 'retrospective_timeout' event - don't silently skip"
+          }
+        }
+      },
+      {
+        "step_id": "fr-s4",
+        "title": "Parse and store retrospective with explicit malformed handling",
+        "scope": "forge-core",
+        "description": "Parse agent's retrospective response with clear handling of malformed responses",
+        "dependencies": ["fr-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Parse JSON from agent response" },
+          { "id": "ac2", "description": "Validate against RetrospectiveSchema" },
+          { "id": "ac3", "description": "Valid: store as trajectory event type='retrospective_recorded'" },
+          { "id": "ac4", "description": "Invalid JSON: store trajectory event 'retrospective_parse_error' with raw_response and parse_error fields" },
+          { "id": "ac5", "description": "Invalid schema: store trajectory event 'retrospective_validation_error' with raw_response and validation_errors fields" },
+          { "id": "ac6", "description": "All error events visible in timeline and trajectory export" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "JSON parsing with explicit error events - never silently skip or log-and-forget",
+            "error_visibility": "All parsing/validation errors stored as trajectory events, visible in UI timeline"
+          }
+        }
+      },
+      {
+        "step_id": "fr-s5",
+        "title": "Link decisions to record_decision calls",
+        "scope": "forge-core",
+        "description": "Cross-reference retrospective decisions with earlier record_decision tool calls",
+        "dependencies": ["fr-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Query trajectory for decision_recorded events for this task" },
+          { "id": "ac2", "description": "Match retrospective decisions by question similarity" },
+          { "id": "ac3", "description": "Add event_id references to linked decisions" }
+        ],
+        "specification": {
+          "architecture": {
+            "matching": "Fuzzy match on question text"
+          }
+        }
+      },
+      {
+        "step_id": "fr-s6",
+        "title": "Add retrospective to trajectory query API",
+        "scope": "forge-core",
+        "description": "Include retrospective in trajectory timeline and export",
+        "dependencies": ["fr-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /runs/:id/trajectory includes retrospective_recorded, retrospective_timeout, and retrospective_*_error events" },
+          { "id": "ac2", "description": "GET /runs/:id/tasks/:taskId includes retrospective if available, or error_type if failed" },
+          { "id": "ac3", "description": "Export includes formatted retrospective or error details" }
+        ],
+        "specification": {
+          "integration": "Add to forge-trajectory-capture query handlers"
+        }
+      }
+    ]
+  }
+}

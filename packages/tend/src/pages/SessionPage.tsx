@@ -42,7 +42,7 @@ export function SessionPage() {
     return (
       <div className="flex flex-col h-full items-center justify-center">
         <LoadingSpinner size="lg" />
-        <p className="text-text-muted mt-4">Loading session...</p>
+        <p className="text-text-muted mt-4">Opening conversation...</p>
       </div>
     );
   }
@@ -51,7 +51,7 @@ export function SessionPage() {
   if (error) {
     return (
       <div className="flex flex-col h-full items-center justify-center">
-        <p className="text-error mb-4">Failed to load session</p>
+        <p className="text-error mb-4">Lost connection to session</p>
         <p className="text-text-muted text-sm">{error.message}</p>
         <button
           onClick={() => refetch()}

@@ -1,0 +1,15 @@
+{
+  "feature_id": "ideation-doc-ui-upload",
+  "title": "Document Upload UI",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "ideation-documents",
+  "component": "ideation-ui",
+  "dependencies": [
+    "ideation-doc-api"
+  ],
+  "summary": {
+    "goal": "Document Upload UI"
+  }
+}

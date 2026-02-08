@@ -1,9 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Block } from '../components/canvas';
 
 const API_BASE_URL = '/api/ideation';
-const RECONNECT_DELAY = 3000;
-const MAX_RECONNECT_ATTEMPTS = 5;
 
 interface UseBlocksReturn {
   blocks: Block[];
@@ -43,19 +41,21 @@ interface UseBlocksReturn {
  * ));
  * ```
  */
-export function useBlocks(sessionId: string): UseBlocksReturn {
+export function useBlocks(sessionId: string | undefined, refreshKey?: number): UseBlocksReturn {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const reconnectAttemptsRef = useRef(0);
 
   /**
    * Fetch blocks from API
    */
   const fetchBlocks = useCallback(async () => {
+    if (!sessionId) {
+      setBlocks([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -77,91 +77,13 @@ export function useBlocks(sessionId: string): UseBlocksReturn {
   }, [sessionId]);
 
   /**
-   * Connect to SSE for real-time block updates
-   */
-  const connect = useCallback(() => {
-    // Close existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-
-    const url = `${API_BASE_URL}/sessions/${sessionId}/events`;
-    console.log(`[useBlocks] Connecting to SSE: ${url}`);
-
-    const eventSource = new EventSource(url);
-
-    eventSource.onopen = () => {
-      console.log(`[useBlocks] SSE connection opened for session ${sessionId}`);
-      // Reset reconnect attempts on successful connection
-      reconnectAttemptsRef.current = 0;
-    };
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log(`[useBlocks] Received event: ${data.type}`);
-
-        // Handle block-related events
-        if (data.type.startsWith('session:block_')) {
-          console.log(`[useBlocks] Block event detected`);
-
-          // If the event includes the updated blocks array, use it
-          if (data.blocks) {
-            console.log(`[useBlocks] Updating blocks from event payload (${data.blocks.length} blocks)`);
-            setBlocks(data.blocks);
-          } else {
-            // Otherwise, refetch from API
-            console.log(`[useBlocks] Refetching blocks`);
-            fetchBlocks();
-          }
-        }
-      } catch (err) {
-        console.error(`[useBlocks] Parse error:`, err);
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      console.error(`[useBlocks] SSE error for session ${sessionId}:`, err);
-      eventSource.close();
-
-      // Limit reconnect attempts to prevent infinite loop
-      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttemptsRef.current++;
-        const delay = RECONNECT_DELAY * Math.min(reconnectAttemptsRef.current, 3);
-        console.log(`[useBlocks] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, delay);
-      } else {
-        console.error(`[useBlocks] Max reconnect attempts reached`);
-      }
-    };
-
-    eventSourceRef.current = eventSource;
-  }, [sessionId, fetchBlocks]);
-
-  /**
-   * Initial fetch on mount
+   * Initial fetch on mount + refetch when refreshKey changes
+   * (SSE removed — useProjectEvents in ProjectContext handles real-time updates
+   *  and increments refreshKey to trigger refetch, avoiding browser connection limit exhaustion)
    */
   useEffect(() => {
     fetchBlocks();
-  }, [fetchBlocks]);
-
-  /**
-   * SSE subscription
-   */
-  useEffect(() => {
-    connect();
-
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-    };
-  }, [connect]);
+  }, [fetchBlocks, refreshKey]);
 
   /**
    * Curate a block (mark as ready for planning)

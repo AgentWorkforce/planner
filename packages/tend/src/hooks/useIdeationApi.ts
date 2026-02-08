@@ -26,9 +26,13 @@ export interface TranscriptMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  metadata?: {
-    options?: string[];
-    [key: string]: unknown;
+  multiple_choice?: {
+    options: Array<{
+      id: string;
+      label: string;
+      description?: string;
+    }>;
+    selected_id?: string; // Track which option was selected (for historical questions)
   };
 }
 
@@ -114,7 +118,7 @@ export function useIdeationApi() {
     sessionId: string,
     content: string,
     blockContext?: string
-  ): Promise<TranscriptMessage | null> => {
+  ): Promise<TranscriptMessage[] | null> => {
     setLoading(true);
     setError(null);
     try {
@@ -128,11 +132,14 @@ export function useIdeationApi() {
         body.block_context = blockContext;
       }
 
-      const result = await fetchJson<TranscriptMessage>(`${API_BASE_URL}/sessions/${sessionId}/messages`, {
+      // Backend returns the full updated Session object (with assistant response in transcript).
+      // Extract the transcript directly so callers can update state immediately
+      // instead of depending on SSE to deliver the update.
+      const result = await fetchJson<{ transcript?: TranscriptMessage[] }>(`${API_BASE_URL}/sessions/${sessionId}/messages`, {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      return result;
+      return result.transcript ?? null;
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       return null;

@@ -1,0 +1,50 @@
+{
+  "title": "Scenario Runner",
+  "summary": {
+    "goal": "Execute scenarios through Planner → Forge → Tuner pipeline",
+    "acceptance_criteria": [
+      {
+        "id": "tr1",
+        "description": "ScenarioRunner.run(scenario, options) returns RunResult"
+      },
+      {
+        "id": "tr2",
+        "description": "Creates plan via Planner API with scenario.goal"
+      },
+      {
+        "id": "tr3",
+        "description": "Auto-approves and publishes plan"
+      },
+      {
+        "id": "tr4",
+        "description": "Creates Forge run from plan_ref"
+      },
+      {
+        "id": "tr5",
+        "description": "Polls run status until complete or timeout"
+      },
+      {
+        "id": "tr6",
+        "description": "Runs verification after execution completes"
+      },
+      {
+        "id": "tr7",
+        "description": "Collects outcomes from Tuner API"
+      },
+      {
+        "id": "tr8",
+        "description": "Returns structured RunResult with all metrics"
+      }
+    ]
+  },
+  "feature_id": "testbench-runner",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "testbench",
+  "component": "testbench",
+  "dependencies": [
+    "testbench-core",
+    "testbench-scenarios"
+  ]
+}

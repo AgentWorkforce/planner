@@ -1,0 +1,45 @@
+{
+  "title": "Tuner Storage Layer",
+  "summary": {
+    "goal": "SQLite storage for outcomes, baselines, drift alerts, and config versions",
+    "acceptance_criteria": [
+      {
+        "id": "sto1",
+        "description": "task_outcomes table with indexes on run_id, timestamp"
+      },
+      {
+        "id": "sto2",
+        "description": "run_outcomes table with unique run_id"
+      },
+      {
+        "id": "sto3",
+        "description": "task_baselines table keyed by normalized pattern"
+      },
+      {
+        "id": "sto4",
+        "description": "model_baselines table keyed by (model, task_type, complexity)"
+      },
+      {
+        "id": "sto5",
+        "description": "drift_alerts table with severity and acknowledged tracking"
+      },
+      {
+        "id": "sto6",
+        "description": "config_versions table with JSON config and audit trail"
+      },
+      {
+        "id": "sto7",
+        "description": "Storage interface abstraction for testability"
+      }
+    ]
+  },
+  "feature_id": "tuner-storage",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "critical",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-domain"
+  ]
+}

@@ -47,6 +47,10 @@ For each feature, create these tasks in order:
 | DOC | [DOC] Document [feature] completion | VERIFY |
 | CHECKPOINT | [CHECKPOINT] Context check | DOC |
 
+**AUDIT checkpoints**: Insert an [AUDIT] task after every ~5 IMPL tasks (use discretion based on logical groupings/phases). AUDIT tasks review the code produced so far for quality, bugs, and consistency before continuing. Block subsequent IMPLs on the AUDIT task.
+
+**Multi-phase features**: For features with distinct phases (e.g., "Phase 1", "Phase 2" or verification gates in the plan), treat each phase like a mini-feature: add a [PRE] task before each phase to analyze context and patterns from previous phases, and a [POST] task after each phase to review that phase's code before proceeding.
+
 ## Cross-Feature Dependencies
 
 If feature B depends on feature A:
@@ -85,7 +89,7 @@ Feature: [feature_id]
 Step: [step_id] - [step_title]
 File: docs/flow/features/[feature_id].json
 
-DO: Implement this step per its acceptance_criteria in the feature file.
+DO: Implement this step per its acceptance_criteria and specification (if present) in the feature file.
 ```
 
 **POST**:
@@ -106,6 +110,21 @@ DO: Review this code as if it were a PR from another developer.
 3. Make fixes and improvements—don't just note them
 
 Be critical. If you wouldn't approve this PR, fix it before marking complete.
+```
+
+**AUDIT** (inserted every ~5 IMPLs):
+```
+Feature: [feature_id]
+Phase: [phase or step range being audited]
+
+DO: Review code produced in the last batch of IMPLs.
+
+1. Re-read all code written since the last AUDIT (or PRE if first AUDIT)
+2. Check for bugs, logic errors, inconsistent patterns
+3. Verify the code follows existing codebase conventions
+4. Fix issues before proceeding to next batch of IMPLs
+
+This is a quality gate—subsequent IMPLs are blocked until this passes.
 ```
 
 **VERIFY**:
@@ -155,3 +174,18 @@ Each feature must have `plan_implementation.steps`. Skip features without plans,
 ## After All Tasks Created
 
 Stop. The user works through the tasks. You don't implement.
+
+## Fits the Whole
+
+| Skill | Section |
+|-------|---------|
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
+| **flow-tasks** | Creates executable tasks from plan |
+| flow-feature | `user_flow` |
+| flow-ui-ux-validation | `validation_uiux` |
+| flow-test-designer | `plan_tests` |
+| flow-visualize | Reads all, renders diagram |
+| flow-change-request | Updates any, cascades |

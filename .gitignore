@@ -22,6 +22,7 @@ build/
 # IDE
 .idea/
 .vscode/
+.windsurf/
 *.swp
 *.swo
 
@@ -47,8 +48,9 @@ coverage/
 # Agent Relay runtime (messages, sessions, identities)
 .agent-relay/
 
-# Playwright MCP screenshots (testing artifacts)
+# Screenshots (testing/debug artifacts)
 .playwright-mcp/
+forge-ui-*.png
 
 # Lock files
 prpm.lock
@@ -56,5 +58,8 @@ prpm.lock
 # Claude prompts (local snippets)
 .prompts/
 
-# Research docs (local reference, not tracked)
-docs/research/
+# Local docs (not tracked, except docs/flow/)
+docs/*
+!docs/flow/
+!docs/flow/**
+docs/flow/**/.DS_Store

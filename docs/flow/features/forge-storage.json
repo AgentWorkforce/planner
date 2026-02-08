@@ -1,0 +1,204 @@
+{
+  "feature_id": "forge-storage",
+  "title": "Forge State Database",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-core",
+  "dependencies": ["forge-domain"],
+
+  "summary": {
+    "goal": "SQLite storage layer for runs, tasks, attempts, artifacts, gates, questions, and workspaces. Uses JSONB for complex nested data while maintaining queryable columns for status and relationships.",
+    "acceptance_criteria": [
+      { "id": "fs-ac1", "description": "runs table with id, plan_ref, status, has_pending_gate, and document JSONB column" },
+      { "id": "fs-ac2", "description": "tasks table with run_id, step_id, status, dependencies JSONB, workspace_path, gate_id" },
+      { "id": "fs-ac3", "description": "task_attempts table tracking attempt_number, started_at, ended_at, outcome, error, audit_findings JSONB" },
+      { "id": "fs-ac4", "description": "artifacts table with type, reference, task_id, created_at" },
+      { "id": "fs-ac5", "description": "Query helpers: getReadyTasks(runId), getActiveRuns(), getTaskHistory(taskId)" },
+      { "id": "fs-ac6", "description": "Indexes on status columns for efficient filtering" },
+      { "id": "fs-ac7", "description": "workspace_cleanup table for retention tracking (task_id, cleanup_after)" },
+      { "id": "fs-ac8", "description": "gates table for human approval gate state" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "JSONB pattern from planner-core works well for LLM context assembly",
+        "Status columns enable efficient queries without parsing JSON",
+        "Task dependencies stored as JSONB array of step_ids",
+        "Workspace path tracked for cleanup and debugging",
+        "Gates are 1:1 with tasks that have gate config - gate_id on task links them"
+      ],
+      "patterns": [
+        "Hybrid storage: relational for queries, JSONB for full documents",
+        "better-sqlite3 for synchronous operations (matches relay stack)",
+        "Migrations via SQL files"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "database": "SQLite via better-sqlite3",
+      "schema_pattern": "Queryable columns + JSONB document column"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fs-s1",
+        "title": "Create ForgeStorage interface",
+        "scope": "forge-core",
+        "description": "Define the storage interface for Forge entities",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeStorage interface with Run operations: createRun, getRun, updateRun, updateRunStatus, listRuns, getActiveRuns" },
+          { "id": "ac2", "description": "Task operations: createTask, getTask, updateTask, updateTaskStatus, listTasksByRun, getReadyTasks(runId)" },
+          { "id": "ac3", "description": "TaskAttempt operations: createAttempt, getAttempt, updateAttempt, listAttemptsByTask" },
+          { "id": "ac4", "description": "Artifact operations: createArtifact, listArtifactsByTask, listArtifactsByRun" },
+          { "id": "ac5", "description": "Gate operations: createGate, getGate, updateGate, listPendingGates" },
+          { "id": "ac6", "description": "Workspace cleanup operations: scheduleCleanup, getExpiredCleanups, deleteCleanup" },
+          { "id": "ac7", "description": "transaction<T>(fn) method for atomic operations" },
+          { "id": "ac8", "description": "close() method for cleanup" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/interface.ts",
+          "pattern_description": "Copy PlanStorage interface pattern. See lines 56-179 for interface structure with grouped operations."
+        }
+      },
+      {
+        "step_id": "fs-s2",
+        "title": "Create SQLite schema definitions",
+        "scope": "forge-core",
+        "description": "Define SQL CREATE TABLE statements for all Forge entities",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_RUNS_TABLE: run_id PK, plan_id, plan_version, status (CHECK constraint), has_pending_gate BOOLEAN, document JSONB, started_at, completed_at, error, created_at, updated_at" },
+          { "id": "ac2", "description": "CREATE_TASKS_TABLE: task_id PK, run_id FK, step_id, status, dependencies JSONB, workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at" },
+          { "id": "ac3", "description": "CREATE_TASK_ATTEMPTS_TABLE: attempt_id PK, task_id FK, attempt_number, started_at, ended_at, outcome, error, agent_id, audit_findings JSONB" },
+          { "id": "ac4", "description": "CREATE_ARTIFACTS_TABLE: artifact_id PK, task_id FK, type, reference, metadata JSONB, created_at" },
+          { "id": "ac5", "description": "CREATE_GATES_TABLE: gate_id PK, task_id FK UNIQUE, status, approver_role, decided_by, decided_at, comment, created_at" },
+          { "id": "ac6", "description": "CREATE_WORKSPACE_CLEANUP_TABLE: task_id PK, cleanup_after TIMESTAMP" },
+          { "id": "ac7", "description": "Indexes on status columns for efficient filtering: idx_runs_status, idx_tasks_status, idx_tasks_run_id, idx_gates_status" },
+          { "id": "ac8", "description": "ALL_SCHEMA_STATEMENTS array for initialization" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/schema.ts",
+          "pattern_description": "Copy schema pattern: exported const strings for each CREATE TABLE, CHECK constraints for status enums, indexes for query optimization. See lines 18-65 for table pattern."
+        }
+      },
+      {
+        "step_id": "fs-s3",
+        "title": "Implement SQLite storage adapter",
+        "scope": "forge-core",
+        "description": "Implement ForgeStorage interface with better-sqlite3",
+        "dependencies": ["fs-s1", "fs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createForgeStorage(dbPath) factory function returns initialized ForgeStorage" },
+          { "id": "ac2", "description": "Constructor initializes schema with ALL_SCHEMA_STATEMENTS" },
+          { "id": "ac3", "description": "Row-to-entity mapping: runFromRow(), taskFromRow(), attemptFromRow(), artifactFromRow(), gateFromRow()" },
+          { "id": "ac4", "description": "getReadyTasks(runId) returns tasks with status='pending' AND all dependencies completed AND run.has_pending_gate=false" },
+          { "id": "ac5", "description": "transaction() uses db.transaction() for atomicity" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/sqlite.ts",
+          "pattern_description": "Copy SQLitePlanStorage pattern: constructor with schema init, prepared statements, row mapping functions. Key patterns at lines 1-50 (setup) and row mapping throughout."
+        }
+      },
+      {
+        "step_id": "fs-s4",
+        "title": "Add trajectory events table schema",
+        "scope": "forge-core",
+        "description": "Create table schema for storing trajectory events (owned by forge-trajectory-capture)",
+        "dependencies": ["fs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_TRAJECTORY_EVENTS_TABLE: event_id PK, run_id FK, task_id FK nullable, event_type, payload JSONB, timestamp" },
+          { "id": "ac2", "description": "Index on run_id + timestamp for efficient timeline queries" },
+          { "id": "ac3", "description": "Storage methods added: createTrajectoryEvent(), listTrajectoryEvents(runId, filter?)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/schema.ts:313-352",
+          "pattern_description": "Copy trajectory_events table pattern from planner-core",
+          "notes": "Table schema defined here, but owned by forge-trajectory-capture feature"
+        }
+      },
+      {
+        "step_id": "fs-s5",
+        "title": "Add question queue table schema",
+        "scope": "forge-core",
+        "description": "Create table schema for question queue (owned by forge-question-queue)",
+        "dependencies": ["fs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_QUESTIONS_TABLE: question_id PK, run_id FK, task_id FK, agent_id, text, options JSONB, blocking_level, steps_blocked, can_use_default, default_value, subscribers JSONB, status, answer, priority_score, created_at, answered_at" },
+          { "id": "ac2", "description": "Index on (run_id, status, priority_score DESC) for queue ordering" },
+          { "id": "ac3", "description": "Storage methods added: createQuestion(), getQuestion(), updateQuestion(), listPendingByPriority()" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/schema.ts:263-307",
+          "pattern_description": "Copy questions table pattern from planner-core",
+          "notes": "Table schema defined here, but owned by forge-question-queue feature"
+        }
+      },
+      {
+        "step_id": "fs-s6",
+        "title": "Add user trajectory tables schema",
+        "scope": "forge-core",
+        "description": "Create table schemas for user trajectory (owned by forge-user-trajectory)",
+        "dependencies": ["fs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_USER_TRAJECTORY_EVENTS_TABLE: event_id PK, user_id, scope, question_text, selected_option, reasoning, run_id, task_id, timestamp" },
+          { "id": "ac2", "description": "CREATE_DERIVED_PREFERENCES_TABLE: preference_id PK, user_id, scope, category, value, confidence, evidence_count, last_expressed" },
+          { "id": "ac3", "description": "Indexes on (user_id, scope) and (user_id, scope, category)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/schema.ts:313-352",
+          "pattern_description": "Copy trajectory_events table pattern",
+          "notes": "Table schemas defined here, but owned by forge-user-trajectory feature"
+        }
+      },
+      {
+        "step_id": "fs-s7",
+        "title": "Add checkpoint table schema",
+        "scope": "forge-core",
+        "description": "Create table schema for durability checkpoints (owned by forge-durability)",
+        "dependencies": ["fs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_CHECKPOINTS_TABLE: checkpoint_id PK, run_id FK, snapshot JSONB, created_at" },
+          { "id": "ac2", "description": "Index on run_id for efficient lookup" },
+          { "id": "ac3", "description": "Storage methods: createCheckpoint(), getLatestCheckpoint(runId), listCheckpoints(runId)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/schema.ts",
+          "pattern_description": "Follow existing table pattern",
+          "notes": "Table schema defined here, but owned by forge-durability feature"
+        }
+      },
+      {
+        "step_id": "fs-s8",
+        "title": "Create storage index and exports",
+        "scope": "forge-core",
+        "description": "Create index.ts exporting storage interface, schema, and SQLite implementation",
+        "dependencies": ["fs-s1", "fs-s2", "fs-s3", "fs-s4", "fs-s5", "fs-s6", "fs-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/forge-core/src/storage/index.ts exports ForgeStorage interface and createForgeStorage factory" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/index.ts",
+          "pattern_description": "Copy export pattern from planner-core storage"
+        }
+      }
+    ]
+  }
+}

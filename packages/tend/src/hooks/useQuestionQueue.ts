@@ -1,169 +1,147 @@
-/**
- * useQuestionQueue Hook
- *
- * Manages the queue of pending reply items that need user attention.
- * Built on top of useQuestionNotifications for the tend package.
- *
- * Features:
- * - Queue management with add/remove operations
- * - Auto-sorted by priority (high → medium → low)
- * - Mock data for initial development
- * - Integrates with existing useQuestionNotifications hook
- */
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-import { useState, useCallback, useMemo } from 'react';
-import type { Question } from './useQuestionNotifications';
-
-/** Priority levels for reply items */
-export type ReplyPriority = 'high' | 'medium' | 'low';
-
-/** Reply item type discriminator */
-export type ReplyItemType = 'question' | 'approval' | 'review';
-
-/**
- * A reply item in the queue
- */
-export interface ReplyItem {
+export interface PendingItem {
   id: string;
-  type: ReplyItemType;
-  /** Short preview text shown in the bar */
-  preview: string;
-  /** Agent role (e.g., 'architect', 'coder') */
-  agentRole?: string;
-  /** Priority for sorting */
-  priority: ReplyPriority;
-  /** ISO timestamp */
-  timestamp: string;
-  /** Original question data (if type is 'question') */
-  question?: Question;
+  type: 'question' | 'gate' | 'decision';
+  content: string;
+  source: string;
+  priority: 'blocking' | 'normal' | 'fyi';
+  created_at: string;
 }
 
-interface UseQuestionQueueOptions {
-  /** Enable mock data for development */
-  useMockData?: boolean;
+interface Question {
+  id: string;
+  content: string;
+  status: string;
+  source?: string;
+  priority?: 'blocking' | 'normal' | 'fyi';
+  created_at: string;
 }
 
-interface UseQuestionQueueResult {
-  /** All items in the queue, sorted by priority */
-  items: ReplyItem[];
-  /** Count of pending items */
-  pendingCount: number;
-  /** Add an item to the queue */
-  addItem: (item: ReplyItem) => void;
-  /** Remove an item from the queue */
-  removeItem: (itemId: string) => void;
-  /** Clear all items */
-  clearAll: () => void;
+interface Gate {
+  id: string;
+  title: string;
+  status: string;
+  agent_name?: string;
+  created_at: string;
 }
 
-/**
- * Convert Question to ReplyItem
- */
-function questionToReplyItem(question: Question): ReplyItem {
-  // Map blocking level to priority
-  const priorityMap: Record<string, ReplyPriority> = {
-    hard_block: 'high',
-    soft_block: 'medium',
-    preference: 'low',
-    fyi: 'low',
-  };
+interface QuestionsResponse {
+  questions: Question[];
+}
 
-  return {
-    id: question.question_id,
-    type: 'question',
-    preview: question.text.slice(0, 60) + (question.text.length > 60 ? '...' : ''),
-    agentRole: question.agent_role,
-    priority: priorityMap[question.blocking_level] || 'medium',
-    timestamp: question.created_at,
-    question,
-  };
+interface GatesResponse {
+  gates: Gate[];
+}
+
+export interface UseQuestionQueueReturn {
+  items: PendingItem[];
+  loading: boolean;
+  refetch: () => void;
 }
 
 /**
- * Hook for managing the queue of pending reply items.
+ * useQuestionQueue - Aggregates pending questions and gates from planner and forge APIs
+ *
+ * Fetches questions when planId is set, gates when runId is set.
+ * Polls every 15s and sorts by priority (blocking > normal > fyi).
+ *
+ * @param planId - Plan ID for fetching questions
+ * @param runId - Run ID for fetching gates
  */
 export function useQuestionQueue(
-  options: UseQuestionQueueOptions = {}
-): UseQuestionQueueResult {
-  const { useMockData = true } = options;
+  planId: string | undefined,
+  runId: string | undefined
+): UseQuestionQueueReturn {
+  const [items, setItems] = useState<PendingItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Mock data for initial development
-  const mockItems: ReplyItem[] = useMockData ? [
-    {
-      id: 'q1',
-      type: 'question',
-      preview: 'Should we use TypeScript for this component?',
-      agentRole: 'architect',
-      priority: 'high',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 min ago
-    },
-    {
-      id: 'q2',
-      type: 'approval',
-      preview: 'Ready to merge PR #42 - needs approval',
-      agentRole: 'coder',
-      priority: 'medium',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 min ago
-    },
-    {
-      id: 'q3',
-      type: 'review',
-      preview: 'API design review requested',
-      agentRole: 'architect',
-      priority: 'low',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
-    },
-  ] : [];
+  const fetchItems = useCallback(async () => {
+    const allItems: PendingItem[] = [];
 
-  const [items, setItems] = useState<ReplyItem[]>(mockItems);
-
-  // Sort by priority: high > medium > low
-  const sortedItems = useMemo(() => {
-    const priorityOrder: Record<ReplyPriority, number> = {
-      high: 0,
-      medium: 1,
-      low: 2,
-    };
-
-    return [...items].sort((a, b) => {
-      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-      if (priorityDiff !== 0) return priorityDiff;
-
-      // If same priority, sort by timestamp (oldest first)
-      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-    });
-  }, [items]);
-
-  const addItem = useCallback((item: ReplyItem) => {
-    setItems(prev => {
-      // Avoid duplicates
-      if (prev.some(i => i.id === item.id)) {
-        return prev;
+    try {
+      // Fetch questions if planId exists
+      if (planId) {
+        const questionsRes = await fetch(`/api/plans/${planId}/questions`);
+        if (questionsRes.ok) {
+          const data: QuestionsResponse = await questionsRes.json();
+          const pendingQuestions = data.questions
+            .filter((q) => q.status !== 'answered')
+            .map((q): PendingItem => ({
+              id: q.id,
+              type: 'question',
+              content: q.content,
+              source: q.source || 'Unknown',
+              priority: q.priority || 'normal',
+              created_at: q.created_at,
+            }));
+          allItems.push(...pendingQuestions);
+        }
       }
-      return [...prev, item];
-    });
-  }, []);
 
-  const removeItem = useCallback((itemId: string) => {
-    setItems(prev => prev.filter(i => i.id !== itemId));
-  }, []);
+      // Fetch gates if runId exists
+      if (runId) {
+        const gatesRes = await fetch(`/api/forge/runs/${runId}/gates?status=pending`);
+        if (gatesRes.ok) {
+          const data: GatesResponse = await gatesRes.json();
+          const pendingGates = data.gates
+            .filter((g) => g.status === 'pending')
+            .map((g): PendingItem => ({
+              id: g.id,
+              type: 'gate',
+              content: g.title,
+              source: g.agent_name || 'Unknown',
+              priority: 'normal',
+              created_at: g.created_at,
+            }));
+          allItems.push(...pendingGates);
+        }
+      }
 
-  const clearAll = useCallback(() => {
-    setItems([]);
-  }, []);
+      // Sort by priority (blocking > normal > fyi)
+      const priorityOrder = { blocking: 0, normal: 1, fyi: 2 };
+      allItems.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
-  return {
-    items: sortedItems,
-    pendingCount: sortedItems.length,
-    addItem,
-    removeItem,
-    clearAll,
-  };
-}
+      setItems(allItems);
+      setLoading(false);
+    } catch (error) {
+      // Handle errors gracefully - return empty array
+      console.error('Error fetching question queue:', error);
+      setItems([]);
+      setLoading(false);
+    }
+  }, [planId, runId]);
 
-/**
- * Convert a Question from useQuestionNotifications to a ReplyItem
- */
-export function questionToItem(question: Question): ReplyItem {
-  return questionToReplyItem(question);
+  const refetch = useCallback(() => {
+    setLoading(true);
+    void fetchItems();
+  }, [fetchItems]);
+
+  useEffect(() => {
+    // Initial fetch
+    if (planId || runId) {
+      setLoading(true);
+      void fetchItems();
+
+      // Poll every 15s
+      intervalRef.current = setInterval(() => {
+        void fetchItems();
+      }, 15000);
+    } else {
+      // Clear items if no planId or runId
+      setItems([]);
+      setLoading(false);
+    }
+
+    // Cleanup interval on unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [planId, runId, fetchItems]);
+
+  return { items, loading, refetch };
 }

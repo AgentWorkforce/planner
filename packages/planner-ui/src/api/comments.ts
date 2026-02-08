@@ -44,6 +44,7 @@ export async function createComment(
   version: number,
   stepId: string,
   content: string,
+  author: string,
   parentId?: string
 ): Promise<CommentResponse> {
   return apiClient.post<CommentResponse>(
@@ -52,7 +53,7 @@ export async function createComment(
       step_id: stepId,
       content,
       parent_id: parentId,
-      author: 'User', // TODO: Get from auth context
+      author,
     }
   );
 }
@@ -63,11 +64,12 @@ export async function createComment(
 export async function resolveComment(
   planId: string,
   version: number,
-  commentId: string
+  commentId: string,
+  resolvedBy: string
 ): Promise<CommentResponse> {
   return apiClient.post<CommentResponse>(
     `/plans/${planId}/versions/${version}/comments/${commentId}/resolve`,
-    { resolved_by: 'User' } // TODO: Get from auth context
+    { resolved_by: resolvedBy }
   );
 }
 

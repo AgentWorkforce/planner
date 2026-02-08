@@ -1,26 +1,15 @@
 /**
- * ProjectContext - Provides the current project state throughout the tend app
+ * ProjectContext Provider
  *
- * Wraps useProjectEvents and project API calls. The project entity links
- * ideation sessions, plans, and forge runs into a single workspace.
- *
- * Usage:
- *   // In App.tsx or ProjectPage, wrap with provider:
- *   <ProjectProvider projectId={id}>
- *     <ProjectWorkspace />
- *   </ProjectProvider>
- *
- *   // In any child component:
- *   const { project, isLoading, updateProject, updateFocus } = useProject();
+ * Manages project state, fetches linked entities, and subscribes to real-time updates.
+ * Central context for project-level state in the tend app.
  */
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useState, useCallback, useEffect } from 'react';
+import { useProjectEvents } from '@/hooks/useProjectEvents';
 
-/**
- * Project entity structure matching backend schema
- * See: docs/flow/features/tend-project-entity.json
- */
-export interface Project {
+/** Project entity from planner domain */
+interface Project {
   id: string;
   name: string;
   owner_id: string | null;
@@ -28,189 +17,340 @@ export interface Project {
   session_id: string | null;
   plan_id: string | null;
   run_id: string | null;
-  config: ProjectConfig | null;
-  current_focus: CurrentFocus | null;
+  config: Record<string, unknown> | null;
+  current_focus: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/**
- * Project configuration defining scopes and execution policy
- */
-export interface ProjectConfig {
-  scopes?: {
-    workspace_path?: string;
-    remote_url?: string;
-    default_branch?: string;
+/** Ideation session entity */
+interface IdeationSession {
+  id: string;
+  status: 'active' | 'abandoned';
+  initiative_id?: string;
+  source: {
+    type: 'human' | 'intake';
+    initial_intent: string;
+    channel_ref?: string;
   };
-  execution_policy?: {
-    max_concurrent?: number;
-    timeout?: number;
-    retries?: number;
-    budget?: number;
-  };
+  active_specialists: Array<{
+    name: string;
+    role_hint?: string;
+    joined_at: string;
+  }>;
+  aggregate_confidence: number;
+  created_at: string;
+  updated_at: string;
 }
 
-/**
- * Current focus tracks what the user is currently viewing
- * (step_id, tree path, etc.)
- */
-export interface CurrentFocus {
-  type?: 'step' | 'scope' | 'tree_node' | 'conversation';
-  id?: string;
-  path?: string[];
-  metadata?: Record<string, unknown>;
+/** Plan entity */
+interface Plan {
+  plan_id: string;
+  initiative_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Forge run entity */
+interface ForgeRun {
+  run_id: string;
+  plan_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ProjectContextValue {
-  /** The current project (null if not loaded) */
   project: Project | null;
-  /** Whether the project is being loaded */
-  isLoading: boolean;
-  /** Error message if loading or updating failed */
+  phase: string;
+  loading: boolean;
   error: string | null;
-  /** Load a project by ID */
-  loadProject: (id: string) => Promise<void>;
-  /** Update project fields (name, config, linked IDs) */
-  updateProject: (updates: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
-  /** Update the current focus (what the user is looking at) */
-  updateFocus: (focus: CurrentFocus) => Promise<void>;
+
+  // Linked entities
+  session: IdeationSession | null;
+  plan: Plan | null;
+  run: ForgeRun | null;
+
+  // Refresh triggers (increment to force re-fetch of dependent data)
+  planRefreshKey: number;
+  blockRefreshKey: number;
+  transcriptRefreshKey: number;
+
+  // Actions
+  graduate: (target: 'ideation' | 'planning' | 'forging', blockIds?: string[]) => Promise<void>;
+  updateProject: (patch: Partial<Project>) => Promise<void>;
+  refetch: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 interface ProjectProviderProps {
-  /** Project ID to load on mount (optional) */
-  projectId?: string;
+  projectId: string;
   children: ReactNode;
 }
 
-/**
- * ProjectProvider - Manages project state and provides it to children
- *
- * Fetches project data on mount if projectId is provided.
- * Provides methods to update project fields and current focus.
- */
+async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`HTTP ${response.status}: ${errorText}`);
+  }
+
+  return response.json();
+}
+
 export function ProjectProvider({ projectId, children }: ProjectProviderProps) {
   const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [session, setSession] = useState<IdeationSession | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [run, setRun] = useState<ForgeRun | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [planRefreshKey, setPlanRefreshKey] = useState(0);
+  const [blockRefreshKey, setBlockRefreshKey] = useState(0);
+  const [transcriptRefreshKey, setTranscriptRefreshKey] = useState(0);
 
-  const loadProject = useCallback(async (id: string) => {
-    setIsLoading(true);
+  // Fetch project and linked entities
+  const fetchProject = useCallback(async () => {
+    setLoading(true);
     setError(null);
+
     try {
-      const res = await fetch(`/api/projects/${id}`);
-      if (!res.ok) {
-        throw new Error(`Failed to load project: ${res.statusText}`);
+      // Fetch project
+      const projectResult = await fetchJson<{ project: Project }>(`/api/projects/${projectId}`);
+      setProject(projectResult.project);
+
+      // Fetch linked session if exists
+      if (projectResult.project.session_id) {
+        try {
+          const sessionResult = await fetchJson<IdeationSession>(
+            `/api/ideation/sessions/${projectResult.project.session_id}`
+          );
+          setSession(sessionResult);
+        } catch (err) {
+          console.warn('[ProjectContext] Failed to fetch session:', err);
+          setSession(null);
+        }
+      } else {
+        setSession(null);
       }
-      const data = await res.json();
-      setProject(data.project);
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      setError(errorMessage);
-      console.error('Error loading project:', e);
+
+      // Fetch linked plan if exists
+      if (projectResult.project.plan_id) {
+        try {
+          const planResult = await fetchJson<{ plan: Plan }>(
+            `/api/plans/${projectResult.project.plan_id}`
+          );
+          setPlan(planResult.plan);
+        } catch (err) {
+          console.warn('[ProjectContext] Failed to fetch plan:', err);
+          setPlan(null);
+        }
+      } else {
+        setPlan(null);
+      }
+
+      // Fetch linked run if exists
+      if (projectResult.project.run_id) {
+        try {
+          const runResult = await fetchJson<ForgeRun>(
+            `/api/forge/runs/${projectResult.project.run_id}`
+          );
+          setRun(runResult);
+        } catch (err) {
+          console.warn('[ProjectContext] Failed to fetch run:', err);
+          setRun(null);
+        }
+      } else {
+        setRun(null);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load project';
+      setError(message);
+      console.error('[ProjectContext] Fetch error:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
-  const updateProject = useCallback(
-    async (updates: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>) => {
-      if (!project) {
-        console.warn('Cannot update project: no project loaded');
-        return;
-      }
-      try {
-        const res = await fetch(`/api/projects/${project.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        });
-        if (!res.ok) {
-          throw new Error(`Failed to update project: ${res.statusText}`);
-        }
-        const data = await res.json();
-        setProject(data.project);
-      } catch (e: unknown) {
-        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-        setError(errorMessage);
-        console.error('Error updating project:', e);
-      }
-    },
-    [project],
-  );
-
-  const updateFocus = useCallback(
-    async (focus: CurrentFocus) => {
-      if (!project) {
-        console.warn('Cannot update focus: no project loaded');
-        return;
-      }
-      try {
-        const res = await fetch(`/api/projects/${project.id}/focus`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ current_focus: focus }),
-        });
-        if (!res.ok) {
-          throw new Error(`Failed to update focus: ${res.statusText}`);
-        }
-        const data = await res.json();
-        setProject(data.project);
-      } catch (e: unknown) {
-        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-        setError(errorMessage);
-        console.error('Error updating focus:', e);
-      }
-    },
-    [project],
-  );
-
-  // Load project on mount if projectId provided
+  // Initial fetch
   useEffect(() => {
-    if (projectId) {
-      loadProject(projectId);
+    fetchProject();
+  }, [fetchProject]);
+
+  // Subscribe to real-time events
+  useProjectEvents(project, {
+    // Ideation events
+    onTranscript: () => {
+      console.log('[ProjectContext] Transcript updated');
+      setTranscriptRefreshKey(k => k + 1);
+      if (project?.session_id) {
+        fetchJson<IdeationSession>(`/api/ideation/sessions/${project.session_id}`)
+          .then(result => setSession(result))
+          .catch(err => console.warn('[ProjectContext] Failed to refetch session:', err));
+      }
+    },
+    onUnderstanding: () => {
+      console.log('[ProjectContext] Understanding updated');
+      if (project?.session_id) {
+        fetchJson<IdeationSession>(`/api/ideation/sessions/${project.session_id}`)
+          .then(result => setSession(result))
+          .catch(err => console.warn('[ProjectContext] Failed to refetch session:', err));
+      }
+    },
+    onBlockUpdate: () => {
+      console.log('[ProjectContext] Block updated');
+      setBlockRefreshKey(k => k + 1);
+    },
+    onBlocksGraduated: () => {
+      console.log('[ProjectContext] Blocks graduated — refetching project');
+      fetchProject();
+      setPlanRefreshKey(k => k + 1);
+      setBlockRefreshKey(k => k + 1);
+    },
+    onStatus: (status) => {
+      console.log('[ProjectContext] Session status changed:', status);
+      if (session) {
+        setSession({ ...session, status });
+      }
+    },
+
+    // Planner events
+    onPlanChange: () => {
+      console.log('[ProjectContext] Plan changed');
+      setPlanRefreshKey(k => k + 1);
+      // Refetch plan
+      if (project?.plan_id) {
+        fetchJson<{ plan: Plan }>(`/api/plans/${project.plan_id}`)
+          .then(result => setPlan(result.plan))
+          .catch(err => console.warn('[ProjectContext] Failed to refetch plan:', err));
+      }
+    },
+
+    // Forge events
+    onRunProgress: () => {
+      console.log('[ProjectContext] Run progress updated');
+      if (project?.run_id) {
+        fetchJson<ForgeRun>(`/api/forge/runs/${project.run_id}`)
+          .then(result => setRun(result))
+          .catch(err => console.warn('[ProjectContext] Failed to refetch run:', err));
+      }
+    },
+    onTaskUpdate: () => {
+      console.log('[ProjectContext] Task updated');
+      if (project?.run_id) {
+        fetchJson<ForgeRun>(`/api/forge/runs/${project.run_id}`)
+          .then(result => setRun(result))
+          .catch(err => console.warn('[ProjectContext] Failed to refetch run:', err));
+      }
+    },
+  });
+
+  // Graduate project to next phase
+  const graduate = useCallback(async (target: 'ideation' | 'planning' | 'forging', blockIds?: string[]) => {
+    if (!project) {
+      throw new Error('No project loaded');
     }
-  }, [projectId, loadProject]);
+
+    try {
+      const body: Record<string, unknown> = { target };
+      if (blockIds && blockIds.length > 0) {
+        body.options = { block_ids: blockIds };
+      }
+
+      const result = await fetchJson<{ project: Project }>(
+        `/api/projects/${project.id}/graduate`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }
+      );
+
+      setProject(result.project);
+
+      // If graduating to forging and a run was created, fetch it immediately
+      if (target === 'forging' && result.project.run_id) {
+        try {
+          const runResult = await fetchJson<ForgeRun>(`/api/forge/runs/${result.project.run_id}`);
+          setRun(runResult);
+          console.log('[ProjectContext] Fetched new forge run:', runResult.run_id);
+        } catch (err) {
+          console.warn('[ProjectContext] Failed to fetch new run:', err);
+        }
+      }
+
+      // Refetch all linked entities to ensure consistency
+      await fetchProject();
+    } catch (err) {
+      // Don't set context-level error — graduation failures are non-fatal.
+      throw err;
+    }
+  }, [project, fetchProject]);
+
+  // Update project fields
+  const updateProject = useCallback(async (patch: Partial<Project>) => {
+    if (!project) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      const result = await fetchJson<{ project: Project }>(
+        `/api/projects/${project.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(patch),
+        }
+      );
+
+      setProject(result.project);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update project';
+      setError(message);
+      throw err;
+    }
+  }, [project]);
+
+  // Derive phase from project state
+  const phase = project
+    ? project.run_id
+      ? 'forging'
+      : project.plan_id
+      ? 'planning'
+      : project.session_id
+      ? 'ideation'
+      : 'new'
+    : 'unknown';
 
   const value: ProjectContextValue = {
     project,
-    isLoading,
+    phase,
+    loading,
     error,
-    loadProject,
+    session,
+    plan,
+    run,
+    planRefreshKey,
+    blockRefreshKey,
+    transcriptRefreshKey,
+    graduate,
     updateProject,
-    updateFocus,
+    refetch: fetchProject,
   };
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 
-/**
- * useProject - Access the project context
- *
- * @throws Error if used outside ProjectProvider
- *
- * @example
- * const { project, isLoading, updateProject } = useProject();
- * if (isLoading) return <LoadingSpinner />;
- * if (!project) return <div>No project loaded</div>;
- * return <div>{project.name}</div>;
- */
-export function useProject(): ProjectContextValue {
+export function useProject() {
   const context = useContext(ProjectContext);
   if (!context) {
-    throw new Error('useProject must be used within a ProjectProvider');
+    throw new Error('useProject must be used within ProjectProvider');
   }
   return context;
-}
-
-/**
- * useOptionalProject - Access project context without throwing
- *
- * Returns null when used outside ProjectProvider. Use this in components
- * that may or may not be rendered within a ProjectProvider.
- */
-export function useOptionalProject(): ProjectContextValue | null {
-  return useContext(ProjectContext);
 }

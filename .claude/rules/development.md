@@ -2,16 +2,26 @@
 
 ## dev.sh Script
 
-The `dev.sh` script manages the development environment:
-- Starts/stops agent-relay daemon
-- Backend API (using `tsx watch` for hot-reload)
-- Frontend (Vite)
+The `dev.sh` script manages the full development environment with PID tracking and graceful shutdown:
+- Agent-relay daemon (`agent-relay up --dashboard`)
+- Backend server on port 3001 (`npm run start -w server`)
+- Planner UI on port 3000 (Vite)
+- Ideation UI on port 3002 (Vite)
+- Forge UI on port 3003 (Vite)
+- Tuner service on port 4002
 
-**Backend startup**: Use `npm run start` (which runs `tsx src/server.ts`), not `npm run dev` recursively—this causes infinite loops.
+**Backend startup**: `npm run start -w server` runs `tsx packages/server/src/server.ts`. Do NOT use `npm run dev` recursively—causes infinite loops.
 
 ## Testing
 
 - **Framework**: Vitest (matches relay stack)
+- **Playwright**: 1.58.1 available for E2E testing
+- **Backend tests**: `vitest.config.ts` at root, covers packages/planner, server, ideation
+- **Frontend tests**: Per-package Vitest + jsdom + React Testing Library
+- **Test databases**: In-memory SQLite (`:memory:`) for isolation
+- **Commands**:
+  - `npm test` (all packages)
+  - `npm test -w planner` (specific package)
 - **Mocking**: Use `vi.mock()` to isolate unit/integration tests
 - **tsconfig.json**: Exclude test files (`.test.ts`) from build output; Vitest handles transpilation separately
 - **Kill hanging tests**: Terminate test runner process if it hangs or doesn't exit
@@ -29,10 +39,24 @@ The `dev.sh` script manages the development environment:
 
 ## API Design
 
-- **Validation**: Use Zod schemas (`CreatePlanRequestSchema`, `ListPlansQuerySchema`) for request/query validation
+- **Framework**: Express 5.2.1 (not v4)
+- **Routes**: Multi-domain structure
+  - `/api/plans/*` - Planner domain
+  - `/api/ideation/sessions/*` - Ideation domain
+  - `/api/forge/runs/*` - Forge domain
+- **Validation**: Use Zod schemas per domain (`CreatePlanRequestSchema`, `ListPlansQuerySchema`, etc.)
 - **Type exports**: Export TypeScript types from Zod schemas for consistency
+- **Response format**: `{ data: T }` or `{ plans: T[] }` with typed generics
+- **Error handling**: Use `@plannr/errors` package for structured error types
+- **Middleware stack**:
+  1. CORS
+  2. JSON parser
+  3. Timeout
+  4. Plan channel middleware
+  5. QA channel middleware
+  6. Routes
+  7. Error handler
 - **Plan updates**: Plan-level attributes (`initiative_id`) should be independently updateable; don't block on version status for non-version fields
-- **Error types**: Use `ApiError` for specific error handling
 
 ## Migrations
 
@@ -42,5 +66,21 @@ The `dev.sh` script manages the development environment:
 
 ## Environment Variables
 
-- **ANTHROPIC_API_KEY**: Controls whether PlannerLead runs in real AI mode or mock mode
-- **Configuration via .env**: Standard practice for sensitive values
+```bash
+# Server
+PORT=3001                      # HTTP server port
+
+# Databases
+DB_PATH=./planner.db           # Planner database path
+IDEATION_DB_PATH=./ideation.db # Ideation database path
+FORGE_DB_PATH=./forge.db       # Forge database path
+
+# AI & Integration (optional)
+ANTHROPIC_API_KEY              # Enables AI mode (mock if missing)
+TUNER_URL                      # Enables tuner integration
+
+# Execution mode
+FORGE_MODE=test|real           # Execution mode (default: based on relay connection)
+```
+
+**Configuration via .env**: Standard practice for sensitive values

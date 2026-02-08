@@ -1,0 +1,33 @@
+{
+  "title": "Mock Execution Mode",
+  "summary": {
+    "goal": "Simulate execution without spawning agents for fast iteration",
+    "acceptance_criteria": [
+      {
+        "id": "tm1",
+        "description": "--mock flag enables mock mode"
+      },
+      {
+        "id": "tm2",
+        "description": "Mock mode creates plan but skips Forge execution"
+      },
+      {
+        "id": "tm3",
+        "description": "Generates synthetic outcomes based on scenario.expected"
+      },
+      {
+        "id": "tm4",
+        "description": "Verification still runs against mock-generated files (or skipped)"
+      }
+    ]
+  },
+  "feature_id": "testbench-mock",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "testbench",
+  "component": "testbench",
+  "dependencies": [
+    "testbench-runner"
+  ]
+}

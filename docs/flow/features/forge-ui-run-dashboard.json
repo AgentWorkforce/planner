@@ -1,0 +1,268 @@
+{
+  "feature_id": "forge-ui-run-dashboard",
+  "title": "Run Dashboard",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-layout"],
+
+  "summary": {
+    "goal": "Main view during execution showing progress, tasks, and agents. The command center for monitoring a running forge execution.",
+    "acceptance_criteria": [
+      { "id": "frd-ac1", "description": "Progress bar with task counts (4/7 completed) and percentage" },
+      { "id": "frd-ac2", "description": "Task list with status icons: complete, running, pending, gate" },
+      { "id": "frd-ac3", "description": "Each task shows: title, duration, artifacts produced, dependencies" },
+      { "id": "frd-ac4", "description": "Active Agents section showing working agents" },
+      { "id": "frd-ac5", "description": "Run controls: Pause, Resume, Cancel buttons with confirmation" },
+      { "id": "frd-ac6", "description": "Real-time SSE subscription for live updates" },
+      { "id": "frd-ac7", "description": "Gate pending banner with link to approval UI" },
+      { "id": "frd-ac8", "description": "Elapsed time counter" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Core view during execution",
+        "SSE provides task.started, task.completed, etc. events",
+        "Run controls call Forge API endpoints",
+        "useRun hook returns composite data shape for dashboard consumption"
+      ],
+      "patterns": [
+        "Progress component with animated bar",
+        "Task list with collapsible details",
+        "Agent cards component (separate feature)"
+      ],
+      "confidence": "confident"
+    },
+    "designer": {
+      "observations": [
+        "ASCII wireframe in design doc is the reference",
+        "Visual hierarchy: progress -> tasks -> agents",
+        "Clear status indicators with color coding"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "hook_return_shape": {
+        "useRun_returns": "{ run, tasks, activeGate, agents, elapsedMs, isLoading, error, refetch }",
+        "run": "Full Run object with status, plan_id, etc.",
+        "tasks": "Task[] - all tasks for this run",
+        "activeGate": "Gate | null - currently pending gate if any",
+        "agents": "Agent[] - currently active agents",
+        "elapsedMs": "number - calculated from run.started_at, updates every second for running runs"
+      }
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "frd-s1",
+        "title": "Create RunProgress component",
+        "scope": "forge-ui",
+        "description": "Progress bar showing overall run completion",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Progress bar with fill animation (cyan accent color)" },
+          { "id": "ac2", "description": "Text: 'X/Y tasks completed (Z%)'" },
+          { "id": "ac3", "description": "Sub-text: elapsed time in HH:MM:SS format" },
+          { "id": "ac4", "description": "Status indicator: 'Running' / 'Paused' / 'Complete' / 'Failed'" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/ExecutionProgress.tsx",
+          "pattern_description": "Similar progress bar pattern",
+          "design": {
+            "bar": "h-2 bg-bg-tertiary rounded-full, fill with bg-accent-cyan",
+            "animation": "transition-all duration-300"
+          }
+        }
+      },
+      {
+        "step_id": "frd-s2",
+        "title": "Create TaskItem component",
+        "scope": "forge-ui",
+        "description": "Single task row in the task list",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Status icon: CheckIcon (complete), SpinnerIcon (running), CircleIcon (pending), GateIcon (awaiting_approval)" },
+          { "id": "ac2", "description": "Task title with scope badge if multi-scope plan" },
+          { "id": "ac3", "description": "Duration shown for completed/running tasks" },
+          { "id": "ac4", "description": "Expandable to show: description, artifacts, dependencies" },
+          { "id": "ac5", "description": "Status colors match design system: complete=green, running=cyan, pending=muted, gate=orange" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/StepEditor.tsx (view mode)",
+          "pattern_description": "Collapsible item pattern with status indicator",
+          "design": {
+            "layout": "flex items-center gap-3 p-3 border-b border-border-subtle",
+            "expanded": "bg-bg-secondary rounded-lg"
+          }
+        }
+      },
+      {
+        "step_id": "frd-s3",
+        "title": "Create TaskList component",
+        "scope": "forge-ui",
+        "description": "Scrollable list of all tasks in the run",
+        "dependencies": ["frd-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Renders TaskItem for each task" },
+          { "id": "ac2", "description": "Groups by scope if multi-scope plan (collapsible scope headers)" },
+          { "id": "ac3", "description": "Auto-scrolls to currently running task" },
+          { "id": "ac4", "description": "Handles empty state: 'No tasks in this run'" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/ScopeGroup.tsx",
+          "pattern_description": "Grouped list pattern with collapsible sections"
+        }
+      },
+      {
+        "step_id": "frd-s4",
+        "title": "Create RunControls component",
+        "scope": "forge-ui",
+        "description": "Buttons for controlling run execution",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Pause button (visible when running)" },
+          { "id": "ac2", "description": "Resume button (visible when paused)" },
+          { "id": "ac3", "description": "Cancel button (always visible, with confirmation dialog)" },
+          { "id": "ac4", "description": "Loading state on buttons during API call" },
+          { "id": "ac5", "description": "Disabled when run is completed/cancelled/failed" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/WorkflowActions.tsx",
+          "pattern_description": "Action buttons pattern with confirmation dialogs",
+          "design": {
+            "pause": "secondary style",
+            "resume": "primary style (accent-cyan)",
+            "cancel": "danger style (error red)"
+          }
+        }
+      },
+      {
+        "step_id": "frd-s5",
+        "title": "Create GateBanner component",
+        "scope": "forge-ui",
+        "description": "Banner shown when a gate is pending approval",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Banner with warning icon and 'Gate pending approval' message" },
+          { "id": "ac2", "description": "Shows task title of the gate step" },
+          { "id": "ac3", "description": "Review button navigates to gate approval UI" },
+          { "id": "ac4", "description": "Orange/warning color scheme" },
+          { "id": "ac5", "description": "Hidden when no gates pending" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/PendingGatesNotification.tsx",
+          "pattern_description": "Similar notification banner pattern",
+          "design": {
+            "layout": "sticky top-0 z-10 bg-warning/10 border border-warning/30 rounded-lg p-4",
+            "icon": "ShieldCheck or Gate icon"
+          }
+        }
+      },
+      {
+        "step_id": "frd-s6",
+        "title": "Create useRun hook",
+        "scope": "forge-ui",
+        "description": "Data fetching and SSE subscription for single run",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useRun(runId) returns { run, tasks, activeGate, agents, elapsedMs, isLoading, error, refetch }" },
+          { "id": "ac2", "description": "Initial fetch via getRun API" },
+          { "id": "ac3", "description": "SSE subscription for live updates" },
+          { "id": "ac4", "description": "Updates local state on task_status_changed, run_status_changed events" },
+          { "id": "ac5", "description": "Elapsed time counter (elapsedMs) updates every second for running runs" },
+          { "id": "ac6", "description": "activeGate computed from tasks with status 'awaiting_approval'" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/hooks/usePlanEvents.ts + API fetch",
+          "pattern_description": "Combine fetch with SSE subscription pattern",
+          "data_shape": {
+            "return_type": "{ run: Run, tasks: Task[], activeGate: Gate | null, agents: Agent[], elapsedMs: number, isLoading: boolean, error: Error | null, refetch: () => void }",
+            "run": "Full Run object from API",
+            "tasks": "Task[] from API, updated via SSE events",
+            "activeGate": "Gate | null - computed from tasks where task.gate && task.status === 'awaiting_approval'",
+            "agents": "Agent[] - active agents for this run",
+            "elapsedMs": "number - Date.now() - Date.parse(run.started_at), updated every 1s via setInterval for running runs"
+          }
+        }
+      },
+      {
+        "step_id": "frd-s7",
+        "title": "Create RunHeader component",
+        "scope": "forge-ui",
+        "description": "Header section with run info and controls",
+        "dependencies": ["frd-s1", "frd-s4"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Breadcrumb: Forge > Run [short-id]" },
+          { "id": "ac2", "description": "Plan goal as title" },
+          { "id": "ac3", "description": "RunProgress component" },
+          { "id": "ac4", "description": "RunControls on the right side" },
+          { "id": "ac5", "description": "Link to timeline view" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/PlanHeader.tsx",
+          "pattern_description": "Similar header pattern with breadcrumb and actions"
+        }
+      },
+      {
+        "step_id": "frd-s8",
+        "title": "Implement RunDashboardPage",
+        "scope": "forge-ui",
+        "description": "Main dashboard page assembly",
+        "dependencies": ["frd-s3", "frd-s5", "frd-s6", "frd-s7"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Uses useRun hook to fetch and subscribe to run data" },
+          { "id": "ac2", "description": "Renders RunHeader at top" },
+          { "id": "ac3", "description": "GateBanner shown below header if has_pending_gate" },
+          { "id": "ac4", "description": "Two-column layout on desktop: TaskList (main), ActiveAgents (sidebar)" },
+          { "id": "ac5", "description": "Single column on mobile: TaskList above ActiveAgents" },
+          { "id": "ac6", "description": "Loading state: skeleton for header and list" },
+          { "id": "ac7", "description": "Error state: ErrorMessage with retry" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/pages/PlanEditorPage.tsx",
+          "pattern_description": "Similar two-column layout pattern",
+          "layout": {
+            "desktop": "grid grid-cols-[1fr_320px] gap-6",
+            "mobile": "flex flex-col gap-4"
+          }
+        }
+      },
+      {
+        "step_id": "frd-s9",
+        "title": "Add run control API integration",
+        "scope": "forge-ui",
+        "description": "Wire up pause/resume/cancel to API",
+        "dependencies": ["frd-s8"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Pause calls pauseRun(runId), updates local state on success" },
+          { "id": "ac2", "description": "Resume calls resumeRun(runId), updates local state on success" },
+          { "id": "ac3", "description": "Cancel shows confirmation dialog, calls cancelRun(runId)" },
+          { "id": "ac4", "description": "Error toast on failure with message" },
+          { "id": "ac5", "description": "Success toast on state change" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/WorkflowActions.tsx",
+          "pattern_description": "Same API call + toast pattern"
+        }
+      }
+    ]
+  }
+}

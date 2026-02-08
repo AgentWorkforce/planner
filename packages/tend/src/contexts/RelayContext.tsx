@@ -17,23 +17,8 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useRelayConnection } from '@/hooks/useRelayConnection';
-import type { UseRelayConnectionResult } from '@/types';
-
-const SESSION_USER_ID_KEY = 'relay_anonymous_user_id';
-
-/**
- * Get or create a stable anonymous user ID for this session.
- * Persists to sessionStorage so it survives page refreshes within the same tab.
- */
-function getOrCreateAnonymousUserId(): string {
-  const stored = sessionStorage.getItem(SESSION_USER_ID_KEY);
-  if (stored) {
-    return stored;
-  }
-  const newId = `anon-${crypto.randomUUID().slice(0, 8)}`;
-  sessionStorage.setItem(SESSION_USER_ID_KEY, newId);
-  return newId;
-}
+import { getUserId } from '@/lib/identity';
+import type { UseRelayConnectionResult } from '@/types/relay';
 
 interface RelayContextValue {
   /** The underlying relay connection (useRelayConnection result) */
@@ -57,16 +42,14 @@ interface RelayProviderProps {
 /**
  * RelayProvider - Establishes a single shared relay connection for the app.
  *
- * For tend, we use anonymous users only (no authentication yet).
- * Generates a stable ID that persists in sessionStorage. The connection
+ * Uses sessionStorage for stable anonymous user identity. The connection
  * persists across page navigation because this provider wraps the entire app.
  */
 export function RelayProvider({ children }: RelayProviderProps) {
-  // Compute stable identity - generate anonymous ID
+  // Compute stable identity - use session-persistent ID
   const { userId, displayName } = useMemo(() => {
-    // Anonymous user - use session-persistent ID
     return {
-      userId: getOrCreateAnonymousUserId(),
+      userId: getUserId(),
       displayName: 'Anonymous',
     };
   }, []);

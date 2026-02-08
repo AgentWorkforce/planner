@@ -1,0 +1,311 @@
+{
+  "feature_id": "forge-planner-adapter",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fpa-s1-task",
+      "step_id": "fpa-s1",
+      "title": "Create forge configuration schema",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect for config structure",
+            "Understand role_cli_mapping and scope_repo_mapping requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ForgeConfigSchema with Zod validation",
+            "role_cli_mapping: Record<string, { cli: string, timeout?: number, audit?: boolean }>",
+            "scope_repo_mapping: Record<string, { repo_url: string, base_branch?: string }>",
+            "loadForgeConfig(path) function with validation"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test config loading from YAML and JSON",
+            "Test validation error messages"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for config schema and loading"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpa-s2-task",
+      "step_id": "fpa-s2",
+      "title": "Create PlannerClient for API access",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review Planner REST API endpoints",
+            "Understand authentication requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "PlannerClient class with configurable base URL",
+            "fetchPlanVersion(planId, version) returns PlanVersion",
+            "reportRunStatus(planId, runId, status) - throws PlannerUnavailableError on failure",
+            "createChangeRequest(planId, changeRequest) sends CR to Planner"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with mock Planner API",
+            "Verify error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for PlannerClient methods"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpa-s3-task",
+      "step_id": "fpa-s3",
+      "title": "Implement PlanVersion to ForgePlan transformer",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review PlanVersion schema from Planner",
+            "Review ForgePlan schema from forge-domain"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "transformToForgePlan(planVersion, config) returns ForgePlan",
+            "Maps PlanVersion.steps to ForgeSteps",
+            "Resolves owner_role to CLI config via role_cli_mapping",
+            "Resolves scope to repo URL via scope_repo_mapping",
+            "Preserves dependencies, acceptance_criteria, gates",
+            "Adds resolved fields to ForgeStep: repo_url, cli, audit from config"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test transformation with various plan structures",
+            "Verify all fields are correctly mapped"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for transformer"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpa-s4-task",
+      "step_id": "fpa-s4",
+      "title": "Implement ForgePlan validation",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/domain/step.ts:validateStepDag pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "validateForgePlan(plan) checks for issues",
+            "Validate: no orphan dependencies (all referenced step_ids exist)",
+            "Validate: no cycles in dependency graph",
+            "Validate: all steps have repo_url resolved (from config)",
+            "Returns { valid: boolean, errors: string[] }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with valid and invalid plans",
+            "Test cycle detection"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for validation"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpa-s5-task",
+      "step_id": "fpa-s5",
+      "title": "Create handoff orchestration function",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Understand full handoff flow",
+            "Review Forge API for run creation"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "startRunFromPlanRef(planId, version, config) orchestrates full handoff",
+            "Steps: fetch plan -> transform -> validate -> POST to Forge /runs -> report status",
+            "Returns { run_id, tasks_count } on success",
+            "Throws descriptive error on validation failure"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test full handoff flow",
+            "Test error cases"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: plan -> run creation"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpa-s6-task",
+      "step_id": "fpa-s6",
+      "title": "Implement run status reporting to Planner with explicit error handling",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review trajectory capture integration points",
+            "Understand Planner status endpoint requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "On run status change, call plannerClient.reportRunStatus()",
+            "Status updates: started, paused, completed, failed, cancelled",
+            "Include task completion counts in update",
+            "On failure: store error in run.planner_sync_error field, expose via GET /runs/:id response",
+            "Run continues executing even if Planner reporting fails - but error is VISIBLE not silent",
+            "Health endpoint GET /health/planner includes planner_reachable: boolean and last_sync_error if any",
+            "Retry failed status updates on next status change (best-effort catch-up)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test status reporting on each transition",
+            "Test error visibility when Planner unreachable"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: status reporting with mock Planner"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpa-s7-task",
+      "step_id": "fpa-s7",
+      "title": "Implement ChangeRequest creation for blocked tasks",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/api/handlers/change-requests.ts pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "When task reports blocked with suggested_change, create ChangeRequest",
+            "ChangeRequest includes: run_id, task_id, reason, suggested_changes",
+            "Link ChangeRequest ID to task for tracking",
+            "Pause run awaiting plan revision (optional, configurable)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test ChangeRequest creation",
+            "Test optional run pause"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: blocked task -> ChangeRequest"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpa-s7"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -3,21 +3,18 @@
  *
  * Visual indicator for an agent showing their current state.
  * Displays role-based emoji icon with state indicators (working dot, needs input ring, etc).
- *
- * Adapted from planner-ui with tend's earth-tone color palette.
  */
 
-import type { ReactNode } from 'react';
-import { getRoleConfig } from '../../config/agentRoles';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '../ui/Tooltip';
-import type { AgentRole, AgentState } from '../../hooks/useAgentOrchestration';
+import { useRef, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
+import type { AgentRole, AgentState } from '@/hooks/useAgentOrchestration';
 
 export type AvatarSize = 'sm' | 'md' | 'lg';
+
+export interface NotificationBubble {
+  text: string;
+  onDismiss?: () => void;
+}
 
 interface AgentAvatarProps {
   role: AgentRole;
@@ -28,20 +25,24 @@ interface AgentAvatarProps {
   currentStep?: string;
   currentThought?: string;
   displayName?: string;
-  /** Duration in seconds agent has been waiting for input (for escalation animation) */
-  waitingDuration?: number;
-  /** Whether to show tooltip on hover (default: true) */
-  showTooltip?: boolean;
+  notification?: NotificationBubble;
   className?: string;
-  /** Custom notification content to display in forced-open tooltip */
-  notificationContent?: ReactNode;
-  /** Whether to show the notification bubble (forces tooltip open) */
-  showNotification?: boolean;
-  /** Callback when notification bubble is clicked */
-  onNotificationClick?: () => void;
+  /** Agent progress (0-100), shown as a ring when agent is working */
+  progress?: number;
 }
 
-// Human-readable state labels for tooltip
+// Role configuration with icons
+const ROLE_CONFIG: Record<AgentRole, { icon: string; label: string }> = {
+  architect: { icon: '🏛️', label: 'Architect' },
+  'ui-designer': { icon: '🎨', label: 'UI Designer' },
+  'data-modeler': { icon: '📊', label: 'Data Modeler' },
+  coder: { icon: '💻', label: 'Coder' },
+  tester: { icon: '🧪', label: 'Tester' },
+  security: { icon: '🔒', label: 'Security' },
+  'planner-lead': { icon: '📋', label: 'Planner' },
+};
+
+// Human-readable state labels
 const STATE_LABELS: Record<AgentState, string> = {
   normal: 'Ready',
   working: 'Working',
@@ -72,51 +73,103 @@ const SIZE_CONFIG = {
   },
 };
 
-// State-based container styles (earth-tone adapted)
+// State-based container styles
 const STATE_CONTAINER_STYLES: Record<AgentState, string> = {
   normal: 'opacity-100',
   working: 'opacity-100',
-  needs_input: 'opacity-100 ring-2 ring-[var(--color-brick)] ring-offset-1 ring-offset-[var(--canvas-bg)]',
+  needs_input: 'opacity-100 ring-2 ring-warning/50 ring-offset-1 ring-offset-bg-secondary',
   idle: 'opacity-50',
   error: 'opacity-100',
 };
 
 /**
+ * Renders a circular progress ring around the avatar.
+ */
+function ProgressRing({ progress, size }: { progress: number; size: AvatarSize }) {
+  // SVG circle dimensions based on avatar size
+  const dimensions = {
+    sm: { r: 9, cx: 10, cy: 10, viewBox: 20, strokeWidth: 2 },
+    md: { r: 14, cx: 16, cy: 16, viewBox: 32, strokeWidth: 2.5 },
+    lg: { r: 18, cx: 20, cy: 20, viewBox: 40, strokeWidth: 3 },
+  };
+
+  const d = dimensions[size];
+  const circumference = 2 * Math.PI * d.r;
+  const dashOffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <svg
+      className="absolute inset-0 -rotate-90"
+      viewBox={`0 0 ${d.viewBox} ${d.viewBox}`}
+    >
+      {/* Background track */}
+      <circle
+        cx={d.cx}
+        cy={d.cy}
+        r={d.r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={d.strokeWidth}
+        className="text-bg-tertiary opacity-30"
+      />
+      {/* Progress arc */}
+      <circle
+        cx={d.cx}
+        cy={d.cy}
+        r={d.r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={d.strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={dashOffset}
+        strokeLinecap="round"
+        className="text-success transition-all duration-500"
+      />
+    </svg>
+  );
+}
+
+/**
  * Renders the state indicator (dot, ring, or warning icon).
- * Uses earth-tone colors: moss green for working, brick red for needs_input.
  */
 function StateIndicator({
   state,
   size,
-  waitingDuration = 0,
 }: {
   state: AgentState;
   size: AvatarSize;
-  waitingDuration?: number;
 }) {
   const config = SIZE_CONFIG[size];
-  // Escalate animation after 2 minutes of waiting
-  const isEscalated = waitingDuration >= 120;
 
   switch (state) {
     case 'working':
       return (
         <div
-          className={`absolute ${config.indicatorPosition} ${config.indicator} rounded-full bg-[var(--color-moss)] animate-pulse`}
+          className={cn(
+            'absolute rounded-full bg-success animate-pulse',
+            config.indicatorPosition,
+            config.indicator
+          )}
         />
       );
     case 'needs_input':
       return (
         <div
-          className={`absolute ${config.indicatorPosition} ${config.indicator} rounded-full border-2 border-[var(--color-brick)] bg-transparent ${
-            isEscalated ? 'animate-ring-escalate' : ''
-          }`}
+          className={cn(
+            'absolute rounded-full border-2 border-warning bg-transparent',
+            config.indicatorPosition,
+            config.indicator
+          )}
         />
       );
     case 'error':
       return (
         <div
-          className={`absolute ${config.indicatorPosition} ${config.indicator} flex items-center justify-center text-[var(--color-clay)] text-[10px]`}
+          className={cn(
+            'absolute flex items-center justify-center text-warning text-[10px]',
+            config.indicatorPosition,
+            config.indicator
+          )}
         >
           ⚠
         </div>
@@ -137,132 +190,109 @@ export function AgentAvatar({
   currentStep,
   currentThought,
   displayName,
-  waitingDuration = 0,
-  showTooltip = true,
-  className = '',
-  notificationContent,
-  showNotification = false,
-  onNotificationClick,
+  notification,
+  className,
+  progress,
 }: AgentAvatarProps) {
-  const roleConfig = getRoleConfig(role);
+  const roleConfig = ROLE_CONFIG[role] || ROLE_CONFIG.coder;
   const sizeConfig = SIZE_CONFIG[size];
   const containerStateStyle = STATE_CONTAINER_STYLES[state];
 
-  const isClickable = onClick !== undefined || (showNotification && onNotificationClick !== undefined);
-
-  // Build tooltip content - richer for working agents
+  const isClickable = onClick !== undefined;
   const agentLabel = displayName || roleConfig.label;
 
-  // For working agents with detailed info, show structured content
+  // Track state transitions for completion glow
+  const prevStateRef = useRef<AgentState>(state);
+  const [showCompletionGlow, setShowCompletionGlow] = useState(false);
+
+  useEffect(() => {
+    if (prevStateRef.current === 'working' && (state === 'normal' || state === 'idle')) {
+      setShowCompletionGlow(true);
+      const timer = setTimeout(() => setShowCompletionGlow(false), 1200);
+      prevStateRef.current = state;
+      return () => clearTimeout(timer);
+    }
+    prevStateRef.current = state;
+    return undefined;
+  }, [state]);
+
+  // Build tooltip title
   const hasDetailedInfo = state === 'working' && (currentActivity || currentStep || currentThought);
-
-  const tooltipContent = hasDetailedInfo ? (
-    <div className="space-y-1 max-w-xs">
-      <div className="font-medium">{agentLabel}</div>
-      {currentActivity && (
-        <div className="text-xs opacity-90">
-          <span className="opacity-70">Activity:</span> {currentActivity}
-        </div>
-      )}
-      {currentStep && (
-        <div className="text-xs opacity-90">
-          <span className="opacity-70">Step:</span> {currentStep}
-        </div>
-      )}
-      {currentThought && (
-        <div className="text-xs opacity-80 italic">
-          "{currentThought.length > 100 ? currentThought.slice(0, 100) + '...' : currentThought}"
-        </div>
-      )}
-    </div>
-  ) : (
-    currentActivity
+  const tooltipTitle = hasDetailedInfo
+    ? [
+        `${agentLabel} - ${STATE_LABELS[state]}`,
+        progress != null && progress > 0 && `Progress: ${progress}%`,
+        currentActivity && `Activity: ${currentActivity}`,
+        currentStep && `Step: ${currentStep}`,
+        currentThought && `"${currentThought.slice(0, 100)}${currentThought.length > 100 ? '...' : ''}"`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : currentActivity
       ? `${agentLabel}: ${currentActivity}`
-      : `${agentLabel} - ${STATE_LABELS[state]}`
-  );
+      : `${agentLabel} - ${STATE_LABELS[state]}`;
 
-  const avatarElement = (
-    <div
-      className={`
-        relative inline-flex items-center justify-center
-        rounded-full bg-[var(--canvas-card-bg)]
-        ${sizeConfig.container}
-        ${containerStateStyle}
-        ${isClickable ? 'cursor-pointer hover:bg-[var(--canvas-card-bg-hover)]' : ''}
-        transition-colors
-        ${className}
-      `}
-      onClick={onClick}
-      role={isClickable ? 'button' : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-      onKeyDown={
-        isClickable
-          ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onClick?.();
-              }
-            }
-          : undefined
-      }
-    >
-      {/* Role icon */}
-      <span className={`text-center select-none ${sizeConfig.icon}`}>
-        {roleConfig.icon}
-      </span>
-
-      {/* State indicator */}
-      <StateIndicator state={state} size={size} waitingDuration={waitingDuration} />
-    </div>
-  );
-
-  if (!showTooltip && !showNotification) {
-    return avatarElement;
-  }
-
-  // Notification mode: force tooltip open with custom content
-  if (showNotification && notificationContent) {
-    const handleClick = () => {
-      if (onNotificationClick) {
-        onNotificationClick();
-      } else if (onClick) {
-        onClick();
-      }
-    };
-
-    return (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip open={true}>
-          <TooltipTrigger asChild>
-            <div onClick={handleClick} className="cursor-pointer">
-              {avatarElement}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent
-            side="top"
-            sideOffset={8}
-            className="p-0 bg-transparent border-0 shadow-none animate-notification-enter"
-            onClick={handleClick}
-          >
-            {notificationContent}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  // Normal tooltip mode
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>{avatarElement}</TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="bg-[var(--canvas-card-bg)] text-[var(--text-primary)] border-[var(--block-draft-border)]"
-        >
-          {tooltipContent}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className={cn('relative inline-block', className)}>
+      {/* Notification bubble */}
+      {notification && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="bg-bg-elevated border border-border-default rounded-lg shadow-lg px-3 py-2 min-w-[200px] max-w-[280px]">
+            <p className="text-xs text-text-primary mb-2">{notification.text}</p>
+            {notification.onDismiss && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  notification.onDismiss?.();
+                }}
+                className="text-xs text-accent-primary hover:text-accent-hover transition-colors"
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+          {/* Pointer arrow */}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border-default" />
+        </div>
+      )}
+
+      {/* Avatar container */}
+      <div
+        className={cn(
+          'relative inline-flex items-center justify-center rounded-full bg-bg-tertiary transition-colors',
+          sizeConfig.container,
+          containerStateStyle,
+          isClickable && 'cursor-pointer hover:bg-bg-elevated',
+          showCompletionGlow && 'animate-completion-glow',
+        )}
+        onClick={onClick}
+        role={isClickable ? 'button' : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        onKeyDown={
+          isClickable
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onClick?.();
+                }
+              }
+            : undefined
+        }
+        title={tooltipTitle}
+      >
+        {/* Progress ring — shows when agent is working with known progress */}
+        {state === 'working' && progress != null && progress > 0 && (
+          <ProgressRing progress={progress} size={size} />
+        )}
+
+        {/* Role icon */}
+        <span className={cn('text-center select-none', sizeConfig.icon)}>
+          {roleConfig.icon}
+        </span>
+
+        {/* State indicator */}
+        <StateIndicator state={state} size={size} />
+      </div>
+    </div>
   );
 }

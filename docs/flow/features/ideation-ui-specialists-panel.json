@@ -1,0 +1,428 @@
+{
+  "feature_id": "ideation-ui-specialists-panel",
+  "title": "Specialists Panel (Right Sidebar)",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["ideation-ui-layout"],
+  "parent": "ideation-ui",
+  "summary": {
+    "goal": "Display real-time specialist observations in a minimal, scannable format. Specialists are dynamic (not fixed 5) and observations are freeform. Panel adapts to whatever specialists the Interviewer has spawned. Shows both per-specialist and session-wide confidence aggregation.",
+    "design_spec": {
+      "layout": "Vertical stack of specialist cards in right sidebar, with session confidence header",
+      "session_confidence_header": {
+        "location": "Top of panel, above specialist cards",
+        "display": "Overall session confidence bar (0-100) + breakdown by specialist",
+        "aggregation_method": "Weighted average across specialists and their domain categories",
+        "color_coding": "red (<40), orange (40-60), green (>60)"
+      },
+      "card_structure": {
+        "header": "Icon (by role_hint) + Specialist name + Confidence percent + Category count",
+        "collapsed_summary": "Key insights extracted from nested categories (max 3 bullet points)",
+        "body_expanded": "Full category details with per-category confidence",
+        "alerts": "Extract recommendations/concerns from nested data"
+      },
+      "confidence_indicators": {
+        "note": "Specialists write 'confidence_level' as string (e.g., '75%') or per-category 'confidence' values",
+        "extraction_strategy": "Parse confidence_level string or average per-category confidence values",
+        "per_specialist": "Show as percentage badge + small bar",
+        "session_aggregate": "Weighted average of all specialist confidences, displayed as full-width bar"
+      },
+      "nested_data_extraction": {
+        "categories": "Each top-level key (except reserved) is a domain category",
+        "key_insights": "Extract category names as summary tags",
+        "recommendations": "Look for 'recommendations' arrays within observations",
+        "concerns": "Look for categories with low confidence (<50%) as implicit concerns"
+      },
+      "icon_mapping": {
+        "note": "Use role_hint to select icon, fallback to generic brain icon",
+        "known_hints": ["architecture", "data", "design", "testing", "security"],
+        "fallback": "generic brain/lightbulb icon"
+      }
+    },
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Panel shows cards for all active_specialists (dynamic count)" },
+      { "id": "ac2", "description": "Specialist name displayed (from understanding keys)" },
+      { "id": "ac3", "description": "Per-specialist confidence: parse 'confidence_level' string (e.g., '75%') or average per-category confidences" },
+      { "id": "ac4", "description": "Session-wide confidence: aggregate bar shown in panel header, weighted average of all specialist confidences" },
+      { "id": "ac5", "description": "Collapsed card shows: category names as tags (max 5), specialist confidence %" },
+      { "id": "ac6", "description": "Expanded card shows: full category breakdown with per-category confidence values" },
+      { "id": "ac7", "description": "Recommendations array extracted and shown as actionable items" },
+      { "id": "ac8", "description": "Low-confidence categories (<50%) visually flagged as concerns" },
+      { "id": "ac9", "description": "Panel updates in real-time as specialists contribute" },
+      { "id": "ac10", "description": "Empty state when no specialists spawned yet" },
+      { "id": "ac11", "description": "Panel is collapsible on smaller screens" }
+    ],
+    "decisions": [
+      { "decision": "Parse percentage strings", "rationale": "Specialists write confidence as '75%' string - need to parse for aggregation" },
+      { "decision": "Category names as summary tags", "rationale": "More informative than 'X categories' - shows what domains specialist is analyzing" },
+      { "decision": "Low-confidence flagging", "rationale": "Categories with <50% confidence are implicit concerns needing attention" },
+      { "decision": "Session confidence in header", "rationale": "Users need at-a-glance session readiness indicator" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-ui"],
+    "steps": [
+      {
+        "step_id": "pnl001",
+        "title": "Create ConfidenceDots component",
+        "scope": "ideation-ui",
+        "description": "3-dot indicator for confidence level",
+        "status": "implemented",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ConfidenceDots({ level }) renders 3 dots" },
+          { "id": "ac2", "description": "exploring: all dots empty/muted (text-accent-purple/30)" },
+          { "id": "ac3", "description": "forming: 2 dots filled (text-warning)" },
+          { "id": "ac4", "description": "confident: all 3 dots filled (text-success)" },
+          { "id": "ac5", "description": "Each dot is 6px circle with appropriate fill" }
+        ]
+      },
+      {
+        "step_id": "pnl002",
+        "title": "Create specialist icon mapping",
+        "scope": "ideation-ui",
+        "description": "Icon selection based on role_hint or specialist name",
+        "status": "implemented",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getSpecialistIcon(name, roleHint?) returns appropriate icon component" },
+          { "id": "ac2", "description": "Known hints map: 'architecture'->building, 'data'->grid, 'design'->palette, 'test'->flask, 'security'->shield" },
+          { "id": "ac3", "description": "Name matching: 'Architect'->building, 'Designer'->palette, etc. (case-insensitive contains)" },
+          { "id": "ac4", "description": "Fallback: generic brain/lightbulb icon for unknown specialists" },
+          { "id": "ac5", "description": "All icons: currentColor, size prop (default 16px)" }
+        ]
+      },
+      {
+        "step_id": "pnl003",
+        "title": "Create KeywordTag component",
+        "scope": "ideation-ui",
+        "description": "Compact tag for keywords/category names",
+        "status": "implemented",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "KeywordTag({ keyword }) renders pill-shaped tag" },
+          { "id": "ac2", "description": "Styling: bg-accent-cyan/10 text-accent-cyan text-xs px-2 py-0.5 rounded-full" },
+          { "id": "ac3", "description": "Truncates if keyword > 15 chars" }
+        ]
+      },
+      {
+        "step_id": "pnl004",
+        "title": "Create AlertCount component",
+        "scope": "ideation-ui",
+        "description": "Count badge for concerns/questions",
+        "status": "implemented",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AlertCount({ type, count }) renders icon + count" },
+          { "id": "ac2", "description": "type='concern': warning icon, text-warning" },
+          { "id": "ac3", "description": "type='question': help-circle icon, text-accent-purple" },
+          { "id": "ac4", "description": "Hidden when count=0" }
+        ]
+      },
+      {
+        "step_id": "pnl005",
+        "title": "Create SpecialistCard component",
+        "scope": "ideation-ui",
+        "description": "Card showing single specialist's freeform observations",
+        "status": "implemented",
+        "dependencies": ["pnl001", "pnl002", "pnl003", "pnl004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistCard({ name, roleHint, observations }) renders card" },
+          { "id": "ac2", "description": "Header: icon (from mapping) + name + ConfidenceDots (from observations.confidence)" },
+          { "id": "ac3", "description": "Body: KeywordTags from observations.keywords if present (max 5)" },
+          { "id": "ac4", "description": "Footer: AlertCount from observations.concerns and observations.questions if present" },
+          { "id": "ac5", "description": "Empty state if observations is empty object: 'Thinking...'" },
+          { "id": "ac6", "description": "Card styling: bg-bg-card border-border-subtle rounded-lg p-3" }
+        ]
+      },
+      {
+        "step_id": "pnl006",
+        "title": "Create SpecialistsPanel component",
+        "scope": "ideation-ui",
+        "description": "Panel containing dynamic specialist cards",
+        "status": "implemented",
+        "dependencies": ["pnl005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistsPanel({ understanding, activeSpecialists }) renders panel" },
+          { "id": "ac2", "description": "Header: 'Specialists' title with count badge" },
+          { "id": "ac3", "description": "Body: SpecialistCard for each key in understanding (dynamic count)" },
+          { "id": "ac4", "description": "Footer: total concerns/questions badge (aggregated from all)" },
+          { "id": "ac5", "description": "Empty state when no specialists: 'Specialists will appear as needed'" }
+        ]
+      },
+      {
+        "step_id": "pnl007",
+        "title": "Create useUnderstanding hook",
+        "scope": "ideation-ui",
+        "description": "Hook to get freeform understanding from session with real-time updates",
+        "status": "implemented",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useUnderstanding(sessionId) returns { understanding, activeSpecialists }" },
+          { "id": "ac2", "description": "Integrates with useSessionEvents for real-time updates" },
+          { "id": "ac3", "description": "Returns Record<string, Record<string, unknown>> for understanding" },
+          { "id": "ac4", "description": "Returns ActiveSpecialist[] for specialist metadata" }
+        ]
+      },
+      {
+        "step_id": "pnl008",
+        "title": "Integrate panel into IdeationLayout",
+        "scope": "ideation-ui",
+        "description": "Wire up SpecialistsPanel as right sidebar",
+        "status": "implemented",
+        "dependencies": ["pnl006", "pnl007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistsPanel rendered in IdeationLayout right slot" },
+          { "id": "ac2", "description": "Receives understanding from useUnderstanding hook" },
+          { "id": "ac3", "description": "Only shown when viewing a session (not on empty state)" },
+          { "id": "ac4", "description": "Respects collapse state from layout" }
+        ]
+      },
+      {
+        "step_id": "pnl009",
+        "title": "Create confidence extraction utilities",
+        "scope": "ideation-ui",
+        "description": "Utility functions to extract and aggregate confidence from nested specialist data",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "parseConfidenceValue(value) parses '75%' -> 75, 'confident' -> 80, etc." },
+          { "id": "ac2", "description": "extractSpecialistConfidence(observations) returns { overall: number, byCategory: Record<string, number> }" },
+          { "id": "ac3", "description": "Checks for 'confidence_level' at root, falls back to averaging per-category 'confidence' values" },
+          { "id": "ac4", "description": "Categories without explicit confidence default to 50%" },
+          { "id": "ac5", "description": "Returns 0 if no confidence data found (still exploring)" }
+        ],
+        "specification": {
+          "extraction_logic": {
+            "priority_order": [
+              "1. Root 'confidence_level' string (e.g., '75%')",
+              "2. Average of per-category 'confidence' values",
+              "3. Default to 0 (exploring)"
+            ],
+            "string_parsing": {
+              "'75%'": 75,
+              "'confident'": 80,
+              "'forming'": 50,
+              "'exploring'": 20
+            }
+          }
+        }
+      },
+      {
+        "step_id": "pnl010",
+        "title": "Create category extraction utilities",
+        "scope": "ideation-ui",
+        "description": "Extract meaningful category summaries from nested specialist data",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "extractCategoryNames(observations) returns string[] of domain category keys (excluding reserved keys)" },
+          { "id": "ac2", "description": "extractCategoryDetails(observations) returns Array<{ name, confidence, itemCount, hasRecommendations }>" },
+          { "id": "ac3", "description": "extractRecommendations(observations) finds and flattens any 'recommendations' arrays" },
+          { "id": "ac4", "description": "identifyLowConfidenceCategories(observations) returns categories with confidence < 50%" },
+          { "id": "ac5", "description": "formatCategoryName(key) converts 'system_design' -> 'System Design'" }
+        ],
+        "specification": {
+          "reserved_keys": ["confidence", "confidence_level", "keywords", "concerns", "questions", "observations", "recommendations"],
+          "low_confidence_threshold": 50
+        }
+      },
+      {
+        "step_id": "pnl011",
+        "title": "Create ConfidencePercent component",
+        "scope": "ideation-ui",
+        "description": "Numeric confidence display with color coding",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ConfidencePercent({ value }) renders '75%' badge" },
+          { "id": "ac2", "description": "Color: text-error for <40, text-warning for 40-60, text-success for >60" },
+          { "id": "ac3", "description": "Size variants: 'sm' (text-xs), 'md' (text-sm)" },
+          { "id": "ac4", "description": "Shows '--' when value is undefined/null" }
+        ],
+        "specification": {
+          "design": {
+            "component": "Badge-style span",
+            "color_thresholds": { "error": "<40", "warning": "40-60", "success": ">60" }
+          }
+        }
+      },
+      {
+        "step_id": "pnl012",
+        "title": "Create SessionConfidenceBar component",
+        "scope": "ideation-ui",
+        "description": "Aggregate session confidence display for panel header",
+        "dependencies": ["pnl009", "pnl011"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionConfidenceBar({ understanding }) renders full-width progress bar" },
+          { "id": "ac2", "description": "Calculates weighted average of all specialist confidences" },
+          { "id": "ac3", "description": "Bar color: bg-error (<40), bg-warning (40-60), bg-success (>60)" },
+          { "id": "ac4", "description": "Shows percentage label at right end" },
+          { "id": "ac5", "description": "Hover tooltip shows breakdown by specialist" }
+        ],
+        "specification": {
+          "design": {
+            "component": "Progress bar with tooltip",
+            "height": "h-2 rounded-full",
+            "background": "bg-bg-tertiary"
+          },
+          "aggregation": {
+            "method": "Weighted average where weight = number of categories per specialist",
+            "empty_specialists": "Weight of 0 (excluded from calculation)"
+          }
+        }
+      },
+      {
+        "step_id": "pnl013",
+        "title": "Create CategoryTag component",
+        "scope": "ideation-ui",
+        "description": "Tag showing category name with optional confidence indicator",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CategoryTag({ name, confidence }) renders pill tag" },
+          { "id": "ac2", "description": "Shows formatted category name (System Design, not system_design)" },
+          { "id": "ac3", "description": "Low confidence (<50%) gets warning border/indicator" },
+          { "id": "ac4", "description": "Base styling matches KeywordTag but with subtle confidence tint" }
+        ],
+        "specification": {
+          "design": {
+            "normal": "bg-accent-cyan/10 text-accent-cyan border-transparent",
+            "low_confidence": "bg-warning/10 text-warning border-warning/30 border"
+          }
+        }
+      },
+      {
+        "step_id": "pnl014",
+        "title": "Enhance SpecialistCard with nested data display",
+        "scope": "ideation-ui",
+        "description": "Update SpecialistCard to show meaningful summaries from nested specialist data",
+        "dependencies": ["pnl005", "pnl009", "pnl010", "pnl011", "pnl013"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header shows: Icon + Name + ConfidencePercent (not just dots)" },
+          { "id": "ac2", "description": "Collapsed state shows: CategoryTags for top 5 categories (not 'X categories' text)" },
+          { "id": "ac3", "description": "Low-confidence categories visually flagged with warning styling" },
+          { "id": "ac4", "description": "Recommendations shown as bullet list when expanded" },
+          { "id": "ac5", "description": "Per-category confidence shown in expanded view" },
+          { "id": "ac6", "description": "Backwards compatible: still works with flat format (keywords, concerns arrays)" }
+        ],
+        "specification": {
+          "collapsed_summary": {
+            "max_tags": 5,
+            "tag_source": "Category names from nested data",
+            "priority": "Show low-confidence categories first (they need attention)"
+          },
+          "expanded_view": {
+            "categories": "Full list with confidence values",
+            "recommendations": "Bullet list if present",
+            "details": "First few items from each category"
+          }
+        }
+      },
+      {
+        "step_id": "pnl015",
+        "title": "Enhance SpecialistsPanel with session confidence header",
+        "scope": "ideation-ui",
+        "description": "Add aggregate confidence display to panel header",
+        "dependencies": ["pnl006", "pnl012"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Panel header shows SessionConfidenceBar" },
+          { "id": "ac2", "description": "Label: 'Session Readiness' with aggregate percentage" },
+          { "id": "ac3", "description": "Tooltip shows breakdown: 'Architect: 75%, Designer: 67%, ...'" },
+          { "id": "ac4", "description": "Updates in real-time as specialist observations change" }
+        ],
+        "specification": {
+          "header_layout": {
+            "row1": "'Specialists' title + count badge",
+            "row2": "SessionConfidenceBar spanning full width"
+          }
+        }
+      },
+      {
+        "step_id": "pnl016",
+        "title": "Update useConfidence hook for nested data",
+        "scope": "ideation-ui",
+        "description": "Enhance confidence hook to aggregate from nested specialist observations",
+        "dependencies": ["pnl009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useConfidence(sessionId) calculates from understanding if API returns no explicit confidence" },
+          { "id": "ac2", "description": "Returns { score, breakdown, bySpecialist } where bySpecialist has per-specialist details" },
+          { "id": "ac3", "description": "Falls back to API-provided confidence when available" },
+          { "id": "ac4", "description": "Re-calculates when understanding updates via SSE" }
+        ],
+        "specification": {
+          "calculation_priority": {
+            "1": "API-provided confidence score (if implemented)",
+            "2": "Client-side calculation from understanding data"
+          }
+        }
+      },
+      {
+        "step_id": "pnl017",
+        "title": "Write tests for confidence extraction",
+        "scope": "ideation-ui",
+        "description": "Unit tests for confidence parsing and aggregation utilities",
+        "dependencies": ["pnl009", "pnl010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test parseConfidenceValue with various formats ('75%', 'confident', 75, undefined)" },
+          { "id": "ac2", "description": "Test extractSpecialistConfidence with real specialist data shape" },
+          { "id": "ac3", "description": "Test category extraction with nested structure" },
+          { "id": "ac4", "description": "Test aggregation produces expected weighted average" },
+          { "id": "ac5", "description": "Test low-confidence detection" }
+        ]
+      },
+      {
+        "step_id": "pnl018",
+        "title": "Verify panel integration",
+        "scope": "ideation-ui",
+        "description": "End-to-end verification of enhanced panel",
+        "dependencies": ["pnl014", "pnl015", "pnl016", "pnl017"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Panel shows session confidence bar in header" },
+          { "id": "ac2", "description": "Cards show category tags (not 'X categories')" },
+          { "id": "ac3", "description": "Confidence percentages display correctly" },
+          { "id": "ac4", "description": "Low-confidence items visually flagged" },
+          { "id": "ac5", "description": "Real-time updates work with SSE" },
+          { "id": "ac6", "description": "Build passes, no TypeScript errors" }
+        ]
+      },
+      {
+        "step_id": "pnl019",
+        "title": "Add panel collapse functionality",
+        "scope": "ideation-ui",
+        "description": "Make SpecialistsPanel collapsible on smaller screens",
+        "dependencies": ["pnl015"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Panel hidden by default on viewports < 1024px" },
+          { "id": "ac2", "description": "Toggle button appears in header to show/hide panel" },
+          { "id": "ac3", "description": "Collapse state persists in localStorage" },
+          { "id": "ac4", "description": "Panel animates open/close (slide transition)" }
+        ],
+        "specification": {
+          "design": {
+            "breakpoint": "lg (1024px)",
+            "toggle_position": "Panel header, right side",
+            "animation": "transition-transform duration-200",
+            "collapsed_indicator": "Floating button at screen edge when collapsed"
+          }
+        }
+      }
+    ]
+  }
+}

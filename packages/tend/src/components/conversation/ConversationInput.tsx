@@ -47,7 +47,7 @@ export function ConversationInput({
     <div className="p-4">
       <div
         className={cn(
-          'relative rounded-xl bg-bg-secondary border border-border-subtle shadow-md',
+          'relative rounded-xl bg-[var(--color-bg-input)] border border-border-subtle shadow-md',
           'transition-all',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
@@ -60,6 +60,7 @@ export function ConversationInput({
           placeholder={placeholder}
           disabled={disabled}
           rows={3}
+          data-conversation-input
           className={cn(
             'w-full resize-none bg-transparent px-4 py-3 pr-14',
             'text-sm text-text-primary placeholder:text-text-muted',

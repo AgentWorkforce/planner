@@ -85,6 +85,12 @@ describe('InitiativeCollapsible', () => {
     );
   };
 
+  // Helper to click the expand button (chevron)
+  const clickExpandButton = async (user: ReturnType<typeof userEvent.setup>) => {
+    const expandButton = screen.getByRole('button', { name: /expand|collapse/i });
+    await user.click(expandButton);
+  };
+
   describe('initiative header', () => {
     it('renders initiative name', () => {
       renderInitiativeCollapsible();
@@ -125,10 +131,23 @@ describe('InitiativeCollapsible', () => {
       expect(badges.length).toBe(0);
     });
 
-    it('renders chevron icon', () => {
+    it('renders chevron icon when plans exist', () => {
       renderInitiativeCollapsible();
 
       expect(screen.getByTestId('chevron-icon')).toBeInTheDocument();
+    });
+
+    it('does not render chevron when no plans exist', () => {
+      renderInitiativeCollapsible({ plans: [] });
+
+      expect(screen.queryByTestId('chevron-icon')).not.toBeInTheDocument();
+    });
+
+    it('initiative header links to initiative page', () => {
+      renderInitiativeCollapsible();
+
+      const link = screen.getByRole('link', { name: /q1 goals/i });
+      expect(link).toHaveAttribute('href', '/initiatives/init-1');
     });
   });
 
@@ -141,14 +160,13 @@ describe('InitiativeCollapsible', () => {
       expect(screen.queryByText('Add payment processing')).not.toBeInTheDocument();
     });
 
-    it('expands to show plans when clicked in uncontrolled mode', async () => {
+    it('expands to show plans when chevron is clicked in uncontrolled mode', async () => {
       const user = userEvent.setup();
 
       renderInitiativeCollapsible();
 
-      // Click the initiative header
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      // Click the expand button (chevron)
+      await clickExpandButton(user);
 
       // Plans should now be visible
       expect(screen.getByText('Implement user authentication')).toBeInTheDocument();
@@ -156,19 +174,17 @@ describe('InitiativeCollapsible', () => {
       expect(screen.getByText('Deploy to production')).toBeInTheDocument();
     });
 
-    it('collapses to hide plans when clicked again in uncontrolled mode', async () => {
+    it('collapses to hide plans when chevron is clicked again', async () => {
       const user = userEvent.setup();
 
       renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-
       // Expand
-      await user.click(header);
+      await clickExpandButton(user);
       expect(screen.getByText('Implement user authentication')).toBeInTheDocument();
 
       // Collapse
-      await user.click(header);
+      await clickExpandButton(user);
       expect(screen.queryByText('Implement user authentication')).not.toBeInTheDocument();
     });
 
@@ -179,7 +195,7 @@ describe('InitiativeCollapsible', () => {
       expect(screen.getByText('Implement user authentication')).toBeInTheDocument();
     });
 
-    it('calls onToggleExpanded when clicked in controlled mode', async () => {
+    it('calls onToggleExpanded when chevron is clicked in controlled mode', async () => {
       const user = userEvent.setup();
       const onToggleExpanded = vi.fn();
 
@@ -188,8 +204,7 @@ describe('InitiativeCollapsible', () => {
         onToggleExpanded,
       });
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       expect(onToggleExpanded).toHaveBeenCalledTimes(1);
     });
@@ -203,8 +218,7 @@ describe('InitiativeCollapsible', () => {
       expect(chevron).not.toHaveClass('rotate-90');
 
       // Expand
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       expect(chevron).toHaveClass('rotate-90');
     });
@@ -216,8 +230,7 @@ describe('InitiativeCollapsible', () => {
 
       renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       expect(screen.getByText('Implement user authentication')).toBeInTheDocument();
       expect(screen.getByText('Add payment processing')).toBeInTheDocument();
@@ -229,8 +242,7 @@ describe('InitiativeCollapsible', () => {
 
       renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       const plan1Link = screen.getByRole('link', { name: /implement user authentication/i });
       expect(plan1Link).toHaveAttribute('href', '/plans/plan-1');
@@ -247,8 +259,7 @@ describe('InitiativeCollapsible', () => {
 
       const { container } = renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       // Find status dots (h-2 w-2 rounded-full)
       const statusDots = container.querySelectorAll('.h-2.w-2.rounded-full');
@@ -260,8 +271,7 @@ describe('InitiativeCollapsible', () => {
 
       const { container } = renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       // Find the draft plan's status dot (first one)
       const statusDots = container.querySelectorAll('.h-2.w-2.rounded-full');
@@ -274,8 +284,7 @@ describe('InitiativeCollapsible', () => {
 
       const { container } = renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       const statusDots = container.querySelectorAll('.h-2.w-2.rounded-full');
       const approvedDot = statusDots[1];
@@ -287,8 +296,7 @@ describe('InitiativeCollapsible', () => {
 
       const { container } = renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       const statusDots = container.querySelectorAll('.h-2.w-2.rounded-full');
       const publishedDot = statusDots[2];
@@ -304,8 +312,9 @@ describe('InitiativeCollapsible', () => {
     it('does not render plan list when expanded but no plans exist', () => {
       renderInitiativeCollapsible({ plans: [], isExpanded: true });
 
-      // The SidebarMenuSub should not render
-      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+      // No plan links should render (only initiative link)
+      const links = screen.getAllByRole('link');
+      expect(links).toHaveLength(1); // Only the initiative link
     });
   });
 
@@ -313,9 +322,9 @@ describe('InitiativeCollapsible', () => {
     it('highlights initiative when on initiative route', () => {
       renderInitiativeCollapsible({}, '/initiatives/init-1');
 
-      const initiativeName = screen.getByText('Q1 Goals');
+      const initiativeLink = screen.getByRole('link', { name: /q1 goals/i });
       // The SidebarMenuButton with isActive prop applies [data-active] attribute
-      expect(initiativeName.closest('[data-active]')).toBeTruthy();
+      expect(initiativeLink).toHaveAttribute('data-active', 'true');
     });
 
     it('highlights initiative when one of its plans is active', async () => {
@@ -324,14 +333,14 @@ describe('InitiativeCollapsible', () => {
       renderInitiativeCollapsible({}, '/plans/plan-1');
 
       // Initiative should be highlighted even though we're on a plan page
-      const initiativeName = screen.getByText('Q1 Goals');
-      expect(initiativeName.closest('[data-active]')).toBeTruthy();
+      const initiativeLink = screen.getByRole('link', { name: /q1 goals/i });
+      expect(initiativeLink).toHaveAttribute('data-active', 'true');
 
       // Expand to see the plan
-      await user.click(initiativeName);
+      await clickExpandButton(user);
 
       const planLink = screen.getByRole('link', { name: /implement user authentication/i });
-      expect(planLink.closest('[data-active]')).toBeTruthy();
+      expect(planLink).toHaveAttribute('data-active', 'true');
     });
 
     it('highlights specific plan when on that plan route', async () => {
@@ -339,22 +348,21 @@ describe('InitiativeCollapsible', () => {
 
       renderInitiativeCollapsible({}, '/plans/plan-2');
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       const activePlanLink = screen.getByRole('link', { name: /add payment processing/i });
-      expect(activePlanLink.closest('[data-active]')).toBeTruthy();
+      expect(activePlanLink).toHaveAttribute('data-active', 'true');
 
       // Other plans should not be highlighted
       const inactivePlanLink = screen.getByRole('link', { name: /implement user authentication/i });
-      expect(inactivePlanLink.closest('[data-active="true"]')).toBeNull();
+      expect(inactivePlanLink).not.toHaveAttribute('data-active', 'true');
     });
 
     it('does not highlight initiative when on unrelated route', () => {
       renderInitiativeCollapsible({}, '/settings');
 
-      const initiativeName = screen.getByText('Q1 Goals');
-      expect(initiativeName.closest('[data-active="true"]')).toBeNull();
+      const initiativeLink = screen.getByRole('link', { name: /q1 goals/i });
+      expect(initiativeLink).not.toHaveAttribute('data-active', 'true');
     });
   });
 
@@ -364,8 +372,7 @@ describe('InitiativeCollapsible', () => {
 
       renderInitiativeCollapsible();
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       // Find status labels
       const draftLabel = screen.getByLabelText('Status: draft');
@@ -385,25 +392,39 @@ describe('InitiativeCollapsible', () => {
       expect(colorDot).toHaveAttribute('aria-hidden', 'true');
     });
 
-    it(
-      'all plan items are links with proper role',
-      async () => {
-        const user = userEvent.setup();
+    it('expand button has appropriate aria-label', () => {
+      renderInitiativeCollapsible();
 
-        renderInitiativeCollapsible();
+      const expandButton = screen.getByRole('button', { name: 'Expand plans' });
+      expect(expandButton).toBeInTheDocument();
+    });
 
-        const header = screen.getByText('Q1 Goals');
-        await user.click(header);
+    it('expand button aria-label changes when expanded', async () => {
+      const user = userEvent.setup();
 
-        const links = screen.getAllByRole('link');
-        expect(links.length).toBe(3);
+      renderInitiativeCollapsible();
 
-        links.forEach((link) => {
-          expect(link).toHaveAttribute('href');
-        });
-      },
-      10000
-    );
+      const button = screen.getByRole('button', { name: 'Expand plans' });
+      await user.click(button);
+
+      expect(screen.getByRole('button', { name: 'Collapse plans' })).toBeInTheDocument();
+    });
+
+    it('plan items are links with proper href attributes', async () => {
+      const user = userEvent.setup();
+
+      renderInitiativeCollapsible();
+
+      await clickExpandButton(user);
+
+      // 1 initiative link + 3 plan links = 4 total
+      const links = screen.getAllByRole('link');
+      expect(links.length).toBe(4);
+
+      links.forEach((link) => {
+        expect(link).toHaveAttribute('href');
+      });
+    });
   });
 
   describe('edge cases', () => {
@@ -427,32 +448,27 @@ describe('InitiativeCollapsible', () => {
       ).toBeInTheDocument();
     });
 
-    it(
-      'handles long plan goals',
-      async () => {
-        const user = userEvent.setup();
+    it('handles long plan goals', async () => {
+      const user = userEvent.setup();
 
-        const longGoalPlans = [
-          {
-            plan_id: 'plan-1',
-            goal: 'This is a very long plan goal that should be truncated to fit within the sidebar',
-            status: 'draft' as PlanStatus,
-          },
-        ];
+      const longGoalPlans = [
+        {
+          plan_id: 'plan-1',
+          goal: 'This is a very long plan goal that should be truncated to fit within the sidebar',
+          status: 'draft' as PlanStatus,
+        },
+      ];
 
-        renderInitiativeCollapsible({ plans: longGoalPlans });
+      renderInitiativeCollapsible({ plans: longGoalPlans });
 
-        const header = screen.getByText('Q1 Goals');
-        await user.click(header);
+      await clickExpandButton(user);
 
-        expect(
-          screen.getByText(
-            'This is a very long plan goal that should be truncated to fit within the sidebar'
-          )
-        ).toBeInTheDocument();
-      },
-      10000
-    );
+      expect(
+        screen.getByText(
+          'This is a very long plan goal that should be truncated to fit within the sidebar'
+        )
+      ).toBeInTheDocument();
+    });
 
     it('handles plans with different statuses', async () => {
       const user = userEvent.setup();
@@ -465,8 +481,7 @@ describe('InitiativeCollapsible', () => {
 
       const { container } = renderInitiativeCollapsible({ plans: mixedStatusPlans });
 
-      const header = screen.getByText('Q1 Goals');
-      await user.click(header);
+      await clickExpandButton(user);
 
       const statusDots = container.querySelectorAll('.h-2.w-2.rounded-full');
       expect(statusDots.length).toBe(3);

@@ -1,0 +1,209 @@
+{
+  "feature_id": "forge-durability",
+  "title": "Durability & Recovery",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-core",
+  "dependencies": ["forge-trajectory-capture", "forge-storage", "forge-relay-integration"],
+
+  "summary": {
+    "goal": "Enable recovery from Forgemaster crashes, agent failures, and infrastructure issues without re-executing completed work. Provide health monitoring and checkpointing.",
+    "acceptance_criteria": [
+      { "id": "fdu-ac1", "description": "Checkpoint created after each task completion (snapshot of run state)" },
+      { "id": "fdu-ac2", "description": "On Forgemaster restart, recover active runs from last checkpoint" },
+      { "id": "fdu-ac3", "description": "Detect orphaned agents (spawned but Forgemaster crashed) and clean up" },
+      { "id": "fdu-ac4", "description": "Resume paused runs from exact state (pending gates, queued tasks)" },
+      { "id": "fdu-ac5", "description": "Health monitoring: detect stuck agents (no messages for N minutes)" },
+      { "id": "fdu-ac6", "description": "Graceful shutdown: wait for in-progress tasks or timeout" },
+      { "id": "fdu-ac7", "description": "Recovery log showing what was recovered and any issues" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Temporal-inspired durability but simpler (not full event replay)",
+        "Checkpoints are snapshots, not full event log replay",
+        "Orphan detection via relay agent listing vs. DB expected agents",
+        "Health monitoring prevents silent agent hangs"
+      ],
+      "patterns": [
+        "Checkpoint after each task state transition",
+        "Recovery: load checkpoint -> verify agents -> resume queuing",
+        "Heartbeat from agents or periodic presence check"
+      ],
+      "concerns": [
+        "Checkpoint frequency vs. storage cost",
+        "Agent orphan cleanup must not kill still-working agents"
+      ],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "checkpoint_trigger": "After each task completion or gate resolution",
+      "health_check_interval": "Every 60 seconds",
+      "agent_stuck_threshold": "5 minutes without message"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fdu-s1",
+        "title": "Define checkpoint schema",
+        "scope": "forge-core",
+        "description": "Define checkpoint data structure for run state snapshots",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CheckpointSchema: { checkpoint_id, run_id, run_status, has_pending_gate, tasks_snapshot: JSONB, active_agents: string[], created_at }" },
+          { "id": "ac2", "description": "tasks_snapshot includes: all task statuses, current attempts, pending gates" },
+          { "id": "ac3", "description": "active_agents lists agent IDs that should be running (agent name pattern)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Snapshot of run state at point in time"
+          }
+        }
+      },
+      {
+        "step_id": "fdu-s2",
+        "title": "Verify checkpoints table in storage",
+        "scope": "forge-core",
+        "description": "Checkpoints table schema defined in forge-storage, verify storage methods work",
+        "dependencies": ["fdu-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Verify ForgeStorage.createCheckpoint() works with checkpoint schema" },
+          { "id": "ac2", "description": "Verify ForgeStorage.getLatestCheckpoint(runId) retrieves most recent" },
+          { "id": "ac3", "description": "Verify ForgeStorage.listCheckpoints(runId) returns all checkpoints" }
+        ],
+        "specification": {
+          "notes": "Table schema defined in forge-storage fs-s7"
+        }
+      },
+      {
+        "step_id": "fdu-s3",
+        "title": "Implement checkpoint creation",
+        "scope": "forge-core",
+        "description": "Create checkpoint after task state transitions",
+        "dependencies": ["fdu-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createCheckpoint(runId) captures current run state" },
+          { "id": "ac2", "description": "Called after: task completion, task failure, gate resolution" },
+          { "id": "ac3", "description": "Captures: all task statuses, active agents via spawner.listActiveAgents()" },
+          { "id": "ac4", "description": "Async, non-blocking (should not slow down main flow)" }
+        ],
+        "specification": {
+          "architecture": {
+            "trigger": "Hook on state transitions, not synchronous in critical path"
+          }
+        }
+      },
+      {
+        "step_id": "fdu-s4",
+        "title": "Implement run recovery on startup",
+        "scope": "forge-core",
+        "description": "Recover active runs from checkpoints on Forgemaster restart",
+        "dependencies": ["fdu-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "recoverActiveRuns() called on Forgemaster startup" },
+          { "id": "ac2", "description": "Find runs with status 'running' or 'paused' in DB" },
+          { "id": "ac3", "description": "For each: load latest checkpoint, verify agent states, resume scheduling" },
+          { "id": "ac4", "description": "Log recovery actions for debugging" }
+        ],
+        "specification": {
+          "architecture": {
+            "startup_hook": "Called in server initialization, before accepting new runs"
+          }
+        }
+      },
+      {
+        "step_id": "fdu-s5",
+        "title": "Implement orphan agent detection",
+        "scope": "forge-core",
+        "description": "Detect and clean up agents that were running when Forgemaster crashed",
+        "dependencies": ["fdu-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "detectOrphanAgents() compares expected vs. actual running agents" },
+          { "id": "ac2", "description": "Expected: from checkpoint active_agents list" },
+          { "id": "ac3", "description": "Actual: call spawner.listActiveAgents() which uses relay SDK agent listing" },
+          { "id": "ac4", "description": "Orphans (running but not expected): terminate gracefully" },
+          { "id": "ac5", "description": "Missing (expected but not running): mark task for retry" }
+        ],
+        "specification": {
+          "architecture": {
+            "relay_api": "AgentSpawner.listActiveAgents() uses relay SDK to list running agents",
+            "grace_period": "Wait 30s before terminating (agent might still be starting)"
+          }
+        }
+      },
+      {
+        "step_id": "fdu-s6",
+        "title": "Implement health monitoring for stuck agents",
+        "scope": "forge-core",
+        "description": "Detect agents that haven't sent messages for too long",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "trackAgentHeartbeat(agentId, timestamp) updates last seen time" },
+          { "id": "ac2", "description": "Heartbeat updated on: report_progress tool calls, relay messages" },
+          { "id": "ac3", "description": "detectStuckAgents() finds agents with no activity for N minutes" },
+          { "id": "ac4", "description": "Stuck agent: terminate and mark task for retry" },
+          { "id": "ac5", "description": "Configurable threshold: FORGE_AGENT_STUCK_THRESHOLD (default 5 min)" }
+        ],
+        "specification": {
+          "architecture": {
+            "heartbeat_source": "MCP tool calls via report_progress, relay messages",
+            "check_interval": "Every 60 seconds"
+          }
+        }
+      },
+      {
+        "step_id": "fdu-s7",
+        "title": "Implement graceful shutdown",
+        "scope": "forge-core",
+        "description": "Clean shutdown waiting for in-progress tasks",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On SIGTERM: stop accepting new runs, stop enqueueing tasks" },
+          { "id": "ac2", "description": "Wait for in-progress tasks to complete (up to timeout)" },
+          { "id": "ac3", "description": "After timeout: create checkpoint, terminate agents" },
+          { "id": "ac4", "description": "Configurable timeout: FORGE_SHUTDOWN_TIMEOUT (default 60s)" }
+        ],
+        "specification": {
+          "architecture": {
+            "signal_handling": "process.on('SIGTERM', ...)",
+            "pattern": "Drain queues, wait, checkpoint, exit"
+          }
+        }
+      },
+      {
+        "step_id": "fdu-s8",
+        "title": "Create recovery log endpoint",
+        "scope": "forge-core",
+        "description": "API endpoint to view recovery actions",
+        "dependencies": ["fdu-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /health/recovery returns last recovery log" },
+          { "id": "ac2", "description": "Log includes: runs recovered, orphans terminated, tasks retried" },
+          { "id": "ac3", "description": "Timestamp of last recovery" }
+        ],
+        "specification": {
+          "architecture": {
+            "storage": "In-memory or simple file for recovery log"
+          }
+        }
+      }
+    ]
+  }
+}

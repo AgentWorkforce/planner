@@ -2,14 +2,14 @@ import { useState, useCallback, useRef } from 'react';
 import { TranscriptMessage, useIdeationApi } from './useIdeationApi';
 
 interface UseSendMessageResult {
-  send: (content: string) => Promise<TranscriptMessage | null>;
+  /** Sends a message and returns the full updated transcript from the server, or null on failure. */
+  send: (content: string) => Promise<TranscriptMessage[] | null>;
   sending: boolean;
 }
 
 export function useSendMessage(
   sessionId: string | undefined,
   focusedBlockId?: string,
-  onOptimisticAdd?: (message: TranscriptMessage) => void
 ): UseSendMessageResult {
   const [sending, setSending] = useState(false);
   const { sendMessage } = useIdeationApi();
@@ -18,24 +18,14 @@ export function useSendMessage(
   const sendMessageRef = useRef(sendMessage);
   sendMessageRef.current = sendMessage;
 
-  const onOptimisticAddRef = useRef(onOptimisticAdd);
-  onOptimisticAddRef.current = onOptimisticAdd;
-
-  const send = useCallback(async (content: string): Promise<TranscriptMessage | null> => {
+  const send = useCallback(async (content: string): Promise<TranscriptMessage[] | null> => {
     if (!sessionId || !content.trim()) return null;
-
-    // Optimistically add user message
-    const optimisticMessage: TranscriptMessage = {
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    onOptimisticAddRef.current?.(optimisticMessage);
 
     setSending(true);
     try {
-      const result = await sendMessageRef.current(sessionId, content.trim(), focusedBlockId);
-      return result;
+      // Returns the full updated transcript (including assistant response) from the API
+      const transcript = await sendMessageRef.current(sessionId, content.trim(), focusedBlockId);
+      return transcript;
     } finally {
       setSending(false);
     }

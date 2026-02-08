@@ -1,12 +1,8 @@
-export { MessageBubble } from './MessageBubble';
-export { ConversationMessages } from './ConversationMessages';
-export { ConversationInput } from './ConversationInput';
-export { ConversationHeader } from './ConversationHeader';
 export { ConversationPane } from './ConversationPane';
-export { TypingIndicator } from './TypingIndicator';
-export { ConfidenceBar } from './ConfidenceBar';
-export { SystemEvent } from './SystemEvent';
-export { ContextMarker } from './ContextMarker';
-export { MultipleChoiceInput } from './MultipleChoiceInput';
-export { AgentTab } from './AgentTab';
+export { ConversationInput } from './ConversationInput';
+export { ConversationMessages } from './ConversationMessages';
+export { SystemEvent, type SystemEventProps, type SystemEventType, type SystemEventMetadata } from './SystemEvent';
+export { ContextMarker, type ContextMarkerProps } from './ContextMarker';
 export { AgentTabBar } from './AgentTabBar';
+export { AgentTab } from './AgentTab';
+export { MultipleChoiceInput, type MultipleChoiceInputProps, type MultipleChoiceOption } from './MultipleChoiceInput';

@@ -1,161 +1,85 @@
 import { cn } from '@/lib/utils';
-import type { Step, StepExecutionStatus } from '@/types/plan';
+import type { TreeStep } from './ProjectTree';
 
-/**
- * Props for StepNode component
- */
 export interface StepNodeProps {
-  /** Step data to display */
-  step: Step;
-  /** Optional execution status overlay */
-  executionStatus?: StepExecutionStatus;
-  /** Click handler for step selection */
+  step: TreeStep;
+  isSelected?: boolean;
+  isFocusedAwaitingClick?: boolean;
   onClick?: () => void;
-  /** Whether this step is currently focused */
-  isFocused?: boolean;
-  /** Optional CSS class */
-  className?: string;
 }
 
 /**
- * Get status indicator symbol based on execution status
- */
-function getStatusIndicator(status?: StepExecutionStatus): string {
-  switch (status) {
-    case 'done':
-      return '✓';
-    case 'running':
-      return '⟳';
-    case 'blocked':
-      return '⊗';
-    case 'failed':
-      return '✗';
-    case 'pending':
-    default:
-      return '○';
-  }
-}
-
-/**
- * Get status color based on execution status
- */
-function getStatusColor(status?: StepExecutionStatus): string {
-  switch (status) {
-    case 'done':
-      return 'text-green-600';
-    case 'running':
-      return 'text-blue-600 animate-spin';
-    case 'blocked':
-      return 'text-yellow-600';
-    case 'failed':
-      return 'text-red-600';
-    case 'pending':
-    default:
-      return 'text-gray-400';
-  }
-}
-
-/**
- * StepNode
+ * StepNode - Compact step representation in project tree
  *
- * Simplified, compact view of a step for the project tree.
- * Adapted from planner-ui's StepEditor component, but focuses on
- * display rather than editing (editing happens in sheets).
+ * Simplified from planner-ui StepEditor - NO editing, NO expansion.
+ * Just displays step title + status indicator + dependency badge.
+ *
+ * Status indicators:
+ * - ○ pending (muted)
+ * - ⟳ running (accent + spin)
+ * - ✓ done (success)
+ * - ⚠ blocked (warning)
+ * - ✗ failed (error)
  *
  * Features:
- * - Compact single-line display: status indicator + title
- * - Status indicators: ○ pending, ⟳ running, ✓ done, ⊗ blocked, ✗ failed
- * - Click to select (triggers zoom or sheet opening)
- * - Hover state for interactivity
- * - Optional scope badge
- *
- * Design:
- * - No inline editing (simplified from StepEditor)
- * - No expand/collapse (full detail in sheets)
- * - No delete buttons (tree is read-only)
- * - Clean, minimal aesthetic matching earth-tone palette
- *
- * @example
- * ```tsx
- * <StepNode
- *   step={step}
- *   executionStatus="running"
- *   onClick={() => handleStepClick(step.step_id)}
- *   isFocused={focusedStepId === step.step_id}
- * />
- * ```
+ * - Compact layout (text-xs to text-sm)
+ * - Hover effect (bg-bg-hover)
+ * - Selected state (border-l-2 + bg-bg-active)
+ * - Focused state (subtle ring + hint text - awaiting second click)
+ * - Dependency count badge
  */
-export function StepNode({
-  step,
-  executionStatus,
-  onClick,
-  isFocused = false,
-  className,
-}: StepNodeProps) {
-  const statusIndicator = getStatusIndicator(executionStatus);
-  const statusColorClass = getStatusColor(executionStatus);
+export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = false, onClick }: StepNodeProps) {
+  const status = step.execution_status || 'pending';
+
+  // Status icons and colors - attention levels applied
+  // Level 0 (background): pending
+  // Level 1 (info): running, done
+  // Level 3 (urgent): blocked, failed
+  const statusConfig = {
+    pending: { icon: '○', className: 'text-text-muted' },
+    running: { icon: '⟳', className: 'text-accent-primary animate-spin' },
+    done: { icon: '✓', className: 'text-success' },
+    blocked: { icon: '⚠', className: 'text-accent-secondary animate-pulse' },
+    failed: { icon: '✗', className: 'text-accent-secondary' },
+  };
+
+  const { icon, className: statusClassName } = statusConfig[status];
+
+  const hasDependencies = step.dependencies && step.dependencies.length > 0;
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        'group relative flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150',
-        'border border-border-subtle hover:border-border',
-        isFocused
-          ? 'bg-accent-cyan/10 border-accent-cyan'
-          : 'bg-bg-card hover:bg-bg-elevated',
-        className
+        'flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-all',
+        'hover:bg-bg-hover',
+        isSelected && 'border-l-2 border-accent-primary bg-bg-active',
+        isFocusedAwaitingClick && !isSelected && 'border-l-2 border-accent-primary/50 bg-bg-hover ring-1 ring-accent-primary/30',
+        !isSelected && !isFocusedAwaitingClick && 'border-l-2 border-transparent'
       )}
     >
       {/* Status indicator */}
-      <span
-        className={cn(
-          'flex-shrink-0 text-base font-mono',
-          statusColorClass
-        )}
-        title={executionStatus ? `Status: ${executionStatus}` : 'Pending'}
-        aria-label={executionStatus ? `Status: ${executionStatus}` : 'Pending'}
-      >
-        {statusIndicator}
+      <span className={cn('text-sm flex-shrink-0', statusClassName)} title={status}>
+        {icon}
       </span>
 
       {/* Step title */}
-      <div className="flex-1 min-w-0">
-        <div
-          className={cn(
-            'text-sm font-medium truncate transition-colors',
-            isFocused ? 'text-accent-cyan' : 'text-text-primary'
-          )}
-        >
-          {step.title}
-        </div>
-      </div>
+      <span className="flex-1 min-w-0 text-sm text-text-primary truncate">{step.title || 'Untitled Step'}</span>
 
-      {/* Scope badge (if present) */}
-      {step.scope && (
-        <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-bg-elevated text-text-secondary rounded border border-border-subtle">
-          {step.scope}
+      {/* Click hint for focused steps */}
+      {isFocusedAwaitingClick && !isSelected && (
+        <span className="flex-shrink-0 text-xs text-text-muted italic">
+          click for details
         </span>
       )}
 
-      {/* Dependency count indicator (if any dependencies) */}
-      {step.dependencies.length > 0 && (
+      {/* Dependency count badge */}
+      {hasDependencies && !isFocusedAwaitingClick && (
         <span
-          className="flex-shrink-0 text-xs text-text-muted"
+          className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-bg-tertiary text-text-secondary rounded"
           title={`${step.dependencies.length} dependencies`}
         >
-          ←{step.dependencies.length}
-        </span>
-      )}
-
-      {/* Gate indicator (if approval required) */}
-      {step.gate && (
-        <span
-          className="flex-shrink-0 text-xs text-yellow-600"
-          title="Approval gate"
-          aria-label="Requires approval"
-        >
-          🛡
+          {step.dependencies.length}
         </span>
       )}
     </div>

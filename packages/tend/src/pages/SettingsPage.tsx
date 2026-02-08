@@ -1,215 +1,274 @@
+import { Link } from 'react-router-dom';
+import { useTheme } from '@/hooks/useTheme';
+import { useSettings } from '@/hooks/useSettings';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/Button';
+import { useRelayConnection } from '@/hooks/useRelayConnection';
+import { useEffect } from 'react';
+
 /**
- * SettingsPage
+ * SettingsPage - Application settings and preferences
  *
- * User settings and preferences.
+ * Provides user controls for:
+ * - Theme (light/dark/system)
+ * - Notification timing
+ * - Graduation threshold
+ * - Execution defaults
+ * - Connection status
  *
- * @route /settings
+ * All settings are automatically persisted to localStorage.
  */
-
-import { useTheme, useSettings } from '@/hooks';
-
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const { settings, updateSettings, resetSettings } = useSettings();
+  const { state: connectionState, reconnect } = useRelayConnection('User', false);
+  const {
+    settings,
+    updateSettings,
+    updateBubbleTiming,
+    updateExecutionDefaults,
+  } = useSettings();
+
+  // Sync theme from settings to useTheme hook
+  useEffect(() => {
+    if (settings.theme !== theme) {
+      setTheme(settings.theme);
+    }
+  }, [settings.theme, theme, setTheme]);
 
   return (
-    <div className="p-8 max-w-4xl">
-      <h1 className="text-2xl font-semibold text-text-primary mb-6">Settings</h1>
-
-      {/* Theme Section */}
-      <section className="mb-8">
-        <h2 className="text-lg font-medium text-text-primary mb-4">Theme</h2>
-        <div className="bg-bg-elevated rounded-lg border border-border-subtle p-4">
-          <p className="text-sm text-text-muted mb-4">
-            Choose how Tend looks. System matches your device preference.
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setTheme('light')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                theme === 'light'
-                  ? 'bg-accent-green text-white'
-                  : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-              }`}
-            >
-              Light
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                theme === 'dark'
-                  ? 'bg-accent-green text-white'
-                  : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-              }`}
-            >
-              Dark
-            </button>
-            <button
-              onClick={() => setTheme('system')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                theme === 'system'
-                  ? 'bg-accent-green text-white'
-                  : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-              }`}
-            >
-              System
-            </button>
-          </div>
+    <div className="min-h-screen bg-bg-deep">
+      <div className="max-w-2xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Link
+            to="/"
+            className="text-text-secondary hover:text-text-primary text-sm mb-4 inline-flex items-center gap-2 transition-colors"
+          >
+            <span>←</span>
+            <span>Back to Dashboard</span>
+          </Link>
+          <h1 className="text-2xl font-semibold text-text-primary mt-4">Settings</h1>
         </div>
-      </section>
 
-      {/* Notifications Section */}
-      <section className="mb-8">
-        <h2 className="text-lg font-medium text-text-primary mb-4">Notifications</h2>
-        <div className="bg-bg-elevated rounded-lg border border-border-subtle p-4 space-y-4">
-          <label className="flex items-center justify-between cursor-pointer">
-            <div>
-              <div className="text-sm font-medium text-text-primary">Question Bubbles</div>
-              <div className="text-sm text-text-muted">
-                Show visual notifications when agents ask questions
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.notifications.questionBubbles}
-              onChange={(e) =>
-                updateSettings({
-                  notifications: {
-                    ...settings.notifications,
-                    questionBubbles: e.target.checked,
-                  },
-                })
-              }
-              className="w-4 h-4 accent-accent-green"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <div>
-              <div className="text-sm font-medium text-text-primary">Sound Alerts</div>
-              <div className="text-sm text-text-muted">
-                Play sound when important events occur
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.notifications.soundAlerts}
-              onChange={(e) =>
-                updateSettings({
-                  notifications: {
-                    ...settings.notifications,
-                    soundAlerts: e.target.checked,
-                  },
-                })
-              }
-              className="w-4 h-4 accent-accent-green"
-            />
-          </label>
-        </div>
-      </section>
-
-      {/* Agent Preferences Section */}
-      <section className="mb-8">
-        <h2 className="text-lg font-medium text-text-primary mb-4">Agent Preferences</h2>
-        <div className="bg-bg-elevated rounded-lg border border-border-subtle p-4 space-y-6">
-          <div>
-            <label className="text-sm font-medium text-text-primary mb-3 block">
-              Default Response Speed
+        {/* Theme Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Appearance</h2>
+          <div className="bg-bg-card rounded-lg border border-border-subtle p-6">
+            <label className="block text-sm font-medium text-text-primary mb-3">
+              Theme
             </label>
-            <p className="text-sm text-text-muted mb-3">
-              How quickly agents should respond. Faster = less thorough, slower = more detail.
+            <ToggleGroup
+              type="single"
+              value={settings.theme}
+              onValueChange={(value) => {
+                if (value) {
+                  const newTheme = value as 'light' | 'dark' | 'system';
+                  updateSettings({ theme: newTheme });
+                  setTheme(newTheme);
+                }
+              }}
+              variant="tabs"
+            >
+              <ToggleGroupItem value="light" aria-label="Light theme">
+                Light
+              </ToggleGroupItem>
+              <ToggleGroupItem value="dark" aria-label="Dark theme">
+                Dark
+              </ToggleGroupItem>
+              <ToggleGroupItem value="system" aria-label="System theme">
+                System
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <p className="text-xs text-text-muted mt-3">
+              Choose your preferred color scheme or follow your system settings.
             </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() =>
-                  updateSettings({
-                    agent: { ...settings.agent, defaultResponseSpeed: 'fast' },
-                  })
+          </div>
+        </section>
+
+        {/* Notifications Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Notifications</h2>
+          <div className="bg-bg-card rounded-lg border border-border-subtle p-6 space-y-5">
+            <p className="text-sm text-text-muted mb-4">
+              Control how long notification bubbles appear based on their priority level.
+            </p>
+
+            {/* Blocking */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Blocking (Critical) - {settings.bubble_timing.blocking}s
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                value={settings.bubble_timing.blocking}
+                onChange={(e) =>
+                  updateBubbleTiming({ blocking: Number(e.target.value) })
                 }
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  settings.agent.defaultResponseSpeed === 'fast'
-                    ? 'bg-accent-green text-white'
-                    : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-                }`}
-              >
-                Fast
-              </button>
-              <button
-                onClick={() =>
-                  updateSettings({
-                    agent: { ...settings.agent, defaultResponseSpeed: 'balanced' },
-                  })
+                className="w-full accent-accent-primary"
+              />
+              <p className="text-xs text-text-muted mt-1">0 = stays until dismissed</p>
+            </div>
+
+            {/* Normal */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Normal - {settings.bubble_timing.normal}s
+              </label>
+              <input
+                type="range"
+                min="3"
+                max="15"
+                value={settings.bubble_timing.normal}
+                onChange={(e) =>
+                  updateBubbleTiming({ normal: Number(e.target.value) })
                 }
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  settings.agent.defaultResponseSpeed === 'balanced'
-                    ? 'bg-accent-green text-white'
-                    : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-                }`}
-              >
-                Balanced
-              </button>
-              <button
-                onClick={() =>
-                  updateSettings({
-                    agent: { ...settings.agent, defaultResponseSpeed: 'thorough' },
-                  })
+                className="w-full accent-accent-primary"
+              />
+            </div>
+
+            {/* FYI */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                FYI (Informational) - {settings.bubble_timing.fyi}s
+              </label>
+              <input
+                type="range"
+                min="5"
+                max="30"
+                value={settings.bubble_timing.fyi}
+                onChange={(e) =>
+                  updateBubbleTiming({ fyi: Number(e.target.value) })
                 }
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  settings.agent.defaultResponseSpeed === 'thorough'
-                    ? 'bg-accent-green text-white'
-                    : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-                }`}
-              >
-                Thorough
-              </button>
+                className="w-full accent-accent-primary"
+              />
             </div>
           </div>
+        </section>
 
-          <label className="flex items-center justify-between cursor-pointer">
+        {/* Graduation Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Graduation</h2>
+          <div className="bg-bg-card rounded-lg border border-border-subtle p-6">
+            <label className="block text-sm font-medium text-text-primary mb-2">
+              Graduation Threshold - {settings.graduation_threshold}%
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={settings.graduation_threshold}
+              onChange={(e) =>
+                updateSettings({ graduation_threshold: Number(e.target.value) })
+              }
+              className="w-full accent-accent-primary"
+            />
+            <p className="text-xs text-text-muted mt-3">
+              Minimum confidence percentage required before a project can graduate from ideation to planning.
+            </p>
+          </div>
+        </section>
+
+        {/* Execution Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Execution</h2>
+          <div className="bg-bg-card rounded-lg border border-border-subtle p-6 space-y-5">
+            <p className="text-sm text-text-muted mb-4">
+              Default settings for agent execution and task orchestration.
+            </p>
+
+            {/* Max Concurrent */}
             <div>
-              <div className="text-sm font-medium text-text-primary">Auto-approve Actions</div>
-              <div className="text-sm text-text-muted">
-                Automatically approve low-risk agent actions
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Max Concurrent Agents
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={settings.execution_defaults.max_concurrent}
+                onChange={(e) =>
+                  updateExecutionDefaults({ max_concurrent: Number(e.target.value) })
+                }
+                className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+              />
+            </div>
+
+            {/* Timeout */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Timeout (seconds)
+              </label>
+              <input
+                type="number"
+                min="60"
+                max="3600"
+                step="30"
+                value={settings.execution_defaults.timeout}
+                onChange={(e) =>
+                  updateExecutionDefaults({ timeout: Number(e.target.value) })
+                }
+                className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+              />
+            </div>
+
+            {/* Retries */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Max Retries
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                value={settings.execution_defaults.retries}
+                onChange={(e) =>
+                  updateExecutionDefaults({ retries: Number(e.target.value) })
+                }
+                className="w-full px-3 py-2 bg-bg-secondary border border-border-subtle rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Connection Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Connection</h2>
+          <div className="bg-bg-card rounded-lg border border-border-subtle p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary mb-1">Relay Status</p>
+                <p className="text-sm text-text-muted">
+                  {connectionState === 'connected' && 'Connected'}
+                  {connectionState === 'connecting' && 'Connecting...'}
+                  {connectionState === 'disconnected' && 'Disconnected'}
+                  {connectionState === 'reconnecting' && 'Reconnecting...'}
+                  {connectionState === 'error' && 'Connection Error'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Status indicator */}
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    connectionState === 'connected'
+                      ? 'bg-success'
+                      : connectionState === 'connecting' || connectionState === 'reconnecting'
+                      ? 'bg-warning'
+                      : 'bg-error'
+                  }`}
+                />
+                {/* Reconnect button */}
+                {connectionState !== 'connected' && connectionState !== 'connecting' && (
+                  <Button variant="secondary" size="sm" onClick={reconnect}>
+                    Reconnect
+                  </Button>
+                )}
               </div>
             </div>
-            <input
-              type="checkbox"
-              checked={settings.agent.autoApprove}
-              onChange={(e) =>
-                updateSettings({
-                  agent: { ...settings.agent, autoApprove: e.target.checked },
-                })
-              }
-              className="w-4 h-4 accent-accent-green"
-            />
-          </label>
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section className="mb-8">
-        <h2 className="text-lg font-medium text-text-primary mb-4">About</h2>
-        <div className="bg-bg-elevated rounded-lg border border-border-subtle p-4 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-text-muted">Version</span>
-            <span className="text-sm text-text-primary font-mono">0.1.0</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-text-muted">Environment</span>
-            <span className="text-sm text-text-primary font-mono">
-              {(import.meta as any).env?.MODE || 'development'}
-            </span>
-          </div>
-          <div className="border-t border-border-subtle pt-4 mt-4">
-            <button
-              onClick={resetSettings}
-              className="text-sm text-error hover:text-error font-medium"
-            >
-              Reset to Defaults
-            </button>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

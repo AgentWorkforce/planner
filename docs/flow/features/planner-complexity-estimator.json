@@ -1,0 +1,42 @@
+{
+  "title": "Complexity Estimator Service",
+  "summary": {
+    "goal": "Compute complexity estimates for each step using deterministic formula with optional LLM adjustment",
+    "acceptance_criteria": [
+      {
+        "id": "ce1",
+        "description": "estimateComplexity(step) returns ComplexityEstimate with level, score, confidence, signals, recommendation"
+      },
+      {
+        "id": "ce2",
+        "description": "Score formula: descTokens/500*30 + scopeCount*10 + depCount*5 + acCount*3 + keywordBoost"
+      },
+      {
+        "id": "ce3",
+        "description": "Level mapping: <15=trivial, <30=simple, <50=moderate, <75=complex, else=very_complex"
+      },
+      {
+        "id": "ce4",
+        "description": "Recommendation: <30=proceed, <60=consider_decomposition, else=require_decomposition"
+      },
+      {
+        "id": "ce5",
+        "description": "Language tier multiplier applied: score * tier_multiplier"
+      },
+      {
+        "id": "ce6",
+        "description": "Optional LLM adjustment for borderline scores (30-60), capped at +/-20%"
+      },
+      {
+        "id": "ce7",
+        "description": "Confidence is 0.8 if historical data available, else 0.5"
+      }
+    ]
+  },
+  "feature_id": "planner-complexity-estimator",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "dot-planner-enhancements",
+  "component": "planner-core"
+}

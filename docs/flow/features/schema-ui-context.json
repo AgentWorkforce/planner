@@ -1,0 +1,269 @@
+{
+  "feature_id": "schema-ui-context",
+  "title": "Context Section UI",
+  "type": "feature",
+  "status": "completed",
+  "priority": "medium",
+  "dependencies": ["schema-api-endpoints"],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Add Context tab to PlanEditorPage showing formalized role decisions using freeform key-value editing (dynamic roles, dynamic fields)",
+    "context": "Context bridges understanding (observations) and specification (implementation). Schema is freeform: Record<string, Record<string, unknown>> - any role key, any fields. Suggested roles and fields are documented for agent prompts but not enforced by UI or schema. The UI uses dynamic tabs with KeyValueEditor, matching the schema-context approach.",
+    "freeform_rationale": "Different roles think differently, orgs have different needs. PlannerLead spawns specialist agents dynamically. The Orchestrator is an LLM that can understand any JSON structure. Intelligence lives in agent prompts, not UI forms.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "PlanEditorPage shows Plan | Understanding | Context tabs" },
+      { "id": "ac2", "description": "Context tab shows one tab per role key in context + '+' button at end" },
+      { "id": "ac3", "description": "'+' button opens AddRolePopover with suggested roles and custom role input" },
+      { "id": "ac4", "description": "Each role tab uses KeyValueEditor for freeform field editing" },
+      { "id": "ac5", "description": "KeyValueEditor shows placeholder hints from SUGGESTED_ROLES when role matches" },
+      { "id": "ac6", "description": "Empty role context shows 'Add first field' CTA" },
+      { "id": "ac7", "description": "Fields are editable inline on draft plans" },
+      { "id": "ac8", "description": "Delete role option in role tab dropdown (with confirmation)" },
+      { "id": "ac9", "description": "Empty context shows 'Add your first role' CTA with '+' button" },
+      { "id": "ac10", "description": "Context updates trigger re-fetch and SSE events" },
+      { "id": "ac11", "description": "Reuses KeyValueEditor component from src/components/context/" }
+    ]
+  },
+  "design_spec": {
+    "location": "New tab in PlanEditorPage alongside Understanding tab",
+    "pattern": "role-context-card with KeyValueEditor",
+    "schema_approach": "Freeform: displays any role, any fields. SUGGESTED_ROLES provide hints, not constraints.",
+    "ui_pattern": {
+      "add_role": {
+        "trigger": "'+' button after last role tab",
+        "action": "Shows popover with suggested roles (Designer, Architect, Modeler, Tester, Security) as quick-add buttons, plus 'Custom role' text input",
+        "result": "New tab appears with role name as label",
+        "component": "AddRolePopover (shared with schema-context)"
+      },
+      "add_field": {
+        "trigger": "'+ Add field' button within role tab content",
+        "action": "Adds new row with editable key (text input) and value (textarea)",
+        "suggestions": "Shows placeholder hints for suggested fields based on role (from SUGGESTED_ROLES)",
+        "component": "KeyValueEditor (shared with schema-context and schema-ui-specification)"
+      },
+      "delete": {
+        "field": "X button per field row",
+        "role": "Delete role option in role tab dropdown (with confirmation)"
+      }
+    },
+    "suggested_roles": {
+      "designer": {
+        "icon": "DesignerIcon (paintbrush/palette)",
+        "suggested_fields": ["library", "theme", "typography", "patterns", "icons"]
+      },
+      "architect": {
+        "icon": "ArchitectIcon (blueprint/grid)",
+        "suggested_fields": ["tech_stack", "api_style", "storage", "boundaries"]
+      },
+      "modeler": {
+        "icon": "DatabaseIcon",
+        "suggested_fields": ["approach", "entities", "relationships", "conventions", "migrations"]
+      },
+      "tester": {
+        "icon": "TesterIcon (flask/beaker)",
+        "suggested_fields": ["framework", "coverage_target", "strategy", "test_data"]
+      },
+      "security": {
+        "icon": "SecurityIcon (shield)",
+        "suggested_fields": ["auth", "compliance", "data_handling"]
+      }
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uc001",
+        "title": "Add Context types to frontend",
+        "scope": "planner-ui",
+        "description": "Add TypeScript types for freeform Context schema",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RoleContext = Record<string, unknown> type defined" },
+          { "id": "ac2", "description": "Context = Record<string, RoleContext> type defined" },
+          { "id": "ac3", "description": "SUGGESTED_ROLES constant with role names and field hints (for UI hints)" },
+          { "id": "ac4", "description": "Types exported from src/types/context.ts" }
+        ]
+      },
+      {
+        "step_id": "uc002",
+        "title": "Add API client methods for context",
+        "scope": "planner-ui",
+        "description": "Add getContext() and updateContext() methods to plans API client",
+        "dependencies": ["uc001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "updateContext(planId, version, role, data) patches context (any fields)" },
+          { "id": "ac2", "description": "deleteRoleContext(planId, version, role) removes role from context" },
+          { "id": "ac3", "description": "Returns updated context object" }
+        ]
+      },
+      {
+        "step_id": "uc003",
+        "title": "Create ContextEmptyState component",
+        "scope": "planner-ui",
+        "description": "Create empty state component for when no roles exist in context",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/context/ContextEmptyState.tsx" },
+          { "id": "ac2", "description": "Shows 'Add your first role' message with '+' button" },
+          { "id": "ac3", "description": "Clicking '+' opens AddRolePopover" },
+          { "id": "ac4", "description": "Follows design system empty state pattern" }
+        ]
+      },
+      {
+        "step_id": "uc004",
+        "title": "Verify KeyValueEditor supports context use case",
+        "scope": "planner-ui",
+        "description": "Ensure KeyValueEditor from schema-context implementation works for context tab",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "KeyValueEditor exists at src/components/context/KeyValueEditor.tsx" },
+          { "id": "ac2", "description": "Props: fields, onChange, isEditable, fieldHints" },
+          { "id": "ac3", "description": "Handles any field values (string, array, object)" },
+          { "id": "ac4", "description": "Shows hints for suggested fields when key matches fieldHints" }
+        ]
+      },
+      {
+        "step_id": "uc005",
+        "title": "Verify AddRolePopover supports context use case",
+        "scope": "planner-ui",
+        "description": "Ensure AddRolePopover from schema-context implementation works for context tab",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AddRolePopover exists at src/components/context/AddRolePopover.tsx" },
+          { "id": "ac2", "description": "Shows suggested roles with icons" },
+          { "id": "ac3", "description": "Has custom role text input" },
+          { "id": "ac4", "description": "Disables already-added roles" }
+        ]
+      },
+      {
+        "step_id": "uc006",
+        "title": "Create RoleContextCard component",
+        "scope": "planner-ui",
+        "description": "Create card component for displaying a single role's freeform context using KeyValueEditor",
+        "dependencies": ["uc004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/context/RoleContextCard.tsx" },
+          { "id": "ac2", "description": "Shows role name and icon (from SUGGESTED_ROLES or generic) in header" },
+          { "id": "ac3", "description": "Body uses KeyValueEditor for freeform fields" },
+          { "id": "ac4", "description": "Passes fieldHints from SUGGESTED_ROLES when role matches" },
+          { "id": "ac5", "description": "Empty state shows 'Add first field' CTA" },
+          { "id": "ac6", "description": "Delete role option in header dropdown (with confirmation)" }
+        ]
+      },
+      {
+        "step_id": "uc007",
+        "title": "Create ContextTab component",
+        "scope": "planner-ui",
+        "description": "Create the main Context tab component with dynamic role tabs",
+        "dependencies": ["uc003", "uc005", "uc006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/ContextTab.tsx" },
+          { "id": "ac2", "description": "Tab bar shows one tab per role in context + '+' button at end" },
+          { "id": "ac3", "description": "'+' button opens AddRolePopover" },
+          { "id": "ac4", "description": "Adding role creates new tab and initializes empty context for that role" },
+          { "id": "ac5", "description": "Tab content shows RoleContextCard for selected role" },
+          { "id": "ac6", "description": "Deleting role via RoleContextCard removes tab" },
+          { "id": "ac7", "description": "Empty context shows ContextEmptyState" },
+          { "id": "ac8", "description": "Loading state with skeleton while fetching" }
+        ]
+      },
+      {
+        "step_id": "uc008",
+        "title": "Add Context tab to PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Add Context tab alongside Understanding tab in PlanEditorPage",
+        "dependencies": ["uc007", "uc002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tab bar shows Plan | Understanding | Context" },
+          { "id": "ac2", "description": "Context tab renders ContextTab component" },
+          { "id": "ac3", "description": "Tab state persists in URL query param" },
+          { "id": "ac4", "description": "onUpdate calls updateContext API, refetches plan" }
+        ]
+      },
+      {
+        "step_id": "uc009",
+        "title": "Add Context icon to tab bar",
+        "scope": "planner-ui",
+        "description": "Add appropriate icon for Context tab",
+        "dependencies": ["uc008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Context tab shows SettingsIcon or SlidersIcon" },
+          { "id": "ac2", "description": "Icon follows design system (inline SVG, 16px)" }
+        ]
+      },
+      {
+        "step_id": "uc010",
+        "title": "Add tests for Context UI",
+        "scope": "planner-ui",
+        "description": "Add tests for context UI components",
+        "dependencies": ["uc008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: ContextTab renders role tabs dynamically from context keys" },
+          { "id": "ac2", "description": "Test: '+' button opens AddRolePopover with suggested roles and custom input" },
+          { "id": "ac3", "description": "Test: Adding role creates new tab" },
+          { "id": "ac4", "description": "Test: KeyValueEditor renders existing fields and allows editing" },
+          { "id": "ac5", "description": "Test: Adding/editing fields calls onChange" },
+          { "id": "ac6", "description": "Test: Empty context shows ContextEmptyState with '+' button" },
+          { "id": "ac7", "description": "Test: Deleting role removes tab" }
+        ]
+      }
+    ]
+  },
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "Context tab renders tabs dynamically from context keys (designer, architect, custom_role)"
+      },
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "'+' button shows AddRolePopover with suggested roles and custom input"
+      },
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "KeyValueEditor renders existing fields and allows adding new ones"
+      },
+      {
+        "type": "happy",
+        "scope": "ui",
+        "description": "Adding role via popover creates new tab with empty KeyValueEditor"
+      },
+      {
+        "type": "edge",
+        "scope": "ui",
+        "description": "Empty context shows ContextEmptyState with 'Add your first role' CTA"
+      },
+      {
+        "type": "edge",
+        "scope": "ui",
+        "description": "Suggested roles already in context are disabled in AddRolePopover"
+      },
+      {
+        "type": "edge",
+        "scope": "ui",
+        "description": "Field hints appear for suggested role fields but allow any field name"
+      }
+    ],
+    "data_requirements": [
+      "Draft plan with context for suggested role (designer) and custom role (qa_lead)",
+      "Plan with nested objects in context fields",
+      "Plan with empty context"
+    ]
+  }
+}

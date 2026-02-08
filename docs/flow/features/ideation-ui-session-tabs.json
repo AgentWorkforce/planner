@@ -1,0 +1,300 @@
+{
+  "feature_id": "ideation-ui-session-tabs",
+  "title": "Session View Tab Navigation",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "medium",
+  "dependencies": ["ideation-ui-chat", "ideation-ui-specialists-panel"],
+  "parent": "ideation-ui",
+  "summary": {
+    "goal": "Add tab-based navigation to the ideation session view, similar to the plans view. Allow users to switch between Chat (conversation) and Understanding (specialist observations) views to peek into what the agents have stored.",
+    "context": "The plans view has Plan | Understanding | Context tabs. For ideation sessions, agents only store 'understanding' (freeform specialist observations) - there is no 'context' (formalized decisions happen in the planning phase). The SpecialistsPanel already shows understanding in the sidebar, but a dedicated tab view allows deeper exploration without the sidebar constraint.",
+    "in_scope": [
+      "Tab navigation in SessionPage/SessionChatView: Chat | Understanding",
+      "Understanding tab reuses existing SpecialistsPanel components (SpecialistCard, ConfidenceDots, KeywordTag)",
+      "Tab state persisted in URL (/session/:id vs /session/:id/understanding)",
+      "Responsive: On mobile, Understanding tab replaces sidebar since sidebar is hidden",
+      "Empty state for Understanding tab when no specialists have contributed"
+    ],
+    "out_of_scope": [
+      "Context tab (ideation doesn't have formalized decisions - that's a planner concept)",
+      "Editing understanding from UI (read-only display of agent observations)",
+      "Transcript tab (transcript is the Chat tab content already)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "SessionPage shows tab bar with 'Chat' and 'Understanding' tabs" },
+      { "id": "ac2", "description": "Chat tab shows SessionChatView (existing behavior)" },
+      { "id": "ac3", "description": "Understanding tab shows UnderstandingTab component with specialist observation cards" },
+      { "id": "ac4", "description": "Tab navigation updates URL: /session/:id (Chat) and /session/:id/understanding" },
+      { "id": "ac5", "description": "Understanding tab uses same SpecialistCard component from SpecialistsPanel for consistency" },
+      { "id": "ac6", "description": "Understanding tab shows expanded cards with full observations, keywords, questions, concerns" },
+      { "id": "ac7", "description": "Confidence display per specialist matches SpecialistCard pattern (ConfidenceDots)" },
+      { "id": "ac8", "description": "Empty state: 'No specialist observations yet. As you brainstorm, specialists will contribute insights.'" },
+      { "id": "ac9", "description": "Tab badge shows count when specialists have observations (e.g., 'Understanding (3)')" },
+      { "id": "ac10", "description": "Real-time updates: Understanding tab updates via SSE like SpecialistsPanel" }
+    ],
+    "decisions": [
+      { "decision": "Two tabs only (Chat + Understanding)", "rationale": "Ideation agents only store understanding. Context (formalized decisions) is a planner concept, not ideation." },
+      { "decision": "Reuse SpecialistCard component", "rationale": "Consistency between sidebar and tab view. Already has good styling and handles freeform observations." },
+      { "decision": "Keep SpecialistsPanel sidebar on desktop", "rationale": "Tab provides deep dive, sidebar provides at-a-glance. Both useful. Mobile only gets tabs since sidebar is hidden." },
+      { "decision": "URL-based tab state", "rationale": "Consistent with plans view pattern. Allows deep-linking to Understanding tab." }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Ideation Session already has understanding: Record<string, Record<string, unknown>>",
+        "SpecialistsPanel and SpecialistCard already render this data",
+        "useUnderstanding hook already fetches and subscribes to SSE updates",
+        "SessionPage is currently just a thin wrapper around SessionChatView",
+        "Need to lift SessionPage to handle tab routing",
+        "PlanEditorPage shows excellent pattern: ToggleGroup for tabs, useLocation for active tab detection, navigate() for tab changes"
+      ],
+      "keywords": ["tabs", "understanding", "SpecialistCard", "useUnderstanding", "SSE", "ToggleGroup"],
+      "questions": [],
+      "confidence": "confident"
+    },
+    "designer": {
+      "observations": [
+        "Plans view uses ToggleGroup for tabs (Plan | Understanding | Context)",
+        "SpecialistCard uses collapsible pattern - could default expanded in tab view",
+        "Tab bar should match ChatHeader height for visual consistency (h-14)",
+        "ToggleGroup in planner-ui uses h-8 container with p-0.5 bg-bg-tertiary rounded-lg"
+      ],
+      "keywords": ["ToggleGroup", "collapsible", "tabs", "h-14", "bg-bg-tertiary"],
+      "confidence": "confident"
+    }
+  },
+  "context": {
+    "architect": {
+      "pattern": "Follow PlanEditorPage tab routing pattern exactly",
+      "state_management": "Tab state from URL path, useLocation() + navigate()"
+    },
+    "designer": {
+      "component_library": "Copy ToggleGroup from planner-ui or use shared-ui",
+      "tab_bar_height": "h-12 to match PlanEditorPage row 2 pattern"
+    }
+  },
+  "design_spec": {
+    "location": "SessionPage wraps tab navigation, routes to Chat or Understanding views",
+    "navigation": {
+      "tabs": ["Chat", "Understanding"],
+      "routes": ["/session/:id", "/session/:id/understanding"],
+      "pattern": "ToggleGroup with tabs variant (like PlanEditorPage)"
+    },
+    "components": {
+      "SessionPage": "Handles tab routing, shows tab bar + active view",
+      "SessionChatView": "Existing - used for Chat tab",
+      "SessionUnderstandingTab": "New - renders understanding data in expanded cards",
+      "SpecialistCard": "Existing - reused with expanded=true for tab view"
+    },
+    "responsive": {
+      "desktop": "Tab bar + content, SpecialistsPanel sidebar still visible",
+      "mobile": "Tab bar + content, no sidebar (Understanding tab is primary way to see observations)"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-ui"],
+    "steps": [
+      {
+        "step_id": "ist001",
+        "title": "Copy ToggleGroup component from planner-ui",
+        "scope": "ideation-ui",
+        "description": "Copy ToggleGroup and toggle components to ideation-ui for tab navigation",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/components/ui/toggle.tsx copied from planner-ui" },
+          { "id": "ac2", "description": "src/components/ui/toggle-group.tsx copied from planner-ui" },
+          { "id": "ac3", "description": "cva (class-variance-authority) added to package.json if not present" },
+          { "id": "ac4", "description": "@radix-ui/react-toggle-group added to package.json" },
+          { "id": "ac5", "description": "Components exported from src/components/ui/index.ts" }
+        ],
+        "specification": {
+          "design": {
+            "source": "packages/planner-ui/src/components/ui/toggle-group.tsx",
+            "variants_needed": ["default", "tabs"],
+            "note": "Copy exact implementation to ensure visual consistency"
+          }
+        }
+      },
+      {
+        "step_id": "ist002",
+        "title": "Extend SpecialistCard with expanded mode",
+        "scope": "ideation-ui",
+        "description": "Add defaultExpanded prop and expanded content to SpecialistCard",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SpecialistCard accepts defaultExpanded?: boolean prop" },
+          { "id": "ac2", "description": "Expanded state toggleable via header click (ChevronIcon)" },
+          { "id": "ac3", "description": "Expanded view shows: observations[] as bullet list, keywords[] as tags, questions[] with HelpCircleIcon, concerns[] with AlertIcon" },
+          { "id": "ac4", "description": "Collapsed view remains unchanged (keywords + alert counts only)" },
+          { "id": "ac5", "description": "Animation: max-height transition for smooth expand/collapse" }
+        ],
+        "specification": {
+          "design": {
+            "expand_trigger": "Click anywhere on header row",
+            "icon": "ChevronIcon rotates 90deg when expanded",
+            "expanded_sections": [
+              { "name": "Observations", "render": "ul with text-sm text-text-secondary" },
+              { "name": "Questions", "render": "Each with HelpCircleIcon prefix, text-accent-purple" },
+              { "name": "Concerns", "render": "Each with AlertIcon prefix, text-warning" }
+            ],
+            "animation": "transition-[max-height] duration-200 overflow-hidden"
+          }
+        }
+      },
+      {
+        "step_id": "ist003",
+        "title": "Create SessionUnderstandingTab component",
+        "scope": "ideation-ui",
+        "description": "Create component that renders understanding data using expanded SpecialistCard components",
+        "dependencies": ["ist002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/session/SessionUnderstandingTab.tsx" },
+          { "id": "ac2", "description": "Props: { understanding: Record<string, Record<string, unknown>>, activeSpecialists?: ActiveSpecialist[], loading?: boolean }" },
+          { "id": "ac3", "description": "Renders SpecialistCard for each specialist with defaultExpanded={true}" },
+          { "id": "ac4", "description": "Header: 'Specialist Observations' h2 + Badge with count" },
+          { "id": "ac5", "description": "Empty state: BrainIcon (lg, text-accent-purple/30) + 'No specialist observations yet...' message" },
+          { "id": "ac6", "description": "Loading state: Skeleton cards (3x) with pulse animation" },
+          { "id": "ac7", "description": "Cards arranged in responsive grid: 1 col mobile, 2 cols lg+" }
+        ],
+        "specification": {
+          "design": {
+            "layout": "p-6 space-y-4",
+            "header": "flex items-center justify-between mb-4",
+            "title": "text-lg font-semibold text-text-primary",
+            "grid": "grid grid-cols-1 lg:grid-cols-2 gap-4",
+            "empty_state": "flex flex-col items-center justify-center py-16 text-center"
+          }
+        }
+      },
+      {
+        "step_id": "ist004",
+        "title": "Create SessionTabBar component",
+        "scope": "ideation-ui",
+        "description": "Create tab bar component for Chat/Understanding navigation using ToggleGroup",
+        "dependencies": ["ist001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Component: src/components/session/SessionTabBar.tsx" },
+          { "id": "ac2", "description": "Props: { activeTab: 'chat' | 'understanding', onTabChange: (tab) => void, understandingCount?: number }" },
+          { "id": "ac3", "description": "Uses ToggleGroup type='single' with h-8 p-0.5 bg-bg-tertiary rounded-lg" },
+          { "id": "ac4", "description": "Chat tab: MessageIcon + 'Chat'" },
+          { "id": "ac5", "description": "Understanding tab: BrainIcon + 'Understanding' + Badge(count) when count > 0" },
+          { "id": "ac6", "description": "Container height h-12 with flex items-center px-4 border-b border-border-subtle" }
+        ],
+        "specification": {
+          "design": {
+            "container": "h-12 flex items-center px-4 border-b border-border-subtle bg-bg-primary",
+            "toggle_group": "h-8 p-0.5 bg-bg-tertiary rounded-lg",
+            "toggle_item": "h-7 px-3 gap-1.5 text-sm",
+            "badge": "ml-1.5 h-5 min-w-5 text-xs bg-accent-cyan/20 text-accent-cyan"
+          }
+        }
+      },
+      {
+        "step_id": "ist005",
+        "title": "Refactor SessionPage for tab routing",
+        "scope": "ideation-ui",
+        "description": "Update SessionPage to handle tab navigation and route to appropriate view",
+        "dependencies": ["ist003", "ist004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionPage uses useLocation() to detect active tab from URL path" },
+          { "id": "ac2", "description": "activeTab = pathname.endsWith('/understanding') ? 'understanding' : 'chat'" },
+          { "id": "ac3", "description": "Renders: SessionTabBar + (activeTab === 'chat' ? SessionChatView : SessionUnderstandingTab)" },
+          { "id": "ac4", "description": "onTabChange uses navigate(`/session/${id}` or `/session/${id}/understanding`)" },
+          { "id": "ac5", "description": "useSession hook called at page level, session passed to ChatHeader and SessionChatView" },
+          { "id": "ac6", "description": "useUnderstanding hook called at page level, passed to SessionUnderstandingTab and SessionTabBar (for count)" },
+          { "id": "ac7", "description": "Loading state shows LoadingSpinner at page level before tabs render" },
+          { "id": "ac8", "description": "Error state with retry button at page level" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Follows PlanEditorPage tab routing pattern",
+            "state_source": "URL path via useLocation()",
+            "navigation": "react-router-dom navigate()"
+          },
+          "design": {
+            "layout": "flex flex-col h-full",
+            "tab_bar": "shrink-0 (fixed height)",
+            "content": "flex-1 overflow-hidden"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "ist006",
+        "title": "Add Understanding route to App.tsx",
+        "scope": "ideation-ui",
+        "description": "Add route for /session/:id/understanding and update SpecialistsPanelWrapper",
+        "dependencies": ["ist005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Route /session/:id/understanding added, renders SessionPage" },
+          { "id": "ac2", "description": "Wildcard route /session/:id/* catches both paths" },
+          { "id": "ac3", "description": "SpecialistsPanelWrapper route updated to /session/:id/* to match both paths" },
+          { "id": "ac4", "description": "Direct navigation to /session/:id/understanding works (deep-link)" }
+        ],
+        "specification": {
+          "architecture": {
+            "route_pattern": "/session/:id/*",
+            "element": "<SessionPage />",
+            "note": "Wildcard allows SessionPage to handle sub-paths internally"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "ist007",
+        "title": "Update ChatHeader position in layout",
+        "scope": "ideation-ui",
+        "description": "Ensure ChatHeader renders correctly below SessionTabBar",
+        "dependencies": ["ist005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Layout order: SessionTabBar -> ChatHeader -> ChatContent (for chat tab)" },
+          { "id": "ac2", "description": "ChatHeader still shows: session title, ConfidenceBar, Send to Planner button" },
+          { "id": "ac3", "description": "No visual overlap or double borders between tab bar and header" },
+          { "id": "ac4", "description": "ChatHeader only renders on Chat tab (not Understanding tab)" }
+        ],
+        "specification": {
+          "design": {
+            "border": "ChatHeader keeps border-b, SessionTabBar also has border-b",
+            "conditional_render": "ChatHeader inside chat tab content, not at page level"
+          }
+        }
+      },
+      {
+        "step_id": "ist008",
+        "title": "Add tests for session tabs",
+        "scope": "ideation-ui",
+        "description": "Add component tests for new tab navigation",
+        "dependencies": ["ist005", "ist006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: SessionPage renders Chat tab by default at /session/:id" },
+          { "id": "ac2", "description": "Test: SessionPage renders Understanding tab at /session/:id/understanding" },
+          { "id": "ac3", "description": "Test: Clicking Understanding tab navigates to /session/:id/understanding" },
+          { "id": "ac4", "description": "Test: Clicking Chat tab navigates back to /session/:id" },
+          { "id": "ac5", "description": "Test: Understanding tab shows empty state when understanding={}" },
+          { "id": "ac6", "description": "Test: Understanding tab shows specialist cards when data exists" },
+          { "id": "ac7", "description": "Test: Tab badge shows correct count" }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest + @testing-library/react",
+            "router_mock": "MemoryRouter with initialEntries",
+            "fixtures": [
+              "Empty understanding: {}",
+              "With specialists: { Architect: { keywords: ['API'], confidence: 'forming' }, Designer: { ... } }"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

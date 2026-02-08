@@ -1,372 +1,42 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
-import { getPlan, updatePlan, ApiError, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion } from '@/api';
-import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
-import { PlanBreadcrumb } from '@/components/PlanBreadcrumb';
-import { StepEditor } from '@/components/StepEditor';
-import { EditableText } from '@/components/EditableText';
-import { ChatPanel } from '@/components/ChatPanel';
+import { Link, useLocation } from 'react-router-dom';
+import { PlanEditorProvider, usePlanEditor } from '@/contexts/PlanEditorContext';
+import { PlanEditorHeader } from '@/components/plan-editor/PlanEditorHeader';
+import { PlanTabContent } from '@/components/plan-editor/PlanTabContent';
+import { DecisionsTabContent } from '@/components/plan-editor/DecisionsTabContent';
+import { UnderstandingTab } from '@/components/UnderstandingTab';
+import { ContextTab } from '@/components/ContextTab';
 import { CommentThread } from '@/components/CommentThread';
-import { WorkflowActions } from '@/components/WorkflowActions';
-import { SwimlaneView } from '@/components/SwimlaneView';
-import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
-import { DependencyLinesOverlay } from '@/components/DependencyLinesOverlay';
 import { MessagingSidebar } from '@/components/MessagingSidebar';
-import { Badge } from '@/components/ui/Badge';
-import { MessageIcon, DocumentIcon, DecisionsIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useAIChat, useAIConnectionStatus, usePlanEvents } from '@/hooks';
 
-/** Panel type for coexistence - only one panel can be open at a time */
-type ActivePanel = 'chat' | 'comments' | null;
-
-/** Storage key for sidebar collapsed state */
-const SIDEBAR_COLLAPSED_KEY = 'planner-sidebar-collapsed';
-
-export function PlanEditorPage() {
-  const { planId } = useParams<{ planId: string }>();
+function PlanEditorContent() {
   const location = useLocation();
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [version, setVersion] = useState<PlanVersion | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Messaging sidebar collapsed state (persisted)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    return stored === 'true';
-  });
-
-  // Persist sidebar collapsed state
-  const handleSidebarCollapseChange = useCallback((collapsed: boolean) => {
-    setSidebarCollapsed(collapsed);
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-  }, []);
-
-  // Get parent chain from navigation state
-  const navState = location.state as SubPlanNavigationState | null;
-  const parents: ParentPlanInfo[] = navState?.parents || [];
-
-  // Track selected step for contextual chat prompts
-  const [selectedStep, setSelectedStep] = useState<Step | undefined>(undefined);
-
-  // Track which step is expanded for editing
-  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
-
-  // Panel coexistence: only one panel can be open at a time
-  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-
-  // Comment state
-  const [commentStepId, setCommentStepId] = useState<string | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-
-  // View mode state (list vs swimlane)
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [hoveredStepId, setHoveredStepId] = useState<string | null>(null);
-  const [hoveredDirection, setHoveredDirection] = useState<'incoming' | 'outgoing' | null>(null);
-  const stepsContainerRef = useRef<HTMLDivElement>(null);
-
-  // Scroll to and highlight a step (used by dependency indicator click)
-  const handleScrollToStep = useCallback((stepId: string) => {
-    const container = stepsContainerRef.current;
-    if (!container) return;
-
-    const stepElement = container.querySelector(`[data-step-id="${stepId}"]`);
-    if (stepElement) {
-      stepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Temporarily highlight the step
-      setHoveredStepId(stepId);
-      setTimeout(() => setHoveredStepId(null), 2000);
-    }
-  }, []);
-
-  // AI connection status - check if planning agent is active
   const {
-    status: connectionStatus,
-    connect: connectToAgent,
-    isConnecting,
-    connectError,
-  } = useAIConnectionStatus(planId ?? null);
+    plan,
+    version,
+    loading,
+    error,
+    sidebarCollapsed,
+    handleSidebarCollapseChange,
+    selectedStep,
+    activePanel,
+    commentStep,
+    closeActivePanel,
+    handleAddComment,
+    handleResolveComment,
+    handleUnresolveComment,
+    getStepComments,
+    currentUser,
+  } = usePlanEditor();
 
-  // Clear connection error handler
-  const [localConnectError, setLocalConnectError] = useState<string | null>(null);
-  useEffect(() => {
-    setLocalConnectError(connectError);
-  }, [connectError]);
-  const clearConnectError = useCallback(() => setLocalConnectError(null), []);
-
-  // Debounced refetch plan data (used by real-time sync)
-  const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refetchPlan = useCallback(async () => {
-    if (!planId) return;
-    try {
-      const result = await getPlan(planId);
-      // Only update if fetched version is newer than local
-      setVersion((prev) => {
-        if (!prev || result.version.version > prev.version) {
-          return result.version;
-        }
-        return prev;
-      });
-      setPlan(result.plan);
-    } catch (err) {
-      console.error('[PlanEditorPage] Failed to refetch plan:', err);
-    }
-  }, [planId]);
-
-  // Debounced event handler (300ms) to coalesce rapid events
-  const handlePlanEvent = useCallback(() => {
-    if (refetchTimeoutRef.current) {
-      clearTimeout(refetchTimeoutRef.current);
-    }
-    refetchTimeoutRef.current = setTimeout(() => {
-      refetchPlan();
-      refetchTimeoutRef.current = null;
-    }, 300);
-  }, [refetchPlan]);
-
-  // Cleanup debounce timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (refetchTimeoutRef.current) {
-        clearTimeout(refetchTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Real-time sync: Subscribe to plan changes (always enabled since PlannerLead is persistent)
-  const { isConnected: isEventStreamConnected, error: eventStreamError } = usePlanEvents(
-    planId ?? null,
-    true, // Always subscribe - PlannerLead may update plans at any time
-    handlePlanEvent
-  );
-
-  // Log event stream status for debugging (isEventStreamConnected used in log)
-  useEffect(() => {
-    if (eventStreamError) {
-      console.warn('[PlanEditorPage] Event stream error:', eventStreamError);
-    }
-    if (isEventStreamConnected) {
-      console.debug('[PlanEditorPage] Event stream connected for real-time plan updates');
-    }
-  }, [eventStreamError, isEventStreamConnected]);
-
-  // AI chat hook - must be called unconditionally (before early returns)
-  // Use mock when not connected to real agent
-  const aiChat = useAIChat(version, { useMock: connectionStatus !== 'connected' });
-
-  // Fetch plan on mount
-  useEffect(() => {
-    async function fetchPlan() {
-      if (!planId) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result = await getPlan(planId);
-        setPlan(result.plan);
-        setVersion(result.version);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.message);
-        } else {
-          setError('Failed to load plan');
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchPlan();
-  }, [planId]);
-
-  // Fetch comments when plan/version loads
-  useEffect(() => {
-    async function fetchComments() {
-      if (!planId || !version) return;
-
-      try {
-        const result = await getComments(planId, version.version);
-        setComments(result.comments);
-      } catch (err) {
-        console.error('Failed to load comments:', err);
-        // Don't set error state - comments are not critical
-      }
-    }
-
-    fetchComments();
-  }, [planId, version?.version]);
-
-  // Handler for updating a step
-  const handleStepUpdate = useCallback(
-    async (stepId: string, updates: Partial<Step>) => {
-      if (!planId || !version) return;
-
-      // Create updated steps array
-      const updatedSteps = version.steps.map((step) =>
-        step.step_id === stepId ? { ...step, ...updates } : step
-      );
-
-      // Call API and update local state
-      const result = await updatePlan(planId, { steps: updatedSteps });
-      setVersion(result.version);
-    },
-    [planId, version]
-  );
-
-  // Handler for deleting a step
-  const handleStepDelete = useCallback(
-    async (stepId: string) => {
-      if (!planId || !version) return;
-
-      // Remove step from array
-      const updatedSteps = version.steps.filter((step) => step.step_id !== stepId);
-
-      // Also remove this step from other steps' dependencies
-      const cleanedSteps = updatedSteps.map((step) => ({
-        ...step,
-        dependencies: step.dependencies.filter((depId) => depId !== stepId),
-      }));
-
-      // Call API and update local state
-      const result = await updatePlan(planId, { steps: cleanedSteps });
-      setVersion(result.version);
-
-      // Clear selection if deleted step was selected
-      if (selectedStep?.step_id === stepId) {
-        setSelectedStep(undefined);
-      }
-      if (expandedStepId === stepId) {
-        setExpandedStepId(null);
-      }
-      // Close comment panel if viewing comments for deleted step
-      if (commentStepId === stepId) {
-        setActivePanel(null);
-        setCommentStepId(null);
-      }
-    },
-    [planId, version, selectedStep, expandedStepId, commentStepId]
-  );
-
-  // Panel coexistence handlers
-  const openChatPanel = useCallback(() => {
-    setActivePanel('chat');
-    // Also call aiChat.open to ensure its internal state is synced
-    aiChat.open();
-  }, [aiChat]);
-
-  const openCommentsPanel = useCallback((stepId: string) => {
-    setCommentStepId(stepId);
-    setActivePanel('comments');
-  }, []);
-
-  const closeActivePanel = useCallback(() => {
-    setActivePanel(null);
-    setCommentStepId(null);
-    aiChat.close();
-  }, [aiChat]);
-
-  // Comment handlers
-  const handleAddComment = useCallback(
-    async (stepId: string, content: string, parentId?: string) => {
-      if (!planId || !version) return;
-
-      const result = await createComment(planId, version.version, stepId, content, parentId);
-      setComments((prev) => [...prev, result.comment]);
-    },
-    [planId, version]
-  );
-
-  const handleResolveComment = useCallback(
-    async (commentId: string) => {
-      if (!planId || !version) return;
-
-      const result = await resolveComment(planId, version.version, commentId);
-      setComments((prev) =>
-        prev.map((c) => (c.comment_id === commentId ? result.comment : c))
-      );
-    },
-    [planId, version]
-  );
-
-  const handleUnresolveComment = useCallback(
-    async (commentId: string) => {
-      if (!planId || !version) return;
-
-      const result = await unresolveComment(planId, version.version, commentId);
-      setComments((prev) =>
-        prev.map((c) => (c.comment_id === commentId ? result.comment : c))
-      );
-    },
-    [planId, version]
-  );
-
-  // Workflow handlers for submit/approve/publish transitions
-  const handleWorkflowSubmit = useCallback(async () => {
-    if (!planId || !version) return;
-    const result = await submitVersion(planId, version.version);
-    setVersion(result.version);
-  }, [planId, version]);
-
-  const handleWorkflowApprove = useCallback(async (approver: string) => {
-    if (!planId || !version) return;
-    const result = await approveVersion(planId, version.version, approver);
-    setVersion(result.version);
-  }, [planId, version]);
-
-  const handleWorkflowPublish = useCallback(async () => {
-    if (!planId || !version) return;
-    const result = await publishVersion(planId, version.version);
-    setVersion(result.version);
-  }, [planId, version]);
-
-  // Handler for updating the plan goal (title)
-  const handleGoalUpdate = useCallback(
-    async (newGoal: string) => {
-      if (!planId || !version) return;
-      const result = await updatePlan(planId, { goal: newGoal });
-      setVersion(result.version);
-    },
-    [planId, version]
-  );
-
-  // Get comments for a specific step
-  const getStepComments = useCallback(
-    (stepId: string): Comment[] => {
-      return comments.filter((c) => c.step_id === stepId);
-    },
-    [comments]
-  );
-
-  // Get unresolved comment count for a step
-  const getUnresolvedCount = useCallback(
-    (stepId: string): number => {
-      return comments.filter((c) => c.step_id === stepId && !c.resolved).length;
-    },
-    [comments]
-  );
-
-  // Get the step for the comment panel
-  const commentStep = commentStepId
-    ? version?.steps.find((s) => s.step_id === commentStepId)
-    : null;
-
-  // Keyboard shortcut: Cmd+/ (or Ctrl+/) toggles chat panel
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
-        e.preventDefault();
-        if (activePanel === 'chat') {
-          closeActivePanel();
-        } else {
-          openChatPanel();
-        }
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activePanel, openChatPanel, closeActivePanel]);
+  // Active tab detection based on URL
+  const activeTab = location.pathname.endsWith('/decisions')
+    ? 'decisions'
+    : location.pathname.endsWith('/understanding')
+      ? 'understanding'
+      : location.pathname.endsWith('/context')
+        ? 'context'
+        : 'plan';
 
   if (loading) {
     return (
@@ -417,260 +87,55 @@ export function PlanEditorPage() {
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex overflow-hidden">
       {/* Main content area - higher z-index so popovers appear above sidebar */}
-      <div className="flex-1 min-w-0 overflow-auto relative z-10">
+      <div className="flex-1 min-w-0 overflow-y-auto relative z-10">
         {/* Header */}
-        <div className="border-b border-border-subtle bg-bg-card">
-          <div className="px-6 py-4">
-          {/* Breadcrumb row */}
-          <PlanBreadcrumb parents={parents} currentGoal={version.summary.goal} />
+        <PlanEditorHeader activeTab={activeTab} />
 
-          {/* Tab navigation */}
-          <div className="flex items-center gap-2 mt-3 mb-1 border-b border-border-subtle pb-3">
-            <Link
-              to={`/plans/${planId}`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === `/plans/${planId}`
-                  ? 'bg-bg-tertiary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-              }`}
-            >
-              <DocumentIcon size="sm" />
-              <span>Plan</span>
-            </Link>
-            <Link
-              to={`/plans/${planId}/decisions`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === `/plans/${planId}/decisions`
-                  ? 'bg-bg-tertiary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-              }`}
-            >
-              <DecisionsIcon size="sm" />
-              <span>Decisions</span>
-            </Link>
+        {/* Content - conditionally render based on active tab */}
+        {activeTab === 'plan' && <PlanTabContent />}
+
+        {/* Understanding tab content */}
+        {activeTab === 'understanding' && (
+          <div className="px-6 py-6 space-y-6 overflow-auto">
+            <UnderstandingTab
+              understanding={version.understanding}
+              isEditable={version.status === 'draft'}
+            />
           </div>
+        )}
 
-          {/* Main header: 2-column layout */}
-          <div className="mt-4 flex gap-8">
-            {/* Left column: Title and metadata */}
-            <div className="flex-1 min-w-0">
-              <EditableText
-                value={version.summary.goal || ''}
-                onSave={handleGoalUpdate}
-                placeholder="Enter plan goal..."
-                disabled={version.status !== 'draft'}
-                as="h1"
-                className="text-2xl font-semibold text-text-primary"
-              />
-              {version.summary.context && (
-                <p className="mt-2 text-sm text-text-secondary line-clamp-2">
-                  {version.summary.context}
-                </p>
-              )}
-              <div className="flex items-center gap-3 mt-2 text-sm text-text-muted">
-                <span>Version {version.version}</span>
-                {version.submitted_at && (
-                  <>
-                    <span className="text-text-dim">•</span>
-                    <span>Submitted for review</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Right column: Status and actions */}
-            <div className="flex-shrink-0 w-72">
-              <WorkflowActions
-                version={version}
-                onSubmit={handleWorkflowSubmit}
-                onApprove={handleWorkflowApprove}
-                onPublish={handleWorkflowPublish}
-              />
-            </div>
+        {/* Context tab content */}
+        {activeTab === 'context' && (
+          <div className="px-6 py-6 space-y-6 overflow-auto">
+            <ContextTab
+              planId={plan.plan_id}
+              context={version.context}
+              isEditable={version.status === 'draft'}
+              onContextUpdate={() => {
+                // This updates the version directly via the ContextTab's internal logic
+                // The context already handles version updates via the API
+              }}
+            />
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Content */}
-      <div className="px-6 py-6 space-y-6">
-        {/* Steps section */}
-        <div className="bg-bg-tertiary rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-text-primary">
-              Steps ({version.steps.length})
-            </h2>
-            {version.steps.length > 0 && (
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
-            )}
-          </div>
+        {/* Decisions tab content */}
+        {activeTab === 'decisions' && <DecisionsTabContent />}
 
-          {version.steps.length === 0 ? (
-            <div className="text-center py-12 text-text-muted">
-              No steps yet. Add steps to define the work needed to achieve your goal.
-            </div>
-          ) : (
-            <div ref={stepsContainerRef} className="relative pl-10 pr-10">
-              {/* Left/right 40px gutters for dependency lines */}
-              {viewMode === 'list' ? (
-                <div className="space-y-2">
-                  {version.steps.map((step) => {
-                    const hasSubPlan = !!step.sub_plan_id;
-                    const isExpanded = expandedStepId === step.step_id;
-                    const isSelected = selectedStep?.step_id === step.step_id;
-                    const isEditable = version.status === 'draft';
-                    const unresolvedComments = getUnresolvedCount(step.step_id);
-
-                    // Sub-plan steps render as links
-                    if (hasSubPlan) {
-                      const newParents: ParentPlanInfo[] = [
-                        ...parents,
-                        { plan_id: plan.plan_id, goal: version.summary.goal },
-                      ];
-
-                      return (
-                        <div
-                          key={step.step_id}
-                          data-step-id={step.step_id}
-                          className="bg-bg-card border border-border-subtle rounded-lg overflow-hidden hover:border-border-light transition-colors"
-                        >
-                          <Link
-                            to={`/plans/${step.sub_plan_id}`}
-                            className="block p-4"
-                            state={{ parents: newParents }}
-                            aria-label={`Navigate to sub-plan: ${step.title}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium text-text-primary">{step.title}</span>
-                              {step.scope && (
-                                <span className="text-xs px-2 py-0.5 bg-bg-tertiary text-text-muted rounded">
-                                  {step.scope}
-                                </span>
-                              )}
-                              <Badge variant="info">Sub-plan</Badge>
-                            </div>
-                          </Link>
-                        </div>
-                      );
-                    }
-
-                    // Regular steps use StepEditor
-                    return (
-                      <div
-                        key={step.step_id}
-                        data-step-id={step.step_id}
-                        className={`rounded-lg transition-colors ${
-                          isSelected ? 'ring-1 ring-accent-cyan' : ''
-                        }`}
-                        onClick={(e) => {
-                          // Don't toggle selection if clicking interactive elements (buttons, inputs, etc.)
-                          const target = e.target as HTMLElement;
-                          const isInteractive = target.closest('button, input, select, textarea, a, [role="button"]');
-                          if (!isInteractive) {
-                            setSelectedStep(isSelected ? undefined : step);
-                          }
-                        }}
-                        onMouseEnter={() => setHoveredStepId(step.step_id)}
-                        onMouseLeave={() => setHoveredStepId(null)}
-                      >
-                        <StepEditor
-                          step={step}
-                          allSteps={version.steps}
-                          onUpdate={handleStepUpdate}
-                          onDelete={handleStepDelete}
-                          disabled={!isEditable}
-                          isExpanded={isExpanded}
-                          onToggleExpand={() =>
-                            setExpandedStepId(isExpanded ? null : step.step_id)
-                          }
-                          commentCount={unresolvedComments}
-                          onOpenComments={openCommentsPanel}
-                          onIndicatorHover={setHoveredDirection}
-                          onScrollToStep={handleScrollToStep}
-                          isHovered={hoveredStepId === step.step_id}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <SwimlaneView
-                  steps={version.steps}
-                  onStepClick={(step) => setSelectedStep(step)}
-                  selectedStepId={selectedStep?.step_id}
-                  hoveredStepId={hoveredStepId ?? undefined}
-                  onStepHover={setHoveredStepId}
-                  onIndicatorHover={setHoveredDirection}
-                  onScrollToStep={handleScrollToStep}
-                />
-              )}
-              {/* Dependency lines only for list view - swimlane has its own cross-scope lines */}
-              {viewMode === 'list' && (
-                <DependencyLinesOverlay
-                  steps={version.steps}
-                  containerRef={stepsContainerRef}
-                  hoveredStepId={hoveredStepId}
-                  hoveredDirection={hoveredDirection}
-                  viewMode={viewMode}
-                />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Timestamps */}
-        <div className="flex items-center gap-6 text-sm text-text-muted">
-          <span>Created: {new Date(version.created_at).toLocaleString()}</span>
-          <span>Updated: {new Date(version.updated_at).toLocaleString()}</span>
-        </div>
-      </div>
-
-      {/* AI Chat Panel */}
-      <ChatPanel
-        isOpen={activePanel === 'chat'}
-        onClose={closeActivePanel}
-        version={version}
-        messages={aiChat.messages}
-        isLoading={aiChat.isLoading}
-        selectedStep={selectedStep}
-        connectionStatus={connectionStatus}
-        planStatus={version.status}
-        isConnecting={isConnecting}
-        connectError={localConnectError}
-        onConnect={connectToAgent}
-        onClearConnectError={clearConnectError}
-        onSendMessage={aiChat.sendMessage}
-        onApplySuggestion={aiChat.applySuggestion}
-        onDismissSuggestion={aiChat.dismissSuggestion}
-      />
-
-      {/* Comment Thread Panel */}
-      {activePanel === 'comments' && commentStep && (
-        <CommentThread
-          step={commentStep}
-          comments={getStepComments(commentStep.step_id)}
-          currentUser="User" // TODO: Get from auth context
-          onAddComment={handleAddComment}
-          onResolve={handleResolveComment}
-          onUnresolve={handleUnresolveComment}
-          onClose={closeActivePanel}
-        />
-      )}
-
-      {/* Panel toggle button (visible when panels closed and sidebar collapsed) */}
-      {activePanel === null && sidebarCollapsed && (
-        <div className="fixed bottom-6 right-6 z-40">
-          <button
-            className="p-4 bg-accent-cyan text-bg-deep rounded-full shadow-glow-cyan hover:bg-accent-cyan/90 transition-colors"
-            onClick={openChatPanel}
-            aria-label="Open AI Chat (Cmd+/)"
-            title="AI Chat (Cmd+/)"
-          >
-            <MessageIcon size="lg" />
-          </button>
-        </div>
-      )}
+        {/* Comment Thread Panel */}
+        {activePanel === 'comments' && commentStep && (
+          <CommentThread
+            step={commentStep}
+            comments={getStepComments(commentStep.step_id)}
+            currentUser={currentUser?.name || 'User'}
+            onAddComment={handleAddComment}
+            onResolve={handleResolveComment}
+            onUnresolve={handleUnresolveComment}
+            onClose={closeActivePanel}
+          />
+        )}
       </div>
 
       {/* Messaging Sidebar */}
@@ -678,8 +143,15 @@ export function PlanEditorPage() {
         planContext={planContext}
         isCollapsed={sidebarCollapsed}
         onCollapseChange={handleSidebarCollapseChange}
-        displayName="User"
       />
     </div>
+  );
+}
+
+export function PlanEditorPage() {
+  return (
+    <PlanEditorProvider>
+      <PlanEditorContent />
+    </PlanEditorProvider>
   );
 }

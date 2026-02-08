@@ -26,6 +26,10 @@ export { useBlocks } from './useBlocks';
 export { useUserSettings, shouldAutoCurate, isBlockVisible } from './useUserSettings';
 export type { UserSettings } from './useUserSettings';
 
+// Tend settings
+export { useSettings } from './useSettings';
+export type { TendSettings } from './useSettings';
+
 // Initiatives
 export { useInitiatives } from './useInitiatives';
 export type { Initiative } from './useInitiatives';
@@ -40,46 +44,24 @@ export type { Toast, ToastOptions, ToastVariant } from './useToast';
 
 // Project events
 export { useProjectEvents } from './useProjectEvents';
-export type { ProjectEvent } from './useProjectEvents';
 
 // Agent orchestration
 export { useAgentOrchestration } from './useAgentOrchestration';
-export type {
-  Agent,
-  AgentRole,
-  AgentState,
-  AgentOrchestrationState,
-  UseAgentOrchestrationResult,
-} from './useAgentOrchestration';
+export type { AgentRole, AgentState, AgentOrchestrationState, UseAgentOrchestrationResult } from './useAgentOrchestration';
+export type { Agent as OrchestrationAgent } from './useAgentOrchestration';
 
 // Question notifications
 export { useQuestionNotifications } from './useQuestionNotifications';
-export type {
-  Question,
-  QuestionNotification,
-  QuestionBlockingLevel,
-  QuestionStatus,
-} from './useQuestionNotifications';
-
-// Relay connection
-export { useRelayConnection } from './useRelayConnection';
-export type { UseRelayConnectionResult } from '@/types';
-
-// Theme
-export { useTheme } from './useTheme';
-
-// Settings
-export { useSettings } from './useSettings';
-export type { TendSettings } from './useSettings';
+export type { Question, QuestionNotification, QuestionPriority } from './useQuestionNotifications';
 
 // Question queue
-export { useQuestionQueue, questionToItem } from './useQuestionQueue';
-export type { ReplyItem, ReplyPriority, ReplyItemType } from './useQuestionQueue';
+export { useQuestionQueue } from './useQuestionQueue';
+export type { UseQuestionQueueReturn } from './useQuestionQueue';
 
-// Forge events
-export { useForgeEvents } from './useForgeEvents';
-export type { ForgeEvent, UseForgeEventsOptions } from './useForgeEvents';
+// Agent tabs
+export { useAgents } from './useAgents';
+export type { Agent as TabAgent } from './useAgents';
 
-// SSE reconnection
-export { useSSEReconnect } from './useSSEReconnect';
-export type { UseSSEReconnectOptions, UseSSEReconnectReturn } from './useSSEReconnect';
+// Plan steps
+export { usePlanSteps } from './usePlanSteps';
+export type { Step, UsePlanStepsReturn } from './usePlanSteps';

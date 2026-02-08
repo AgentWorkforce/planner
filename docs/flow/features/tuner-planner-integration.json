@@ -1,0 +1,38 @@
+{
+  "title": "Planner Integration",
+  "summary": {
+    "goal": "Wire Planner to read decomposition config from Tuner",
+    "acceptance_criteria": [
+      {
+        "id": "pi1",
+        "description": "Planner reads PlannerConfig on startup"
+      },
+      {
+        "id": "pi2",
+        "description": "Planner refreshes config periodically"
+      },
+      {
+        "id": "pi3",
+        "description": "Complexity estimation uses tuner-provided weights"
+      },
+      {
+        "id": "pi4",
+        "description": "Language tier multipliers applied to step estimates"
+      },
+      {
+        "id": "pi5",
+        "description": "Graceful fallback to defaults if Tuner unavailable"
+      }
+    ]
+  },
+  "feature_id": "tuner-planner-integration",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-api",
+    "tuner-config-writer"
+  ]
+}

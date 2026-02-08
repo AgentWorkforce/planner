@@ -1,9 +1,7 @@
-/**
- * Sheets - Slide-in panels for detailed views
- */
-
 export { SheetContainer } from './SheetContainer';
-export type { SheetContainerProps } from './SheetContainer';
-
 export { StepSheet } from './StepSheet';
+export { EditableText } from './EditableText';
+export { EditableTextarea } from './EditableTextarea';
+
+export type { SheetContainerProps } from './SheetContainer';
 export type { StepSheetProps } from './StepSheet';

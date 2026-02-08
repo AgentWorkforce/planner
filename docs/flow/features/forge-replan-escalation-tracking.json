@@ -1,0 +1,67 @@
+{
+  "feature_id": "forge-replan-escalation-tracking",
+  "title": "Replan & Escalation Count Tracking",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "forge-dot-enhancements",
+  "component": "forge-core",
+  "dependencies": ["forge-retry-ladder", "forge-confidence-handling"],
+
+  "summary": {
+    "goal": "Wire replan_count and escalation_count in RunOutcomeEmission to actual RunService counters instead of hardcoded 0. The TaskFailureHandler already implements a recovery ladder (retry → revise → rollback → branch → escalate → skip) and ReplanConfig exists with cascade failure thresholds, but neither tracks counts that flow to the outcome emission. These counts are critical for Tuner's drift detection — they indicate run health and recovery patterns.",
+    "acceptance_criteria": [
+      { "id": "ret-ac1", "description": "escalation_count increments each time TaskFailureHandler escalates a task (RecoveryStrategy.Escalate)" },
+      { "id": "ret-ac2", "description": "replan_count increments each time a replan is triggered (cascade failure threshold exceeded per ReplanConfig)" },
+      { "id": "ret-ac3", "description": "Counts are per-run and persisted (survive server restart via checkpoint)" },
+      { "id": "ret-ac4", "description": "RunOutcomeEmission.replan_count reflects actual count (not hardcoded 0)" },
+      { "id": "ret-ac5", "description": "RunOutcomeEmission.escalation_count reflects actual count (not hardcoded 0)" },
+      { "id": "ret-ac6", "description": "Counts are available in run detail API response for observability" },
+      { "id": "ret-ac7", "description": "Tuner drift detection can use non-zero replan/escalation counts as health signals" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "RunOutcomeEmission in run-service.ts has replan_count and escalation_count fields (recently added)",
+        "Orchestrator finalizeRun() and failRun() set both to 0 with TODO comments",
+        "TaskFailureHandler in recovery.ts implements recovery ladder: retry → revise → rollback → branch → escalate → skip",
+        "RecoveryStrategy.Escalate exists but doesn't increment a counter — it creates a gate",
+        "ReplanConfig in types.ts has on_cascade_failure (bool) and threshold_blocked_tasks (default 3)",
+        "No replan logic is actually triggered yet — the config exists but cascade detection doesn't call anything",
+        "RunService tracks state per-run but no counter fields for replans/escalations",
+        "Checkpoint system exists for durability — counts should be included in checkpoint snapshots"
+      ],
+      "patterns": [
+        "Counter stored on Run entity or in RunService's per-run state Map",
+        "Increment at decision point in TaskFailureHandler (escalation) and RunService (replan)",
+        "Flow to outcome emission in finalizeRun/failRun"
+      ],
+      "keywords": ["replan", "escalation", "recovery ladder", "cascade failure", "drift detection"],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "hardcoded_locations": [
+        "packages/forge-core/src/services/orchestrator.ts — finalizeRun(): replan_count: 0",
+        "packages/forge-core/src/services/orchestrator.ts — failRun(): replan_count: 0"
+      ],
+      "recovery_ladder_location": "packages/forge-core/src/services/recovery.ts — TaskFailureHandler",
+      "replan_config_location": "packages/forge-core/src/domain/types.ts — ReplanConfigSchema",
+      "counter_storage_options": {
+        "option_a": "Add replan_count/escalation_count columns to runs table",
+        "option_b": "Track in RunService per-run state Map (lost on restart unless checkpointed)",
+        "option_c": "Derive from trajectory events (count events of type escalation/replan)"
+      },
+      "recommended": "option_a (explicit columns) for simplicity and queryability"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": []
+  }
+}

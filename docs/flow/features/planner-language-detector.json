@@ -1,0 +1,38 @@
+{
+  "title": "Language/Domain Tier Detector",
+  "summary": {
+    "goal": "Detect programming language tier and domain familiarity from step context",
+    "acceptance_criteria": [
+      {
+        "id": "ld1",
+        "description": "detectLanguageTier(step) returns tier: 's' | 'a' | 'b' | 'c' | 'd'"
+      },
+      {
+        "id": "ld2",
+        "description": "Detection uses: scope field, file extensions mentioned, keywords in description"
+      },
+      {
+        "id": "ld3",
+        "description": "Language mapping covers all Tier S-D languages from research"
+      },
+      {
+        "id": "ld4",
+        "description": "Domain familiarity adjustment: +25% for mobile, +100% for embedded, etc."
+      },
+      {
+        "id": "ld5",
+        "description": "Unknown language defaults to Tier A (conservative estimate)"
+      },
+      {
+        "id": "ld6",
+        "description": "Tier stored on step as language_tier field"
+      }
+    ]
+  },
+  "feature_id": "planner-language-detector",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "dot-planner-enhancements",
+  "component": "planner-core"
+}

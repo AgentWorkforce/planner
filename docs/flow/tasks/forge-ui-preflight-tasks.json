@@ -1,0 +1,475 @@
+{
+  "feature_id": "forge-ui-preflight",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fpf-s1-task",
+      "step_id": "fpf-s1",
+      "title": "Create preflight API module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/ for API patterns",
+            "Review context.architect.cross_service_api for cross-service requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "getPlanForPreflight(planId, version?) returns ForgePlan with summary and steps",
+            "validatePreflight(planId) returns { checks: PreflightCheck[], valid: boolean }",
+            "createRun(planId, options?: { environment?: string }) returns { run_id, status }",
+            "PreflightCheck type: { id, name, status: 'pass' | 'fail' | 'warning', message? }",
+            "PLANNER_API_BASE configurable via env var, default /api",
+            "Error handling for Planner unavailable: 'Cannot connect to Planner service'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API functions with mock backend",
+            "Verify error handling for Planner unavailable"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for preflight API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s1b-task",
+      "step_id": "fpf-s1b",
+      "title": "Configure Vite proxy for Planner API",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/vite.config.ts for proxy patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "vite.config.ts proxy /api to Planner backend (default localhost:3000)",
+            "Separate proxy target from /forge-api (which goes to Forge backend)",
+            "Document CORS requirements for production deployment"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test /api proxy routes to Planner",
+            "Test /forge-api proxy routes to Forge"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with both backends"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s1b"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s2-task",
+      "step_id": "fpf-s2",
+      "title": "Create PlanSummaryCard component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/PlanCard.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Plan goal as title",
+            "Stats row: X steps, Y scopes, Z gates",
+            "Estimated duration (if available)",
+            "Plan version badge"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test card rendering",
+            "Test with various plan data"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s3-task",
+      "step_id": "fpf-s3",
+      "title": "Create PreflightCheckItem component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review design system for check item patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Status icon: CheckIcon (pass), XIcon (fail), AlertTriangleIcon (warning)",
+            "Check name",
+            "Message shown for fail/warning status",
+            "Loading spinner while checking"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all status states",
+            "Test loading state"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s4-task",
+      "step_id": "fpf-s4",
+      "title": "Create PreflightChecklist component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/CollapsibleSection.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header: 'Pre-Flight Checks'",
+            "PreflightCheckItem for each check",
+            "Overall status: 'All checks passed' or 'N issues found'",
+            "Expand/collapse details for failed checks"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with all pass",
+            "Test with failures",
+            "Test expand/collapse"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s5-task",
+      "step_id": "fpf-s5",
+      "title": "Create EnvironmentSelector component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review shadcn/ui Select component"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Dropdown with available environments (development, staging, production)",
+            "Default to development",
+            "Warning badge for production",
+            "Hidden if only one environment available"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test environment selection",
+            "Test production warning"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s6-task",
+      "step_id": "fpf-s6",
+      "title": "Create StepsPreview component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/SwimlaneView.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Collapsible list of steps grouped by scope",
+            "Step title with gate indicator if applicable",
+            "Dependency lines between steps (simplified)",
+            "Default collapsed, expandable per scope"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test step grouping",
+            "Test expand/collapse"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s7-task",
+      "step_id": "fpf-s7",
+      "title": "Create usePreflight hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/useAttentionPlans.ts",
+            "Understand cross-service error handling requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "usePreflight(planId) returns { plan, checks, isLoading, error, revalidate, plannerAvailable }",
+            "Fetches plan from Planner API",
+            "Runs preflight validation",
+            "isValid computed from checks",
+            "plannerAvailable: false if Planner API unreachable, shows fallback UI"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test data fetching",
+            "Test error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s8-task",
+      "step_id": "fpf-s8",
+      "title": "Implement PreflightPage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/pages/ for page patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header: 'Pre-Flight Check' with plan title",
+            "PlanSummaryCard at top",
+            "Two-column: PreflightChecklist (left), StepsPreview (right)",
+            "EnvironmentSelector above action buttons",
+            "Action bar: Cancel (secondary), Start Forging (primary)",
+            "Start Forging disabled if validation fails",
+            "If Planner unavailable: show error state with retry button"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all page states",
+            "Test responsive layout"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s9-task",
+      "step_id": "fpf-s9",
+      "title": "Implement run creation flow",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/WorkflowActions.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Confirmation dialog: 'Start forging this plan?'",
+            "Shows environment if not development",
+            "On confirm: createRun API call",
+            "Loading state on button during creation",
+            "On success: navigate to /forge/runs/:newRunId",
+            "On error: show error toast, stay on page"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test confirmation flow",
+            "Test success/error handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with backend"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s9"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fpf-s10-task",
+      "step_id": "fpf-s10",
+      "title": "Add navigation from runs list",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review frl-s6 Import Plan flow"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Import Plan modal (from frl-s6) navigates to /forge/preflight/:planId",
+            "URL includes plan version if specific version selected"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test navigation from runs list"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Navigation test"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fpf-s10"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 /**
- * Tend UI - Global Styles with Tailwind CSS v4
- * Mission Control Theme (matching relay-dashboard)
+ * Tend - Global Styles with Tailwind CSS v4
+ * Earth-tone Theme
  *
  * Theme colors are defined as CSS variables and referenced by Tailwind.
  * Uses system preference (prefers-color-scheme) by default.
@@ -25,57 +25,50 @@
 :root {
   color-scheme: light;
 
-  /* Background Colors */
-  --color-bg-deep: #f5f0e8;
-  --color-bg-primary: #ece7dd;
-  --color-bg-secondary: #e3ddd3;
-  --color-bg-tertiary: #d9d2c7;
-  --color-bg-card: #ffffff;
+  /* Backgrounds — warm, layered */
+  --color-bg-deep: #f5f0e8;          /* Warm sand */
+  --color-bg-primary: #ece7dd;       /* Parchment */
+  --color-bg-secondary: #e3ddd3;     /* Warm stone */
+  --color-bg-tertiary: #d9d2c7;      /* Deeper stone */
+  --color-bg-card: #ffffff;           /* Clean white cards */
   --color-bg-elevated: #ffffff;
-  --color-bg-hover: rgba(45, 42, 36, 0.04);
-  --color-bg-active: rgba(45, 42, 36, 0.08);
+  --color-bg-hover: rgba(74, 124, 89, 0.08);
+  --color-bg-active: rgba(74, 124, 89, 0.15);
+  --color-bg-input: #fcfbf8;         /* bg-deep 70% toward white */
 
-  /* Text Colors */
-  --color-text-primary: #2d2a24;
-  --color-text-secondary: #6b6560;
-  --color-text-muted: #9b9590;
+  /* Text — earth tones */
+  --color-text-primary: #2d2a24;     /* Rich brown-black */
+  --color-text-secondary: #6b6560;   /* Warm gray */
+  --color-text-muted: #9b9590;       /* Faded stone */
   --color-text-dim: #c5bfb8;
   --color-text-inverse: #ffffff;
 
   /* Border Colors */
-  --color-border-default: rgba(45, 42, 36, 0.15);
-  --color-border-subtle: rgba(45, 42, 36, 0.08);
-  --color-border-light: rgba(45, 42, 36, 0.15);
-  --color-border-medium: rgba(45, 42, 36, 0.2);
+  --color-border-default: rgba(107, 101, 96, 0.2);
+  --color-border-subtle: rgba(107, 101, 96, 0.1);
+  --color-border-light: rgba(107, 101, 96, 0.15);
+  --color-border-medium: rgba(107, 101, 96, 0.25);
 
-  /* Accent Colors - Earth tones (moss and clay) */
-  --color-accent-cyan: #4a7c59;
-  --color-accent-orange: #c4703e;
-  --color-accent-purple: #7c6b5e;
-  --color-accent-green: #4a7c59;
-  --color-accent-hover: #3d6648;
-  --color-accent-light: rgba(74, 124, 89, 0.15);
+  /* Accents — moss and clay */
+  --color-accent-primary: #4a7c59;   /* Moss green */
+  --color-accent-secondary: #c4703e; /* Clay/terracotta */
+  --color-accent-tertiary: #7c6b5e;  /* Warm brown */
+  --color-accent-hover: #3d6748;
+  --color-accent-light: rgba(74, 124, 89, 0.12);
 
-  /* Status Colors */
-  --color-success: #4a7c59;
-  --color-success-light: rgba(74, 124, 89, 0.15);
-  --color-warning: #c4703e;
-  --color-warning-light: rgba(196, 112, 62, 0.15);
-  --color-error: #b54a3a;
-  --color-error-light: rgba(181, 74, 58, 0.15);
-
-  /* Earth-tone semantic colors (for agent status bar and phase badges) */
-  --color-moss: #4a7c59;        /* working state / ideation phase - green */
-  --color-moss-foreground: #ffffff;
-  --color-brick: #b54a3a;       /* blocked/error state / execution phase - red */
-  --color-brick-foreground: #ffffff;
-  --color-clay: #c4703e;        /* needs_input state / planning phase - yellow/orange */
-  --color-clay-foreground: #ffffff;
+  /* Status */
+  --color-success: #4a7c59;          /* Moss */
+  --color-success-light: rgba(74, 124, 89, 0.12);
+  --color-warning: #c4703e;          /* Clay */
+  --color-warning-light: rgba(196, 112, 62, 0.12);
+  --color-error: #b54a3a;            /* Brick red */
+  --color-error-light: rgba(181, 74, 58, 0.12);
+  --color-info: #5a7a8a;             /* Slate blue */
 
   /* Sidebar Colors */
   --color-sidebar-bg: #ece7dd;
-  --color-sidebar-border: rgba(45, 42, 36, 0.08);
-  --color-sidebar-hover: rgba(45, 42, 36, 0.06);
+  --color-sidebar-border: rgba(107, 101, 96, 0.15);
+  --color-sidebar-hover: rgba(74, 124, 89, 0.08);
 
   /* Layout Dimensions */
   --sidebar-width: 15rem;
@@ -84,8 +77,8 @@
   --specialists-panel-width: 18rem;
 
   /* Scrollbar */
-  --scrollbar-thumb: rgba(45, 42, 36, 0.3);
-  --scrollbar-thumb-hover: rgba(45, 42, 36, 0.4);
+  --scrollbar-thumb: rgba(107, 101, 96, 0.25);
+  --scrollbar-thumb-hover: rgba(107, 101, 96, 0.35);
 
   /* Selection */
   --selection-bg: rgba(74, 124, 89, 0.2);
@@ -99,35 +92,32 @@
   --sidebar-foreground: #2d2a24;
   --sidebar-primary: #4a7c59;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(45, 42, 36, 0.04);
+  --sidebar-accent: rgba(74, 124, 89, 0.08);
   --sidebar-accent-foreground: #2d2a24;
-  --sidebar-border: rgba(45, 42, 36, 0.08);
+  --sidebar-border: rgba(107, 101, 96, 0.15);
   --sidebar-ring: #4a7c59;
 
-  /* Canvas Theme - Light (warm sand) */
+  /* Canvas Theme - Light (warm earth tones) */
   --canvas-bg: #f5f0e8;
   --canvas-bg-subtle: #ece7dd;
   --canvas-text-primary: #2d2a24;
-  --canvas-text-muted: #9b9590;
-  --canvas-card-bg: #ffffff;
-  --canvas-card-bg-hover: rgba(45, 42, 36, 0.04);
-  --block-draft: #fbf8f2;
-  --block-draft-border: #e3ddd3;
-  --block-curated: #fbf8f2;
+  --canvas-text-muted: #6b6560;
+  --block-draft: #ffffff;
+  --block-draft-border: #d9d2c7;
+  --block-curated: #ffffff;
   --block-curated-border: #4a7c59;
   --canvas-accent: #4a7c59;
-  --canvas-accent-light: rgba(74, 124, 89, 0.15);
-  --canvas-accent-rgb: 74, 124, 89;
+  --canvas-accent-light: #e8f0eb;
 
-  /* Session progress colors (light mode - subtle on warm cream) */
-  --session-new-bg: rgba(100, 116, 139, 0.12);
-  --session-new-border: rgba(100, 116, 139, 0.28);
-  --session-developing-bg: rgba(180, 100, 20, 0.1);
-  --session-developing-border: rgba(180, 100, 20, 0.25);
-  --session-maturing-bg: rgba(20, 140, 130, 0.1);
-  --session-maturing-border: rgba(20, 140, 130, 0.25);
-  --session-ready-bg: rgba(34, 140, 70, 0.1);
-  --session-ready-border: rgba(34, 140, 70, 0.25);
+  /* Session progress colors (light mode - earth tones) */
+  --session-new-bg: rgba(90, 122, 138, 0.15);
+  --session-new-border: rgba(90, 122, 138, 0.3);
+  --session-developing-bg: rgba(196, 112, 62, 0.12);
+  --session-developing-border: rgba(196, 112, 62, 0.28);
+  --session-maturing-bg: rgba(74, 124, 89, 0.12);
+  --session-maturing-border: rgba(74, 124, 89, 0.28);
+  --session-ready-bg: rgba(74, 124, 89, 0.18);
+  --session-ready-border: rgba(74, 124, 89, 0.35);
 }
 
 /**
@@ -138,18 +128,19 @@
   :root {
     color-scheme: dark;
 
-    /* Background Colors - Warm charcoal */
-    --color-bg-deep: #1a1816;
-    --color-bg-primary: #201e1a;
+    /* Backgrounds — dark earth */
+    --color-bg-deep: #1a1816;          /* Warm charcoal */
+    --color-bg-primary: #201e1a;       /* Dark earth */
     --color-bg-secondary: #282520;
     --color-bg-tertiary: #302c26;
     --color-bg-card: #302c26;
     --color-bg-elevated: #383430;
-    --color-bg-hover: rgba(232, 226, 216, 0.04);
-    --color-bg-active: rgba(232, 226, 216, 0.08);
+    --color-bg-hover: rgba(90, 156, 106, 0.08);
+    --color-bg-active: rgba(90, 156, 106, 0.15);
+    --color-bg-input: #3c3b39;         /* bg-deep ~15% toward white */
 
-    /* Text Colors - Warm off-whites */
-    --color-text-primary: #e8e2d8;
+    /* Text — warm off-white */
+    --color-text-primary: #e8e2d8;     /* Warm off-white */
     --color-text-secondary: #a09888;
     --color-text-muted: #706860;
     --color-text-dim: #504840;
@@ -158,85 +149,78 @@
     /* Border Colors */
     --color-border-default: rgba(232, 226, 216, 0.15);
     --color-border-subtle: rgba(232, 226, 216, 0.08);
-    --color-border-light: rgba(232, 226, 216, 0.15);
+    --color-border-light: rgba(232, 226, 216, 0.12);
     --color-border-medium: rgba(232, 226, 216, 0.2);
 
-    /* Accent Colors - Lighter earth tones for dark backgrounds */
-    --color-accent-cyan: #5a9c6a;
-    --color-accent-orange: #d4804e;
-    --color-accent-purple: #8c7b6e;
-    --color-accent-green: #5a9c6a;
-    --color-accent-hover: #4a8c5a;
+    /* Accents — brightened earth tones */
+    --color-accent-primary: #5a9c6a;
+    --color-accent-secondary: #d4804e;
+    --color-accent-tertiary: #8c7b6e;
+    --color-accent-hover: #6bb87c;
     --color-accent-light: rgba(90, 156, 106, 0.15);
 
-    /* Status Colors */
+    /* Status */
     --color-success: #5a9c6a;
     --color-success-light: rgba(90, 156, 106, 0.15);
     --color-warning: #d4804e;
     --color-warning-light: rgba(212, 128, 78, 0.15);
     --color-error: #c45a4a;
     --color-error-light: rgba(196, 90, 74, 0.15);
-
-    /* Earth-tone semantic colors (for agent status bar) - Lighter for dark mode */
-    --color-moss: #5a9c6a;        /* working state - green */
-    --color-brick: #c45a4a;       /* blocked/error state - red */
-    --color-clay: #d4804e;        /* needs_input state - yellow/orange */
+    --color-info: #6a8a9a;
 
     /* Sidebar Colors */
     --color-sidebar-bg: #201e1a;
-    --color-sidebar-border: rgba(232, 226, 216, 0.08);
-    --color-sidebar-hover: rgba(232, 226, 216, 0.06);
+    --color-sidebar-border: rgba(232, 226, 216, 0.12);
+    --color-sidebar-hover: rgba(90, 156, 106, 0.08);
 
     /* Layout Dimensions */
-    --sidebar-width: 16rem;
-    --sidebar-width-collapsed: 3.5rem;
+    --sidebar-width: 15rem;
+    --sidebar-width-collapsed: 4rem;
     --sidebar-transition-duration: 200ms;
     --specialists-panel-width: 18rem;
 
     /* Scrollbar */
-    --scrollbar-thumb: rgba(232, 226, 216, 0.25);
-    --scrollbar-thumb-hover: rgba(232, 226, 216, 0.35);
+    --scrollbar-thumb: rgba(232, 226, 216, 0.15);
+    --scrollbar-thumb-hover: rgba(232, 226, 216, 0.25);
 
     /* Selection */
-    --selection-bg: rgba(90, 156, 106, 0.25);
+    --selection-bg: rgba(90, 156, 106, 0.2);
     --selection-color: #5a9c6a;
 
     /* Focus */
     --focus-color: #5a9c6a;
 
-    /* Sidebar (shadcn/ui) - mapped to earth-tone dark theme */
+    /* Sidebar (shadcn/ui) - dark earth theme */
     --sidebar: #201e1a;
     --sidebar-foreground: #e8e2d8;
     --sidebar-primary: #5a9c6a;
     --sidebar-primary-foreground: #1a1816;
-    --sidebar-accent: rgba(232, 226, 216, 0.04);
+    --sidebar-accent: rgba(90, 156, 106, 0.08);
     --sidebar-accent-foreground: #e8e2d8;
-    --sidebar-border: rgba(232, 226, 216, 0.06);
+    --sidebar-border: rgba(232, 226, 216, 0.12);
     --sidebar-ring: #5a9c6a;
 
-    /* Canvas Theme - Dark (warm earth tones) */
+    /* Canvas Theme - Dark (warm earth) */
     --canvas-bg: #1a1816;
     --canvas-bg-subtle: #201e1a;
     --canvas-text-primary: #e8e2d8;
-    --canvas-text-muted: #706860;
-    --canvas-card-bg: #302c26;
-    --canvas-card-bg-hover: rgba(232, 226, 216, 0.04);
-    --block-draft: #2d2a24;
-    --block-draft-border: #3d3830;
-    --block-curated: #2d2a24;
+    --canvas-text-muted: #a09888;
+    --block-draft: #282520;
+    --block-draft-border: #383430;
+    --block-curated: #282520;
     --block-curated-border: #5a9c6a;
     --canvas-accent: #5a9c6a;
-    --canvas-accent-light: rgba(90, 156, 106, 0.15);
+    --canvas-accent-light: #1e2a1e;
 
     /* Session progress colors (dark mode - earth tones) */
-    --session-new-bg: rgba(100, 116, 139, 0.3);
-    --session-new-border: rgba(100, 116, 139, 0.5);
-    --session-developing-bg: rgba(212, 128, 78, 0.25);
-    --session-developing-border: rgba(212, 128, 78, 0.45);
-    --session-maturing-bg: rgba(90, 156, 106, 0.25);
-    --session-maturing-border: rgba(90, 156, 106, 0.45);
-    --session-ready-bg: rgba(90, 156, 106, 0.3);
-    --session-ready-border: rgba(90, 156, 106, 0.5);
+    --session-new-bg: rgba(106, 138, 154, 0.25);
+    --session-new-border: rgba(106, 138, 154, 0.4);
+    --session-developing-bg: rgba(212, 128, 78, 0.2);
+    --session-developing-border: rgba(212, 128, 78, 0.35);
+    --session-maturing-bg: rgba(90, 156, 106, 0.2);
+    --session-maturing-border: rgba(90, 156, 106, 0.35);
+    --session-ready-bg: rgba(90, 156, 106, 0.28);
+    --session-ready-border: rgba(90, 156, 106, 0.45);
   }
 }
 
@@ -247,220 +231,217 @@
 html.theme-light {
   color-scheme: light;
 
-  --color-bg-deep: #f5f0e8;
-  --color-bg-primary: #ece7dd;
-  --color-bg-secondary: #e3ddd3;
-  --color-bg-tertiary: #d9d2c7;
-  --color-bg-card: #ffffff;
+  /* Backgrounds — warm, layered */
+  --color-bg-deep: #f5f0e8;          /* Warm sand */
+  --color-bg-primary: #ece7dd;       /* Parchment */
+  --color-bg-secondary: #e3ddd3;     /* Warm stone */
+  --color-bg-tertiary: #d9d2c7;      /* Deeper stone */
+  --color-bg-card: #ffffff;           /* Clean white cards */
   --color-bg-elevated: #ffffff;
-  --color-bg-hover: rgba(45, 42, 36, 0.04);
-  --color-bg-active: rgba(45, 42, 36, 0.08);
+  --color-bg-hover: rgba(74, 124, 89, 0.08);
+  --color-bg-active: rgba(74, 124, 89, 0.15);
+  --color-bg-input: #fcfbf8;         /* bg-deep 70% toward white */
 
-  --color-text-primary: #2d2a24;
-  --color-text-secondary: #6b6560;
-  --color-text-muted: #9b9590;
+  /* Text — earth tones */
+  --color-text-primary: #2d2a24;     /* Rich brown-black */
+  --color-text-secondary: #6b6560;   /* Warm gray */
+  --color-text-muted: #9b9590;       /* Faded stone */
   --color-text-dim: #c5bfb8;
   --color-text-inverse: #ffffff;
 
-  --color-border-default: rgba(45, 42, 36, 0.15);
-  --color-border-subtle: rgba(45, 42, 36, 0.08);
-  --color-border-light: rgba(45, 42, 36, 0.15);
-  --color-border-medium: rgba(45, 42, 36, 0.2);
+  /* Border Colors */
+  --color-border-default: rgba(107, 101, 96, 0.2);
+  --color-border-subtle: rgba(107, 101, 96, 0.1);
+  --color-border-light: rgba(107, 101, 96, 0.15);
+  --color-border-medium: rgba(107, 101, 96, 0.25);
 
-  --color-accent-cyan: #4a7c59;
-  --color-accent-orange: #c4703e;
-  --color-accent-purple: #7c6b5e;
-  --color-accent-green: #4a7c59;
-  --color-accent-hover: #3d6648;
-  --color-accent-light: rgba(74, 124, 89, 0.15);
+  /* Accents — moss and clay */
+  --color-accent-primary: #4a7c59;   /* Moss green */
+  --color-accent-secondary: #c4703e; /* Clay/terracotta */
+  --color-accent-tertiary: #7c6b5e;  /* Warm brown */
+  --color-accent-hover: #3d6748;
+  --color-accent-light: rgba(74, 124, 89, 0.12);
 
-  --color-success: #4a7c59;
-  --color-success-light: rgba(74, 124, 89, 0.15);
-  --color-warning: #c4703e;
-  --color-warning-light: rgba(196, 112, 62, 0.15);
-  --color-error: #b54a3a;
-  --color-error-light: rgba(181, 74, 58, 0.15);
+  /* Status */
+  --color-success: #4a7c59;          /* Moss */
+  --color-success-light: rgba(74, 124, 89, 0.12);
+  --color-warning: #c4703e;          /* Clay */
+  --color-warning-light: rgba(196, 112, 62, 0.12);
+  --color-error: #b54a3a;            /* Brick red */
+  --color-error-light: rgba(181, 74, 58, 0.12);
+  --color-info: #5a7a8a;             /* Slate blue */
 
+  /* Sidebar Colors */
   --color-sidebar-bg: #ece7dd;
-  --color-sidebar-border: rgba(45, 42, 36, 0.08);
-  --color-sidebar-hover: rgba(45, 42, 36, 0.06);
+  --color-sidebar-border: rgba(107, 101, 96, 0.15);
+  --color-sidebar-hover: rgba(74, 124, 89, 0.08);
 
+  /* Layout Dimensions */
   --sidebar-width: 15rem;
   --sidebar-width-collapsed: 4rem;
   --sidebar-transition-duration: 200ms;
   --specialists-panel-width: 18rem;
 
-  --scrollbar-thumb: rgba(45, 42, 36, 0.3);
-  --scrollbar-thumb-hover: rgba(45, 42, 36, 0.4);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(107, 101, 96, 0.25);
+  --scrollbar-thumb-hover: rgba(107, 101, 96, 0.35);
 
+  /* Selection */
   --selection-bg: rgba(74, 124, 89, 0.2);
   --selection-color: #4a7c59;
 
+  /* Focus */
   --focus-color: #4a7c59;
 
+  /* Sidebar (shadcn/ui) - mapped to earth-tone theme */
   --sidebar: #ece7dd;
   --sidebar-foreground: #2d2a24;
   --sidebar-primary: #4a7c59;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(45, 42, 36, 0.04);
+  --sidebar-accent: rgba(74, 124, 89, 0.08);
   --sidebar-accent-foreground: #2d2a24;
-  --sidebar-border: rgba(45, 42, 36, 0.08);
+  --sidebar-border: rgba(107, 101, 96, 0.15);
   --sidebar-ring: #4a7c59;
 
-  /* Canvas Theme - Light (warm sand) */
+  /* Canvas Theme - Light (warm earth tones) */
   --canvas-bg: #f5f0e8;
   --canvas-bg-subtle: #ece7dd;
   --canvas-text-primary: #2d2a24;
-  --canvas-text-muted: #9b9590;
-  --canvas-card-bg: #ffffff;
-  --canvas-card-bg-hover: rgba(45, 42, 36, 0.04);
-  --block-draft: #fbf8f2;
-  --block-draft-border: #e3ddd3;
-  --block-curated: #fbf8f2;
+  --canvas-text-muted: #6b6560;
+  --block-draft: #ffffff;
+  --block-draft-border: #d9d2c7;
+  --block-curated: #ffffff;
   --block-curated-border: #4a7c59;
   --canvas-accent: #4a7c59;
-  --canvas-accent-light: rgba(74, 124, 89, 0.15);
-  --canvas-accent-rgb: 74, 124, 89;
+  --canvas-accent-light: #e8f0eb;
 
-  /* Session progress colors (light mode - subtle on warm cream) */
-  --session-new-bg: rgba(100, 116, 139, 0.12);
-  --session-new-border: rgba(100, 116, 139, 0.28);
-  --session-developing-bg: rgba(180, 100, 20, 0.1);
-  --session-developing-border: rgba(180, 100, 20, 0.25);
-  --session-maturing-bg: rgba(20, 140, 130, 0.1);
-  --session-maturing-border: rgba(20, 140, 130, 0.25);
-  --session-ready-bg: rgba(34, 140, 70, 0.1);
-  --session-ready-border: rgba(34, 140, 70, 0.25);
+  /* Session progress colors (light mode - earth tones) */
+  --session-new-bg: rgba(90, 122, 138, 0.15);
+  --session-new-border: rgba(90, 122, 138, 0.3);
+  --session-developing-bg: rgba(196, 112, 62, 0.12);
+  --session-developing-border: rgba(196, 112, 62, 0.28);
+  --session-maturing-bg: rgba(74, 124, 89, 0.12);
+  --session-maturing-border: rgba(74, 124, 89, 0.28);
+  --session-ready-bg: rgba(74, 124, 89, 0.18);
+  --session-ready-border: rgba(74, 124, 89, 0.35);
 }
 
 html.theme-dark {
   color-scheme: dark;
 
-  --color-bg-deep: #1a1816;
-  --color-bg-primary: #201e1a;
+  /* Backgrounds — dark earth */
+  --color-bg-deep: #1a1816;          /* Warm charcoal */
+  --color-bg-primary: #201e1a;       /* Dark earth */
   --color-bg-secondary: #282520;
   --color-bg-tertiary: #302c26;
   --color-bg-card: #302c26;
   --color-bg-elevated: #383430;
-  --color-bg-hover: rgba(232, 226, 216, 0.04);
-  --color-bg-active: rgba(232, 226, 216, 0.08);
+  --color-bg-hover: rgba(90, 156, 106, 0.08);
+  --color-bg-active: rgba(90, 156, 106, 0.15);
+  --color-bg-input: #3c3b39;         /* bg-deep ~15% toward white */
 
-  --color-text-primary: #e8e2d8;
+  /* Text — warm off-white */
+  --color-text-primary: #e8e2d8;     /* Warm off-white */
   --color-text-secondary: #a09888;
   --color-text-muted: #706860;
   --color-text-dim: #504840;
   --color-text-inverse: #1a1816;
 
+  /* Border Colors */
   --color-border-default: rgba(232, 226, 216, 0.15);
   --color-border-subtle: rgba(232, 226, 216, 0.08);
-  --color-border-light: rgba(232, 226, 216, 0.15);
+  --color-border-light: rgba(232, 226, 216, 0.12);
   --color-border-medium: rgba(232, 226, 216, 0.2);
 
-  --color-accent-cyan: #5a9c6a;
-  --color-accent-orange: #d4804e;
-  --color-accent-purple: #8c7b6e;
-  --color-accent-green: #5a9c6a;
-  --color-accent-hover: #4a8c5a;
+  /* Accents — brightened earth tones */
+  --color-accent-primary: #5a9c6a;
+  --color-accent-secondary: #d4804e;
+  --color-accent-tertiary: #8c7b6e;
+  --color-accent-hover: #6bb87c;
   --color-accent-light: rgba(90, 156, 106, 0.15);
 
+  /* Status */
   --color-success: #5a9c6a;
   --color-success-light: rgba(90, 156, 106, 0.15);
   --color-warning: #d4804e;
   --color-warning-light: rgba(212, 128, 78, 0.15);
   --color-error: #c45a4a;
   --color-error-light: rgba(196, 90, 74, 0.15);
+  --color-info: #6a8a9a;
 
+  /* Sidebar Colors */
   --color-sidebar-bg: #201e1a;
-  --color-sidebar-border: rgba(232, 226, 216, 0.08);
-  --color-sidebar-hover: rgba(232, 226, 216, 0.06);
+  --color-sidebar-border: rgba(232, 226, 216, 0.12);
+  --color-sidebar-hover: rgba(90, 156, 106, 0.08);
 
+  /* Layout Dimensions */
   --sidebar-width: 15rem;
   --sidebar-width-collapsed: 4rem;
   --sidebar-transition-duration: 200ms;
   --specialists-panel-width: 18rem;
 
-  --scrollbar-thumb: rgba(232, 226, 216, 0.25);
-  --scrollbar-thumb-hover: rgba(232, 226, 216, 0.35);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(232, 226, 216, 0.15);
+  --scrollbar-thumb-hover: rgba(232, 226, 216, 0.25);
 
-  --selection-bg: rgba(90, 156, 106, 0.25);
+  /* Selection */
+  --selection-bg: rgba(90, 156, 106, 0.2);
   --selection-color: #5a9c6a;
 
+  /* Focus */
   --focus-color: #5a9c6a;
 
+  /* Sidebar (shadcn/ui) - dark earth theme */
   --sidebar: #201e1a;
   --sidebar-foreground: #e8e2d8;
   --sidebar-primary: #5a9c6a;
   --sidebar-primary-foreground: #1a1816;
-  --sidebar-accent: rgba(232, 226, 216, 0.04);
+  --sidebar-accent: rgba(90, 156, 106, 0.08);
   --sidebar-accent-foreground: #e8e2d8;
-  --sidebar-border: rgba(232, 226, 216, 0.06);
+  --sidebar-border: rgba(232, 226, 216, 0.12);
   --sidebar-ring: #5a9c6a;
 
-  /* Canvas Theme - Dark (warm earth tones) */
+  /* Canvas Theme - Dark (warm earth) */
   --canvas-bg: #1a1816;
   --canvas-bg-subtle: #201e1a;
   --canvas-text-primary: #e8e2d8;
-  --canvas-text-muted: #706860;
-  --block-draft: #2d2a24;
-  --block-draft-border: #3d3830;
-  --block-curated: #2d2a24;
+  --canvas-text-muted: #a09888;
+  --block-draft: #282520;
+  --block-draft-border: #383430;
+  --block-curated: #282520;
   --block-curated-border: #5a9c6a;
   --canvas-accent: #5a9c6a;
-  --canvas-accent-light: rgba(90, 156, 106, 0.15);
+  --canvas-accent-light: #1e2a1e;
 
   /* Session progress colors (dark mode - earth tones) */
-  --session-new-bg: rgba(100, 116, 139, 0.3);
-  --session-new-border: rgba(100, 116, 139, 0.5);
-  --session-developing-bg: rgba(212, 128, 78, 0.25);
-  --session-developing-border: rgba(212, 128, 78, 0.45);
-  --session-maturing-bg: rgba(90, 156, 106, 0.25);
-  --session-maturing-border: rgba(90, 156, 106, 0.45);
-  --session-ready-bg: rgba(90, 156, 106, 0.3);
-  --session-ready-border: rgba(90, 156, 106, 0.5);
-}
-
-/* ===== Shorthand Variable Aliases ===== */
-/* For backward compatibility and convenience - map to canvas theme variables */
-:root,
-html.theme-light,
-html.theme-dark {
-  --text-primary: var(--canvas-text-primary);
-  --text-muted: var(--canvas-text-muted);
+  --session-new-bg: rgba(106, 138, 154, 0.25);
+  --session-new-border: rgba(106, 138, 154, 0.4);
+  --session-developing-bg: rgba(212, 128, 78, 0.2);
+  --session-developing-border: rgba(212, 128, 78, 0.35);
+  --session-maturing-bg: rgba(90, 156, 106, 0.2);
+  --session-maturing-border: rgba(90, 156, 106, 0.35);
+  --session-ready-bg: rgba(90, 156, 106, 0.28);
+  --session-ready-border: rgba(90, 156, 106, 0.45);
 }
 
 /* ===== Base Styles ===== */
 
 html,
-body {
+body,
+#root {
   height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus styles */
-:focus-visible {
+/* Focus styles — show outline on interactive controls, not on text inputs */
+:focus-visible:not(input):not(textarea):not(select) {
   outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
 
-/* Scrollbar styles */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-}
+/* Scrollbar — no custom styling, use native macOS overlay behavior.
+   On macOS, the native scrollbar auto-shows on scroll and fades away after. */
 
 /* Selection */
 ::selection {
@@ -468,7 +449,7 @@ body {
   color: var(--selection-color);
 }
 
-/* Reduced motion preference */
+/* Reduced motion preference - accessibility for vestibular disorders */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -476,6 +457,9 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    animation: none !important;
+    transition: none !important;
+    will-change: auto !important;
   }
 }
 
@@ -521,6 +505,26 @@ body {
 
 .animate-bounce-dot {
   animation: bounce-dot 1.4s ease-in-out infinite;
+}
+
+/* Reconnection indicator animation */
+@keyframes reconnect-slide {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 30%;
+    margin-left: 35%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+.animate-reconnect-slide {
+  animation: reconnect-slide 1.5s ease-in-out infinite;
 }
 
 .animate-bounce-dot-delay-1 {
@@ -657,116 +661,73 @@ body {
   --tw-prose-td-borders: var(--block-draft-border);
 }
 
-/* ===== UX Polish Animations ===== */
+/* ===== Phase Transition Animation ===== */
 
-/* Tree crystallizing animation - characters resolve from noise to text */
+/* Phase transition - fade content when switching project phases */
+.phase-transition-enter {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.phase-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+/* ===== Tree Crystallizing Animation ===== */
+
+/* Crystallize animation for when a forming block becomes a tree step */
 @keyframes crystallize {
   0% {
     opacity: 0;
-    filter: blur(4px);
     transform: scale(0.95);
   }
   50% {
-    opacity: 0.7;
-    filter: blur(2px);
+    opacity: 1;
+    transform: scale(1.02);
   }
   100% {
     opacity: 1;
-    filter: blur(0);
     transform: scale(1);
   }
 }
 
 .animate-crystallize {
-  animation: crystallize 500ms ease-out;
+  animation: crystallize 300ms ease-out;
 }
 
-/* Graduation animation - block shrinks in left column */
-@keyframes graduate-shrink {
+/* ===== Block Graduation Animation ===== */
+
+/* Graduation animation for blocks moving from forming to curated */
+@keyframes graduate-out {
   0% {
-    transform: scale(1);
     opacity: 1;
-  }
-  50% {
-    transform: scale(0.95);
+    transform: translateX(0);
   }
   100% {
-    transform: scale(0.85);
     opacity: 0;
-  }
-}
-
-.animate-graduate-shrink {
-  animation: graduate-shrink 400ms ease-in-out forwards;
-}
-
-/* Graduation animation - step appears in right column */
-@keyframes graduate-appear {
-  0% {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.animate-graduate-appear {
-  animation: graduate-appear 400ms ease-out;
-}
-
-/* Workspace transition animations */
-@keyframes workspace-slide-in-left {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes workspace-slide-in-right {
-  from {
     transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
   }
 }
 
-.animate-workspace-slide-in-left {
-  animation: workspace-slide-in-left 300ms ease-out;
+.animate-graduate-out {
+  animation: graduate-out 500ms ease-out forwards;
 }
 
-.animate-workspace-slide-in-right {
-  animation: workspace-slide-in-right 300ms ease-out;
+/* ===== Agent Completion Glow Animation ===== */
+
+/* Completion glow for agents transitioning from working to normal/idle */
+@keyframes completion-glow {
+  0% {
+    box-shadow: 0 0 8px 2px var(--color-success);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
-/* Enhanced reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .animate-crystallize,
-  .animate-graduate-shrink,
-  .animate-graduate-appear,
-  .animate-workspace-slide-in-left,
-  .animate-workspace-slide-in-right,
-  .physics-block-pop-in,
-  .physics-block-pop-out,
-  .session-synonym,
-  .session-slide-out {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
-  }
-
-  /* Keep simple opacity transitions */
-  .animate-crystallize,
-  .animate-graduate-appear {
-    transition: opacity 150ms ease !important;
-  }
+.animate-completion-glow {
+  animation: completion-glow 1.2s ease-out forwards;
+  border-radius: 9999px;
 }

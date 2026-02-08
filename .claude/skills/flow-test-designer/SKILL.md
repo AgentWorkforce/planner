@@ -5,7 +5,7 @@ user-invocable: false
 ---
 # Test Designer: Feature → Test Design
 
-**Owns**: Feature `plan_tests` section
+**Owns**: Feature `plan_tests` section; contributes to `understanding.tester`, `context.tester`
 
 ## Purpose
 
@@ -30,6 +30,7 @@ If neither exists → "Run /flow feature or /flow planner first."
 - Feature file with `user_flow` OR `plan_implementation`
 - Optional: `validation_uiux` results
 - Optional: existing test files (to identify gaps)
+- `understanding.tester` (if exists) - existing observations about testability
 
 ## Output
 
@@ -46,6 +47,13 @@ Feature's `plan_tests` section filled.
 **If only `plan_implementation` exists** (backend/infra):
 - Extract testable behaviors from step acceptance criteria
 - Identify API contracts, data transformations, error conditions
+
+### 1b. Check Existing Understanding
+
+If `understanding.tester` exists, review existing observations:
+- What testability concerns were noted?
+- What test framework decisions were made?
+- Any blockers or dependencies identified?
 
 ### 2. Determine Coverage Level
 
@@ -109,6 +117,30 @@ What test data is needed?
 | **medium** | Secondary flow, less frequent |
 | **low** | Edge case, nice-to-have coverage |
 
+### 7. Record Test Understanding
+
+Capture observations in `understanding.tester`:
+```json
+"understanding": {
+  "tester": {
+    "observations": ["High test coverage possible", "Mock needed for external API"],
+    "concerns": ["Flaky due to timing dependency"],
+    "confidence": "forming"
+  }
+}
+```
+
+Capture decisions in `context.tester`:
+```json
+"context": {
+  "tester": {
+    "framework": "Vitest",
+    "strategy": "Integration-first",
+    "mocking": "MSW for API mocks"
+  }
+}
+```
+
 ## Rules
 
 - Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
@@ -122,13 +154,14 @@ What test data is needed?
 
 | Skill | Section |
 |-------|---------|
-| flow-discover | `summary` (from code) |
-| flow-brainstorm | `summary` (from ideas) |
-| flow-planner | `plan_implementation` |
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
 | flow-tasks | Creates executable tasks from plan |
 | flow-feature | `user_flow` |
 | flow-ui-ux-validation | `validation_uiux` |
-| **flow-test-designer** | `plan_tests` |
+| **flow-test-designer** | `plan_tests`, `understanding.tester`, `context.tester` |
 | flow-visualize | Reads all, renders diagram |
 | flow-change-request | Updates any, cascades |
 
@@ -144,3 +177,5 @@ What test data is needed?
 - Critical paths have comprehensive cases
 - Data requirements are specific
 - Priority reflects business impact
+- Test observations captured in `understanding.tester`
+- Test decisions captured in `context.tester` (if any made)

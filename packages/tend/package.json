@@ -1,7 +1,7 @@
 {
   "name": "@plannr/tend",
   "version": "0.1.0",
-  "description": "Tend - Unified workspace for brainstorming, planning, and conversation",
+  "description": "tend - unified AI-native workspace",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,9 +9,6 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -33,7 +30,6 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",

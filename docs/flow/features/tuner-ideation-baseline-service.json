@@ -1,0 +1,270 @@
+{
+  "title": "Ideation Baseline Service",
+  "summary": {
+    "goal": "Build and maintain baselines from correlated IdeationOutcome + PlanQualitySignal data using EMA and Welford's algorithm. This is the learning core.",
+    "acceptance_criteria": [
+      {
+        "id": "ibs1",
+        "description": "Triggered by plan_quality_signal_received event (not ideation_outcome_received)"
+      },
+      {
+        "id": "ibs2",
+        "description": "Correlates PlanQualitySignal with matching IdeationOutcome by session_id"
+      },
+      {
+        "id": "ibs3",
+        "description": "Updates baseline metrics with Welford's algorithm: questions_per_plan, versions_before_approval, block_utilization, conversation_turns"
+      },
+      {
+        "id": "ibs4",
+        "description": "Updates specialist_contribution_rates per specialist template (contributed = blocks_created > 0 OR insights_queued > 0)"
+      },
+      {
+        "id": "ibs5",
+        "description": "Uses single pattern 'session_quality' for v1 (not per-topic)"
+      },
+      {
+        "id": "ibs6",
+        "description": "Skips baseline update if no matching IdeationOutcome found for session_id"
+      },
+      {
+        "id": "ibs7",
+        "description": "EMA smoothing factor α=0.1 (same as Forge BaselineService)"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "ibs001",
+        "title": "Create IdeationBaselineService class",
+        "scope": "tuner",
+        "description": "Create packages/tuner/src/services/ideation-baseline-service.ts following BaselineService pattern. Implements onPlanQualitySignal handler.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Class has constructor(storage: TunerStorage)"
+          },
+          {
+            "id": "ac2",
+            "description": "onPlanQualitySignal(signal: PlanQualitySignal) method"
+          },
+          {
+            "id": "ac3",
+            "description": "Skips if signal.source === 'test'"
+          },
+          {
+            "id": "ac4",
+            "description": "Correlates signal with IdeationOutcome by session_id"
+          },
+          {
+            "id": "ac5",
+            "description": "Returns early if no matching IdeationOutcome found"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/ideation-baseline-service.ts",
+            "pattern": "Similar to BaselineService but triggered by different event",
+            "reference": "Plan section 5.1"
+          }
+        }
+      },
+      {
+        "step_id": "ibs002",
+        "title": "Implement Welford baseline updates",
+        "scope": "tuner",
+        "description": "Implement updateBaselineWithWelford helper that updates mean/stddev for questions, versions, block_utilization, conversation_turns using Welford's online algorithm",
+        "dependencies": [
+          "ibs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Uses EMA α=0.1 for mean updates"
+          },
+          {
+            "id": "ac2",
+            "description": "Uses Welford's algorithm for variance: m2 = m2 + (x - old_mean) * (x - new_mean)"
+          },
+          {
+            "id": "ac3",
+            "description": "stddev = sqrt(m2 / n)"
+          },
+          {
+            "id": "ac4",
+            "description": "First sample initializes with stddev=0, sample_count=1"
+          },
+          {
+            "id": "ac5",
+            "description": "Increments sample_count on each update"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "algorithms": {
+              "ema": "new_mean = α * value + (1-α) * old_mean",
+              "welford": "m2 = m2 + (x - old_mean) * (x - new_mean); stddev = sqrt(m2/n)"
+            },
+            "reference": "Plan section 5.1, matches BaselineService algorithm"
+          }
+        }
+      },
+      {
+        "step_id": "ibs003",
+        "title": "Implement specialist contribution tracking",
+        "scope": "tuner",
+        "description": "Update specialist_contribution_rates in baseline for each specialist in IdeationOutcome. Contribution = blocks_created > 0 OR insights_queued > 0.",
+        "dependencies": [
+          "ibs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "For each specialist in outcome.specialist_contributions, check if contributed"
+          },
+          {
+            "id": "ac2",
+            "description": "contributed = contrib.blocks_created > 0 OR contrib.insights_queued > 0"
+          },
+          {
+            "id": "ac3",
+            "description": "Update contribution rate with EMA: new_rate = α * (contributed ? 1 : 0) + (1-α) * old_rate"
+          },
+          {
+            "id": "ac4",
+            "description": "specialist_contribution_rates is z.record(z.string(), z.number())"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "EMA for contribution rate per specialist",
+            "reference": "Plan section 5.1"
+          }
+        }
+      },
+      {
+        "step_id": "ibs004",
+        "title": "Use single 'session_quality' pattern",
+        "scope": "tuner",
+        "description": "All baselines stored under pattern='session_quality'. No per-topic patterns in v1.",
+        "dependencies": [
+          "ibs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "storage.getIdeationBaseline('session_quality') for all reads"
+          },
+          {
+            "id": "ac2",
+            "description": "storage.upsertIdeationBaseline({ pattern: 'session_quality', ... }) for all writes"
+          },
+          {
+            "id": "ac3",
+            "description": "No topic extraction or per-topic pattern logic in v1"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "note": "Single global baseline for v1. Per-topic requires higher volume and keyword extraction.",
+            "reference": "Plan section 1.4"
+          }
+        }
+      },
+      {
+        "step_id": "ibs005",
+        "title": "Test IdeationBaselineService",
+        "scope": "tuner",
+        "description": "Unit tests for baseline computation correctness",
+        "dependencies": [
+          "ibs002",
+          "ibs003",
+          "ibs004"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Welford variance converges to correct value for known data set"
+          },
+          {
+            "id": "ac2",
+            "description": "EMA mean converges to expected value"
+          },
+          {
+            "id": "ac3",
+            "description": "Specialist contribution rate calculated correctly (EMA of 0/1 indicator)"
+          },
+          {
+            "id": "ac4",
+            "description": "Baseline skipped when no matching IdeationOutcome"
+          },
+          {
+            "id": "ac5",
+            "description": "Test-sourced signals are stored but don't update baselines (checked in factory wiring)"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/tuner/src/services/ideation-baseline-service.test.ts"
+          }
+        }
+      },
+      {
+        "step_id": "ibs006",
+        "title": "Wire IdeationBaselineService into factory",
+        "scope": "tuner",
+        "description": "Add IdeationBaselineService to packages/tuner/src/services/factory.ts, wire plan_quality_signal_received event",
+        "dependencies": [
+          "ibs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "const ideationBaseline = new IdeationBaselineService(storage) in createTunerServices()"
+          },
+          {
+            "id": "ac2",
+            "description": "Wire event: collector.on('plan_quality_signal_received', (signal) => { if (signal.source === 'test') return; ideationBaseline.onPlanQualitySignal(signal); })"
+          },
+          {
+            "id": "ac3",
+            "description": "Add ideationBaseline to TunerServices interface"
+          },
+          {
+            "id": "ac4",
+            "description": "Return ideationBaseline in factory return object"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/services/factory.ts",
+            "pattern": "Wire event handler in wireEventHandlers()",
+            "reference": "Plan section 5.3"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-baseline-service",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-ideation-collector",
+    "tuner-baseline-service"
+  ]
+}

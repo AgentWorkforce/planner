@@ -33,8 +33,23 @@ For state synchronization across disconnected components (e.g., updating sidebar
 
 ### Modular Hooks
 Break complex UI logic into reusable hooks:
+
+**planner-ui:**
 - `useQuestionNotifications` - notification state management
 - `useActiveChannels` - channel subscription handling
+- `usePlanEvents` - SSE subscription for plan updates
+- `useRelayConnection` - WebSocket connection lifecycle
+- `usePresence` - agent presence tracking
+- `useAttentionPlans` - plans requiring attention
+
+**ideation-ui:**
+- `usePhysicsEngine` - Matter.js simulation management
+- `usePanelState` - panel visibility and layout
+- `useUnderstanding` - understanding state tracking
+- `useSessions` - session lifecycle management
+
+**shared-ui:**
+- Shared hooks exported from `@plannr/shared-ui` for cross-app reuse
 
 This improves testability and organization.
 
@@ -62,6 +77,47 @@ Key patterns:
 - Use `useRef` to track previous values and skip unnecessary updates
 - Memoize array/object dependencies with `useMemo`
 - For callbacks, ensure `useCallback` dependencies are primitives or stable references
+
+## Physics Engine Integration
+
+For ideation-ui's Matter.js-based physics simulation:
+
+- `usePhysicsEngine` manages simulation (zero gravity, custom attraction forces)
+- Pattern: physics body state synced to React via `requestAnimationFrame` loop
+- GPU-accelerated transforms: use `transform: translate3d()` with `will-change: transform`
+- Mouse constraint for drag interaction
+- Cleanup: `Engine.clear()` and `World.clear()` in useEffect cleanup
+- Force constants tuned empirically - don't change without visual testing
+
+## SSE Subscription Pattern
+
+For `usePlanEvents` and similar real-time update hooks:
+
+- EventSource for server-sent events (plan changes, status updates)
+- Implement exponential backoff reconnection with max retries
+- Close EventSource in useEffect cleanup
+- Don't gate SSE subscriptions on relay connectionStatus for persistent services
+
+## Real-Time Connection Lifecycle
+
+### WebSocket (Relay)
+- `useRelayConnection` manages connect/reconnect/message handlers
+- Implement exponential backoff for reconnection
+- Cleanup: close WebSocket in useEffect return
+- Use stable refs to prevent stale closures in handlers
+
+### SSE (Plan Events)
+- `usePlanEvents` manages EventSource
+- Implement exponential backoff for reconnection with max retries
+- Cleanup: close EventSource in useEffect return
+- Use stable refs to prevent stale closures in handlers
+
+## Multi-App Shared Patterns
+
+- `@plannr/shared-ui` exports reusable hooks, components, providers
+- Import shared components: `import { CommandPalette } from '@plannr/shared-ui'`
+- Each app has its own contexts (RelayContext in planner-ui, separate in ideation-ui)
+- Don't put app-specific state in shared-ui
 
 ## DOM Position Detection
 

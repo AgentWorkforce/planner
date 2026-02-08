@@ -66,41 +66,20 @@ describe('CanvasHeader', () => {
     expect(screen.getByText('→ Planner')).toBeInTheDocument();
   });
 
-  it('calls onOpenUnderstanding when AI Understanding button is clicked', () => {
-    const handleOpenUnderstanding = vi.fn();
-
+  it('renders AI Understanding button', () => {
     render(
       <BrowserRouter>
         <CanvasHeader
           sessionId="1"
           sessionTitle="Session 1"
           sessions={mockSessions}
-          onOpenUnderstanding={handleOpenUnderstanding}
         />
       </BrowserRouter>
     );
 
-    fireEvent.click(screen.getByText('AI Understanding'));
-    expect(handleOpenUnderstanding).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('AI Understanding')).toBeInTheDocument();
   });
 
-  it('calls onHandoff when Planner button is clicked', () => {
-    const handleHandoff = vi.fn();
-
-    render(
-      <BrowserRouter>
-        <CanvasHeader
-          sessionId="1"
-          sessionTitle="Session 1"
-          sessions={mockSessions}
-          onHandoff={handleHandoff}
-        />
-      </BrowserRouter>
-    );
-
-    fireEvent.click(screen.getByText('→ Planner'));
-    expect(handleHandoff).toHaveBeenCalledTimes(1);
-  });
 
   it('shows dropdown when clicking session title with other sessions', () => {
     render(

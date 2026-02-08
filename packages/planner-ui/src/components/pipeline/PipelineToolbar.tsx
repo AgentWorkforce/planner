@@ -122,11 +122,11 @@ function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
       size="sm"
       aria-label="View mode"
     >
-      <ToggleGroupItem value="sequence" aria-label="Sequence view">
-        <RowsIcon size="sm" />
-      </ToggleGroupItem>
       <ToggleGroupItem value="board" aria-label="Board view">
         <ColumnsIcon size="sm" />
+      </ToggleGroupItem>
+      <ToggleGroupItem value="sequence" aria-label="Sequence view">
+        <RowsIcon size="sm" />
       </ToggleGroupItem>
     </ToggleGroup>
   );

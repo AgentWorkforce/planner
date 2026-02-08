@@ -106,6 +106,7 @@ export function PhysicsBlock({
         'flex flex-col items-center justify-center',
         interactive ? 'cursor-pointer hover:shadow-lg' : 'cursor-default pointer-events-none',
         showGlow && 'animate-pulse',
+        block.status === 'curated' && 'animate-graduate-out',
       )}
       style={{
         opacity,
@@ -122,8 +123,8 @@ export function PhysicsBlock({
         <div
           className="absolute top-0 right-0 w-2 h-2 rounded-full"
           style={{
-            backgroundColor: 'var(--color-accent-cyan)',
-            boxShadow: '0 0 4px rgba(74, 124, 89, 0.4)',
+            backgroundColor: 'var(--color-accent-tertiary)',
+            boxShadow: '0 0 4px var(--color-accent-tertiary)',
           }}
           title="User edited"
         />
@@ -136,7 +137,7 @@ export function PhysicsBlock({
 
       {/* Keyword - shown for developing and above when size permits */}
       {showKeyword && (
-        <span className="text-[10px] text-text-muted mt-0.5 truncate max-w-full px-1 uppercase tracking-wide">
+        <span className="text-[10px] text-muted mt-0.5 truncate max-w-full px-1 uppercase tracking-wide">
           {block.keyword}
         </span>
       )}

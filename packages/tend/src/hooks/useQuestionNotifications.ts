@@ -1,58 +1,33 @@
 /**
  * useQuestionNotifications Hook
  *
- * Manages the notification queue for new agent questions.
+ * Manages the notification queue for new questions.
  * When questions are added to the queue, shows them one at a time
  * as mini notification bubbles above agent avatars in the status bar.
  *
  * Features:
- * - Queues new questions as they arrive (via SSE events)
- * - Shows one notification at a time for 5 seconds
+ * - Queues new questions as they arrive (via project events)
+ * - Shows one notification at a time with configurable duration
  * - Auto-advances to next notification after timeout
  * - dismiss() immediately advances the queue
  * - Provides current notification with agentId for avatar matching
  *
- * Adapted from planner-ui for tend package.
+ * Timing configuration:
+ * - Blocking questions: 30 seconds
+ * - Normal questions: 15 seconds
+ * - FYI questions: 8 seconds
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-/** Question blocking level - determines urgency */
-export type QuestionBlockingLevel = 'hard_block' | 'soft_block' | 'preference' | 'fyi';
+export type QuestionPriority = 'blocking' | 'normal' | 'fyi';
 
-/** Question status */
-export type QuestionStatus = 'pending' | 'answered' | 'dismissed';
-
-/**
- * Question from an agent awaiting human answer.
- */
 export interface Question {
   question_id: string;
-  plan_id: string;
   agent_id: string;
-  agent_role: string;
   text: string;
-  context?: string;
-  /** Multiple choice options (if any) */
-  options?: string[];
-  blocking_level: QuestionBlockingLevel;
-  /** Number of steps blocked by this question */
-  steps_blocked: number;
-  /** Whether the agent can proceed with a default value */
-  can_use_default: boolean;
-  /** Default value if can_use_default is true */
-  default_value?: string;
-  /** Other agent IDs waiting for this answer */
-  subscribers: string[];
-  /** Question IDs that were deduplicated/merged into this one */
-  merged_from: string[];
-  status: QuestionStatus;
-  answer?: string;
-  answered_at?: string;
-  /** Computed priority score for queue ordering */
-  priority_score: number;
+  priority?: QuestionPriority;
   created_at: string;
-  updated_at: string;
 }
 
 /** Notification with question and matching agent info */
@@ -62,8 +37,6 @@ export interface QuestionNotification {
 }
 
 interface UseQuestionNotificationsOptions {
-  /** Time in ms before auto-advancing to next notification (default: 5000) */
-  autoAdvanceDelay?: number;
   /** Callback when notification is clicked */
   onNotificationClick?: (notification: QuestionNotification) => void;
 }
@@ -79,6 +52,13 @@ interface UseQuestionNotificationsResult {
   addToQueue: (question: Question) => void;
 }
 
+// Duration based on priority
+const DURATION_MS: Record<QuestionPriority, number> = {
+  blocking: 30000, // 30 seconds
+  normal: 15000, // 15 seconds
+  fyi: 8000, // 8 seconds
+};
+
 /**
  * Hook for managing question notification queue.
  *
@@ -88,7 +68,7 @@ interface UseQuestionNotificationsResult {
 export function useQuestionNotifications(
   options: UseQuestionNotificationsOptions = {}
 ): UseQuestionNotificationsResult {
-  const { autoAdvanceDelay = 5000, onNotificationClick } = options;
+  const { onNotificationClick } = options;
 
   const [queue, setQueue] = useState<QuestionNotification[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,7 +112,7 @@ export function useQuestionNotifications(
     });
   }, []);
 
-  // Auto-advance timer
+  // Auto-advance timer with priority-based duration
   useEffect(() => {
     if (!currentNotification) {
       return;
@@ -143,10 +123,14 @@ export function useQuestionNotifications(
       clearTimeout(timerRef.current);
     }
 
+    // Get duration based on priority
+    const priority = currentNotification.question.priority || 'normal';
+    const duration = DURATION_MS[priority];
+
     // Set timer to auto-advance
     timerRef.current = setTimeout(() => {
       advance();
-    }, autoAdvanceDelay);
+    }, duration);
 
     return () => {
       if (timerRef.current) {
@@ -154,7 +138,7 @@ export function useQuestionNotifications(
         timerRef.current = null;
       }
     };
-  }, [currentNotification, autoAdvanceDelay, advance]);
+  }, [currentNotification, advance]);
 
   return {
     currentNotification,

@@ -1,0 +1,138 @@
+{
+  "feature_id": "ideation-domain",
+  "title": "Ideation Domain Model",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Define the core domain entities for Ideation: Session and Understanding. These form the foundation for the entire package. Intelligence lives in agent prompts, not schemas - schemas are freeform containers.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Session entity has: id, status, initiative_id?, source, transcript[], understanding, planner_sends[], active_specialists[], timestamps" },
+      { "id": "ac2", "description": "Session status enum: 'active' | 'abandoned'" },
+      { "id": "ac3", "description": "Understanding is freeform: Record<string, Record<string, unknown>> - keyed by specialist name/role" },
+      { "id": "ac4", "description": "Each specialist's observations structure is freeform (agent prompts define what to contribute)" },
+      { "id": "ac5", "description": "active_specialists[] tracks currently spawned specialist agent IDs for this session" },
+      { "id": "ac6", "description": "Confidence is agent-reported, not schema-enforced (agents decide their own confidence representation)" },
+      { "id": "ac7", "description": "Transcript message has: id, role ('user' | 'assistant'), content, timestamp" },
+      { "id": "ac8", "description": "PlannerSend captures: sent_at, payload (goal, context?, source, understanding, initiative_id?), result (plan_id, plan_version)" },
+      { "id": "ac9", "description": "planner_sends[] is append-only history of all sends to planner" },
+      { "id": "ac10", "description": "Minimal Zod schemas - validate structure, not content (intelligence in prompts)" },
+      { "id": "ac11", "description": "TypeScript types are exported for use across packages" }
+    ],
+    "decisions": [
+      { "decision": "Freeform Understanding schema", "rationale": "Intelligence lives in agent prompts, not Zod schemas. Any specialist type, any observation structure." },
+      { "decision": "No fixed GuardianRole enum", "rationale": "Specialists are spawned dynamically based on conversation needs. Not limited to predefined 5." },
+      { "decision": "No Nugget entity", "rationale": "Understanding is live state, sent to planner as snapshot. Simpler model." },
+      { "decision": "Sessions stay active", "rationale": "User can continue ideating after sending to planner, send again for replanning" },
+      { "decision": "Transcript is user + assistant only", "rationale": "Specialists never appear in chat - Interviewer facilitates without revealing who originated a question" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core"],
+    "steps": [
+      {
+        "step_id": "dom001",
+        "title": "Define minimal enums and primitive types",
+        "scope": "ideation-core",
+        "description": "Create Zod schemas for minimal structural enums only (not content constraints)",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionStatus = z.enum(['active', 'abandoned'])" },
+          { "id": "ac2", "description": "TranscriptRole = z.enum(['user', 'assistant'])" },
+          { "id": "ac3", "description": "No GuardianRole enum - specialists are dynamic" },
+          { "id": "ac4", "description": "No Confidence enum - agents define their own confidence representation" }
+        ]
+      },
+      {
+        "step_id": "dom002",
+        "title": "Define freeform Understanding schema",
+        "scope": "ideation-core",
+        "description": "Create minimal Zod schema for Understanding as freeform record",
+        "dependencies": ["dom001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Understanding = z.record(z.string(), z.record(z.string(), z.unknown()))" },
+          { "id": "ac2", "description": "Keys are specialist names (e.g., 'Architect', 'DataModeller', or any other)" },
+          { "id": "ac3", "description": "Values are freeform objects - structure defined by agent prompts, not schema" }
+        ]
+      },
+      {
+        "step_id": "dom003",
+        "title": "Define TranscriptMessage schema",
+        "scope": "ideation-core",
+        "description": "Create Zod schema for individual transcript messages (user and assistant only)",
+        "dependencies": ["dom001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TranscriptMessage = { id: string, role: TranscriptRole, content: string, timestamp: string }" }
+        ]
+      },
+      {
+        "step_id": "dom004",
+        "title": "Define PlannerSend schema",
+        "scope": "ideation-core",
+        "description": "Create Zod schema for capturing exact payload sent to planner",
+        "dependencies": ["dom002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlannerSendPayload = { goal: string, context?: string, source: { type: 'ideation', session_id: string }, understanding: Understanding, initiative_id?: string }" },
+          { "id": "ac2", "description": "PlannerSendResult = { plan_id: string, plan_version: number }" },
+          { "id": "ac3", "description": "PlannerSend = { sent_at: string, payload: PlannerSendPayload, result: PlannerSendResult }" }
+        ]
+      },
+      {
+        "step_id": "dom005",
+        "title": "Define ActiveSpecialist schema",
+        "scope": "ideation-core",
+        "description": "Track spawned specialists for a session",
+        "dependencies": ["dom001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ActiveSpecialist = { name: string, agent_id: string, spawned_at: string, role_hint?: string }" },
+          { "id": "ac2", "description": "name is the specialist identifier used in Understanding keys" },
+          { "id": "ac3", "description": "role_hint is optional description of specialist focus (for UI display)" }
+        ]
+      },
+      {
+        "step_id": "dom006",
+        "title": "Define Session schema",
+        "scope": "ideation-core",
+        "description": "Create Zod schema for Session entity with all fields",
+        "dependencies": ["dom002", "dom003", "dom004", "dom005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Session = { id, status, initiative_id?, source: { type: 'human', initial_intent }, transcript[], understanding, active_specialists[], planner_sends[], created_at, updated_at }" }
+        ]
+      },
+      {
+        "step_id": "dom007",
+        "title": "Define aggregate confidence computation",
+        "scope": "ideation-core",
+        "description": "Function to compute overall confidence from specialist observations",
+        "dependencies": ["dom002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "computeAggregateConfidence(understanding) returns 0-100 score" },
+          { "id": "ac2", "description": "Looks for 'confidence' key in each specialist's observations (freeform)" },
+          { "id": "ac3", "description": "Maps string values: 'exploring'->25, 'forming'->50, 'confident'->90 (convention)" },
+          { "id": "ac4", "description": "Returns average of all specialists, or 0 if none have reported" }
+        ]
+      },
+      {
+        "step_id": "dom008",
+        "title": "Export types and create index",
+        "scope": "ideation-core",
+        "description": "Export all TypeScript types from Zod schemas and create domain/index.ts barrel",
+        "dependencies": ["dom006", "dom007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/ideation/src/domain/index.ts exports all schemas and inferred types" },
+          { "id": "ac2", "description": "Types: Session, Understanding, TranscriptMessage, PlannerSend, ActiveSpecialist, etc." }
+        ]
+      }
+    ]
+  }
+}

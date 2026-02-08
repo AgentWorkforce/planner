@@ -1,0 +1,253 @@
+{
+  "feature_id": "forge-mcp-tools",
+  "title": "Agent MCP Tools",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-core",
+  "dependencies": ["forge-domain", "forge-storage"],
+
+  "summary": {
+    "goal": "Define and implement MCP tools that agents use to communicate with Forgemaster. These tools are the only way agents report progress, completion, blockers, and request human input.",
+    "acceptance_criteria": [
+      { "id": "fmt-ac1", "description": "report_progress tool: task_id, status (starting/working/blocked), message, progress_pct" },
+      { "id": "fmt-ac2", "description": "report_complete tool: task_id, artifacts array, optional notes" },
+      { "id": "fmt-ac3", "description": "report_blocked tool: task_id, reason, optional suggested_change for Planner" },
+      { "id": "fmt-ac4", "description": "request_human_input tool: task_id, question, options, blocking_level: 'hard_block' | 'soft_block' | 'preference' | 'fyi', can_use_default, default_value" },
+      { "id": "fmt-ac5", "description": "record_decision tool: task_id, question, chosen, alternatives[], reasoning - for trajectory capture" },
+      { "id": "fmt-ac6", "description": "report_audit_result tool: task_id, result: 'pass' | 'fail', findings[] - for auditor agents" },
+      { "id": "fmt-ac7", "description": "MCP server runs on Forgemaster, exposed to agents via config" },
+      { "id": "fmt-ac8", "description": "Tool calls validated (unknown task_id rejected)" },
+      { "id": "fmt-ac9", "description": "Tool calls trigger trajectory events" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "MCP is the communication contract - agents don't access DB directly",
+        "Tools map to state transitions in Forgemaster",
+        "request_human_input creates Question entities in forge-question-queue",
+        "report_audit_result used by auditor agents (forge-auditor-dispatch)",
+        "Same MCP pattern as planner-core but execution-focused"
+      ],
+      "patterns": [
+        "MCP server as Express HTTP endpoint",
+        "Agent spawned with --mcp-config pointing to Forge MCP",
+        "Tool calls update task state and emit trajectory events"
+      ],
+      "keywords": ["MCP", "tools", "agent-communication"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "mcp_server_port": "configurable, default 3100",
+      "tool_names": ["report_progress", "report_complete", "report_blocked", "request_human_input", "record_decision", "report_audit_result"],
+      "blocking_levels": {
+        "hard_block": "Agent must wait for answer, execution paused",
+        "soft_block": "Agent should wait, but can proceed with default if timeout",
+        "preference": "Agent can proceed with best guess, answer updates behavior",
+        "fyi": "Informational, agent continues, no blocking"
+      }
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fmt-s1",
+        "title": "Create MCP tool response types",
+        "scope": "forge-core",
+        "description": "Define response types for MCP tool handlers",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ToolSuccessResponse<T> = { success: true, data: T }" },
+          { "id": "ac2", "description": "ToolErrorResponse = { success: false, error: string }" },
+          { "id": "ac3", "description": "success<T>(data) and error(message) helper functions" },
+          { "id": "ac4", "description": "toCallToolResult(response) converts to MCP SDK CallToolResult format" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/types.ts",
+          "pattern_description": "Copy entire file - this is the exact pattern to use. See lines 1-60."
+        }
+      },
+      {
+        "step_id": "fmt-s2",
+        "title": "Define report_progress tool",
+        "scope": "forge-core",
+        "description": "MCP tool for agents to report progress during task execution",
+        "dependencies": ["fmt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool schema: task_id (required), status: 'starting' | 'working' | 'blocked', message (required), progress_pct (optional, 0-100)" },
+          { "id": "ac2", "description": "Handler validates task_id exists and belongs to caller's run" },
+          { "id": "ac3", "description": "Emits trajectory event with type='agent_progress'" },
+          { "id": "ac4", "description": "Updates agent heartbeat timestamp for health monitoring" },
+          { "id": "ac5", "description": "Returns { success: true, data: { acknowledged: true } }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts:22-37",
+          "pattern_description": "Copy tool schema pattern with name, description, inputSchema object"
+        }
+      },
+      {
+        "step_id": "fmt-s3",
+        "title": "Define report_complete tool",
+        "scope": "forge-core",
+        "description": "MCP tool for agents to report task completion with artifacts",
+        "dependencies": ["fmt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool schema: task_id (required), artifacts: [{ type, reference, metadata? }][], notes (optional)" },
+          { "id": "ac2", "description": "Handler creates Artifact entities for each artifact via ForgeStorage" },
+          { "id": "ac3", "description": "Updates task status to 'auditing' if step.audit=true, else 'completed'" },
+          { "id": "ac4", "description": "Emits trajectory event with type='task_completed'" },
+          { "id": "ac5", "description": "Returns { success: true, data: { task_status, artifacts_created: number } }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts",
+          "pattern_description": "Follow same tool definition pattern",
+          "notes": "Auditor dispatch handled separately by forge-auditor-dispatch feature"
+        }
+      },
+      {
+        "step_id": "fmt-s4",
+        "title": "Define report_blocked tool",
+        "scope": "forge-core",
+        "description": "MCP tool for agents to report they are blocked",
+        "dependencies": ["fmt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool schema: task_id (required), reason (required), suggested_change (optional object for Planner feedback)" },
+          { "id": "ac2", "description": "Handler updates task status to 'blocked'" },
+          { "id": "ac3", "description": "If suggested_change provided, triggers forge-planner-adapter ChangeRequest creation" },
+          { "id": "ac4", "description": "Emits trajectory event with type='task_blocked'" },
+          { "id": "ac5", "description": "Returns { success: true, data: { task_status: 'blocked', change_request_id? } }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts",
+          "pattern_description": "Follow same tool definition pattern"
+        }
+      },
+      {
+        "step_id": "fmt-s5",
+        "title": "Define request_human_input tool",
+        "scope": "forge-core",
+        "description": "MCP tool for agents to ask questions that require human answers",
+        "dependencies": ["fmt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool schema: task_id (required), question (required), options (optional string[]), blocking_level: 'hard_block' | 'soft_block' | 'preference' | 'fyi', can_use_default (bool), default_value (optional)" },
+          { "id": "ac2", "description": "Handler creates Question entity via ForgeStorage.createQuestion()" },
+          { "id": "ac3", "description": "If blocking_level is hard_block or soft_block, updates task status to 'blocked'" },
+          { "id": "ac4", "description": "Emits trajectory event with type='human_input_requested'" },
+          { "id": "ac5", "description": "Emits SSE event 'question_added' for UI notification" },
+          { "id": "ac6", "description": "Returns { success: true, data: { question_id, blocking: bool } }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts:383-422 (ask_user_question)",
+          "pattern_description": "Similar to ask_user_question in planner-core but execution-focused",
+          "notes": "Question entity schema and advanced queue logic owned by forge-question-queue feature"
+        }
+      },
+      {
+        "step_id": "fmt-s6",
+        "title": "Define record_decision tool",
+        "scope": "forge-core",
+        "description": "MCP tool for agents to record important decisions for trajectory capture",
+        "dependencies": ["fmt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool schema: task_id (required), question (required), chosen (required), alternatives (string[]), reasoning (required)" },
+          { "id": "ac2", "description": "Handler creates trajectory event with type='decision_recorded'" },
+          { "id": "ac3", "description": "Decision stored with full context for retrospective analysis" },
+          { "id": "ac4", "description": "Returns { success: true, data: { event_id, recorded: true } }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/domain/trajectory.ts",
+          "pattern_description": "Similar to DecisionEvent pattern in planner-core trajectory"
+        }
+      },
+      {
+        "step_id": "fmt-s7",
+        "title": "Define report_audit_result tool",
+        "scope": "forge-core",
+        "description": "MCP tool for auditor agents to report verification results",
+        "dependencies": ["fmt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tool schema: task_id (required), result: 'pass' | 'fail', findings: [{ criterion_id, status: 'pass' | 'fail', details }]" },
+          { "id": "ac2", "description": "Handler validates all acceptance criteria have corresponding findings" },
+          { "id": "ac3", "description": "Stores findings in task_attempts.audit_findings JSONB" },
+          { "id": "ac4", "description": "Emits trajectory event with type='audit_completed'" },
+          { "id": "ac5", "description": "Returns { success: true, data: { task_status, findings_count } }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts",
+          "pattern_description": "Add to existing Forge MCP tools registry",
+          "notes": "Audit pass/fail handling and retry logic owned by forge-auditor-dispatch feature"
+        }
+      },
+      {
+        "step_id": "fmt-s8",
+        "title": "Create tool registry and handler dispatcher",
+        "scope": "forge-core",
+        "description": "Implement tool registry and switch-based handler dispatch",
+        "dependencies": ["fmt-s2", "fmt-s3", "fmt-s4", "fmt-s5", "fmt-s6", "fmt-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "tools: Tool[] array with all 6 tool definitions" },
+          { "id": "ac2", "description": "handleToolCall(storage, trajectoryCapture, name, args) function with switch dispatch" },
+          { "id": "ac3", "description": "Each tool handler validates task_id belongs to active run" },
+          { "id": "ac4", "description": "Returns toCallToolResult() for all responses" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/tools/index.ts:513-571",
+          "pattern_description": "Copy handleToolCall and executeToolCall pattern exactly - switch statement dispatches to individual handlers"
+        }
+      },
+      {
+        "step_id": "fmt-s9",
+        "title": "Create MCP HTTP server",
+        "scope": "forge-core",
+        "description": "Express-based HTTP server for MCP tool calls",
+        "dependencies": ["fmt-s8"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /mcp/tools/list returns { tools: Tool[] }" },
+          { "id": "ac2", "description": "POST /mcp/tools/call accepts { name, arguments } and returns CallToolResult" },
+          { "id": "ac3", "description": "Validates task_id in authorization context (X-Task-ID header)" },
+          { "id": "ac4", "description": "Configurable port (default 3100)" }
+        ],
+        "specification": {
+          "pattern_reference": "src/mcp/server.ts",
+          "pattern_description": "Copy MCP server pattern from planner-core"
+        }
+      },
+      {
+        "step_id": "fmt-s10",
+        "title": "Implement answer notification to waiting agents",
+        "scope": "forge-core",
+        "description": "When a question is answered, notify the waiting agent via relay message",
+        "dependencies": ["fmt-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When question answered, send relay message to agent with answer" },
+          { "id": "ac2", "description": "Message format: { type: 'question_answered', question_id, answer }" },
+          { "id": "ac3", "description": "If task was blocked, update status back to 'running'" },
+          { "id": "ac4", "description": "Log notification in trajectory" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration": "Uses relay client to send message to agent by name pattern",
+            "agent_name": "run-{runId}-task-{taskId}"
+          }
+        }
+      }
+    ]
+  }
+}

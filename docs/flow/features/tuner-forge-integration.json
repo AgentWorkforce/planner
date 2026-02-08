@@ -1,0 +1,42 @@
+{
+  "title": "Forge Integration",
+  "summary": {
+    "goal": "Wire Forge to read config from Tuner and emit outcomes",
+    "acceptance_criteria": [
+      {
+        "id": "fi1",
+        "description": "Forge reads ForgeExecutionConfig on startup"
+      },
+      {
+        "id": "fi2",
+        "description": "Forge refreshes config periodically (every 5 min)"
+      },
+      {
+        "id": "fi3",
+        "description": "Forge emits TaskOutcome after each task completes"
+      },
+      {
+        "id": "fi4",
+        "description": "Forge emits RunOutcome after run completes"
+      },
+      {
+        "id": "fi5",
+        "description": "Model selection uses tuner-provided rules"
+      },
+      {
+        "id": "fi6",
+        "description": "Graceful fallback to defaults if Tuner unavailable"
+      }
+    ]
+  },
+  "feature_id": "tuner-forge-integration",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "critical",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-api",
+    "tuner-outcome-collector"
+  ]
+}

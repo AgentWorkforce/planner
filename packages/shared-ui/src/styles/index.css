@@ -1,0 +1,17 @@
+/**
+ * Mission Control Design System - Main Entry Point
+ *
+ * Import this file in your app to get all design system styles.
+ *
+ * Usage in your app's CSS:
+ * @import "@plannr/shared-ui/styles";
+ *
+ * Or import individual parts:
+ * @import "@plannr/shared-ui/styles/tokens.css";
+ * @import "@plannr/shared-ui/styles/typography.css";
+ * @import "@plannr/shared-ui/styles/base.css";
+ */
+
+@import "./tokens.css";
+@import "./typography.css";
+@import "./base.css";

@@ -1,0 +1,165 @@
+{
+  "feature_id": "ideation-planner-handoff",
+  "title": "Planner Handoff Integration",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "dependencies": ["ideation-lead", "ideation-specialists"],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Enable seamless handoff from Ideation to Planner by sending session understanding directly to create or update a Plan.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Session can be sent to Planner via API endpoint (anytime)" },
+      { "id": "ac2", "description": "Plan inherits: goal (from initial_intent or override), context, understanding" },
+      { "id": "ac3", "description": "Plan has source.type = 'ideation' and source.session_id" },
+      { "id": "ac4", "description": "Session stores full PlannerSend snapshot (payload + result) in planner_sends[]" },
+      { "id": "ac5", "description": "Subsequent sends append to planner_sends[], update the plan (new version with updated understanding)" },
+      { "id": "ac6", "description": "Session stays active - user can continue ideating and send again" },
+      { "id": "ac7", "description": "Interviewer can use send_to_planner tool" },
+      { "id": "ac8", "description": "PlannerLead is notified when plan is created/updated from ideation" }
+    ],
+    "notes": "Sessions stay active after sending to planner. User can continue ideating and send updated understanding. This enables iterative refinement."
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core", "planner-core"],
+    "cross_scope_contracts": [
+      {
+        "name": "Create/Update Plan from Ideation",
+        "from": "ideation-core",
+        "to": "planner-core",
+        "endpoint": "POST /api/plans",
+        "request": {
+          "goal": "string",
+          "context": "string (optional)",
+          "source": {
+            "type": "'ideation'",
+            "session_id": "string"
+          },
+          "understanding": "Record<string, Record<string, unknown>>",
+          "initiative_id": "string (optional, inherited from session)"
+        },
+        "response": {
+          "id": "string",
+          "goal": "string",
+          "status": "'draft'",
+          "source": "{ type: 'ideation', session_id: string }",
+          "understanding": "Understanding"
+        }
+      },
+      {
+        "name": "Notify PlannerLead",
+        "from": "ideation-core",
+        "to": "planner-core",
+        "method": "Relay channel message",
+        "channel": "#plan-{plan_id_prefix}",
+        "message_format": {
+          "type": "'plan_from_ideation'",
+          "plan_id": "string",
+          "session_id": "string",
+          "is_update": "boolean",
+          "goal": "string"
+        }
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "hnd001",
+        "title": "Extend planner-core Plan schema for source",
+        "scope": "planner-core",
+        "description": "Add source field to Plan entity to track origin",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Plan.source = { type: 'manual' | 'ideation' | 'intake', session_id?: string, signal_id?: string }" },
+          { "id": "ac2", "description": "source field stored in plans table (JSONB)" },
+          { "id": "ac3", "description": "Existing plans default to source.type = 'manual'" }
+        ]
+      },
+      {
+        "step_id": "hnd002",
+        "title": "Extend planner-core Plan schema for understanding",
+        "scope": "planner-core",
+        "description": "Add understanding field to PlanVersion entity",
+        "dependencies": ["hnd001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersion.understanding = Record<string, Record<string, unknown>> (freeform)" },
+          { "id": "ac2", "description": "understanding field stored in plan_versions table (JSONB)" },
+          { "id": "ac3", "description": "Existing versions default to empty understanding {}" }
+        ],
+        "notes": "This may already exist from schema-enrichment epic - verify and extend if needed"
+      },
+      {
+        "step_id": "hnd003",
+        "title": "Update POST /api/plans to accept source and understanding",
+        "scope": "planner-core",
+        "description": "Extend create plan endpoint to accept ideation data",
+        "dependencies": ["hnd002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreatePlanRequest accepts optional source object" },
+          { "id": "ac2", "description": "CreatePlanRequest accepts optional understanding object" },
+          { "id": "ac3", "description": "Both are passed through to storage.createPlan()" },
+          { "id": "ac4", "description": "Returns full Plan including source and understanding" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "hnd004",
+        "title": "Implement send-to-planner endpoint in ideation-core",
+        "scope": "ideation-core",
+        "description": "Create POST /api/ideation/sessions/:id/send-to-planner endpoint",
+        "dependencies": ["hnd003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Works on active sessions" },
+          { "id": "ac2", "description": "If planner_sends is empty: creates new plan via planner-core API" },
+          { "id": "ac3", "description": "If planner_sends has entries: creates new plan version with updated understanding" },
+          { "id": "ac4", "description": "Appends PlannerSend to session.planner_sends (full payload snapshot)" },
+          { "id": "ac5", "description": "Returns { session, plan_id, plan_version, plan_channel, is_update }" }
+        ]
+      },
+      {
+        "step_id": "hnd005",
+        "title": "Add send_to_planner tool to Interviewer",
+        "scope": "ideation-core",
+        "description": "Add tool definition and execution for sending to planner",
+        "dependencies": ["hnd004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "send_to_planner: { session_id, goal?, context? } -> calls send-to-planner endpoint" },
+          { "id": "ac2", "description": "Returns { success, plan_id, plan_channel, is_update } on success" },
+          { "id": "ac3", "description": "Interviewer can suggest sending when confidence is high" }
+        ]
+      },
+      {
+        "step_id": "hnd006",
+        "title": "Notify PlannerLead of plan from ideation",
+        "scope": "ideation-core",
+        "description": "Send Relay message to PlannerLead when plan is created/updated from ideation",
+        "dependencies": ["hnd004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After successful send, message plan channel" },
+          { "id": "ac2", "description": "Message includes: plan_id, session_id, is_update flag, goal" },
+          { "id": "ac3", "description": "PlannerLead picks up message and welcomes/acknowledges the update" }
+        ]
+      },
+      {
+        "step_id": "hnd007",
+        "title": "Write handoff integration tests",
+        "scope": "ideation-core",
+        "description": "End-to-end tests for send-to-planner flow",
+        "dependencies": ["hnd006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test first send creates plan" },
+          { "id": "ac2", "description": "Test subsequent sends update plan" },
+          { "id": "ac3", "description": "Test understanding is preserved in plan" },
+          { "id": "ac4", "description": "Test source is correctly set" },
+          { "id": "ac5", "description": "Test session stays active after send" }
+        ]
+      }
+    ]
+  }
+}

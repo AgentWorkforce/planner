@@ -28,12 +28,24 @@ export function EditableTextarea({
     }
   }, [value, isEditing]);
 
+  // Auto-resize textarea to match content
+  // Add 2px to account for border-bottom with border-box sizing
+  const autoResize = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight + 2}px`;
+    }
+  }, []);
+
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
       textareaRef.current.select();
+      // Auto-resize on mount
+      autoResize();
     }
-  }, [isEditing]);
+  }, [isEditing, autoResize]);
 
   const startEditing = useCallback(() => {
     if (disabled) return;
@@ -78,31 +90,31 @@ export function EditableTextarea({
 
   if (isEditing) {
     return (
-      <div className={className}>
-        <textarea
-          ref={textareaRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          className="w-full px-3 py-2 bg-bg-secondary border border-accent-cyan rounded-md text-text-primary text-sm placeholder:text-text-muted focus:ring-1 focus:ring-accent-cyan/50 outline-none resize-y"
-          placeholder={placeholder}
-          rows={rows}
-        />
-        <div className="mt-1 text-xs text-text-muted">
-          Press Cmd/Ctrl+Enter to save, Esc to cancel
-        </div>
-      </div>
+      <textarea
+        ref={textareaRef}
+        value={editValue}
+        onChange={(e) => {
+          setEditValue(e.target.value);
+          autoResize();
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        className={`block w-full p-0 m-0 font-[inherit] bg-accent-cyan/10 text-text-secondary placeholder:text-text-muted border-x-0 border-t-0 border-b-2 rounded-none outline-none focus:outline-none focus-visible:outline-none ring-0 resize-none overflow-hidden ${className}`}
+        placeholder={placeholder}
+        rows={rows}
+        style={{ fieldSizing: 'content', outline: 'none', borderColor: 'var(--color-accent-cyan)' } as React.CSSProperties}
+      />
     );
   }
 
   return (
     <div
-      className={`rounded-md p-3 transition-colors ${
+      className={`transition-colors border-b-2 ${
         disabled
-          ? 'cursor-default bg-bg-tertiary'
-          : 'cursor-pointer bg-bg-tertiary hover:bg-bg-elevated border border-transparent hover:border-border'
+          ? 'cursor-default'
+          : 'cursor-text hover:outline hover:outline-1 hover:outline-dashed hover:outline-accent-cyan'
       } ${className}`}
+      style={{ borderColor: 'transparent' }}
       onClick={startEditing}
       role="button"
       tabIndex={disabled ? -1 : 0}
@@ -114,9 +126,9 @@ export function EditableTextarea({
       }}
     >
       {value ? (
-        <span className="text-sm text-text-secondary whitespace-pre-wrap">{value}</span>
+        <span className={`block text-text-secondary whitespace-pre-wrap ${className}`}>{value}</span>
       ) : (
-        <span className="text-sm text-text-muted italic">{placeholder}</span>
+        <span className={`block text-text-muted italic ${className}`}>{placeholder}</span>
       )}
     </div>
   );

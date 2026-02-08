@@ -3,6 +3,16 @@ export type {
   AttentionType,
   AcceptanceCriterion,
   Gate,
+  // Understanding types (agent observations during ideation)
+  Confidence,
+  AgentObservations,
+  Understanding,
+  // Context types (formalized decisions by role)
+  RoleContext,
+  Context,
+  // Specification types (freeform - any domain, any fields)
+  DomainSpec,
+  Specification,
   Step,
   Summary,
   ApprovalInfo,

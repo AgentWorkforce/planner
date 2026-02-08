@@ -1,23 +1,17 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "resolveJsonModule": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "references": [
+    { "path": "./packages/planner" },
+    { "path": "./packages/server" },
+    { "path": "./packages/ideation" },
+    { "path": "./packages/forge-core" },
+    { "path": "./packages/testbench" },
+    { "path": "./packages/tuner" },
+    { "path": "./packages/planner-ui" },
+    { "path": "./packages/ideation-ui" },
+    { "path": "./packages/forge-ui" },
+    { "path": "./packages/shared-ui" },
+    { "path": "./packages/tend" }
+  ],
+  "include": [],
+  "exclude": ["node_modules", "dist"]
 }

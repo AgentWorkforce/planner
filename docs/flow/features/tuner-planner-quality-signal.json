@@ -1,0 +1,276 @@
+{
+  "title": "Planner Quality Signal Emission",
+  "summary": {
+    "goal": "Wire Planner to emit PlanQualitySignal to Tuner when an ideation-sourced plan is approved. This is the downstream quality signal that closes the feedback loop.",
+    "acceptance_criteria": [
+      {
+        "id": "pqs1",
+        "description": "On plan approval, check plan.source.type === 'ideation' and plan.source.session_id exists"
+      },
+      {
+        "id": "pqs2",
+        "description": "Gather questions_asked, questions_hard_blocking from plan questions"
+      },
+      {
+        "id": "pqs3",
+        "description": "Set versions_before_approval from the approved version number"
+      },
+      {
+        "id": "pqs4",
+        "description": "Gather improvements_suggested, improvements_accepted from version improvements"
+      },
+      {
+        "id": "pqs5",
+        "description": "Count blocks_received from plan understanding._blocks"
+      },
+      {
+        "id": "pqs6",
+        "description": "blocks_mapped_to_steps = 0 for v1 (step-level source tracking deferred)"
+      },
+      {
+        "id": "pqs7",
+        "description": "Fire-and-forget submission to Tuner (log warning on failure, don't block approval)"
+      },
+      {
+        "id": "pqs8",
+        "description": "Signal NOT emitted for manually-created plans (only ideation-sourced)"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "planner-core"
+    ],
+    "steps": [
+      {
+        "step_id": "pqs001",
+        "title": "Add PlanQualitySignal emission to approve handler",
+        "scope": "planner-core",
+        "description": "Extend packages/planner/src/api/handlers/workflow.ts approve handler to emit PlanQualitySignal when approving ideation-sourced plans",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "After version status set to 'approved', check plan.source?.type === 'ideation' && plan.source.session_id"
+          },
+          {
+            "id": "ac2",
+            "description": "If check passes, gather signal data and call tunerClient.submitPlanQualitySignal()"
+          },
+          {
+            "id": "ac3",
+            "description": "Fire-and-forget: .catch(e => console.warn('[planner] Failed to submit plan quality signal:', e.message))"
+          },
+          {
+            "id": "ac4",
+            "description": "Approval succeeds even if Tuner submission fails"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/handlers/workflow.ts",
+            "pattern": "Fire-and-forget signal emission after approval",
+            "reference": "Plan section 3.4"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "pqs002",
+        "title": "Gather questions data",
+        "scope": "planner-core",
+        "description": "Query storage for plan questions and count total questions and hard-blocking questions",
+        "dependencies": [
+          "pqs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "const questions = storage.listQuestionsByPlan(planId)"
+          },
+          {
+            "id": "ac2",
+            "description": "questions_asked = questions.length"
+          },
+          {
+            "id": "ac3",
+            "description": "questions_hard_blocking = questions.filter(q => q.blocking_level === 'hard_block').length"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "data_source": "storage.listQuestionsByPlan() or similar method",
+            "reference": "Plan section 3.4"
+          }
+        }
+      },
+      {
+        "step_id": "pqs003",
+        "title": "Gather version and improvements data",
+        "scope": "planner-core",
+        "description": "Set versions_before_approval from version number, gather improvements from version",
+        "dependencies": [
+          "pqs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "versions_before_approval = approvedVersion.version"
+          },
+          {
+            "id": "ac2",
+            "description": "const improvements = version.improvements ?? []"
+          },
+          {
+            "id": "ac3",
+            "description": "improvements_suggested = improvements.length"
+          },
+          {
+            "id": "ac4",
+            "description": "improvements_accepted = improvements.filter(i => i.status === 'accepted').length"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "data_source": "approvedVersion from workflow handler context",
+            "reference": "Plan section 3.4"
+          }
+        }
+      },
+      {
+        "step_id": "pqs004",
+        "title": "Count blocks from understanding",
+        "scope": "planner-core",
+        "description": "Count blocks_received from plan.understanding._blocks (or version.understanding._blocks)",
+        "dependencies": [
+          "pqs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "blocks_received = version.understanding?._blocks?.length ?? 0"
+          },
+          {
+            "id": "ac2",
+            "description": "blocks_mapped_to_steps = 0 for v1 (deferred to later)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "data_source": "version.understanding from ideation handoff",
+            "note": "Step-level source tracking deferred to later phase",
+            "reference": "Plan section 3.4"
+          }
+        }
+      },
+      {
+        "step_id": "pqs005",
+        "title": "Calculate time to approval",
+        "scope": "planner-core",
+        "description": "Compute time_to_approval_seconds from plan creation to approval timestamp",
+        "dependencies": [
+          "pqs001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "If plan.created_at and approval timestamp available: time_to_approval_seconds = (approval_ts - created_ts) / 1000"
+          },
+          {
+            "id": "ac2",
+            "description": "Otherwise: time_to_approval_seconds = null"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "data_source": "plan.created_at, current timestamp",
+            "reference": "Plan section 3.4"
+          }
+        }
+      },
+      {
+        "step_id": "pqs006",
+        "title": "Initialize TunerClient in planner",
+        "scope": "planner-core",
+        "description": "In packages/planner or src/, initialize TunerClient (if not already) and make available to handlers",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "import { TunerClient } from '@planner/tuner'; or getDefaultTunerClient() if available"
+          },
+          {
+            "id": "ac2",
+            "description": "TunerClient initialized with TUNER_URL from env (or default)"
+          },
+          {
+            "id": "ac3",
+            "description": "Available in workflow handler context"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/server.ts or src/api/handlers/workflow.ts",
+            "pattern": "Use existing tuner client if available, otherwise create",
+            "reference": "Plan section 3.4"
+          }
+        },
+        "integration": true
+      },
+      {
+        "step_id": "pqs007",
+        "title": "Test PlanQualitySignal emission",
+        "scope": "planner-core",
+        "description": "Integration tests verifying signal emission on approval of ideation-sourced plans",
+        "dependencies": [
+          "pqs002",
+          "pqs003",
+          "pqs004",
+          "pqs005",
+          "pqs006"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Ideation-sourced plan approval emits PlanQualitySignal with correct data"
+          },
+          {
+            "id": "ac2",
+            "description": "Manually-created plan approval does NOT emit signal"
+          },
+          {
+            "id": "ac3",
+            "description": "Signal includes questions_asked, versions_before_approval, blocks_received"
+          },
+          {
+            "id": "ac4",
+            "description": "Approval succeeds when Tuner is unreachable (fire-and-forget)"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/planner/src/api/handlers/workflow.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-planner-quality-signal",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "planner-core",
+  "dependencies": [
+    "tuner-ideation-api",
+    "ideation-planner-handoff"
+  ]
+}

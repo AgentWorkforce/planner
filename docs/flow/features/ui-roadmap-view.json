@@ -1,0 +1,11 @@
+{
+  "feature_id": "ui-roadmap-view",
+  "title": "ui-roadmap-view",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "parent": "standalone-app",
+  "summary": {
+    "goal": "ui-roadmap-view"
+  }
+}

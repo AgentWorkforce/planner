@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChevronIcon } from '@/components/icons/ChevronIcon';
-import { MenuIcon } from '@/components/icons/MenuIcon';
-import { ConfidenceBar } from '@/components/conversation/ConfidenceBar';
+import { ConfidenceBar } from '@/components/chat/ConfidenceBar';
 import { useConfidence } from '@/hooks/useConfidence';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -35,8 +34,6 @@ export interface SessionNavProps {
   sessions: SessionInfo[];
   onTitleChange?: (newTitle: string) => void;
   onSessionSwitch?: (sessionId: string) => void;
-  onOpenUnderstanding?: () => void;
-  onHandoff?: () => void;
   className?: string;
 }
 
@@ -174,72 +171,6 @@ function SessionTitleDropdown({
 }
 
 /**
- * MobileActionsMenu
- *
- * Dropdown menu for mobile header actions
- * Consolidates AI Understanding and Planner buttons into a menu
- */
-interface MobileActionsMenuProps {
-  onOpenUnderstanding?: () => void;
-  onHandoff?: () => void;
-}
-
-function MobileActionsMenu({ onOpenUnderstanding, onHandoff }: MobileActionsMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
-  return (
-    <div ref={menuRef} className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-md hover:bg-muted transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-        aria-label="Open menu"
-        aria-expanded={isOpen}
-      >
-        <MenuIcon size="md" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 py-1 min-w-[180px] bg-popover border border-border rounded-md shadow-md z-50 animate-in fade-in-0 zoom-in-95 duration-100">
-          <button
-            onClick={() => {
-              onOpenUnderstanding?.();
-              setIsOpen(false);
-            }}
-            className="w-full px-4 py-3 text-sm text-left hover:bg-muted focus:bg-muted focus:outline-none min-h-[44px]"
-          >
-            AI Understanding
-          </button>
-          <button
-            onClick={() => {
-              onHandoff?.();
-              setIsOpen(false);
-            }}
-            className="w-full px-4 py-3 text-sm text-left hover:bg-muted focus:bg-muted focus:outline-none min-h-[44px] font-medium"
-          >
-            → Planner
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
  * SessionNav
  *
  * Navigation bar for the ideation canvas (fits in the N grid area).
@@ -263,8 +194,6 @@ export function SessionNav({
   sessions,
   onTitleChange,
   onSessionSwitch,
-  onOpenUnderstanding,
-  onHandoff,
   className,
 }: SessionNavProps) {
   const navigate = useNavigate();
@@ -280,7 +209,7 @@ export function SessionNav({
       {/* Left section */}
       <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
         <button
-          onClick={() => navigate('/ideation')}
+          onClick={() => navigate('/')}
           className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--canvas-bg-subtle)] transition-colors shrink-0"
           aria-label="Go back to dashboard"
         >
@@ -300,29 +229,11 @@ export function SessionNav({
       {/* Right section — desktop */}
       <div className="hidden md:flex items-center gap-2">
         <ThemeToggle />
-        <button
-          onClick={onOpenUnderstanding}
-          className="px-3 py-1.5 text-sm rounded-md hover:bg-[var(--canvas-bg-subtle)] transition-colors text-[var(--canvas-text-primary)]"
-        >
-          AI Understanding
-        </button>
-        <button
-          onClick={onHandoff}
-          className={cn(
-            'px-3 py-1.5 text-sm rounded-md text-white font-medium transition-colors',
-            score <= 40 && 'bg-error hover:bg-error/90',
-            score > 40 && score <= 60 && 'bg-warning hover:bg-warning/90',
-            score > 60 && 'bg-success hover:bg-success/90',
-          )}
-        >
-          → Planner
-        </button>
       </div>
 
-      {/* Mobile: theme toggle + hamburger menu */}
+      {/* Mobile */}
       <div className="md:hidden flex items-center gap-1">
         <ThemeToggle />
-        <MobileActionsMenu onOpenUnderstanding={onOpenUnderstanding} onHandoff={onHandoff} />
       </div>
     </header>
   );

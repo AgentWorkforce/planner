@@ -1,0 +1,254 @@
+{
+  "title": "Ideation Storage Tables",
+  "summary": {
+    "goal": "Add SQLite tables for ideation outcomes, plan quality signals, and ideation baselines. Extend config_versions with ideation_config column.",
+    "acceptance_criteria": [
+      {
+        "id": "isto1",
+        "description": "ideation_outcomes table with UNIQUE(session_id, send_number), indexes on session_id and timestamp"
+      },
+      {
+        "id": "isto2",
+        "description": "plan_quality_signals table with UNIQUE(plan_id), index on session_id"
+      },
+      {
+        "id": "isto3",
+        "description": "ideation_baselines table with PRIMARY KEY(pattern)"
+      },
+      {
+        "id": "isto4",
+        "description": "config_versions table extended with nullable ideation_config TEXT column"
+      },
+      {
+        "id": "isto5",
+        "description": "TunerStorage interface extended with: insertIdeationOutcome, getIdeationOutcomesBySession, getRecentIdeationOutcomes, insertPlanQualitySignal, getPlanQualitySignal, getPlanQualitySignalBySession, getIdeationBaseline, upsertIdeationBaseline, listIdeationBaselines"
+      },
+      {
+        "id": "isto6",
+        "description": "JSON columns (specialists_spawned, specialist_contributions, specialist_contribution_rates) use JSON.stringify/parse"
+      },
+      {
+        "id": "isto7",
+        "description": "Schema migration is idempotent (safe to re-run)"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "isto001",
+        "title": "Add ideation tables to schema",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/storage/schema.ts with CREATE TABLE statements for ideation_outcomes, plan_quality_signals, ideation_baselines. Add indexes.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "ideation_outcomes table with UNIQUE(session_id, send_number), idx on session_id and timestamp"
+          },
+          {
+            "id": "ac2",
+            "description": "plan_quality_signals table with UNIQUE(plan_id), idx on session_id"
+          },
+          {
+            "id": "ac3",
+            "description": "ideation_baselines table with PRIMARY KEY(pattern)"
+          },
+          {
+            "id": "ac4",
+            "description": "JSON columns: specialists_spawned TEXT NOT NULL DEFAULT '[]', specialist_contributions TEXT NOT NULL DEFAULT '{}'"
+          },
+          {
+            "id": "ac5",
+            "description": "Boolean is_first_send stored as INTEGER (0/1)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/storage/schema.ts",
+            "pattern": "CREATE TABLE IF NOT EXISTS with indexes",
+            "reference": "Plan section 1.6"
+          },
+          "model": {
+            "ideation_outcomes": "session_id, plan_id, session_duration_seconds, conversation_turns, specialists_spawned (JSON), specialist_contributions (JSON), blocks_total, blocks_curated, blocks_user_edited, avg_block_confidence, is_first_send (INT), send_number, understanding_field_count, source, timestamp",
+            "plan_quality_signals": "plan_id, session_id, questions_asked, questions_hard_blocking, versions_before_approval, improvements_suggested, improvements_accepted, blocks_received, blocks_mapped_to_steps, time_to_approval_seconds, source, timestamp",
+            "ideation_baselines": "pattern (PK), mean_questions_per_plan, stddev_questions, mean_versions_before_approval, stddev_versions, mean_block_utilization, stddev_block_utilization, mean_conversation_turns, stddev_conversation_turns, specialist_contribution_rates (JSON), m2_* fields, sample_count, last_updated"
+          }
+        }
+      },
+      {
+        "step_id": "isto002",
+        "title": "Extend config_versions table",
+        "scope": "tuner",
+        "description": "Add migration to extend config_versions with ideation_config TEXT column. Check if column exists first for idempotency.",
+        "dependencies": [
+          "isto001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Migration adds ideation_config TEXT column if not exists"
+          },
+          {
+            "id": "ac2",
+            "description": "Migration is idempotent (safe to re-run)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/storage/schema.ts",
+            "pattern": "ALTER TABLE IF NOT EXISTS logic or PRAGMA table_info check",
+            "reference": "Plan section 1.9"
+          }
+        }
+      },
+      {
+        "step_id": "isto003",
+        "title": "Extend TunerStorage interface",
+        "scope": "tuner",
+        "description": "Add method signatures to packages/tuner/src/storage/interface.ts for ideation CRUD operations",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "insertIdeationOutcome(outcome: IdeationOutcome): void"
+          },
+          {
+            "id": "ac2",
+            "description": "getIdeationOutcomesBySession(sessionId: string): IdeationOutcome[]"
+          },
+          {
+            "id": "ac3",
+            "description": "getRecentIdeationOutcomes(limit: number): IdeationOutcome[]"
+          },
+          {
+            "id": "ac4",
+            "description": "insertPlanQualitySignal(signal: PlanQualitySignal): void"
+          },
+          {
+            "id": "ac5",
+            "description": "getPlanQualitySignal(planId: string): PlanQualitySignal | null"
+          },
+          {
+            "id": "ac6",
+            "description": "getPlanQualitySignalBySession(sessionId: string): PlanQualitySignal[]"
+          },
+          {
+            "id": "ac7",
+            "description": "getIdeationBaseline(pattern: string): IdeationBaseline | null"
+          },
+          {
+            "id": "ac8",
+            "description": "upsertIdeationBaseline(baseline: IdeationBaseline): void"
+          },
+          {
+            "id": "ac9",
+            "description": "listIdeationBaselines(): IdeationBaseline[]"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/storage/interface.ts",
+            "pattern": "Interface method signatures",
+            "reference": "Plan section 1.7"
+          }
+        }
+      },
+      {
+        "step_id": "isto004",
+        "title": "Implement SQLite storage methods",
+        "scope": "tuner",
+        "description": "Implement all new interface methods in packages/tuner/src/storage/sqlite.ts using prepared statements. Handle JSON serialization for array/object columns.",
+        "dependencies": [
+          "isto001",
+          "isto002",
+          "isto003"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "All methods use prepared statements via better-sqlite3"
+          },
+          {
+            "id": "ac2",
+            "description": "JSON columns use JSON.stringify on write, JSON.parse on read"
+          },
+          {
+            "id": "ac3",
+            "description": "Boolean is_first_send converted to/from 0/1"
+          },
+          {
+            "id": "ac4",
+            "description": "upsertIdeationBaseline uses INSERT OR REPLACE"
+          },
+          {
+            "id": "ac5",
+            "description": "Methods follow existing pattern (e.g., insertTaskOutcome, getTaskBaseline)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/storage/sqlite.ts",
+            "pattern": "Prepared statements, JSON serialization",
+            "reference": "Plan section 1.8"
+          }
+        }
+      },
+      {
+        "step_id": "isto005",
+        "title": "Test storage layer",
+        "scope": "tuner",
+        "description": "Unit tests for new storage methods using temp SQLite database",
+        "dependencies": [
+          "isto004"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Insert and retrieve IdeationOutcome round-trips correctly"
+          },
+          {
+            "id": "ac2",
+            "description": "Insert and retrieve PlanQualitySignal round-trips correctly"
+          },
+          {
+            "id": "ac3",
+            "description": "Upsert IdeationBaseline creates/updates correctly"
+          },
+          {
+            "id": "ac4",
+            "description": "JSON columns deserialize to correct types"
+          },
+          {
+            "id": "ac5",
+            "description": "Temp DB cleaned up after tests"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/tuner/src/storage/sqlite.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-storage",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-ideation-domain",
+    "tuner-storage"
+  ]
+}

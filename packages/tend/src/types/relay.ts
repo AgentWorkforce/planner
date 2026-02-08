@@ -1,16 +1,6 @@
-/**
- * Relay types for tend package
- * Based on planner-ui relay types
- */
+export type RelayEntityType = 'user' | 'agent';
 
-export type RelayEntityType = 'agent' | 'user' | 'system';
-
-export type RelayConnectionState =
-  | 'disconnected'
-  | 'connecting'
-  | 'connected'
-  | 'reconnecting'
-  | 'error';
+export type RelayConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 export interface PresenceEntry {
   userId: string;
@@ -24,8 +14,8 @@ export interface RelayMessage {
   from: string;
   fromName: string;
   entityType: RelayEntityType;
-  channel?: string;
-  body: string;
+  channelId?: string;
+  content: string;
   timestamp: string;
   data?: Record<string, unknown>;
 }
@@ -40,7 +30,7 @@ export interface BrowserOutgoingMessage {
 
 export interface ServerIncomingMessage {
   type: 'status' | 'message' | 'channel_message' | 'joined' | 'left' | 'error';
-  mode?: 'connected' | 'mock';
+  mode?: 'real' | 'mock';
   userId?: string;
   id?: string;
   from?: string;
@@ -61,8 +51,8 @@ export interface UseRelayConnectionResult {
   userId: string | null;
   joinChannel: (channelId: string) => void;
   leaveChannel: (channelId: string) => void;
-  sendChannelMessage: (channelId: string, body: string, data?: Record<string, unknown>) => void;
-  sendDirectMessage: (to: string, body: string, data?: Record<string, unknown>) => void;
+  sendChannelMessage: (channelId: string, content: string, data?: Record<string, unknown>) => void;
+  sendDirectMessage: (to: string, content: string, data?: Record<string, unknown>) => void;
   onMessage: (handler: (message: RelayMessage) => void) => () => void;
   onChannelMessage: (handler: (message: RelayMessage) => void) => () => void;
   onJoined: (handler: (channelId: string, members: PresenceEntry[]) => void) => () => void;

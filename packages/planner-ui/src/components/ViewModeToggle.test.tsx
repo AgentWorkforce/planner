@@ -15,14 +15,15 @@ describe('ViewModeToggle', () => {
     render(<ViewModeToggle value="list" onChange={vi.fn()} />);
 
     const listButton = screen.getByRole('button', { name: /list/i });
-    expect(listButton).toHaveClass('active');
+    // Active state uses bg-accent-cyan class
+    expect(listButton).toHaveClass('bg-accent-cyan');
   });
 
   it('shows swimlane button as active when value is swimlane', () => {
     render(<ViewModeToggle value="swimlane" onChange={vi.fn()} />);
 
     const swimlaneButton = screen.getByRole('button', { name: /swimlane/i });
-    expect(swimlaneButton).toHaveClass('active');
+    expect(swimlaneButton).toHaveClass('bg-accent-cyan');
   });
 
   it('calls onChange with "list" when list button clicked', async () => {

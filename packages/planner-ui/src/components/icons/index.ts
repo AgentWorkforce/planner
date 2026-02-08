@@ -16,10 +16,19 @@ export { PlayIcon } from './PlayIcon';
 export { ChannelIcon } from './ChannelIcon';
 export { SendIcon } from './SendIcon';
 export { UsersIcon } from './UsersIcon';
+export { UserIcon } from './UserIcon';
 export { EnvelopeIcon } from './EnvelopeIcon';
 export { SearchIcon } from './SearchIcon';
 export { BrainIcon } from './BrainIcon';
 export { DecisionsIcon } from './DecisionsIcon';
+export { ChatQuestionIcon } from './ChatQuestionIcon';
+
+// Role icons (for Understanding UI and Context UI)
+export { ArchitectIcon } from './ArchitectIcon';
+export { DesignerIcon } from './DesignerIcon';
+export { TesterIcon } from './TesterIcon';
+export { SecurityIcon } from './SecurityIcon';
+export { DatabaseIcon } from './DatabaseIcon';
 
 // Navigation icons (lucide-react)
 export { DashboardIcon } from './DashboardIcon';
@@ -33,6 +42,7 @@ export { ChevronRightIcon } from './ChevronRightIcon';
 // Pipeline view icons (lucide-react)
 export { RowsIcon } from './RowsIcon';
 export { ColumnsIcon } from './ColumnsIcon';
+export { TableIcon } from './TableIcon';
 export { WaveIcon } from './WaveIcon';
 
 // Theme icons

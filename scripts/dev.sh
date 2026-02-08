@@ -1,6 +1,6 @@
 #!/bin/bash
 # Development environment startup script
-# Manages: agent-relay daemon, backend API, frontend UI
+# Manages: agent-relay daemon, backend API, planner/ideation/forge UIs
 
 set -e
 
@@ -28,7 +28,10 @@ error() { echo -e "${RED}[dev]${NC} $1"; }
 
 # PID files for tracking our processes
 BACKEND_PID_FILE="$PROJECT_DIR/.dev-backend.pid"
-FRONTEND_PID_FILE="$PROJECT_DIR/.dev-frontend.pid"
+PLANNER_PID_FILE="$PROJECT_DIR/.dev-planner.pid"
+IDEATION_FRONTEND_PID_FILE="$PROJECT_DIR/.dev-ideation-frontend.pid"
+FORGE_FRONTEND_PID_FILE="$PROJECT_DIR/.dev-forge-frontend.pid"
+TUNER_PID_FILE="$PROJECT_DIR/.dev-tuner.pid"
 TEND_PID_FILE="$PROJECT_DIR/.dev-tend.pid"
 
 # Check if a process is running
@@ -110,7 +113,8 @@ start_backend() {
     fi
 
     log "Starting backend API server..."
-    npm run start > "$PROJECT_DIR/.dev-backend.log" 2>&1 &
+    cd "$PROJECT_DIR"
+    npm run start -w server > "$PROJECT_DIR/.dev-backend.log" 2>&1 &
     local pid=$!
     echo "$pid" > "$BACKEND_PID_FILE"
 
@@ -127,9 +131,9 @@ start_backend() {
     return 1
 }
 
-# Start frontend
-start_frontend() {
-    stop_process "$FRONTEND_PID_FILE" "frontend"
+# Start planner UI
+start_planner() {
+    stop_process "$PLANNER_PID_FILE" "planner"
 
     # Check if port 3000 is in use
     if lsof -i :3000 >/dev/null 2>&1; then
@@ -138,29 +142,121 @@ start_frontend() {
         sleep 1
     fi
 
-    log "Starting frontend dev server..."
+    log "Starting planner UI dev server..."
     cd "$PROJECT_DIR/packages/planner-ui"
-    npm run dev > "$PROJECT_DIR/.dev-frontend.log" 2>&1 &
+    npm run dev > "$PROJECT_DIR/.dev-planner.log" 2>&1 &
     local pid=$!
-    echo "$pid" > "$FRONTEND_PID_FILE"
+    echo "$pid" > "$PLANNER_PID_FILE"
     cd "$PROJECT_DIR"
 
     # Wait for server to be ready
     for i in {1..30}; do
         if curl -s http://localhost:3000 >/dev/null 2>&1; then
-            success "Frontend running at http://localhost:3000"
+            success "Planner UI running at http://localhost:3000"
             return 0
         fi
         sleep 1
     done
 
-    error "Frontend failed to start. Check $PROJECT_DIR/.dev-frontend.log"
+    error "Planner UI failed to start. Check $PROJECT_DIR/.dev-planner.log"
     return 1
 }
 
-# Start tend
-start_tend() {
-    stop_process "$TEND_PID_FILE" "tend"
+# Start ideation frontend
+start_ideation_frontend() {
+    stop_process "$IDEATION_FRONTEND_PID_FILE" "ideation-frontend"
+
+    # Check if port 3002 is in use
+    if lsof -i :3002 >/dev/null 2>&1; then
+        warn "Port 3002 already in use, attempting to free..."
+        lsof -ti :3002 | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+
+    log "Starting ideation frontend dev server..."
+    cd "$PROJECT_DIR/packages/ideation-ui"
+    npm run dev > "$PROJECT_DIR/.dev-ideation-frontend.log" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$IDEATION_FRONTEND_PID_FILE"
+    cd "$PROJECT_DIR"
+
+    # Wait for server to be ready
+    for i in {1..30}; do
+        if curl -s http://localhost:3002 >/dev/null 2>&1; then
+            success "Ideation frontend running at http://localhost:3002"
+            return 0
+        fi
+        sleep 1
+    done
+
+    error "Ideation frontend failed to start. Check $PROJECT_DIR/.dev-ideation-frontend.log"
+    return 1
+}
+
+# Start forge frontend
+start_forge_frontend() {
+    stop_process "$FORGE_FRONTEND_PID_FILE" "forge-frontend"
+
+    # Check if port 3003 is in use
+    if lsof -i :3003 >/dev/null 2>&1; then
+        warn "Port 3003 already in use, attempting to free..."
+        lsof -ti :3003 | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+
+    log "Starting forge frontend dev server..."
+    cd "$PROJECT_DIR/packages/forge-ui"
+    npm run dev > "$PROJECT_DIR/.dev-forge-frontend.log" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$FORGE_FRONTEND_PID_FILE"
+    cd "$PROJECT_DIR"
+
+    # Wait for server to be ready
+    for i in {1..30}; do
+        if curl -s http://localhost:3003 >/dev/null 2>&1; then
+            success "Forge frontend running at http://localhost:3003"
+            return 0
+        fi
+        sleep 1
+    done
+
+    error "Forge frontend failed to start. Check $PROJECT_DIR/.dev-forge-frontend.log"
+    return 1
+}
+
+# Start tuner service
+start_tuner() {
+    stop_process "$TUNER_PID_FILE" "tuner"
+
+    # Check if port 4002 is in use (tuner default port)
+    if lsof -i :4002 >/dev/null 2>&1; then
+        warn "Port 4002 already in use, attempting to free..."
+        lsof -ti :4002 | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+
+    log "Starting tuner service..."
+    cd "$PROJECT_DIR"
+    npm run start -w tuner > "$PROJECT_DIR/.dev-tuner.log" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$TUNER_PID_FILE"
+
+    # Wait for server to be ready
+    for i in {1..30}; do
+        if curl -s http://localhost:4002/health >/dev/null 2>&1; then
+            success "Tuner service running at http://localhost:4002"
+            return 0
+        fi
+        sleep 1
+    done
+
+    error "Tuner failed to start. Check $PROJECT_DIR/.dev-tuner.log"
+    return 1
+}
+
+# Start tend frontend
+start_tend_frontend() {
+    stop_process "$TEND_PID_FILE" "tend-frontend"
 
     # Check if port 3004 is in use
     if lsof -i :3004 >/dev/null 2>&1; then
@@ -169,23 +265,21 @@ start_tend() {
         sleep 1
     fi
 
-    log "Starting tend dev server..."
-    cd "$PROJECT_DIR/packages/tend"
-    npm run dev > "$PROJECT_DIR/.dev-tend.log" 2>&1 &
+    log "Starting tend frontend dev server..."
+    npm run dev -w @plannr/tend > "$PROJECT_DIR/.dev-tend-frontend.log" 2>&1 &
     local pid=$!
     echo "$pid" > "$TEND_PID_FILE"
-    cd "$PROJECT_DIR"
 
     # Wait for server to be ready
     for i in {1..30}; do
         if curl -s http://localhost:3004 >/dev/null 2>&1; then
-            success "Tend running at http://localhost:3004"
+            success "Tend frontend running at http://localhost:3004"
             return 0
         fi
         sleep 1
     done
 
-    error "Tend failed to start. Check $PROJECT_DIR/.dev-tend.log"
+    error "Tend frontend failed to start. Check $PROJECT_DIR/.dev-tend-frontend.log"
     return 1
 }
 
@@ -215,27 +309,63 @@ show_status() {
     fi
 
     # Frontend status
-    if [ -f "$FRONTEND_PID_FILE" ]; then
-        local pid=$(cat "$FRONTEND_PID_FILE")
+    if [ -f "$PLANNER_PID_FILE" ]; then
+        local pid=$(cat "$PLANNER_PID_FILE")
         if is_running "$pid" && curl -s http://localhost:3000 >/dev/null 2>&1; then
-            success "Frontend: running (PID: $pid) at http://localhost:3000"
+            success "Planner UI: running (PID: $pid) at http://localhost:3000"
         else
-            warn "Frontend: not running"
+            warn "Planner UI: not running"
         fi
     else
-        warn "Frontend: not running"
+        warn "Planner UI: not running"
     fi
 
-    # Tend status
+    # Ideation frontend status
+    if [ -f "$IDEATION_FRONTEND_PID_FILE" ]; then
+        local pid=$(cat "$IDEATION_FRONTEND_PID_FILE")
+        if is_running "$pid" && curl -s http://localhost:3002 >/dev/null 2>&1; then
+            success "Ideation UI: running (PID: $pid) at http://localhost:3002"
+        else
+            warn "Ideation UI: not running"
+        fi
+    else
+        warn "Ideation UI: not running"
+    fi
+
+    # Forge frontend status
+    if [ -f "$FORGE_FRONTEND_PID_FILE" ]; then
+        local pid=$(cat "$FORGE_FRONTEND_PID_FILE")
+        if is_running "$pid" && curl -s http://localhost:3003 >/dev/null 2>&1; then
+            success "Forge UI: running (PID: $pid) at http://localhost:3003"
+        else
+            warn "Forge UI: not running"
+        fi
+    else
+        warn "Forge UI: not running"
+    fi
+
+    # Tuner service status
+    if [ -f "$TUNER_PID_FILE" ]; then
+        local pid=$(cat "$TUNER_PID_FILE")
+        if is_running "$pid" && curl -s http://localhost:4002/health >/dev/null 2>&1; then
+            success "Tuner: running (PID: $pid) at http://localhost:4002"
+        else
+            warn "Tuner: not running"
+        fi
+    else
+        warn "Tuner: not running"
+    fi
+
+    # Tend frontend status
     if [ -f "$TEND_PID_FILE" ]; then
         local pid=$(cat "$TEND_PID_FILE")
         if is_running "$pid" && curl -s http://localhost:3004 >/dev/null 2>&1; then
-            success "Tend: running (PID: $pid) at http://localhost:3004"
+            success "Tend UI: running (PID: $pid) at http://localhost:3004"
         else
-            warn "Tend: not running"
+            warn "Tend UI: not running"
         fi
     else
-        warn "Tend: not running"
+        warn "Tend UI: not running"
     fi
 
     echo ""
@@ -248,21 +378,30 @@ case "${1:-start}" in
         echo ""
         start_relay
         start_backend
-        start_frontend
-        start_tend
+        start_tuner
+        start_planner
+        start_ideation_frontend
+        start_forge_frontend
+        start_tend_frontend
         show_status
         success "Development environment ready!"
         echo ""
         log "Logs:"
-        log "  Backend:  tail -f $PROJECT_DIR/.dev-backend.log"
-        log "  Frontend: tail -f $PROJECT_DIR/.dev-frontend.log"
-        log "  Tend:     tail -f $PROJECT_DIR/.dev-tend.log"
+        log "  Backend:           tail -f $PROJECT_DIR/.dev-backend.log"
+        log "  Tuner:             tail -f $PROJECT_DIR/.dev-tuner.log"
+        log "  Planner UI:        tail -f $PROJECT_DIR/.dev-planner.log"
+        log "  Ideation UI:       tail -f $PROJECT_DIR/.dev-ideation-frontend.log"
+        log "  Forge UI:          tail -f $PROJECT_DIR/.dev-forge-frontend.log"
+        log "  Tend UI:           tail -f $PROJECT_DIR/.dev-tend-frontend.log"
         echo ""
         ;;
     stop)
         log "Stopping development environment..."
-        stop_process "$TEND_PID_FILE" "tend"
-        stop_process "$FRONTEND_PID_FILE" "frontend"
+        stop_process "$TEND_PID_FILE" "tend-frontend"
+        stop_process "$FORGE_FRONTEND_PID_FILE" "forge-frontend"
+        stop_process "$IDEATION_FRONTEND_PID_FILE" "ideation-frontend"
+        stop_process "$PLANNER_PID_FILE" "planner"
+        stop_process "$TUNER_PID_FILE" "tuner"
         stop_process "$BACKEND_PID_FILE" "backend"
         stop_relay
         success "Development environment stopped"
@@ -293,21 +432,48 @@ case "${1:-start}" in
             *) log "Usage: $0 backend [start|stop|restart|logs]" ;;
         esac
         ;;
-    frontend)
+    planner)
         case "${2:-start}" in
-            start) start_frontend ;;
-            stop) stop_process "$FRONTEND_PID_FILE" "frontend" ;;
-            restart) stop_process "$FRONTEND_PID_FILE" "frontend"; sleep 1; start_frontend ;;
-            logs) tail -f "$PROJECT_DIR/.dev-frontend.log" ;;
-            *) log "Usage: $0 frontend [start|stop|restart|logs]" ;;
+            start) start_planner ;;
+            stop) stop_process "$PLANNER_PID_FILE" "planner" ;;
+            restart) stop_process "$PLANNER_PID_FILE" "planner"; sleep 1; start_planner ;;
+            logs) tail -f "$PROJECT_DIR/.dev-planner.log" ;;
+            *) log "Usage: $0 planner [start|stop|restart|logs]" ;;
+        esac
+        ;;
+    ideation)
+        case "${2:-start}" in
+            start) start_ideation_frontend ;;
+            stop) stop_process "$IDEATION_FRONTEND_PID_FILE" "ideation-frontend" ;;
+            restart) stop_process "$IDEATION_FRONTEND_PID_FILE" "ideation-frontend"; sleep 1; start_ideation_frontend ;;
+            logs) tail -f "$PROJECT_DIR/.dev-ideation-frontend.log" ;;
+            *) log "Usage: $0 ideation [start|stop|restart|logs]" ;;
+        esac
+        ;;
+    forge)
+        case "${2:-start}" in
+            start) start_forge_frontend ;;
+            stop) stop_process "$FORGE_FRONTEND_PID_FILE" "forge-frontend" ;;
+            restart) stop_process "$FORGE_FRONTEND_PID_FILE" "forge-frontend"; sleep 1; start_forge_frontend ;;
+            logs) tail -f "$PROJECT_DIR/.dev-forge-frontend.log" ;;
+            *) log "Usage: $0 forge [start|stop|restart|logs]" ;;
+        esac
+        ;;
+    tuner)
+        case "${2:-start}" in
+            start) start_tuner ;;
+            stop) stop_process "$TUNER_PID_FILE" "tuner" ;;
+            restart) stop_process "$TUNER_PID_FILE" "tuner"; sleep 1; start_tuner ;;
+            logs) tail -f "$PROJECT_DIR/.dev-tuner.log" ;;
+            *) log "Usage: $0 tuner [start|stop|restart|logs]" ;;
         esac
         ;;
     tend)
         case "${2:-start}" in
-            start) start_tend ;;
-            stop) stop_process "$TEND_PID_FILE" "tend" ;;
-            restart) stop_process "$TEND_PID_FILE" "tend"; sleep 1; start_tend ;;
-            logs) tail -f "$PROJECT_DIR/.dev-tend.log" ;;
+            start) start_tend_frontend ;;
+            stop) stop_process "$TEND_PID_FILE" "tend-frontend" ;;
+            restart) stop_process "$TEND_PID_FILE" "tend-frontend"; sleep 1; start_tend_frontend ;;
+            logs) tail -f "$PROJECT_DIR/.dev-tend-frontend.log" ;;
             *) log "Usage: $0 tend [start|stop|restart|logs]" ;;
         esac
         ;;
@@ -315,7 +481,10 @@ case "${1:-start}" in
         echo "Usage: $0 {start|stop|restart|status}"
         echo "       $0 relay {start|stop|restart}"
         echo "       $0 backend {start|stop|restart|logs}"
-        echo "       $0 frontend {start|stop|restart|logs}"
+        echo "       $0 tuner {start|stop|restart|logs}"
+        echo "       $0 planner {start|stop|restart|logs}"
+        echo "       $0 ideation {start|stop|restart|logs}"
+        echo "       $0 forge {start|stop|restart|logs}"
         echo "       $0 tend {start|stop|restart|logs}"
         exit 1
         ;;

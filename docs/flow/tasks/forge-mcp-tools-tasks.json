@@ -1,0 +1,437 @@
+{
+  "feature_id": "forge-mcp-tools",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fmt-s1-task",
+      "step_id": "fmt-s1",
+      "title": "Create MCP tool response types",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/mcp/tools/types.ts from planner-core (lines 1-60)",
+            "Understand MCP SDK CallToolResult format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ToolSuccessResponse<T> = { success: true, data: T }",
+            "ToolErrorResponse = { success: false, error: string }",
+            "success<T>(data) and error(message) helper functions",
+            "toCallToolResult(response) converts to MCP SDK CallToolResult format"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Verify types match MCP SDK expectations",
+            "Test conversion functions"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for response type helpers"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s2-task",
+      "step_id": "fmt-s2",
+      "title": "Define report_progress tool",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/mcp/tools/index.ts:22-37 for tool schema pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tool schema: task_id (required), status: 'starting' | 'working' | 'blocked', message (required), progress_pct (optional, 0-100)",
+            "Handler validates task_id exists and belongs to caller's run",
+            "Emits trajectory event with type='agent_progress'",
+            "Updates agent heartbeat timestamp for health monitoring",
+            "Returns { success: true, data: { acknowledged: true } }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test tool with valid and invalid task_ids",
+            "Verify trajectory event emission"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for report_progress handler"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s3-task",
+      "step_id": "fmt-s3",
+      "title": "Define report_complete tool",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review Artifact schema from forge-domain",
+            "Understand audit flow (step.audit=true)"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tool schema: task_id (required), artifacts: [{ type, reference, metadata? }][], notes (optional)",
+            "Handler creates Artifact entities for each artifact via ForgeStorage",
+            "Updates task status to 'auditing' if step.audit=true, else 'completed'",
+            "Emits trajectory event with type='task_completed'",
+            "Returns { success: true, data: { task_status, artifacts_created: number } }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with various artifact types",
+            "Verify audit vs non-audit status transition"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for report_complete handler"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s4-task",
+      "step_id": "fmt-s4",
+      "title": "Define report_blocked tool",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review ChangeRequest creation in forge-planner-adapter"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tool schema: task_id (required), reason (required), suggested_change (optional object for Planner feedback)",
+            "Handler updates task status to 'blocked'",
+            "If suggested_change provided, triggers forge-planner-adapter ChangeRequest creation",
+            "Emits trajectory event with type='task_blocked'",
+            "Returns { success: true, data: { task_status: 'blocked', change_request_id? } }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with and without suggested_change",
+            "Verify ChangeRequest creation when applicable"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for report_blocked handler"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s5-task",
+      "step_id": "fmt-s5",
+      "title": "Define request_human_input tool",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/mcp/tools/index.ts:383-422 (ask_user_question) in planner-core",
+            "Review Question entity schema from forge-question-queue"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tool schema: task_id (required), question (required), options (optional string[]), blocking_level: 'hard_block' | 'soft_block' | 'preference' | 'fyi', can_use_default (bool), default_value (optional)",
+            "Handler creates Question entity via ForgeStorage.createQuestion()",
+            "If blocking_level is hard_block or soft_block, updates task status to 'blocked'",
+            "Emits trajectory event with type='human_input_requested'",
+            "Emits SSE event 'question_added' for UI notification",
+            "Returns { success: true, data: { question_id, blocking: bool } }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test each blocking level",
+            "Verify SSE event emission"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for request_human_input handler"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s6-task",
+      "step_id": "fmt-s6",
+      "title": "Define record_decision tool",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/domain/trajectory.ts DecisionEvent pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tool schema: task_id (required), question (required), chosen (required), alternatives (string[]), reasoning (required)",
+            "Handler creates trajectory event with type='decision_recorded'",
+            "Decision stored with full context for retrospective analysis",
+            "Returns { success: true, data: { event_id, recorded: true } }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test decision recording",
+            "Verify trajectory event contains full context"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for record_decision handler"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s7-task",
+      "step_id": "fmt-s7",
+      "title": "Define report_audit_result tool",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review forge-auditor-dispatch for audit flow",
+            "Understand task_attempts.audit_findings storage"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Tool schema: task_id (required), result: 'pass' | 'fail', findings: [{ criterion_id, status: 'pass' | 'fail', details }]",
+            "Handler validates all acceptance criteria have corresponding findings",
+            "Stores findings in task_attempts.audit_findings JSONB",
+            "Emits trajectory event with type='audit_completed'",
+            "Returns { success: true, data: { task_status, findings_count } }"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test pass and fail results",
+            "Verify findings validation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for report_audit_result handler"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s8-task",
+      "step_id": "fmt-s8",
+      "title": "Create tool registry and handler dispatcher",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/mcp/tools/index.ts:513-571 for handleToolCall and executeToolCall pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "tools: Tool[] array with all 6 tool definitions",
+            "handleToolCall(storage, trajectoryCapture, name, args) function with switch dispatch",
+            "Each tool handler validates task_id belongs to active run",
+            "Returns toCallToolResult() for all responses"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test dispatcher with all tool types",
+            "Verify unknown tool handling"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for tool registry and dispatcher"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s8"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s9-task",
+      "step_id": "fmt-s9",
+      "title": "Create MCP HTTP server",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review src/mcp/server.ts from planner-core"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "POST /mcp/tools/list returns { tools: Tool[] }",
+            "POST /mcp/tools/call accepts { name, arguments } and returns CallToolResult",
+            "Validates task_id in authorization context (X-Task-ID header)",
+            "Configurable port (default 3100)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test endpoints with curl",
+            "Verify authorization header validation"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests for MCP HTTP server"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s9"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fmt-s10-task",
+      "step_id": "fmt-s10",
+      "title": "Implement answer notification to waiting agents",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review relay client message sending",
+            "Understand agent name pattern: run-{runId}-task-{taskId}"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "When question answered, send relay message to agent with answer",
+            "Message format: { type: 'question_answered', question_id, answer }",
+            "If task was blocked, update status back to 'running'",
+            "Log notification in trajectory"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test answer notification flow",
+            "Verify task status transition"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test: answer question -> agent notified -> task unblocked"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fmt-s10"
+          ]
+        }
+      }
+    }
+  ]
+}

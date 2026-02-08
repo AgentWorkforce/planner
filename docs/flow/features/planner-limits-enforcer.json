@@ -1,0 +1,41 @@
+{
+  "title": "Step & Depth Limits Enforcer",
+  "summary": {
+    "goal": "Enforce step count and sub-plan depth limits per decomposition config",
+    "acceptance_criteria": [
+      {
+        "id": "le1",
+        "description": "Default limits: max 15 steps per scope, max 3 depth levels"
+      },
+      {
+        "id": "le2",
+        "description": "Limits read from PlannerConfig if Tuner available, else use defaults"
+      },
+      {
+        "id": "le3",
+        "description": "validatePlanLimits(plan) checks steps per scope, returns warnings"
+      },
+      {
+        "id": "le4",
+        "description": "validateSubPlanDepth(plan_id) traverses sub_plan_id chain, rejects if > max_depth"
+      },
+      {
+        "id": "le5",
+        "description": "Warnings surfaced in API response, not blocking (soft enforcement)"
+      },
+      {
+        "id": "le6",
+        "description": "Depth violations are hard errors (prevents infinite recursion)"
+      }
+    ]
+  },
+  "feature_id": "planner-limits-enforcer",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "dot-planner-enhancements",
+  "component": "planner-core",
+  "dependencies": [
+    "planner-tuner-integration"
+  ]
+}

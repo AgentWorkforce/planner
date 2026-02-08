@@ -1,0 +1,243 @@
+{
+  "title": "Ideation API Endpoints",
+  "summary": {
+    "goal": "Add HTTP endpoints for ideation config distribution, outcome ingestion, and insights",
+    "acceptance_criteria": [
+      {
+        "id": "iapi1",
+        "description": "GET /api/tuner/config/ideation returns IdeationConfig (defaults initially)"
+      },
+      {
+        "id": "iapi2",
+        "description": "GET /api/tuner/config/version includes ideation_version"
+      },
+      {
+        "id": "iapi3",
+        "description": "POST /api/tuner/outcomes/ideation validates IdeationOutcome with Zod, returns { received: true }"
+      },
+      {
+        "id": "iapi4",
+        "description": "POST /api/tuner/outcomes/plan-quality validates PlanQualitySignal with Zod, returns { received: true }"
+      },
+      {
+        "id": "iapi5",
+        "description": "GET /api/tuner/insights/ideation returns baselines, specialist contribution rates, total sessions tracked"
+      },
+      {
+        "id": "iapi6",
+        "description": "Zod validation rejects malformed payloads with detailed 400 error messages"
+      },
+      {
+        "id": "iapi7",
+        "description": "Existing Forge/Planner endpoints are unaffected"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "iapi001",
+        "title": "Add getIdeationConfig handler",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/api/handlers/config.ts with getIdeationConfig handler following existing pattern (getForgeConfig/getPlannerConfig)",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "getIdeationConfig calls services.config.getCurrentIdeationConfig()"
+          },
+          {
+            "id": "ac2",
+            "description": "Returns JSON response with IdeationConfig"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns 500 with error message on failure"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/api/handlers/config.ts",
+            "pattern": "Factory function returning handler object",
+            "reference": "Plan section 2.1"
+          }
+        }
+      },
+      {
+        "step_id": "iapi002",
+        "title": "Extend getConfigVersion handler",
+        "scope": "tuner",
+        "description": "Modify existing getConfigVersion handler to include ideation_version in response",
+        "dependencies": [
+          "iapi001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Response includes { forge_version, planner_version, ideation_version }"
+          },
+          {
+            "id": "ac2",
+            "description": "Existing tests still pass"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/api/handlers/config.ts",
+            "pattern": "Extend existing handler",
+            "reference": "Plan section 2.1"
+          }
+        }
+      },
+      {
+        "step_id": "iapi003",
+        "title": "Add outcome handlers for ideation",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/api/handlers/outcomes.ts with recordIdeationOutcome and recordPlanQualitySignal handlers. Use Zod safeParse with detailed error messages.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "recordIdeationOutcome validates with IdeationOutcomeSchema.safeParse()"
+          },
+          {
+            "id": "ac2",
+            "description": "recordPlanQualitySignal validates with PlanQualitySignalSchema.safeParse()"
+          },
+          {
+            "id": "ac3",
+            "description": "Returns 400 on validation failure with details: error.errors.map(e => ({ path: e.path.join('.'), message: e.message }))"
+          },
+          {
+            "id": "ac4",
+            "description": "Returns { received: true } on success"
+          },
+          {
+            "id": "ac5",
+            "description": "Calls services.collector.recordIdeationOutcome() / recordPlanQualitySignal()"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/api/handlers/outcomes.ts",
+            "pattern": "Follow recordTaskOutcome / recordRunOutcome pattern",
+            "reference": "Plan section 2.2"
+          }
+        }
+      },
+      {
+        "step_id": "iapi004",
+        "title": "Add getIdeationInsights handler",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/api/handlers/insights.ts with getIdeationInsights handler. Returns baselines, recent outcomes summary, specialist contribution rates.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Returns { total_sessions_tracked, avg_questions_per_plan, avg_block_utilization, specialist_contribution_rates, baselines }"
+          },
+          {
+            "id": "ac2",
+            "description": "Calls storage.listIdeationBaselines() and storage.getRecentIdeationOutcomes(20)"
+          },
+          {
+            "id": "ac3",
+            "description": "Gracefully handles empty baselines (returns nulls)"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/api/handlers/insights.ts",
+            "pattern": "Follow existing insights handler pattern",
+            "reference": "Plan section 2.3"
+          }
+        }
+      },
+      {
+        "step_id": "iapi005",
+        "title": "Mount new routes",
+        "scope": "tuner",
+        "description": "Extend packages/tuner/src/api/routes.ts to mount GET /config/ideation, POST /outcomes/ideation, POST /outcomes/plan-quality, GET /insights/ideation",
+        "dependencies": [
+          "iapi001",
+          "iapi002",
+          "iapi003",
+          "iapi004"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "All four new routes mounted correctly"
+          },
+          {
+            "id": "ac2",
+            "description": "Existing routes unaffected"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/api/routes.ts",
+            "pattern": "router.get/post mount",
+            "reference": "Plan section 2.4"
+          }
+        }
+      },
+      {
+        "step_id": "iapi006",
+        "title": "Test API endpoints",
+        "scope": "tuner",
+        "description": "Integration tests for all new endpoints using Vitest with temp SQLite database",
+        "dependencies": [
+          "iapi005"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "GET /config/ideation returns default config before any learning"
+          },
+          {
+            "id": "ac2",
+            "description": "POST /outcomes/ideation validates and stores outcome"
+          },
+          {
+            "id": "ac3",
+            "description": "POST /outcomes/plan-quality validates and stores signal"
+          },
+          {
+            "id": "ac4",
+            "description": "Malformed payloads return 400 with field-level errors"
+          },
+          {
+            "id": "ac5",
+            "description": "GET /insights/ideation returns empty state initially, populated after data"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/tuner/src/api/handlers/ideation.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-api",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-ideation-storage",
+    "tuner-api"
+  ]
+}

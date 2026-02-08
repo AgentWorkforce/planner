@@ -1,0 +1,346 @@
+{
+  "feature_id": "forge-ui-timeline",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "ftl-s1-task",
+      "step_id": "ftl-s1",
+      "title": "Create timeline API module",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/api/ for API patterns",
+            "Review forge-trajectory-capture feature for API endpoints"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "getRunTimeline(runId, filter?: { type?: string }) returns { events: TimelineEvent[] }",
+            "TimelineEvent type: { event_id, run_id, event_type, timestamp, data, task_id?, agent_id? }",
+            "Event types: run_started, run_completed, run_failed, task_started, task_completed, task_failed, agent_spawned, agent_exited, gate_reached, gate_approved, gate_rejected, question_asked, question_answered"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API functions"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for timeline API"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s2-task",
+      "step_id": "ftl-s2",
+      "title": "Create TimelineEvent component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect.virtualization for height requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Timestamp in HH:MM:SS format (relative to run start)",
+            "Event type icon with color coding",
+            "Event description with context (task title, agent name, etc.)",
+            "Expandable details section for complex events",
+            "Artifact links if event has associated artifacts",
+            "Fixed height: 56px collapsed, 120px expanded (for virtualization)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all event types",
+            "Test expand/collapse"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s3-task",
+      "step_id": "ftl-s3",
+      "title": "Create TimelineFilter component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/components/TabNavigation.tsx"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Dropdown or tabs: All, Tasks, Agents, Gates, Questions",
+            "Filter persists to URL params",
+            "Count badges showing number of events per type"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test filter switching",
+            "Test URL persistence"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s4-task",
+      "step_id": "ftl-s4",
+      "title": "Create TimelineList component with virtualization",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review @tanstack/react-virtual documentation",
+            "Review context.architect.virtualization for configuration"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Renders TimelineEvent for each event",
+            "Visual marker for run start (top) and run end (bottom if completed)",
+            "Auto-scrolls to latest event for running runs",
+            "Virtualized rendering when events.length > 100",
+            "Uses @tanstack/react-virtual for virtualization",
+            "Smooth scrolling with fixed row heights"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test with small event count",
+            "Test with >100 events"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Performance test with large datasets"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s5-task",
+      "step_id": "ftl-s5",
+      "title": "Create ExportButton component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review client-side file download patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Dropdown button: Export JSON, Export CSV",
+            "JSON export: full event data",
+            "CSV export: timestamp, type, description, task_id, agent_id",
+            "Downloads file with filename: forge-run-{runId}-timeline.{ext}"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test JSON export",
+            "Test CSV export"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Verify exported files are valid"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s6-task",
+      "step_id": "ftl-s6",
+      "title": "Create useTimeline hook",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/hooks/usePlanEvents.ts"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "useTimeline(runId, filter) returns { events, isLoading, error }",
+            "For running runs: SSE subscription for new events",
+            "Appends new events to existing list (no full refetch)",
+            "Client-side filtering when filter changes (no API refetch for type filter)"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test data fetching",
+            "Test SSE append"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s7-task",
+      "step_id": "ftl-s7",
+      "title": "Implement TimelinePage",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review packages/planner-ui/src/pages/ for page patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Header with breadcrumb: Forge > Run [id] > Timeline",
+            "Back button to return to dashboard",
+            "TimelineFilter and ExportButton in toolbar",
+            "TimelineList as main content",
+            "Loading state: skeleton timeline entries",
+            "Empty state: 'No events recorded yet'"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all page states"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "ftl-s8-task",
+      "step_id": "ftl-s8",
+      "title": "Add artifact links",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review artifact link patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Detect artifact references in event data",
+            "Render as external links (target='_blank')",
+            "Icon indicates type: GitHubIcon for PRs/commits, LinkIcon for deployments",
+            "Copy link button on hover"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test link rendering",
+            "Test copy functionality"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step ftl-s8"
+          ]
+        }
+      }
+    }
+  ]
+}

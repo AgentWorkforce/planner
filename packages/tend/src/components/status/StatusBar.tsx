@@ -1,67 +1,58 @@
-/**
- * StatusBar - Fixed bottom status bar with agent avatars
- *
- * Provides ambient awareness of agent activity, project context, and session stats.
- * Fixed to bottom of viewport, visible across all views.
- *
- * Adapted from planner-ui with tend's earth-tone palette.
- *
- * Sections:
- * - Left: Connection status indicator
- * - Center: Agent avatars with progress indicators
- * - Right: Pending question count + stats
- */
-
-import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { ChevronIcon } from '../icons/ChevronIcon';
+import { ChevronIcon } from '@/components/icons/ChevronIcon';
+import { cn } from '@/lib/utils';
+import type { Agent } from '@/hooks/useAgentOrchestration';
 import { AgentAvatar } from './AgentAvatar';
-import { ConnectionIndicator } from './ConnectionIndicator';
-import type { Agent } from '../../hooks/useAgentOrchestration';
 
-export type StatusBarSection = 'context' | 'agents' | 'stats' | 'meta';
+export interface QuestionNotification {
+  agentId: string;
+  text: string;
+}
 
 interface StatusBarProps {
   /** Agent orchestration data */
   agents?: Agent[];
-  /** Stats */
+  /** Pending questions count */
   pendingQuestions?: number;
-  resolvedDecisions?: number;
   /** Session duration in seconds */
   sessionDuration?: number;
-  /** Connection status */
-  connectionStatus?: 'connected' | 'disconnected' | 'reconnecting';
   /** Initial collapsed state */
   defaultCollapsed?: boolean;
+  /** Connection status */
+  connectionStatus?: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'error';
+  /** Current notification to display above an agent avatar */
+  currentNotification?: QuestionNotification | null;
   /** Callback when pending questions badge is clicked */
   onPendingClick?: () => void;
   /** Callback when an agent avatar is clicked */
   onAgentClick?: (agent: Agent) => void;
-  /** Callback when notification bubble is clicked */
-  onNotificationClick?: () => void;
-  /** Render function for notification content */
-  renderNotificationContent?: (agent: Agent) => ReactNode;
+  /** Callback when notification bubble is dismissed */
+  onNotificationDismiss?: () => void;
   className?: string;
 }
 
 /**
- * StatusBar - Permanent bottom status bar
+ * StatusBar - Permanent bottom status bar for tend application
  *
- * Provides ambient awareness of agent activity and session stats.
- * Fixed to bottom of viewport, visible across all views.
+ * Provides ambient awareness of agent activity, session stats, and connection status.
+ * Positioned by the grid layout's status row — always at the bottom of the viewport.
+ *
+ * Sections:
+ * - Left: Agent avatar slots for active agents
+ * - Center: Empty (reserved for future use)
+ * - Right: Session timer, pending questions, connection indicator, collapse toggle
  */
 export function StatusBar({
   agents = [],
   pendingQuestions = 0,
-  resolvedDecisions = 0,
   sessionDuration = 0,
-  connectionStatus = 'disconnected',
   defaultCollapsed = false,
+  connectionStatus = 'disconnected',
+  currentNotification,
   onPendingClick,
   onAgentClick,
-  onNotificationClick,
-  renderNotificationContent,
-  className = '',
+  onNotificationDismiss,
+  className,
 }: StatusBarProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
@@ -79,18 +70,28 @@ export function StatusBar({
     }
   };
 
-  // Connection indicator (only shown when not connected)
-  const showConnectionIndicator = connectionStatus !== 'connected';
+  // Connection status display
+  // Attention levels: connected=Level 0 (background), disconnected/error=Level 2 (action needed)
+  const connectionDisplay = {
+    connected: { text: 'Connected', color: 'text-text-tertiary', dotColor: 'bg-success' },
+    connecting: { text: 'Connecting...', color: 'text-text-muted', dotColor: 'bg-text-muted animate-pulse' },
+    reconnecting: { text: 'Reconnecting...', color: 'text-accent-primary', dotColor: 'bg-accent-primary animate-pulse' },
+    disconnected: { text: 'Offline', color: 'text-accent-primary', dotColor: 'bg-accent-primary' },
+    error: { text: 'Error', color: 'text-accent-secondary', dotColor: 'bg-accent-secondary' },
+  };
+
+  const connectionInfo = connectionDisplay[connectionStatus];
 
   // Collapsed view
   if (isCollapsed) {
     return (
-      <div className={`fixed bottom-0 left-0 right-0 h-6 bg-[var(--canvas-bg)] border-t border-[var(--block-draft-border)] z-50 flex items-center justify-center gap-2 ${className}`}>
-        {/* Connection indicator */}
-        {showConnectionIndicator && (
-          <ConnectionIndicator status={connectionStatus} />
+      <div
+        className={cn(
+          'w-full h-6 border-t flex items-center justify-center gap-2 relative',
+          'bg-bg-secondary border-border-subtle',
+          className
         )}
-
+      >
         {/* Agent avatars (small) */}
         <div className="flex items-center gap-1">
           {agents.map((agent) => (
@@ -100,28 +101,33 @@ export function StatusBar({
               state={agent.state}
               size="sm"
               displayName={agent.displayName}
-              currentActivity={agent.currentActivity}
-              currentStep={agent.currentStep}
-              currentThought={agent.currentThought}
               onClick={() => onAgentClick?.(agent)}
+              notification={
+                currentNotification?.agentId === agent.id
+                  ? { text: currentNotification.text, onDismiss: onNotificationDismiss }
+                  : undefined
+              }
             />
           ))}
         </div>
 
-        {/* Pending badge */}
+        {/* Pending badge - Level 2 (action needed) */}
         {pendingQuestions > 0 && (
           <button
             onClick={handlePendingClick}
-            className="text-xs text-[var(--color-brick)] hover:text-[var(--color-brick)]/80 transition-colors"
+            className="text-xs text-accent-primary hover:text-accent-hover transition-colors"
           >
             ❓{pendingQuestions}
           </button>
         )}
 
+        {/* Connection indicator */}
+        <div className={cn('w-1.5 h-1.5 rounded-full', connectionInfo.dotColor)} />
+
         {/* Expand toggle */}
         <button
           onClick={() => setIsCollapsed(false)}
-          className="absolute right-2 p-0.5 hover:bg-[var(--canvas-card-bg-hover)] rounded text-[var(--text-muted)]"
+          className="absolute right-2 p-0.5 hover:bg-bg-tertiary rounded text-text-muted"
           aria-label="Expand status bar"
         >
           <ChevronIcon direction="up" size="sm" />
@@ -132,68 +138,82 @@ export function StatusBar({
 
   // Expanded view
   return (
-    <div className={`fixed bottom-0 left-0 right-0 h-12 bg-[var(--canvas-bg)] border-t border-[var(--block-draft-border)] z-50 flex items-center px-4 gap-6 ${className}`}>
-      {/* Left section: Connection status */}
+    <div
+      className={cn(
+        'w-full h-12 border-t flex items-center px-4 gap-6',
+        'bg-bg-secondary border-border-subtle relative',
+        className
+      )}
+    >
+      {/* Reconnection indicator */}
+      {(connectionStatus === 'connecting' || connectionStatus === 'reconnecting') && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent-primary/20 overflow-hidden">
+          <div className="h-full bg-accent-primary animate-reconnect-slide" />
+        </div>
+      )}
+
+      {/* Left: Agents section */}
       <div className="flex items-center gap-2 shrink-0">
-        {showConnectionIndicator && (
-          <ConnectionIndicator status={connectionStatus} />
-        )}
-      </div>
-
-      {/* Center section: Agents */}
-      <div className="flex-1 flex items-center justify-center gap-2">
         {agents.length > 0 ? (
-          agents.map((agent) => {
-            return (
-              <AgentAvatar
-                key={agent.id}
-                role={agent.role}
-                state={agent.state}
-                size="md"
-                displayName={agent.displayName}
-                currentActivity={agent.currentActivity}
-                currentStep={agent.currentStep}
-                currentThought={agent.currentThought}
-                onClick={() => onAgentClick?.(agent)}
-                showNotification={false}
-                notificationContent={
-                  renderNotificationContent
-                    ? renderNotificationContent(agent)
-                    : undefined
-                }
-                onNotificationClick={onNotificationClick}
-              />
-            );
-          })
+          agents.map((agent) => (
+            <AgentAvatar
+              key={agent.id}
+              role={agent.role}
+              state={agent.state}
+              size="md"
+              displayName={agent.displayName}
+              currentActivity={agent.currentActivity}
+              currentStep={agent.currentStep}
+              currentThought={agent.currentThought}
+              onClick={() => onAgentClick?.(agent)}
+              notification={
+                currentNotification?.agentId === agent.id
+                  ? { text: currentNotification.text, onDismiss: onNotificationDismiss }
+                  : undefined
+              }
+            />
+          ))
         ) : (
-          <span className="text-[var(--text-muted)] text-sm">No agents active</span>
+          <span className="text-text-muted text-sm">Garden is quiet</span>
         )}
       </div>
 
-      {/* Right section: Stats */}
+      {/* Center: Reserved */}
+      <div className="flex-1" />
+
+      {/* Right: Stats and meta */}
       <div className="flex items-center gap-4 shrink-0">
+        {/* Pending questions - Level 2 (action needed) / Level 3 if >5 (urgent) */}
         <button
           onClick={handlePendingClick}
-          className={`flex items-center gap-1 text-sm transition-colors ${
+          className={cn(
+            'flex items-center gap-1 text-sm transition-colors',
             pendingQuestions > 0
               ? pendingQuestions > 5
-                ? 'text-[var(--color-brick)] animate-pulse'
-                : 'text-[var(--color-brick)] hover:text-[var(--color-brick)]/80'
-              : 'text-[var(--text-muted)] cursor-default'
-          }`}
+                ? 'text-accent-secondary animate-pulse cursor-pointer hover:text-accent-hover'
+                : 'text-accent-primary cursor-pointer hover:text-accent-hover'
+              : 'text-text-muted cursor-default'
+          )}
           disabled={pendingQuestions === 0}
         >
           ❓ {pendingQuestions}
         </button>
-        <span className="flex items-center gap-1 text-sm text-[var(--text-muted)]">
-          ✓ {resolvedDecisions}
-        </span>
-        <span className="text-sm text-[var(--text-muted)] font-mono">
+
+        {/* Session timer */}
+        <span className="text-sm text-text-muted font-mono">
           ⏱️ {formatDuration(sessionDuration)}
         </span>
+
+        {/* Connection status */}
+        <div className="flex items-center gap-1.5">
+          <div className={cn('w-2 h-2 rounded-full', connectionInfo.dotColor)} />
+          <span className={cn('text-xs', connectionInfo.color)}>{connectionInfo.text}</span>
+        </div>
+
+        {/* Collapse toggle */}
         <button
           onClick={() => setIsCollapsed(true)}
-          className="p-1 hover:bg-[var(--canvas-card-bg-hover)] rounded text-[var(--text-muted)]"
+          className="p-1 hover:bg-bg-tertiary rounded text-text-muted"
           aria-label="Collapse status bar"
         >
           <ChevronIcon direction="down" size="md" />

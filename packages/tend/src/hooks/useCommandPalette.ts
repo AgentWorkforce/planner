@@ -41,30 +41,14 @@ export function useCommandPalette({ sessions = [] }: UseCommandPaletteProps = {}
     });
 
     commandActions.push({
-      id: 'nav-ideation',
-      label: 'Go to Ideation Dashboard',
-      description: 'View all ideation sessions',
-      icon: 'dashboard',
-      keywords: ['ideation', 'dashboard', 'sessions'],
-      action: () => {
-        navigate('/ideation');
-        setIsOpen(false);
-      },
-      group: 'Navigation',
-    });
-
-    // Session actions
-    commandActions.push({
-      id: 'new-session',
-      label: 'New Session',
-      description: 'Start a new ideation session',
+      id: 'new-project',
+      label: 'New Project',
+      description: 'Create a new project',
       icon: 'plus',
-      keywords: ['new', 'create', 'session'],
+      keywords: ['new', 'create', 'project'],
       action: () => {
-        // This will be handled by the NewSessionModal component
         setIsOpen(false);
-        // Trigger a custom event that the app can listen to
-        window.dispatchEvent(new CustomEvent('command:new-session'));
+        window.dispatchEvent(new CustomEvent('command:new-project'));
       },
       group: 'Actions',
     });
@@ -77,13 +61,13 @@ export function useCommandPalette({ sessions = [] }: UseCommandPaletteProps = {}
       icon: 'settings',
       keywords: ['settings', 'preferences', 'config'],
       action: () => {
+        navigate('/settings');
         setIsOpen(false);
-        window.dispatchEvent(new CustomEvent('command:settings'));
       },
       group: 'Actions',
     });
 
-    // Add session navigation actions
+    // Add session navigation actions (sessions are linked to projects in tend)
     sessions.forEach((session) => {
       const label = session.source.initial_intent || 'Untitled Session';
       commandActions.push({
@@ -93,7 +77,8 @@ export function useCommandPalette({ sessions = [] }: UseCommandPaletteProps = {}
         icon: 'session',
         keywords: ['session', 'go to', label, session.status],
         action: () => {
-          navigate(`/ideation/session/${session.id}`);
+          // In tend, sessions are accessed via project context
+          navigate('/');
           setIsOpen(false);
         },
         group: 'Sessions',

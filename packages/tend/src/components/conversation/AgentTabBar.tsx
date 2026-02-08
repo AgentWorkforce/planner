@@ -1,59 +1,114 @@
-import { AgentTab as AgentTabType } from '@/types/conversation';
+/**
+ * AgentTabBar
+ *
+ * Horizontal tab bar above conversation for switching between:
+ * - Main tab (project conversation)
+ * - Individual agent tabs (one per active agent)
+ *
+ * Active tab highlighted with accent-primary border-bottom.
+ * Tabs overflow with horizontal scroll and fade edges.
+ */
+
+import { useRef, useEffect, useState } from 'react';
 import { AgentTab } from './AgentTab';
 
-interface AgentTabBarProps {
-  tabs: AgentTabType[];
-  activeTab: string;
-  onTabChange: (tabId: string) => void;
+interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  status: 'active' | 'completed' | 'blocked';
+  unreadCount?: number;
 }
 
-/**
- * AgentTabBar - Horizontal tab bar showing active agent channels
- *
- * Features:
- * - Horizontal tab bar above conversation
- * - "All" tab (default) shows all messages
- * - One tab per active agent channel
- * - Active tab has bottom border in moss green
- * - Tab order: "All" first, then by most recent message
- *
- * Usage:
- * <AgentTabBar
- *   tabs={[
- *     { id: 'all', label: 'All', channel_id: 'all' },
- *     { id: '#planning', label: 'Planning', channel_id: '#planning', unread_count: 2 }
- *   ]}
- *   activeTab="all"
- *   onTabChange={(tabId) => console.log("Active tab:", tabId)}
- * />
- */
-export function AgentTabBar({ tabs, activeTab, onTabChange }: AgentTabBarProps) {
-  // Sort tabs: "All" first, then by last_message_at (most recent first)
-  const sortedTabs = [...tabs].sort((a, b) => {
-    if (a.id === 'all') return -1;
-    if (b.id === 'all') return 1;
+interface AgentTabBarProps {
+  /** Currently active channel ID */
+  activeChannelId: string;
 
-    const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-    const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
-    return bTime - aTime; // Most recent first
-  });
+  /** Callback when tab is selected */
+  onSelectChannel: (channelId: string) => void;
+
+  /** Active agents to display tabs for */
+  agents: Agent[];
+
+  /** Whether user has viewed main tab since last message */
+  mainUnreadCount?: number;
+}
+
+export function AgentTabBar({
+  activeChannelId,
+  onSelectChannel,
+  agents,
+  mainUnreadCount = 0,
+}: AgentTabBarProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(false);
+
+  // Update fade indicators when scroll position changes
+  const updateFadeIndicators = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    setShowLeftFade(scrollLeft > 0);
+    setShowRightFade(scrollLeft + clientWidth < scrollWidth - 1);
+  };
+
+  // Update fade indicators on mount and when agents change
+  useEffect(() => {
+    updateFadeIndicators();
+  }, [agents]);
 
   return (
-    <div
-      className="flex items-center gap-1 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]"
-      role="tablist"
-      aria-label="Agent conversation tabs"
-    >
-      {sortedTabs.map((tab) => (
-        <AgentTab
-          key={tab.id}
-          label={tab.label}
-          isActive={activeTab === tab.id}
-          unreadCount={tab.unread_count}
-          agentRole={tab.agent_role}
-          onClick={() => onTabChange(tab.id)}
-        />
-      ))}
+    <div className="relative border-b border-border-subtle bg-bg-primary">
+      {/* Left fade */}
+      {showLeftFade && (
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-bg-primary to-transparent pointer-events-none z-10" />
+      )}
+
+      {/* Scrollable tab container */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={updateFadeIndicators}
+        className="flex overflow-x-auto scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {/* Main tab - always present */}
+        <button
+          onClick={() => onSelectChannel('main')}
+          className={`
+            relative flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors
+            ${activeChannelId === 'main'
+              ? 'text-accent-primary border-b-2 border-accent-primary'
+              : 'text-text-secondary hover:text-text-primary border-b-2 border-transparent'
+            }
+          `}
+        >
+          <div className="flex items-center gap-2">
+            <span>Main</span>
+            {mainUnreadCount > 0 && (
+              <span className="px-1.5 py-0.5 text-xs rounded-full bg-accent-primary/20 text-accent-primary">
+                {mainUnreadCount}
+              </span>
+            )}
+          </div>
+        </button>
+
+        {/* Agent tabs */}
+        {agents.map((agent) => (
+          <AgentTab
+            key={agent.id}
+            agent={agent}
+            isActive={activeChannelId === `agent-${agent.id}`}
+            onClick={() => onSelectChannel(`agent-${agent.id}`)}
+          />
+        ))}
+      </div>
+
+      {/* Right fade */}
+      {showRightFade && (
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-bg-primary to-transparent pointer-events-none z-10" />
+      )}
     </div>
   );
 }

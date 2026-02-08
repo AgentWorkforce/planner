@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrainIcon } from '@/components/icons';
-import { ConversationInput } from '@/components/conversation/ConversationInput';
+import { ConversationInput } from '@/components/conversation';
 import { useSessions } from '@/hooks/useSessions';
 import { cn } from '@/lib/utils';
 
