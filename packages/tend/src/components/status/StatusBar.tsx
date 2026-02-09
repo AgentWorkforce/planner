@@ -1,148 +1,153 @@
-import { useState } from 'react';
-import { ChevronIcon } from '@/components/icons/ChevronIcon';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { Agent } from '@/hooks/useAgentOrchestration';
-import { AgentAvatar } from './AgentAvatar';
+import type { StatusContent, WipeSignal } from '@/hooks/useStatusLine';
+import { AgentIndicator } from './AgentIndicator';
+import { WIPES } from './animation-frames';
+import type { WipeLevel } from './animation-frames';
 
-export interface QuestionNotification {
-  agentId: string;
-  text: string;
-}
+type ConnectionStatus = 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'error';
 
 interface StatusBarProps {
-  /** Agent orchestration data */
+  /** Content slot — driven by useStatusLine */
+  content: StatusContent;
+  /** Number of messages queued behind the current one */
+  queueSize?: number;
+
+  /** Agent data (rendered when content.type === 'agents') */
   agents?: Agent[];
-  /** Pending questions count */
-  pendingQuestions?: number;
+  /** Callback when an agent indicator is clicked */
+  onAgentClick?: (agent: Agent) => void;
+
   /** Session duration in seconds */
   sessionDuration?: number;
-  /** Initial collapsed state */
-  defaultCollapsed?: boolean;
   /** Connection status */
-  connectionStatus?: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'error';
-  /** Current notification to display above an agent avatar */
-  currentNotification?: QuestionNotification | null;
-  /** Callback when pending questions badge is clicked */
-  onPendingClick?: () => void;
-  /** Callback when an agent avatar is clicked */
-  onAgentClick?: (agent: Agent) => void;
-  /** Callback when notification bubble is dismissed */
-  onNotificationDismiss?: () => void;
+  connectionStatus?: ConnectionStatus;
+  /** Callback when an alert action is triggered */
+  onAlertDismiss?: () => void;
+
+  /** Imperative wipe signal for milestone events */
+  wipeSignal?: WipeSignal | null;
+
   className?: string;
+}
+
+// Connection status — terminal-style bracketed indicators
+const CONNECTION_DISPLAY: Record<ConnectionStatus, { label: string; color: string }> = {
+  connected: { label: '[✓]', color: 'text-text-tertiary' },
+  connecting: { label: '[··]', color: 'text-text-muted animate-pulse' },
+  reconnecting: { label: '[··]', color: 'text-accent-primary animate-pulse' },
+  disconnected: { label: '[--]', color: 'text-accent-primary' },
+  error: { label: '[!!]', color: 'text-accent-secondary' },
+};
+
+// Wipe color per urgency level
+const WIPE_COLORS: Record<WipeLevel, string> = {
+  gentle: 'text-text-muted',
+  normal: 'text-text-secondary',
+  urgent: 'text-warning',
+  celebrate: 'text-success',
+  error: 'text-error',
+  phase: 'text-accent-primary',
+};
+
+// Format seconds as mm:ss
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Build a text-based progress bar from block chars
+function buildProgressBar(percent: number, width: number): string {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const filled = Math.round((clamped / 100) * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+// Stable identity key for each content state
+function getContentKey(content: StatusContent): string {
+  if (content.type === 'message') return `msg-${content.id}`;
+  if (content.type === 'alert') return `alert-${content.id}`;
+  return content.type;
+}
+
+// Map content type to wipe urgency
+function getWipeLevel(content: StatusContent): WipeLevel {
+  if (content.type === 'alert') return 'urgent';
+  if (content.type === 'progress') return 'normal';
+  return 'gentle';
 }
 
 /**
  * StatusBar - Permanent bottom status bar for tend application
  *
- * Provides ambient awareness of agent activity, session stats, and connection status.
- * Positioned by the grid layout's status row — always at the bottom of the viewport.
+ * Content-slot architecture: the left area shows whichever content
+ * has the highest priority (alert > progress > message > agents).
+ * The right area always shows session timer and connection status.
  *
- * Sections:
- * - Left: Agent avatar slots for active agents
- * - Center: Empty (reserved for future use)
- * - Right: Session timer, pending questions, connection indicator, collapse toggle
+ * Content transitions use character-based wipe animations from the
+ * animation-frames system. Wipe intensity scales with urgency:
+ * gentle (·/░) for info, normal (░/▒) for progress, urgent (▒/█) for alerts.
  */
 export function StatusBar({
+  content,
+  queueSize = 0,
   agents = [],
-  pendingQuestions = 0,
-  sessionDuration = 0,
-  defaultCollapsed = false,
-  connectionStatus = 'disconnected',
-  currentNotification,
-  onPendingClick,
   onAgentClick,
-  onNotificationDismiss,
+  sessionDuration = 0,
+  connectionStatus = 'disconnected',
+  onAlertDismiss,
+  wipeSignal,
   className,
 }: StatusBarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const connectionInfo = CONNECTION_DISPLAY[connectionStatus];
 
-  // Format session duration as mm:ss
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  // --- Wipe transition ---
+  // One-shot frame sequence that plays between content changes.
+  // Each frame is a single character repeated to fill the bar width.
+  const [wipe, setWipe] = useState<{ frameIndex: number; level: WipeLevel } | null>(null);
+  const prevKeyRef = useRef(getContentKey(content));
 
-  // Handle clicking pending questions
-  const handlePendingClick = () => {
-    if (pendingQuestions > 0 && onPendingClick) {
-      onPendingClick();
+  // Detect content change → start wipe
+  useEffect(() => {
+    const key = getContentKey(content);
+    if (key !== prevKeyRef.current) {
+      prevKeyRef.current = key;
+      setWipe({ frameIndex: 0, level: getWipeLevel(content) });
     }
-  };
+  }, [content]);
 
-  // Connection status display
-  // Attention levels: connected=Level 0 (background), disconnected/error=Level 2 (action needed)
-  const connectionDisplay = {
-    connected: { text: 'Connected', color: 'text-text-tertiary', dotColor: 'bg-success' },
-    connecting: { text: 'Connecting...', color: 'text-text-muted', dotColor: 'bg-text-muted animate-pulse' },
-    reconnecting: { text: 'Reconnecting...', color: 'text-accent-primary', dotColor: 'bg-accent-primary animate-pulse' },
-    disconnected: { text: 'Offline', color: 'text-accent-primary', dotColor: 'bg-accent-primary' },
-    error: { text: 'Error', color: 'text-accent-secondary', dotColor: 'bg-accent-secondary' },
-  };
+  // Imperative wipe signal (milestone events — overrides content wipe)
+  const prevWipeSeqRef = useRef(wipeSignal?.seq ?? 0);
+  useEffect(() => {
+    if (!wipeSignal || wipeSignal.seq === prevWipeSeqRef.current) return;
+    prevWipeSeqRef.current = wipeSignal.seq;
+    setWipe({ frameIndex: 0, level: wipeSignal.level });
+  }, [wipeSignal]);
 
-  const connectionInfo = connectionDisplay[connectionStatus];
+  // Step through wipe frames (one-shot, then null)
+  useEffect(() => {
+    if (!wipe) return;
+    const anim = WIPES[wipe.level];
+    if (wipe.frameIndex >= anim.frames.length) {
+      setWipe(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setWipe(prev => prev ? { ...prev, frameIndex: prev.frameIndex + 1 } : null);
+    }, anim.interval);
+    return () => clearTimeout(timer);
+  }, [wipe]);
 
-  // Collapsed view
-  if (isCollapsed) {
-    return (
-      <div
-        className={cn(
-          'w-full h-6 border-t flex items-center justify-center gap-2 relative',
-          'bg-bg-secondary border-border-subtle',
-          className
-        )}
-      >
-        {/* Agent avatars (small) */}
-        <div className="flex items-center gap-1">
-          {agents.map((agent) => (
-            <AgentAvatar
-              key={agent.id}
-              role={agent.role}
-              state={agent.state}
-              size="sm"
-              displayName={agent.displayName}
-              onClick={() => onAgentClick?.(agent)}
-              notification={
-                currentNotification?.agentId === agent.id
-                  ? { text: currentNotification.text, onDismiss: onNotificationDismiss }
-                  : undefined
-              }
-            />
-          ))}
-        </div>
+  const isWiping = wipe !== null && wipe.frameIndex < WIPES[wipe.level].frames.length;
 
-        {/* Pending badge - Level 2 (action needed) */}
-        {pendingQuestions > 0 && (
-          <button
-            onClick={handlePendingClick}
-            className="text-xs text-accent-primary hover:text-accent-hover transition-colors"
-          >
-            ❓{pendingQuestions}
-          </button>
-        )}
-
-        {/* Connection indicator */}
-        <div className={cn('w-1.5 h-1.5 rounded-full', connectionInfo.dotColor)} />
-
-        {/* Expand toggle */}
-        <button
-          onClick={() => setIsCollapsed(false)}
-          className="absolute right-2 p-0.5 hover:bg-bg-tertiary rounded text-text-muted"
-          aria-label="Expand status bar"
-        >
-          <ChevronIcon direction="up" size="sm" />
-        </button>
-      </div>
-    );
-  }
-
-  // Expanded view
   return (
     <div
       className={cn(
-        'w-full h-12 border-t flex items-center px-4 gap-6',
-        'bg-bg-secondary border-border-subtle relative',
-        className
+        'w-full h-9 border-t flex items-center px-4 gap-4',
+        'bg-[var(--color-bg-chrome)] border-border-subtle relative',
+        className,
       )}
     >
       {/* Reconnection indicator */}
@@ -152,72 +157,106 @@ export function StatusBar({
         </div>
       )}
 
-      {/* Left: Agents section */}
-      <div className="flex items-center gap-2 shrink-0">
-        {agents.length > 0 ? (
-          agents.map((agent) => (
-            <AgentAvatar
-              key={agent.id}
-              role={agent.role}
-              state={agent.state}
-              size="md"
-              displayName={agent.displayName}
-              currentActivity={agent.currentActivity}
-              currentStep={agent.currentStep}
-              currentThought={agent.currentThought}
-              onClick={() => onAgentClick?.(agent)}
-              notification={
-                currentNotification?.agentId === agent.id
-                  ? { text: currentNotification.text, onDismiss: onNotificationDismiss }
-                  : undefined
-              }
-            />
-          ))
+      {/* Content slot */}
+      <div className="flex-1 min-w-0 flex items-center overflow-hidden">
+        {isWiping ? (
+          <span className={cn('font-mono text-sm whitespace-nowrap', WIPE_COLORS[wipe!.level])}>
+            {(WIPES[wipe!.level].frames[wipe!.frameIndex] ?? '·').repeat(60)}
+          </span>
         ) : (
-          <span className="text-text-muted text-sm">Garden is quiet</span>
+          <>
+            {content.type === 'agents' && (
+              <div className="flex items-center gap-3">
+                {agents.length > 0 ? (
+                  agents.map((agent) => (
+                    <AgentIndicator
+                      key={agent.id}
+                      role={agent.role}
+                      state={agent.state}
+                      displayName={agent.displayName}
+                      currentActivity={agent.currentActivity}
+                      currentStep={agent.currentStep}
+                      currentThought={agent.currentThought}
+                      onClick={onAgentClick ? () => onAgentClick(agent) : undefined}
+                    />
+                  ))
+                ) : (
+                  <span className="text-text-muted text-sm font-mono">Garden is quiet</span>
+                )}
+              </div>
+            )}
+
+            {content.type === 'message' && (
+              <div className="flex items-center gap-2 min-w-0 font-mono text-sm">
+                <span className={cn(
+                  content.level === 'success' && 'text-success',
+                  content.level === 'warning' && 'text-warning',
+                  content.level === 'info' && 'text-text-secondary',
+                )}>
+                  {content.level === 'success' && '✓'}
+                  {content.level === 'warning' && '⚠'}
+                  {content.level === 'info' && '›'}
+                </span>
+                <span className={cn(
+                  'truncate',
+                  content.level === 'success' && 'text-success',
+                  content.level === 'warning' && 'text-warning',
+                  content.level === 'info' && 'text-text-secondary',
+                )}>
+                  {content.text}
+                </span>
+                {queueSize > 0 && (
+                  <span className="text-text-muted shrink-0">(+{queueSize})</span>
+                )}
+              </div>
+            )}
+
+            {content.type === 'progress' && (
+              <div className="flex items-center gap-2 min-w-0 font-mono text-sm">
+                <span className="text-text-secondary shrink-0">{content.label}</span>
+                <span className="text-success">{buildProgressBar(content.percent, 20)}</span>
+                <span className="text-text-muted shrink-0">{Math.round(content.percent)}%</span>
+                {content.detail && (
+                  <span className="text-text-muted shrink-0">{content.detail}</span>
+                )}
+              </div>
+            )}
+
+            {content.type === 'alert' && (
+              <div className="flex items-center gap-2 min-w-0 font-mono text-sm">
+                <span className="text-warning shrink-0">⚠</span>
+                <span className="text-warning truncate">{content.text}</span>
+                {content.action && (
+                  <button
+                    onClick={content.action.onClick}
+                    className="shrink-0 text-accent-primary hover:text-accent-hover transition-colors"
+                  >
+                    [{content.action.label}]
+                  </button>
+                )}
+                {onAlertDismiss && (
+                  <button
+                    onClick={onAlertDismiss}
+                    className="shrink-0 text-text-muted hover:text-text-secondary transition-colors"
+                  >
+                    [×]
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Center: Reserved */}
-      <div className="flex-1" />
-
-      {/* Right: Stats and meta */}
-      <div className="flex items-center gap-4 shrink-0">
-        {/* Pending questions - Level 2 (action needed) / Level 3 if >5 (urgent) */}
-        <button
-          onClick={handlePendingClick}
-          className={cn(
-            'flex items-center gap-1 text-sm transition-colors',
-            pendingQuestions > 0
-              ? pendingQuestions > 5
-                ? 'text-accent-secondary animate-pulse cursor-pointer hover:text-accent-hover'
-                : 'text-accent-primary cursor-pointer hover:text-accent-hover'
-              : 'text-text-muted cursor-default'
-          )}
-          disabled={pendingQuestions === 0}
-        >
-          ❓ {pendingQuestions}
-        </button>
-
+      {/* Persistent right slot */}
+      <div className="flex items-center gap-3 shrink-0">
         {/* Session timer */}
-        <span className="text-sm text-text-muted font-mono">
-          ⏱️ {formatDuration(sessionDuration)}
+        <span className="text-xs text-text-muted font-mono">
+          {formatDuration(sessionDuration)}
         </span>
 
         {/* Connection status */}
-        <div className="flex items-center gap-1.5">
-          <div className={cn('w-2 h-2 rounded-full', connectionInfo.dotColor)} />
-          <span className={cn('text-xs', connectionInfo.color)}>{connectionInfo.text}</span>
-        </div>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setIsCollapsed(true)}
-          className="p-1 hover:bg-bg-tertiary rounded text-text-muted"
-          aria-label="Collapse status bar"
-        >
-          <ChevronIcon direction="down" size="md" />
-        </button>
+        <span className={cn('text-xs font-mono', connectionInfo.color)}>{connectionInfo.label}</span>
       </div>
     </div>
   );

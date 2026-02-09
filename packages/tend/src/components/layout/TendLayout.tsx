@@ -27,14 +27,12 @@ interface TendLayoutProps {
  * |                  S                     |
  * +----------------------------------------+
  *
- * Desktop layout (focus mode):
- * +------------------+----------+
- * |        N         |    R     |
- * |------------------|          |
- * |        C         |          |
- * +------------------+----------+
- * |          S                  |
- * +-----------------------------+
+ * Desktop layout (focus mode — no nav, no side panels):
+ * +--------------------------------------+
+ * |        C (detail | chat)             |
+ * +--------------------------------------+
+ * |                 S                    |
+ * +--------------------------------------+
  *
  * Mobile (<md breakpoint): vertical stack
  * Order: nav, center (chat), left, right, status
@@ -57,9 +55,9 @@ export function TendLayout({
   const getGridStyle = () => {
     if (focusMode) {
       return {
-        gridTemplateAreas: '"nav right" "center right" "status status"',
-        gridTemplateColumns: 'minmax(400px, 3fr) minmax(200px, 1fr)',
-        gridTemplateRows: 'auto 1fr auto',
+        gridTemplateAreas: '"center" "status"',
+        gridTemplateColumns: '1fr',
+        gridTemplateRows: '1fr auto',
       };
     }
 
@@ -87,8 +85,11 @@ export function TendLayout({
       )}
       style={gridStyle}
     >
-      {/* Nav — center top */}
-      <div className="order-1 md:overflow-hidden" style={{ gridArea: 'nav' }}>
+      {/* Nav — hidden in focus mode */}
+      <div
+        className={cn('order-1 md:overflow-hidden', focusMode && 'hidden md:hidden')}
+        style={{ gridArea: focusMode ? undefined : 'nav' }}
+      >
         {nav}
       </div>
 
@@ -114,13 +115,14 @@ export function TendLayout({
         {center}
       </div>
 
-      {/* Right Panel */}
+      {/* Right Panel — hidden in focus mode */}
       <div
         className={cn(
           'order-4 md:order-none md:overflow-hidden',
+          focusMode && 'hidden md:hidden',
           rightCollapsed && 'md:opacity-0 md:pointer-events-none',
         )}
-        style={{ gridArea: 'right' }}
+        style={{ gridArea: focusMode ? undefined : 'right' }}
       >
         <div className="h-full md:transition-opacity md:duration-300">
           {rightPanel}

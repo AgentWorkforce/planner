@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { X, Check } from 'lucide-react';
 import { MarkdownEditor } from './MarkdownEditor';
@@ -91,68 +91,57 @@ export interface FocusModeProps {
  * ```
  */
 export function FocusMode({ block, onClose, onCurate, onContentChange, children, className }: FocusModeProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onClose]);
+
   return (
     <div className={cn('flex h-full focus-mode-enter', className)}>
-      {/* Left: Block Detail Panel (60%) */}
-      <div className="flex-[0_0_60%] h-full overflow-y-auto border-r border-border-subtle bg-[var(--canvas-bg)] p-6">
-        {/* Header with title and actions */}
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl" aria-hidden="true">
-              {block.emoji}
-            </span>
-            <div>
-              <h2 className="text-2xl font-semibold text-text-primary">
-                {block.keyword}
-              </h2>
-              {block.title && (
-                <p className="text-sm text-text-muted mt-1">{block.title}</p>
-              )}
-            </div>
-          </div>
+      {/* Left: Contextual Chat (40%) */}
+      <div className="flex-[0_0_40%] h-full flex flex-col bg-[var(--canvas-bg)]">
+        {children}
+      </div>
 
-          <div className="flex items-center gap-2">
+      {/* Right: Block Detail Panel (60%) */}
+      <div className="flex-[0_0_60%] h-full overflow-y-auto border-l border-border-subtle bg-[var(--canvas-bg)]">
+        {/* Compact header bar — aligns with chat toolbar height */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle">
+          <span className="text-lg" aria-hidden="true">{block.emoji}</span>
+          <h2 className="text-sm font-semibold text-text-primary truncate">{block.keyword}</h2>
+          {block.title && (
+            <span className="text-xs text-text-muted truncate hidden lg:inline">— {block.title}</span>
+          )}
+          <div className="flex items-center gap-2 text-xs text-text-muted ml-auto shrink-0">
+            {block.type && <span>{block.type}</span>}
+            <span>{block.confidence}%</span>
+            <span className="capitalize">{block.status}</span>
             <button
               onClick={onCurate}
-              className="flex items-center gap-2 px-6 py-2.5 bg-[var(--canvas-accent)] text-white font-semibold rounded-full shadow-md hover:shadow-lg hover:brightness-110 transition-all"
+              className="flex items-center gap-1 px-3 py-1 bg-[var(--canvas-accent)] text-white text-xs font-medium rounded-full hover:brightness-110 transition-all"
               aria-label="Curate block"
             >
-              <Check className="w-4 h-4" />
-              <span>Curate</span>
+              <Check className="w-3 h-3" />
+              Curate
             </button>
             <button
               onClick={onClose}
-              className="flex items-center justify-center w-9 h-9 rounded-md hover:bg-bg-secondary transition-colors text-text-muted hover:text-text-primary"
+              className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-bg-secondary transition-colors text-text-muted hover:text-text-primary"
               aria-label="Close focus mode"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Metadata section */}
-        <div className="flex flex-wrap gap-4 mb-6 pb-6 border-b border-border-subtle">
-          {block.type && (
-            <div className="flex flex-col">
-              <span className="text-xs text-text-muted uppercase tracking-wide">Type</span>
-              <span className="text-sm text-text-primary mt-1">{block.type}</span>
-            </div>
-          )}
-          <div className="flex flex-col">
-            <span className="text-xs text-text-muted uppercase tracking-wide">Confidence</span>
-            <span className="text-sm text-text-primary mt-1">{block.confidence}%</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xs text-text-muted uppercase tracking-wide">Status</span>
-            <span className="text-sm text-text-primary mt-1 capitalize">{block.status}</span>
-          </div>
-          {block.specialist && (
-            <div className="flex flex-col">
-              <span className="text-xs text-text-muted uppercase tracking-wide">Created By</span>
-              <span className="text-sm text-text-primary mt-1">{block.specialist}</span>
-            </div>
-          )}
-        </div>
+        <div className="p-6">
 
         {/* Content section - editable markdown */}
         <div className="mb-6">
@@ -203,12 +192,9 @@ export function FocusMode({ block, onClose, onCurate, onContentChange, children,
             </div>
           </div>
         )}
+        </div>
       </div>
 
-      {/* Right: Contextual Chat (40%) */}
-      <div className="flex-[0_0_40%] h-full flex flex-col bg-[var(--canvas-bg)]">
-        {children}
-      </div>
     </div>
   );
 }

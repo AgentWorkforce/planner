@@ -10,6 +10,25 @@
 import { sendMessage } from './client.js';
 
 // ============================================================================
+// Browser Broadcast
+// ============================================================================
+
+/**
+ * Optional direct-to-browser broadcast function.
+ * Set by ws-proxy at startup to bypass relay for guaranteed delivery
+ * to browser clients (relay broadcasts may not reach user-type clients).
+ */
+let browserBroadcast: ((message: Record<string, unknown>) => void) | null = null;
+
+/**
+ * Register a function that broadcasts messages directly to all browser
+ * WebSocket connections. Called by ws-proxy during initialization.
+ */
+export function setBrowserBroadcast(fn: (message: Record<string, unknown>) => void): void {
+  browserBroadcast = fn;
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -109,11 +128,27 @@ const activeAgents = new Map<string, { role: AgentRole; displayName: string; sta
 // ============================================================================
 
 /**
- * Broadcast an event to all connected relay clients.
- * Uses '*' as the recipient to indicate broadcast.
+ * Broadcast an event to all connected clients via two paths:
+ * 1. Relay broadcast ('*') — reaches other relay agents
+ * 2. Direct WebSocket push — guaranteed delivery to browser clients
+ *    (relay broadcasts may not reach user-type clients)
  */
 function broadcastEvent(event: AgentStatusEvent): void {
+  // Path 1: relay broadcast for agents
   sendMessage('*', event.type, 'agent_status', event as unknown as Record<string, unknown>);
+
+  // Path 2: direct push to browser WebSocket connections
+  if (browserBroadcast) {
+    browserBroadcast({
+      type: 'message',
+      from: 'agent-status',
+      fromName: 'agent-status',
+      entityType: 'agent',
+      body: event.type,
+      data: event as unknown as Record<string, unknown>,
+      timestamp: Date.now(),
+    });
+  }
 }
 
 /**

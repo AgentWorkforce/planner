@@ -65,7 +65,7 @@ export function specialistToAgent(specialist: ActiveSpecialist): Agent {
   return {
     id: `specialist-${specialist.name}`,
     role,
-    state: 'working' as AgentState,
+    state: 'normal' as AgentState,
     displayName: specialist.name,
     hasQuestion: false,
   };

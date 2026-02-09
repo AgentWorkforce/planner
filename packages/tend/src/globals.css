@@ -26,15 +26,17 @@
   color-scheme: light;
 
   /* Backgrounds — warm, layered */
-  --color-bg-deep: #f5f0e8;          /* Warm sand */
-  --color-bg-primary: #ece7dd;       /* Parchment */
-  --color-bg-secondary: #e3ddd3;     /* Warm stone */
-  --color-bg-tertiary: #d9d2c7;      /* Deeper stone */
+  --color-bg-deep: #f2f1ed;          /* Warm gray */
+  --color-bg-primary: #e8e6e1;       /* Light warm gray */
+  --color-bg-secondary: #dddbd6;     /* Warm stone */
+  --color-bg-tertiary: #d3d1cc;      /* Deeper stone */
   --color-bg-card: #ffffff;           /* Clean white cards */
   --color-bg-elevated: #ffffff;
   --color-bg-hover: rgba(74, 124, 89, 0.08);
   --color-bg-active: rgba(74, 124, 89, 0.15);
   --color-bg-input: #fcfbf8;         /* bg-deep 70% toward white */
+  --color-bg-user-bubble: color-mix(in srgb, var(--color-bg-deep), black 4%); /* User msg bg */
+  --color-bg-chrome: color-mix(in srgb, var(--color-bg-deep), black 2%); /* Nav/tab chrome */
 
   /* Text — earth tones */
   --color-text-primary: #2d2a24;     /* Rich brown-black */
@@ -98,8 +100,8 @@
   --sidebar-ring: #4a7c59;
 
   /* Canvas Theme - Light (warm earth tones) */
-  --canvas-bg: #f5f0e8;
-  --canvas-bg-subtle: #ece7dd;
+  --canvas-bg: #f2f1ed;
+  --canvas-bg-subtle: #e8e6e1;
   --canvas-text-primary: #2d2a24;
   --canvas-text-muted: #6b6560;
   --block-draft: #ffffff;
@@ -129,7 +131,7 @@
     color-scheme: dark;
 
     /* Backgrounds — dark earth */
-    --color-bg-deep: #1a1816;          /* Warm charcoal */
+    --color-bg-deep: #181614;          /* Warm charcoal -5% */
     --color-bg-primary: #201e1a;       /* Dark earth */
     --color-bg-secondary: #282520;
     --color-bg-tertiary: #302c26;
@@ -137,7 +139,9 @@
     --color-bg-elevated: #383430;
     --color-bg-hover: rgba(90, 156, 106, 0.08);
     --color-bg-active: rgba(90, 156, 106, 0.15);
-    --color-bg-input: #3c3b39;         /* bg-deep ~15% toward white */
+    --color-bg-input: #211f1d;         /* bg-deep +4% white */
+    --color-bg-user-bubble: color-mix(in srgb, var(--color-bg-deep), white 6%); /* User msg bg */
+    --color-bg-chrome: color-mix(in srgb, var(--color-bg-deep), black 2%); /* Nav/tab chrome */
 
     /* Text — warm off-white */
     --color-text-primary: #e8e2d8;     /* Warm off-white */
@@ -232,15 +236,17 @@ html.theme-light {
   color-scheme: light;
 
   /* Backgrounds — warm, layered */
-  --color-bg-deep: #f5f0e8;          /* Warm sand */
-  --color-bg-primary: #ece7dd;       /* Parchment */
-  --color-bg-secondary: #e3ddd3;     /* Warm stone */
-  --color-bg-tertiary: #d9d2c7;      /* Deeper stone */
+  --color-bg-deep: #f2f1ed;          /* Warm gray */
+  --color-bg-primary: #e8e6e1;       /* Light warm gray */
+  --color-bg-secondary: #dddbd6;     /* Warm stone */
+  --color-bg-tertiary: #d3d1cc;      /* Deeper stone */
   --color-bg-card: #ffffff;           /* Clean white cards */
   --color-bg-elevated: #ffffff;
   --color-bg-hover: rgba(74, 124, 89, 0.08);
   --color-bg-active: rgba(74, 124, 89, 0.15);
   --color-bg-input: #fcfbf8;         /* bg-deep 70% toward white */
+  --color-bg-user-bubble: color-mix(in srgb, var(--color-bg-deep), black 4%); /* User msg bg */
+  --color-bg-chrome: color-mix(in srgb, var(--color-bg-deep), black 2%); /* Nav/tab chrome */
 
   /* Text — earth tones */
   --color-text-primary: #2d2a24;     /* Rich brown-black */
@@ -304,8 +310,8 @@ html.theme-light {
   --sidebar-ring: #4a7c59;
 
   /* Canvas Theme - Light (warm earth tones) */
-  --canvas-bg: #f5f0e8;
-  --canvas-bg-subtle: #ece7dd;
+  --canvas-bg: #f2f1ed;
+  --canvas-bg-subtle: #e8e6e1;
   --canvas-text-primary: #2d2a24;
   --canvas-text-muted: #6b6560;
   --block-draft: #ffffff;
@@ -330,7 +336,7 @@ html.theme-dark {
   color-scheme: dark;
 
   /* Backgrounds — dark earth */
-  --color-bg-deep: #1a1816;          /* Warm charcoal */
+  --color-bg-deep: #181614;          /* Warm charcoal -5% */
   --color-bg-primary: #201e1a;       /* Dark earth */
   --color-bg-secondary: #282520;
   --color-bg-tertiary: #302c26;
@@ -338,7 +344,8 @@ html.theme-dark {
   --color-bg-elevated: #383430;
   --color-bg-hover: rgba(90, 156, 106, 0.08);
   --color-bg-active: rgba(90, 156, 106, 0.15);
-  --color-bg-input: #3c3b39;         /* bg-deep ~15% toward white */
+  --color-bg-input: #211f1d;         /* bg-deep +4% white */
+  --color-bg-chrome: color-mix(in srgb, var(--color-bg-deep), black 2%); /* Nav/tab chrome */
 
   /* Text — warm off-white */
   --color-text-primary: #e8e2d8;     /* Warm off-white */
@@ -730,4 +737,41 @@ body {
 .animate-completion-glow {
   animation: completion-glow 1.2s ease-out forwards;
   border-radius: 9999px;
+}
+
+/* Typography plugin - chat theme (agent messages) */
+.prose-chat {
+  --tw-prose-body: var(--color-text-primary);
+  --tw-prose-headings: var(--color-text-primary);
+  --tw-prose-lead: var(--color-text-secondary);
+  --tw-prose-links: var(--color-accent-primary);
+  --tw-prose-bold: var(--color-text-primary);
+  --tw-prose-counters: var(--color-text-muted);
+  --tw-prose-bullets: var(--color-text-muted);
+  --tw-prose-hr: var(--color-border-default);
+  --tw-prose-quotes: var(--color-text-secondary);
+  --tw-prose-quote-borders: var(--color-accent-primary);
+  --tw-prose-code: var(--color-text-primary);
+  --tw-prose-pre-code: var(--color-text-primary);
+  --tw-prose-pre-bg: var(--color-bg-tertiary);
+  --tw-prose-th-borders: var(--color-border-default);
+  --tw-prose-td-borders: var(--color-border-subtle);
+}
+.prose-chat :not(pre) > code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+}
+.prose-chat pre code {
+  font-family: 'IBM Plex Mono', monospace;
+}
+/* Tighten first/last margins for inline chat feel */
+.prose-chat > *:first-child {
+  margin-top: 0;
+}
+.prose-chat > *:last-child {
+  margin-bottom: 0;
 }

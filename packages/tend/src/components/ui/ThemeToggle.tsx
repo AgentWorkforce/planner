@@ -69,7 +69,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     <button
       onClick={toggleTheme}
       className={cn(
-        'w-8 h-8 rounded-full flex items-center justify-center',
+        'w-5 h-5 rounded-full flex items-center justify-center',
         'hover:bg-[var(--canvas-bg-subtle)] transition-colors',
         'text-[var(--canvas-text-muted)] hover:text-[var(--canvas-text-primary)]',
         className

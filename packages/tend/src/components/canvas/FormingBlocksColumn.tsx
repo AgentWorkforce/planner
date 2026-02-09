@@ -123,8 +123,8 @@ export function FormingBlocksColumn({
   }, [isMobile, visibleBlocks, addBody, removeBody, bodies, isReady]);
 
   const header = (
-    <div className="p-4">
-      <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)]">
+    <div className="flex-shrink-0 flex items-center px-4 h-9 border-b border-border-subtle bg-[var(--color-bg-chrome)]">
+      <h2 className="text-xs font-medium uppercase tracking-wider text-text-secondary">
         Forming ({overflowCount > 0 && !showAll ? `${MAX_VISIBLE} of ${filteredBlocks.length}` : filteredBlocks.length})
       </h2>
     </div>

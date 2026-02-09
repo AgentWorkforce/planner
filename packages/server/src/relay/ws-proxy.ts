@@ -14,6 +14,7 @@ import type { Server } from 'http';
 import { RelayClient, type ClientState, type SendPayload, type SendMeta, type ChannelMessagePayload, type Envelope } from '@agent-relay/sdk';
 import { getRelayConfig } from './config.js';
 import { getRelayMode } from './service.js';
+import { setBrowserBroadcast } from './agent-status.js';
 import { randomUUID } from 'crypto';
 
 /** Incoming message from browser */
@@ -43,17 +44,24 @@ interface RelayMessage {
 /** Active connection tracking */
 interface UserConnection {
   ws: WebSocket;
-  client: RelayClient | null;  // null in mock mode
+  client: RelayClient;
   userId: string;
   displayName: string;
   channels: Set<string>;
-  isMock: boolean;
 }
 
 const connections = new Map<WebSocket, UserConnection>();
 
-/** Demo channel ID */
-const DEMO_CHANNEL = '#demo';
+/** Optional callback fired when a user joins a channel */
+let onUserChannelJoinCallback: ((channel: string) => void) | null = null;
+
+/**
+ * Register a callback for user channel joins.
+ * Used by ideation-bridge to spawn agents on-demand when a user navigates to a session.
+ */
+export function onUserChannelJoin(callback: (channel: string) => void): void {
+  onUserChannelJoinCallback = callback;
+}
 
 /**
  * Send a message to the browser WebSocket.
@@ -65,121 +73,10 @@ function sendToBrowser(ws: WebSocket, message: RelayMessage): void {
 }
 
 /**
- * Generate a mock AI response based on the user's message.
- */
-function generateMockResponse(userMessage: string): string {
-  const lowerMsg = userMessage.toLowerCase();
-
-  if (lowerMsg.includes('hello') || lowerMsg.includes('hi')) {
-    return "Hello! I'm the Demo AI. In demo mode, you can explore the messaging UI, but I'm not connected to the real planning system. Try starting the relay daemon for full functionality.";
-  }
-
-  if (lowerMsg.includes('help')) {
-    return "I can help you explore the planning features! In demo mode, I provide simulated responses. To get real AI assistance:\n\n1. Start the relay daemon\n2. Reconnect to see real agents\n3. Ask questions about your plans";
-  }
-
-  if (lowerMsg.includes('plan') || lowerMsg.includes('step')) {
-    return "Great question about planning! In demo mode, I can't access real plans, but I can explain how it works:\n\n- Create plans with goals and context\n- Break down into steps with dependencies\n- AI agents help refine and review\n\nConnect to a relay daemon to start planning for real!";
-  }
-
-  return `Thanks for your message! In demo mode, I provide simulated responses. Your message: "${userMessage.slice(0, 50)}${userMessage.length > 50 ? '...' : ''}"\n\nStart the relay daemon to connect with real planning agents.`;
-}
-
-/**
- * Handle incoming message from browser in mock mode.
- */
-function handleMockMessage(ws: WebSocket, userId: string, displayName: string, channels: Set<string>, message: BrowserMessage): void {
-  switch (message.type) {
-    case 'join':
-      if (message.channel) {
-        channels.add(message.channel);
-        sendToBrowser(ws, { type: 'joined', channel: message.channel });
-        // Send a welcome message from Demo AI
-        setTimeout(() => {
-          sendToBrowser(ws, {
-            type: 'channel_message',
-            channel: message.channel,
-            from: 'Demo AI',
-            fromName: 'Demo AI',
-            entityType: 'agent',
-            body: `Welcome to ${message.channel}! You're in demo mode because the relay daemon is not running.`,
-            messageId: `mock-${randomUUID().slice(0, 8)}`,
-            timestamp: Date.now(),
-          });
-        }, 500);
-      }
-      break;
-
-    case 'leave':
-      if (message.channel) {
-        channels.delete(message.channel);
-        sendToBrowser(ws, { type: 'left', channel: message.channel });
-      }
-      break;
-
-    case 'send':
-      if (message.channel && message.body) {
-        // Echo the user's message back
-        sendToBrowser(ws, {
-          type: 'channel_message',
-          channel: message.channel,
-          from: userId,
-          fromName: displayName,
-          entityType: 'user',
-          body: message.body,
-          messageId: `mock-${randomUUID().slice(0, 8)}`,
-          timestamp: Date.now(),
-        });
-
-        // Send a mock AI response after a delay
-        setTimeout(() => {
-          sendToBrowser(ws, {
-            type: 'channel_message',
-            channel: message.channel,
-            from: 'Demo AI',
-            fromName: 'Demo AI',
-            entityType: 'agent',
-            body: generateMockResponse(message.body!),
-            messageId: `mock-${randomUUID().slice(0, 8)}`,
-            timestamp: Date.now(),
-          });
-        }, 1000 + Math.random() * 1000);
-      }
-      break;
-
-    case 'dm':
-      if (message.to && message.body) {
-        // Send a mock DM response
-        setTimeout(() => {
-          sendToBrowser(ws, {
-            type: 'message',
-            from: 'Demo AI',
-            fromName: 'Demo AI',
-            entityType: 'agent',
-            body: generateMockResponse(message.body!),
-            messageId: `mock-${randomUUID().slice(0, 8)}`,
-            timestamp: Date.now(),
-          });
-        }, 800);
-      }
-      break;
-
-    default:
-      sendToBrowser(ws, { type: 'error', error: `Unknown message type: ${(message as BrowserMessage).type}` });
-  }
-}
-
-/**
  * Handle incoming message from browser.
  */
 function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): void {
   const { client, ws } = conn;
-
-  // Handle mock mode
-  if (conn.isMock || !client) {
-    handleMockMessage(ws, conn.userId, conn.displayName, conn.channels, message);
-    return;
-  }
 
   switch (message.type) {
     case 'join':
@@ -188,6 +85,7 @@ function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): vo
         if (joined) {
           conn.channels.add(message.channel);
           sendToBrowser(ws, { type: 'joined', channel: message.channel });
+          onUserChannelJoinCallback?.(message.channel);
         } else {
           sendToBrowser(ws, { type: 'error', error: `Failed to join channel ${message.channel}` });
         }
@@ -273,7 +171,6 @@ async function createUserClient(ws: WebSocket, userId: string, displayName: stri
     userId,
     displayName,
     channels: new Set(),
-    isMock: false,
   };
 
   // Wire up relay callbacks to browser
@@ -283,7 +180,7 @@ async function createUserClient(ws: WebSocket, userId: string, displayName: stri
 
   client.onMessage = (from: string, payload: SendPayload, messageId: string, meta?: SendMeta) => {
     // Determine entity type based on sender name pattern
-    const isUserMessage = from.startsWith('user-');
+    const isUserMessage = from.startsWith('user-') || from.startsWith('anon-');
     sendToBrowser(ws, {
       type: 'message',
       from,
@@ -299,7 +196,7 @@ async function createUserClient(ws: WebSocket, userId: string, displayName: stri
   client.onChannelMessage = (from: string, channel: string, body: string, envelope: Envelope<ChannelMessagePayload>) => {
     console.log(`[ws-proxy] Received channel message from ${from} in ${channel}: "${body.slice(0, 50)}"`);
     // Determine entity type based on sender name pattern
-    const isUserMessage = from.startsWith('user-');
+    const isUserMessage = from.startsWith('user-') || from.startsWith('anon-');
     sendToBrowser(ws, {
       type: 'channel_message',
       channel,
@@ -347,6 +244,12 @@ export function initWebSocketProxy(server: Server): WebSocketServer {
 
   console.log('[ws-proxy] WebSocket proxy initialized at /ws/relay');
 
+  // Register direct-to-browser broadcast for agent status events
+  // (relay broadcasts may not reach user-type clients)
+  setBrowserBroadcast((message) => {
+    broadcastToUsers(message as RelayMessage);
+  });
+
   wss.on('connection', async (ws: WebSocket, req) => {
     // Extract user info from query string or headers
     // For now, generate anonymous user IDs - can be extended with auth
@@ -356,47 +259,14 @@ export function initWebSocketProxy(server: Server): WebSocketServer {
 
     const mode = getRelayMode();
 
-    // Handle mock/demo mode when relay is unavailable
     if (mode !== 'connected') {
-      console.log(`[ws-proxy] User ${displayName} (${userId}) connected in mock mode`);
-
-      // Create mock connection
-      const mockConn: UserConnection = {
-        ws,
-        client: null,
-        userId,
-        displayName,
-        channels: new Set(),
-        isMock: true,
-      };
-      connections.set(ws, mockConn);
-
-      // Send mock mode status
+      console.log(`[ws-proxy] User ${displayName} (${userId}) rejected: relay not connected`);
       sendToBrowser(ws, {
         type: 'status',
-        status: 'READY',  // Pretend we're ready but in mock mode
-        data: { mode: 'mock', message: 'Demo mode - relay daemon not available' },
+        status: 'DISCONNECTED' as ClientState,
+        data: { message: 'Relay daemon not available. Start the relay daemon to enable real-time messaging.' },
       });
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString()) as BrowserMessage;
-          handleBrowserMessage(mockConn, message);
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error);
-          sendToBrowser(ws, { type: 'error', error: `Invalid message format: ${msg}` });
-        }
-      });
-
-      ws.on('close', () => {
-        console.log(`[ws-proxy] User ${displayName} (${userId}) disconnected from mock mode`);
-        connections.delete(ws);
-      });
-
-      ws.on('error', (error) => {
-        console.error(`[ws-proxy] WebSocket error for ${userId}:`, error.message);
-      });
-
+      ws.close(1013, 'Relay daemon not available');
       return;
     }
 
@@ -406,7 +276,7 @@ export function initWebSocketProxy(server: Server): WebSocketServer {
       connections.set(ws, conn);
 
       // Send initial status
-      sendToBrowser(ws, { type: 'status', status: conn.client!.state });
+      sendToBrowser(ws, { type: 'status', status: conn.client.state });
 
       ws.on('message', (data: Buffer) => {
         try {

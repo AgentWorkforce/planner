@@ -61,9 +61,6 @@ describe('Chat API', () => {
     });
   });
 
-  // Note: POST /api/ai/chat route was moved to packages/server
-  // Tests for that endpoint should be in packages/server/src/api/chat.test.ts
-
   describe('POST /api/ai/suggestions/apply', () => {
     it('requires all fields', async () => {
       const response = await request(app)

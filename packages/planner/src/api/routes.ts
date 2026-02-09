@@ -13,7 +13,7 @@ import { createInitiativeHandlers } from './handlers/initiatives.js';
 import { createQuestionHandlers } from './handlers/questions.js';
 import { createTrajectoryHandlers } from './handlers/trajectories.js';
 import { createProjectHandlers } from './handlers/projects.js';
-import { createChatHandlers } from './handlers/chat.js';
+import { createSuggestionHandlers } from './handlers/chat.js';
 import { createOptionalMcpAuthMiddleware } from './middleware/mcp-auth.js';
 
 /**
@@ -34,7 +34,7 @@ export function createRouter(storage: PlanStorage): Router {
   const questionHandlers = createQuestionHandlers(storage);
   const trajectoryHandlers = createTrajectoryHandlers(storage);
   const projectHandlers = createProjectHandlers(storage);
-  const chatHandlers = createChatHandlers(storage);
+  const suggestionHandlers = createSuggestionHandlers(storage);
   const mcpAuth = createOptionalMcpAuthMiddleware(storage);
 
   // Plan routes
@@ -115,8 +115,8 @@ export function createRouter(storage: PlanStorage): Router {
   router.get('/plans/:id/trajectory/preferences', trajectoryHandlers.getPreferences);
   router.get('/plans/:id/trajectory/similar', trajectoryHandlers.findSimilar);
 
-  // AI suggestion routes (domain logic only - chat route is in server package)
-  router.post('/ai/suggestions/apply', chatHandlers.applySuggestion);
+  // AI suggestion routes
+  router.post('/ai/suggestions/apply', suggestionHandlers.applySuggestion);
 
   // Project routes
   router.get('/projects', projectHandlers.list);

@@ -34,7 +34,6 @@ export {
   isRelayAvailable,
   getRelayMode,
   onModeChange,
-  setForceMockMode,
   type RelayMode,
 } from './service.js';
 
@@ -48,14 +47,6 @@ export {
   type SpawnResult,
   type Spawner,
 } from './spawner.js';
-
-// Mock spawner exports
-export {
-  createMockSpawner,
-  isMockAgent,
-  getActiveMockAgents,
-  clearMockAgents,
-} from './mock-spawner.js';
 
 // Session timeout exports
 export {
@@ -85,18 +76,6 @@ export {
   type ChannelInfo,
 } from './channels.js';
 
-// PlannerLead exports
-export {
-  spawnPlannerLead,
-  terminatePlannerLead,
-  isPlannerLeadActive,
-  getPlannerLeadAgentId,
-  joinPlannerLeadToChannel,
-  initPlannerLead,
-  stopPlannerLead,
-  notifyPlanReady,
-} from './planner-lead.js';
-
 // Ideation bridge exports
 export {
   initIdeationBridge,
@@ -125,9 +104,3 @@ export {
   type AgentsSnapshotEvent,
   type AgentStatusEvent,
 } from './agent-status.js';
-
-// Chat exports
-export {
-  sendToAgent,
-  type AgentResponse,
-} from './chat.js';

@@ -17,6 +17,7 @@ import { useRelayConnection } from './useRelayConnection';
 export type AgentState = 'normal' | 'working' | 'needs_input' | 'idle' | 'error';
 
 export type AgentRole =
+  | 'interviewer'
   | 'architect'
   | 'ui-designer'
   | 'data-modeler'
@@ -50,6 +51,19 @@ export interface AgentOrchestrationState {
   questions: Question[];
   sessionDuration: number;
   isConnected: boolean;
+}
+
+/** Infer agent role from its ID when agent_joined hasn't arrived yet. */
+function inferRoleFromId(agentId: string): AgentRole {
+  const id = agentId.toLowerCase();
+  if (id.includes('interviewer')) return 'interviewer';
+  if (id.includes('planner') || id.includes('pln')) return 'planner-lead';
+  if (id.includes('architect')) return 'architect';
+  if (id.includes('designer') || id.includes('uid')) return 'ui-designer';
+  if (id.includes('data') || id.includes('model')) return 'data-modeler';
+  if (id.includes('test')) return 'tester';
+  if (id.includes('security') || id.includes('sec')) return 'security';
+  return 'coder';
 }
 
 export interface UseAgentOrchestrationResult extends AgentOrchestrationState {
@@ -150,7 +164,36 @@ export function useAgentOrchestration(projectId?: string): UseAgentOrchestration
                 : a
             );
           }
-          return prev;
+          // Safety net: status update arrived before agent_joined.
+          // Check if a placeholder with the same role exists (e.g. the
+          // hardcoded interviewer injected by ProjectPage). If so, update
+          // it in-place rather than adding a duplicate.
+          const inferredRole = inferRoleFromId(update.agentId);
+          const sameRole = prev.find((a) => a.role === inferredRole);
+          if (sameRole) {
+            return prev.map((a) =>
+              a.id === sameRole.id
+                ? {
+                    ...a,
+                    id: update.agentId,
+                    state: update.state,
+                    currentActivity: update.activity,
+                    currentStep: update.step,
+                    currentThought: update.thought,
+                    hasQuestion: update.state === 'needs_input',
+                  }
+                : a
+            );
+          }
+          return [...prev, {
+            id: update.agentId,
+            role: inferredRole,
+            state: update.state,
+            currentActivity: update.activity,
+            currentStep: update.step,
+            currentThought: update.thought,
+            hasQuestion: update.state === 'needs_input',
+          }];
         });
       }
 

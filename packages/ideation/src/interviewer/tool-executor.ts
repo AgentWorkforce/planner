@@ -12,13 +12,14 @@ import type {
   ToolResult,
   StartSessionInput,
   ReadSessionInput,
-  AddMessageInput,
   UpdateUnderstandingInput,
   SendToPlannerInput,
   SpawnSpecialistInput,
   UpdateSynthesisInput,
   ListBlocksInput,
   GraduateBlocksInput,
+  ReportAgentStatusInput,
+  ReportToolUseInput,
 } from './tools.js';
 
 // =============================================================================
@@ -29,6 +30,7 @@ export interface ToolExecutorDeps {
   storage: IdeationStorage;
   spawnAgent?: (sessionId: string, name: string, focus: string, context?: string) => Promise<string>;
   plannerClient?: PlannerClient;
+  reportStatus?: (agentId: string, state: string, options?: { activity?: string; thought?: string }) => void;
 }
 
 export async function executeTool(
@@ -56,13 +58,6 @@ export async function executeTool(
           return { success: false, error: `Session not found: ${session_id}` };
         }
         return { success: true, data: session };
-      }
-
-      case 'add_message': {
-        const { session_id, role, content } = input as AddMessageInput;
-        const message = createTranscriptMessage(role, content);
-        const session = await storage.appendTranscript(session_id, message);
-        return { success: true, data: { message_id: message.id } };
       }
 
       case 'update_understanding': {
@@ -401,6 +396,16 @@ export async function executeTool(
           },
         };
       }
+
+      case 'report_agent_status': {
+        const { session_id, state, activity, thought } = input as ReportAgentStatusInput;
+        const agentId = session_id ? `Interviewer-${session_id.slice(0, 8)}` : 'interviewer';
+        deps.reportStatus?.(agentId, state, { activity, thought });
+        return { success: true, data: { reported: true } };
+      }
+
+      case 'report_tool_use':
+        return { success: true };
 
       default:
         return { success: false, error: `Unknown tool: ${name}` };

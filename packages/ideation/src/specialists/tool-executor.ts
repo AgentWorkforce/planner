@@ -6,7 +6,6 @@
  */
 
 import type { IdeationStorage } from '../storage/index.js';
-import { specialistQueue } from '../interviewer/specialist-queue.js';
 import { ideationEvents } from '../api/events.js';
 import { createBlock, type BlockStatus } from '../domain/block.js';
 import type {
@@ -126,7 +125,7 @@ export async function executeSpecialistTool(
       }
 
       case 'queue_insight': {
-        const { session_id, type, content, priority } = input as QueueInsightInput;
+        const { session_id } = input as QueueInsightInput;
 
         // Get session to verify it exists
         const session = await storage.getSession(session_id);
@@ -134,14 +133,10 @@ export async function executeSpecialistTool(
           return { success: false, error: `Session not found: ${session_id}` };
         }
 
-        // Queue insight for Interviewer
-        // Use first 8 chars of session ID as key (matches Interviewer's format)
-        specialistQueue.queueInput(session_id.slice(0, 8), {
-          specialist_name: specialistName,
-          type,
-          content,
-          priority: Math.max(1, Math.min(10, priority)),
-        });
+        // In the relay model, specialists send insights directly via channel messages.
+        // This tool is deprecated but kept for backward compatibility.
+        // Specialists should use relay channel messages instead.
+        console.log('[tool-executor] queue_insight is deprecated - specialists should use relay channel messages');
 
         return { success: true, data: { queued: true } };
       }
@@ -183,28 +178,10 @@ export async function executeSpecialistTool(
         // Emit event so SSE clients get notified
         ideationEvents.emitSessionEvent('session:block_created', updatedSession);
 
-        // If merge/split suggestions provided, queue insights for user
-        if (merge_suggestion) {
-          const blockTitles = merge_suggestion.block_ids
-            .map(id => session.blocks.find(b => b.id === id)?.title)
-            .filter(Boolean)
-            .join(', ');
-
-          specialistQueue.queueInput(session_id.slice(0, 8), {
-            specialist_name: specialistName,
-            type: 'observation',
-            content: `Merge suggestion: Consider merging blocks [${blockTitles}]. Rationale: ${merge_suggestion.rationale}`,
-            priority: 6,
-          });
-        }
-
-        if (split_suggestion) {
-          specialistQueue.queueInput(session_id.slice(0, 8), {
-            specialist_name: specialistName,
-            type: 'observation',
-            content: `Split suggestion for "${title}": ${split_suggestion.rationale}`,
-            priority: 6,
-          });
+        // Note: merge/split suggestions should be sent via relay channel messages in the relay model.
+        // Specialists can send observations directly to the session channel.
+        if (merge_suggestion || split_suggestion) {
+          console.log('[tool-executor] Merge/split suggestions should be sent via relay channel messages');
         }
 
         return { success: true, data: { block: newBlock } };
@@ -265,28 +242,10 @@ export async function executeSpecialistTool(
         // Emit event so SSE clients get notified
         ideationEvents.emitSessionEvent('session:block_updated', updatedSession);
 
-        // If merge/split suggestions provided, queue insights for user
-        if (merge_suggestion) {
-          const blockTitles = merge_suggestion.block_ids
-            .map(id => session.blocks.find(b => b.id === id)?.title)
-            .filter(Boolean)
-            .join(', ');
-
-          specialistQueue.queueInput(session_id.slice(0, 8), {
-            specialist_name: specialistName,
-            type: 'observation',
-            content: `Merge suggestion: Consider merging blocks [${blockTitles}]. Rationale: ${merge_suggestion.rationale}`,
-            priority: 6,
-          });
-        }
-
-        if (split_suggestion) {
-          specialistQueue.queueInput(session_id.slice(0, 8), {
-            specialist_name: specialistName,
-            type: 'observation',
-            content: `Split suggestion for "${existingBlock.title}": ${split_suggestion.rationale}`,
-            priority: 6,
-          });
+        // Note: merge/split suggestions should be sent via relay channel messages in the relay model.
+        // Specialists can send observations directly to the session channel.
+        if (merge_suggestion || split_suggestion) {
+          console.log('[tool-executor] Merge/split suggestions should be sent via relay channel messages');
         }
 
         return { success: true, data: { block: updatedBlock } };

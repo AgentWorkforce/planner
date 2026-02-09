@@ -12,15 +12,11 @@ import { Router } from 'express';
 import { createChannelHandlers } from './handlers/channels.js';
 import { createHealthHandlers } from './handlers/health.js';
 import { createAgentHandlers } from './handlers/agents.js';
-import { createChatHandlers } from './handlers/chat.js';
 import { createCapabilitiesHandlers } from './handlers/capabilities.js';
 
 /** Storage interface subset needed for routes */
 interface RouteStorage {
   listPlans(): Array<{ plan_id: string }>;
-  getPlan(planId: string): { plan_id: string } | null;
-  getSessionByPlanId(planId: string): { session_id: string; agent_id: string } | null;
-  getLatestVersion(planId: string): { steps?: Array<{ title: string }> } | null;
 }
 
 /**
@@ -31,12 +27,10 @@ export function createServerRouter(storage: RouteStorage): Router {
   const channelHandlers = createChannelHandlers(storage);
   const healthHandlers = createHealthHandlers();
   const agentHandlers = createAgentHandlers();
-  const chatHandlers = createChatHandlers(storage);
   const capabilitiesHandlers = createCapabilitiesHandlers();
 
   // Health routes
   router.get('/health/relay', healthHandlers.relayHealth);
-  router.get('/health/planner-lead', healthHandlers.plannerLeadHealth);
 
   // Capabilities routes
   router.get('/capabilities', capabilitiesHandlers.list);
@@ -48,9 +42,6 @@ export function createServerRouter(storage: RouteStorage): Router {
   router.get('/channels', channelHandlers.list);
   router.get('/channels/:id/messages', channelHandlers.messages);
   router.get('/channels/:id/presence', channelHandlers.presence);
-
-  // Chat routes (relay-aware)
-  router.post('/ai/chat', chatHandlers.chat);
 
   return router;
 }

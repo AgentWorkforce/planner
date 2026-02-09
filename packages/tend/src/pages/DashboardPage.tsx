@@ -284,7 +284,7 @@ export function DashboardPage() {
       leftPanel={leftPanel}
       center={center}
       rightPanel={rightPanel}
-      statusBar={<StatusBar connectionStatus="connected" />}
+      statusBar={<StatusBar content={{ type: 'agents' }} connectionStatus="connected" />}
     />
   );
 }

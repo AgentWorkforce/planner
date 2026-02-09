@@ -39,11 +39,12 @@ export const SessionStatusSchema = z.enum(['active', 'abandoned']);
 export const TranscriptRole = {
   User: 'user',
   Assistant: 'assistant',
+  System: 'system',
 } as const;
 
 export type TranscriptRole = (typeof TranscriptRole)[keyof typeof TranscriptRole];
 
-export const TranscriptRoleSchema = z.enum(['user', 'assistant']);
+export const TranscriptRoleSchema = z.enum(['user', 'assistant', 'system']);
 
 // =============================================================================
 // No Fixed Guardian/Specialist Roles

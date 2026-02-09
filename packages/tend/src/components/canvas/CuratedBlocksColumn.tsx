@@ -12,69 +12,51 @@ export interface CuratedBlocksColumnProps {
 }
 
 /**
- * Props for individual curated block card
+ * Props for individual curated block row
  */
-interface CuratedBlockCardProps {
+interface CuratedBlockRowProps {
   block: Block;
+  isLast: boolean;
   onClick?: () => void;
   onUncurate?: () => void;
 }
 
 /**
- * CuratedBlockCard
- *
- * Individual card for a curated block with green accent border.
- *
- * Features:
- * - Green left border using --block-curated-border
- * - Background color using --block-curated
- * - Displays emoji, title (from keyword), and keyword
- * - Hover effect for interactivity
- * - Optional uncurate button to move back to forming
- *
- * @example
- * ```tsx
- * <CuratedBlockCard
- *   block={block}
- *   onClick={() => handleClick(block.id)}
- *   onUncurate={() => handleUncurate(block.id)}
- * />
- * ```
+ * CuratedBlockRow — single row in an ASCII tree list.
+ * Uses box-drawing characters for structure, dot leaders for alignment.
  */
-function CuratedBlockCard({ block, onClick, onUncurate }: CuratedBlockCardProps) {
+function CuratedBlockRow({ block, isLast, onClick, onUncurate }: CuratedBlockRowProps) {
+  const branch = isLast ? '└' : '├';
   return (
     <div
       onClick={onClick}
-      className="p-3 rounded-lg cursor-pointer transition-all shadow-md hover:shadow-lg animate-in slide-in-from-left-2 fade-in duration-300"
-      style={{
-        backgroundColor: 'var(--block-curated)',
-        borderLeft: '3px solid var(--block-curated-border)',
-      }}
+      className="flex items-center gap-1.5 cursor-pointer py-0 hover:text-foreground transition-colors font-mono text-sm animate-in slide-in-from-left-2 fade-in duration-300"
+      style={{ color: 'var(--canvas-text-secondary, var(--color-text-secondary))' }}
     >
-      <div className="flex items-start gap-2">
-        <span className="text-xl" role="img" aria-label={block.keyword}>
-          {block.emoji}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{block.keyword}</div>
-          <div className="text-xs text-muted-foreground truncate">
-            {Math.round(block.confidence)}% confidence
-          </div>
-        </div>
-        {onUncurate && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onUncurate();
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Move back to forming"
-            aria-label="Uncurate block"
-          >
-            ↩
-          </button>
-        )}
-      </div>
+      <span className="text-[var(--canvas-text-muted)] select-none opacity-40">{branch}─</span>
+      <span className="text-base leading-none w-5 text-center inline-flex justify-center shrink-0 grayscale" role="img" aria-label={block.keyword}>
+        {block.emoji}
+      </span>
+      <span className="font-medium truncate">{block.keyword}</span>
+      <span className="flex-1 min-w-0 overflow-hidden text-[var(--canvas-text-muted)] select-none opacity-40 leading-none">
+        {'·'.repeat(40)}
+      </span>
+      <span className="text-xs whitespace-nowrap tabular-nums">
+        {Math.round(block.confidence)}%
+      </span>
+      {onUncurate && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onUncurate();
+          }}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-1"
+          title="Move back to forming"
+          aria-label="Uncurate block"
+        >
+          ↩
+        </button>
+      )}
     </div>
   );
 }
@@ -138,14 +120,15 @@ export function CuratedBlocksColumn({
   }
 
   return (
-    <div className={cn('flex flex-col gap-2 p-3 overflow-y-auto', className)}>
-      <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)] mb-2">
+    <div className={cn('flex flex-col p-3 overflow-y-auto', className)}>
+      <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--canvas-text-muted)] mb-2 font-mono">
         Curated ({curatedBlocks.length})
       </h3>
-      {curatedBlocks.map((block) => (
-        <CuratedBlockCard
+      {curatedBlocks.map((block, i) => (
+        <CuratedBlockRow
           key={block.id}
           block={block}
+          isLast={i === curatedBlocks.length - 1}
           onClick={() => onBlockClick?.(block.id)}
           onUncurate={onUncurate ? () => onUncurate(block.id) : undefined}
         />

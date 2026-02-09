@@ -70,8 +70,8 @@ export function AgentTab({ agent, isActive, onClick }: AgentTabProps) {
       className={`
         relative flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors
         ${isActive
-          ? 'text-accent-primary border-b-2 border-accent-primary'
-          : 'text-text-secondary hover:text-text-primary border-b-2 border-transparent'
+          ? 'text-accent-primary border-b-2 !border-accent-primary'
+          : 'text-text-secondary hover:text-text-primary border-b-2 !border-transparent'
         }
       `}
     >

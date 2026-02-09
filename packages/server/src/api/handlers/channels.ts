@@ -7,7 +7,7 @@
  * - GET /api/channels/:id/presence - Get online members
  *
  * These handlers check relay connection status and return real data
- * when connected, or demo data when relay is unavailable.
+ * when connected, or empty data when relay is unavailable.
  */
 
 import type { Request, Response, NextFunction } from 'express';
@@ -72,18 +72,9 @@ export function createChannelHandlers(storage: ChannelStorage) {
       try {
         const mode = getRelayMode();
 
-        // In disconnected/mock mode, return demo channel
+        // When disconnected, return empty channel list
         if (mode !== 'connected') {
-          const demoChannels: ChannelResponse[] = [
-            {
-              id: '#demo',
-              name: 'demo',
-              type: 'global',
-              description: 'Demo channel (relay unavailable)',
-              unreadCount: 0,
-            },
-          ];
-          res.json({ channels: demoChannels, mode });
+          res.json({ channels: [], mode });
           return;
         }
 
@@ -121,27 +112,9 @@ export function createChannelHandlers(storage: ChannelStorage) {
 
         const mode = getRelayMode();
 
-        // In disconnected/mock mode, return demo messages
+        // When disconnected, return empty
         if (mode !== 'connected') {
-          const demoMessages: MessageResponse[] = [
-            {
-              id: 'demo-1',
-              from: 'Demo AI',
-              content: 'Welcome to demo mode! The relay daemon is not connected.',
-              timestamp: Date.now() - 60000,
-            },
-            {
-              id: 'demo-2',
-              from: 'Demo AI',
-              content: 'In demo mode, you can explore the UI but messages are simulated.',
-              timestamp: Date.now() - 30000,
-            },
-          ];
-          res.json({
-            messages: demoMessages,
-            hasMore: false,
-            mode,
-          });
+          res.json({ messages: [], hasMore: false, mode });
           return;
         }
 
@@ -179,7 +152,7 @@ export function createChannelHandlers(storage: ChannelStorage) {
           });
         } catch (error) {
           console.error(`[channels] Failed to query messages for ${channelId}:`, error);
-          res.json({ messages: [], hasMore: false, mode, error: 'Failed to fetch messages' });
+          res.status(502).json({ messages: [], hasMore: false, mode, error: 'Failed to fetch messages from relay' });
         }
       } catch (err) {
         next(err);
@@ -196,21 +169,9 @@ export function createChannelHandlers(storage: ChannelStorage) {
 
         const mode = getRelayMode();
 
-        // In disconnected/mock mode, return demo presence
+        // When disconnected, return empty
         if (mode !== 'connected') {
-          const demoPresence: PresenceMember[] = [
-            {
-              id: 'demo-ai',
-              name: 'Demo AI',
-              entityType: 'agent',
-              status: 'online',
-            },
-          ];
-          res.json({
-            members: demoPresence,
-            onlineCount: 1,
-            mode,
-          });
+          res.json({ members: [], onlineCount: 0, mode });
           return;
         }
 
@@ -240,7 +201,7 @@ export function createChannelHandlers(storage: ChannelStorage) {
           });
         } catch (error) {
           console.error(`[channels] Failed to query presence for ${channelId}:`, error);
-          res.json({ members: [], onlineCount: 0, mode, error: 'Failed to fetch presence' });
+          res.status(502).json({ members: [], onlineCount: 0, mode, error: 'Failed to fetch presence from relay' });
         }
       } catch (err) {
         next(err);

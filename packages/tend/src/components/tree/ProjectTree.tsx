@@ -157,7 +157,8 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
     [handleZoomChange, focusedScope]
   );
 
-  // Determine breadcrumb data
+  // Breadcrumb always starts with project name for context.
+  // Zoomed states append scope/step segments.
   const breadcrumbSegments: Array<{ label: string; level: 'project' | 'scope' | 'step'; active: boolean }> = [
     { label: projectName, level: 'project', active: zoom === 'overview' },
   ];
@@ -185,8 +186,8 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
   return (
     <>
       <div className={cn('flex flex-col h-full overflow-hidden', className)}>
-        {/* Breadcrumb */}
-        <div className="flex-shrink-0 px-3 py-2 border-b border-border-subtle">
+        {/* Breadcrumb — always visible for context */}
+        <div className="flex-shrink-0 flex items-center pl-[11px] pr-4 h-9 border-b border-border-subtle bg-[var(--color-bg-chrome)]">
           <TreeBreadcrumb segments={breadcrumbSegments} onSegmentClick={handleBreadcrumbClick} />
         </div>
 
@@ -214,6 +215,7 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
                 scope={focusedScope}
                 steps={orderedScopedSteps[focusedScope] || []}
                 isExpanded={true}
+                hideHeader
                 workspacePath={getScopeWorkspacePath(focusedScope)}
                 onScopeClick={() => handleScopeClick(focusedScope)}
                 onStepClick={(stepId) => handleStepClick(focusedScope, stepId)}
@@ -227,6 +229,7 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
                 scope={focusedScope}
                 steps={orderedScopedSteps[focusedScope] || []}
                 isExpanded={true}
+                hideHeader
                 workspacePath={getScopeWorkspacePath(focusedScope)}
                 selectedStepId={focusedStep}
                 focusedStepId={focusedStep}

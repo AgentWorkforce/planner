@@ -118,6 +118,9 @@ export interface MessageInputProps {
   /** Placeholder text */
   placeholder?: string;
 
+  /** Initial value to pre-fill the input */
+  initialValue?: string;
+
   /** Optional CSS class name */
   className?: string;
 }

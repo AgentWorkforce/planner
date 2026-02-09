@@ -21,12 +21,14 @@ import { TranscriptRoleSchema } from './types.js';
 export const TranscriptMessageSchema = z.object({
   /** Unique message identifier */
   id: z.string(),
-  /** Who sent this message: 'user' or 'assistant' */
+  /** Who sent this message: 'user', 'assistant', or 'system' (tool actions, thinking) */
   role: TranscriptRoleSchema,
   /** The message content */
   content: z.string(),
   /** When this message was sent (ISO 8601) */
   timestamp: z.string(),
+  /** Optional structured data (tool_action, thinking indicators) */
+  data: z.record(z.unknown()).optional(),
 });
 
 export type TranscriptMessage = z.infer<typeof TranscriptMessageSchema>;
@@ -35,13 +37,16 @@ export type TranscriptMessage = z.infer<typeof TranscriptMessageSchema>;
  * Creates a new transcript message with generated ID and timestamp.
  */
 export function createTranscriptMessage(
-  role: 'user' | 'assistant',
-  content: string
+  role: 'user' | 'assistant' | 'system',
+  content: string,
+  data?: Record<string, unknown>
 ): TranscriptMessage {
-  return {
+  const msg: TranscriptMessage = {
     id: crypto.randomUUID(),
     role,
     content,
     timestamp: new Date().toISOString(),
   };
+  if (data) msg.data = data;
+  return msg;
 }

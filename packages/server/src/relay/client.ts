@@ -256,6 +256,8 @@ export interface SpawnAgentOptions {
   planId?: string;
   /** MCP server URL for agent tools (defaults to http://localhost:3001) */
   mcpServerUrl?: string;
+  /** Channels to pre-join the agent to after spawning */
+  channels?: string[];
 }
 
 /**
@@ -392,6 +394,18 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
           console.log(`[relay] Pre-joined ${options.name} to ${channel}`);
         } else {
           console.warn(`[relay] Failed to pre-join ${options.name} to ${channel}`);
+        }
+      }
+
+      // Pre-join agent to additional channels
+      if (options.channels) {
+        for (const channel of options.channels) {
+          const joined = client.adminJoinChannel(channel, options.name);
+          if (joined) {
+            console.log(`[relay] Pre-joined ${options.name} to ${channel}`);
+          } else {
+            console.warn(`[relay] Failed to pre-join ${options.name} to ${channel}`);
+          }
         }
       }
     } else {

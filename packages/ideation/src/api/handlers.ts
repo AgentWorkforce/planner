@@ -29,11 +29,7 @@ import {
 } from './schemas.js';
 import { ideationEvents } from './events.js';
 import { sessionChannelId, getLLMConfig } from '../interviewer/config.js';
-import { interviewer } from '../interviewer/service.js';
-import { specialistQueue } from '../interviewer/specialist-queue.js';
-import { conversationHistory } from '../interviewer/history.js';
 import { sendChannelMessage, isConnected as isRelayConnected } from '../relay/index.js';
-import { navigatorService, isNavigatorActive } from '../navigator/index.js';
 import { getTunerIntegration, type IdeationOutcome } from '../tuner/index.js';
 
 // =============================================================================
@@ -72,6 +68,8 @@ export interface PlannerClient {
 export interface HandlerConfig {
   storage: IdeationStorage;
   plannerClient?: PlannerClient;
+  spawnAgent?: (sessionId: string, name: string, focus: string, context?: string) => Promise<string>;
+  reportStatus?: (agentId: string, state: string, options?: { activity?: string; thought?: string }) => void;
 }
 
 // =============================================================================
@@ -150,13 +148,6 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     try {
       const id = String(req.params.id ?? '');
       const session = await storage.updateSessionStatus(id, 'abandoned');
-
-      // Clean up in-memory state to prevent memory leaks
-      const channelId = sessionChannelId(id);
-      const sessionPrefix = id.slice(0, 8);
-      conversationHistory.clearHistory(channelId);
-      specialistQueue.clearQueue(sessionPrefix);
-      console.log(`[ideation-handlers] Cleaned up memory for abandoned session ${id}`);
 
       // Emit IdeationOutcome to Tuner (fire-and-forget)
       const tuner = getTunerIntegration();
@@ -238,38 +229,9 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
 
       ideationEvents.emitSessionEvent('session:message', session);
 
-      // For user messages, directly invoke Interviewer to get response
-      // Note: We don't broadcast to relay here to avoid message loops.
-      // The Interviewer is invoked directly, and external subscribers can listen via SSE.
-      // IMPORTANT: The API handler stores messages (user above, assistant below).
-      // The Interviewer should NOT use add_message tool when called from API context.
-      if (role === 'user') {
-        const channelId = sessionChannelId(id);
-        console.log(`[ideation-handlers] Processing user message for ${channelId}`);
-
-        // Directly invoke Interviewer - pass skipMessageStorage flag via fromAgent
-        try {
-          const response = await interviewer.handleMessage(channelId, content, 'api-handler');
-
-          if (response) {
-            // Store assistant response - this is the ONLY place assistant messages should be stored
-            // for API-driven flow
-            const assistantMessage = createTranscriptMessage('assistant', response);
-            const updatedSession = await storage.appendTranscript(id, assistantMessage);
-
-            // Emit event so SSE clients get notified
-            ideationEvents.emitSessionEvent('session:message', updatedSession);
-            console.log(`[ideation-handlers] Interviewer response stored and emitted`);
-
-            // Return updated session with response
-            res.json(updatedSession);
-            return;
-          }
-        } catch (err) {
-          console.error('[ideation-handlers] Error getting Interviewer response:', err);
-          // Continue to return original session even if Interviewer fails
-        }
-      }
+      // Note: User messages are now handled by spawned Interviewer agent via relay.
+      // The API handler just stores the message and emits the event.
+      // The Interviewer agent listens on the session channel and responds there.
 
       res.json(session);
     } catch (error) {
@@ -775,36 +737,6 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     });
   }
 
-  // ===========================================================================
-  // Navigator Chat (#cv2-045)
-  // ===========================================================================
-
-  async function navigatorChat(req: Request, res: Response): Promise<void> {
-    try {
-      const { message } = req.body;
-
-      if (!message || typeof message !== 'string') {
-        res.status(400).json({ error: 'Message is required' });
-        return;
-      }
-
-      if (!isNavigatorActive()) {
-        res.status(503).json({
-          error: 'Navigator not available',
-          message: 'Navigator service is not initialized. Check ANTHROPIC_API_KEY.',
-        });
-        return;
-      }
-
-      const response = await navigatorService.generateResponse(message);
-      res.json({ response });
-    } catch (error) {
-      console.error('Error in Navigator chat:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: 'Navigator error', message: errorMessage });
-    }
-  }
-
   return {
     createSession,
     getSession,
@@ -821,6 +753,5 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
     deleteBlock,
     curateBlock,
     subscribeToEvents,
-    navigatorChat,
   };
 }

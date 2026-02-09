@@ -32,6 +32,12 @@ interface AgentTabBarProps {
 
   /** Whether user has viewed main tab since last message */
   mainUnreadCount?: number;
+
+  /** Plan channel ID (truthy when plan exists) */
+  planChannelId?: string;
+
+  /** Unread message count for plan channel */
+  planUnreadCount?: number;
 }
 
 export function AgentTabBar({
@@ -39,6 +45,8 @@ export function AgentTabBar({
   onSelectChannel,
   agents,
   mainUnreadCount = 0,
+  planChannelId,
+  planUnreadCount = 0,
 }: AgentTabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
@@ -60,10 +68,10 @@ export function AgentTabBar({
   }, [agents]);
 
   return (
-    <div className="relative border-b border-border-subtle bg-bg-primary">
+    <div className="relative backdrop-blur-md" style={{ backgroundColor: 'color-mix(in srgb, var(--color-bg-chrome), transparent 50%)' }}>
       {/* Left fade */}
       {showLeftFade && (
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-bg-primary to-transparent pointer-events-none z-10" />
+        <div className="absolute left-0 top-0 bottom-0 w-8 pointer-events-none z-10" style={{ background: 'linear-gradient(to right, color-mix(in srgb, var(--color-bg-chrome), transparent 50%), transparent)' }} />
       )}
 
       {/* Scrollable tab container */}
@@ -79,8 +87,8 @@ export function AgentTabBar({
           className={`
             relative flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors
             ${activeChannelId === 'main'
-              ? 'text-accent-primary border-b-2 border-accent-primary'
-              : 'text-text-secondary hover:text-text-primary border-b-2 border-transparent'
+              ? 'text-accent-primary border-b-2 !border-accent-primary'
+              : 'text-text-secondary hover:text-text-primary border-b-2 !border-transparent'
             }
           `}
         >
@@ -93,6 +101,29 @@ export function AgentTabBar({
             )}
           </div>
         </button>
+
+        {/* Planning tab - shows when plan exists */}
+        {planChannelId && (
+          <button
+            onClick={() => onSelectChannel('planning')}
+            className={`
+              relative flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors
+              ${activeChannelId === 'planning'
+                ? 'text-accent-primary border-b-2 !border-accent-primary'
+                : 'text-text-secondary hover:text-text-primary border-b-2 !border-transparent'
+              }
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <span>Planning</span>
+              {planUnreadCount > 0 && (
+                <span className="px-1.5 py-0.5 text-xs rounded-full bg-accent-primary/20 text-accent-primary">
+                  {planUnreadCount}
+                </span>
+              )}
+            </div>
+          </button>
+        )}
 
         {/* Agent tabs */}
         {agents.map((agent) => (
@@ -107,7 +138,7 @@ export function AgentTabBar({
 
       {/* Right fade */}
       {showRightFade && (
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-bg-primary to-transparent pointer-events-none z-10" />
+        <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10" style={{ background: 'linear-gradient(to left, color-mix(in srgb, var(--color-bg-chrome), transparent 50%), transparent)' }} />
       )}
     </div>
   );

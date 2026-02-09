@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { ProjectProvider, useProject } from '@/contexts';
 import { TendLayout } from '@/components/layout/TendLayout';
@@ -13,14 +13,15 @@ import { useBlocks } from '@/hooks/useBlocks';
 import { usePlanSteps } from '@/hooks/usePlanSteps';
 import { useAgentOrchestration } from '@/hooks/useAgentOrchestration';
 import { useQuestionNotifications } from '@/hooks/useQuestionNotifications';
-import { specialistsToAgents } from '@/lib/specialist-utils';
+import { useStatusLine } from '@/hooks/useStatusLine';
+
 import type { PendingItem } from '@/components/status/ReplyBar';
 
 /**
  * ProjectPageContent - Inner component that uses ProjectContext
  */
 function ProjectPageContent() {
-  const { project, phase, session, plan, run, loading, error, graduate, planRefreshKey, blockRefreshKey, transcriptRefreshKey } = useProject();
+  const { project, phase, session, plan, run, loading, error, graduate, planRefreshKey, blockRefreshKey } = useProject();
   const [searchParams] = useSearchParams();
 
   // Blocks live in the left column (The Now) — always fetch when session exists
@@ -94,28 +95,51 @@ function ProjectPageContent() {
   const focusedStep = focusedStepId ? getFocusedStepInfo(focusedStepId) : undefined;
 
   // Wire agent orchestration for StatusBar
-  const { agents: relayAgents, pendingQuestions, questions, sessionDuration, isConnected } = useAgentOrchestration(project?.id);
+  const { agents: relayAgents, questions, sessionDuration, isConnected } = useAgentOrchestration(project?.id);
 
-  // Merge ideation specialists (from session API) with relay agents
-  // Specialists provide presence even when relay doesn't broadcast agent data
+  // Build agents list from relay (source of truth for who is active).
+  // The Interviewer is always present during an active session but never
+  // appears in relay data (it IS the ideation service), so we synthesize it.
   const agents = useMemo(() => {
-    const specialistAgents = specialistsToAgents(session?.active_specialists ?? []);
-    if (relayAgents.length > 0) {
-      // Relay agents take priority; add specialists that aren't already represented
-      const relayIds = new Set(relayAgents.map(a => a.id));
-      const extras = specialistAgents.filter(s => !relayIds.has(s.id));
-      return [...relayAgents, ...extras];
+    // Relay agents are the only real-time source; session.active_specialists
+    // is a historical list that includes agents who have finished — don't use it.
+    const merged = [...relayAgents];
+
+    // Inject Interviewer if session exists and it's not already in the list
+    if (session && !merged.some(a => a.role === 'interviewer')) {
+      merged.unshift({
+        id: 'ideation-interviewer',
+        role: 'interviewer' as const,
+        state: 'normal' as const,
+        displayName: 'Interviewer',
+        hasQuestion: false,
+      });
     }
-    return specialistAgents;
-  }, [relayAgents, session?.active_specialists]);
 
-  // Wire question notifications for StatusBar bubbles
-  const { currentNotification, dismiss, queue, addToQueue } = useQuestionNotifications();
+    return merged;
+  }, [relayAgents, session]);
 
-  // Feed questions from orchestration to notification queue
+  // Wire question notifications for ReplyBar
+  const { dismiss, queue, addToQueue } = useQuestionNotifications();
+
+  // Status line for the status bar content slot
+  const statusLine = useStatusLine();
+
+  // Feed questions from orchestration to notification queue + status line
+  const pushMessageRef = useRef(statusLine.pushMessage);
+  pushMessageRef.current = statusLine.pushMessage;
+  const pushAlertRef = useRef(statusLine.pushAlert);
+  pushAlertRef.current = statusLine.pushAlert;
+
   useEffect(() => {
     questions.forEach((question) => {
       addToQueue(question);
+      // Blocking questions become alerts; others become messages
+      if (question.priority === 'blocking') {
+        pushAlertRef.current(question.text);
+      } else {
+        pushMessageRef.current(question.text, 'info');
+      }
     });
   }, [questions, addToQueue]);
 
@@ -135,10 +159,15 @@ function ProjectPageContent() {
     };
   });
 
+  // Reply context state
+  const [replyContext, setReplyContext] = useState<string | null>(null);
+
   // Handle replying to a pending item
   const handleReplyItem = (itemId: string) => {
-    // TODO: Open reply modal or focus conversation input
-    console.log('[ProjectPage] Reply to item:', itemId);
+    const item = pendingItems.find((p) => p.id === itemId);
+    if (item) {
+      setReplyContext(`Re: ${item.source} — "${item.content}"\n\n`);
+    }
   };
 
   // Handle dismissing a pending item
@@ -162,8 +191,19 @@ function ProjectPageContent() {
     name: agent.displayName || agent.role,
     role: agent.role,
     status: mapAgentState(agent.state),
-    unreadCount: 0, // TODO: Track unread count per agent
+    unreadCount: 0,
   }));
+
+  // Trigger phase wipe on phase transitions
+  const prevPhaseRef = useRef(phase);
+  useEffect(() => {
+    if (phase !== prevPhaseRef.current) {
+      prevPhaseRef.current = phase;
+      if (phase !== 'new') {
+        statusLine.triggerWipe('phase');
+      }
+    }
+  }, [phase, statusLine.triggerWipe]);
 
   // Auto-graduate new projects to ideation
   useEffect(() => {
@@ -260,9 +300,8 @@ function ProjectPageContent() {
                   emoji: focusedBlock.emoji,
                   keyword: focusedBlock.keyword,
                 }}
-                phase="ideation"
-                hasBlocks={blocks.length > 0}
-                hasSteps={steps.length > 0}
+                planId={plan?.plan_id}
+                replyContext={replyContext}
               />
             </FocusMode>
           ) : (
@@ -274,10 +313,8 @@ function ProjectPageContent() {
               onDismissItem={handleDismissItem}
               focusedBlockId={focusedStepId}
               focusedBlock={focusedStep}
-              phase="ideation"
-              hasBlocks={blocks.length > 0}
-              hasSteps={steps.length > 0}
-              transcriptRefreshKey={transcriptRefreshKey}
+              planId={plan?.plan_id}
+              replyContext={replyContext}
             />
           )
         }
@@ -289,16 +326,13 @@ function ProjectPageContent() {
         }
         statusBar={
           <StatusBar
+            content={statusLine.current}
+            queueSize={statusLine.queueSize}
             agents={agents}
-            pendingQuestions={pendingQuestions}
             sessionDuration={sessionDuration}
             connectionStatus={connectionStatus}
-            currentNotification={
-              currentNotification
-                ? { agentId: currentNotification.agentId, text: currentNotification.question.text }
-                : null
-            }
-            onNotificationDismiss={dismiss}
+            onAlertDismiss={statusLine.dismissAlert}
+            wipeSignal={statusLine.wipeSignal}
           />
         }
       />
@@ -355,9 +389,8 @@ function ProjectPageContent() {
                   emoji: focusedBlock.emoji,
                   keyword: focusedBlock.keyword,
                 }}
-                phase="planning"
-                hasBlocks={blocks.length > 0}
-                hasSteps={steps.length > 0}
+                planId={plan?.plan_id}
+                replyContext={replyContext}
               />
             </FocusMode>
           ) : (
@@ -369,10 +402,8 @@ function ProjectPageContent() {
               onDismissItem={handleDismissItem}
               focusedBlockId={focusedStepId}
               focusedBlock={focusedStep}
-              phase="planning"
-              hasBlocks={blocks.length > 0}
-              hasSteps={steps.length > 0}
-              transcriptRefreshKey={transcriptRefreshKey}
+              planId={plan?.plan_id}
+              replyContext={replyContext}
             />
           )
         }
@@ -384,16 +415,13 @@ function ProjectPageContent() {
         }
         statusBar={
           <StatusBar
+            content={statusLine.current}
+            queueSize={statusLine.queueSize}
             agents={agents}
-            pendingQuestions={pendingQuestions}
             sessionDuration={sessionDuration}
             connectionStatus={connectionStatus}
-            currentNotification={
-              currentNotification
-                ? { agentId: currentNotification.agentId, text: currentNotification.question.text }
-                : null
-            }
-            onNotificationDismiss={dismiss}
+            onAlertDismiss={statusLine.dismissAlert}
+            wipeSignal={statusLine.wipeSignal}
           />
         }
       />
@@ -450,9 +478,8 @@ function ProjectPageContent() {
                   emoji: focusedBlock.emoji,
                   keyword: focusedBlock.keyword,
                 }}
-                phase="forging"
-                hasBlocks={blocks.length > 0}
-                hasSteps={steps.length > 0}
+                planId={plan?.plan_id}
+                replyContext={replyContext}
               />
             </FocusMode>
           ) : (
@@ -464,10 +491,8 @@ function ProjectPageContent() {
               onDismissItem={handleDismissItem}
               focusedBlockId={focusedStepId}
               focusedBlock={focusedStep}
-              phase="forging"
-              hasBlocks={blocks.length > 0}
-              hasSteps={steps.length > 0}
-              transcriptRefreshKey={transcriptRefreshKey}
+              planId={plan?.plan_id}
+              replyContext={replyContext}
             />
           )
         }
@@ -479,16 +504,13 @@ function ProjectPageContent() {
         }
         statusBar={
           <StatusBar
+            content={statusLine.current}
+            queueSize={statusLine.queueSize}
             agents={agents}
-            pendingQuestions={pendingQuestions}
             sessionDuration={sessionDuration}
             connectionStatus={connectionStatus}
-            currentNotification={
-              currentNotification
-                ? { agentId: currentNotification.agentId, text: currentNotification.question.text }
-                : null
-            }
-            onNotificationDismiss={dismiss}
+            onAlertDismiss={statusLine.dismissAlert}
+            wipeSignal={statusLine.wipeSignal}
           />
         }
       />

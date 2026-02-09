@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 // Plugin imports (relative paths to sibling packages)
 import { createPlannerService, type PlannerService } from '../../planner/src/index.js';
 import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
+import { createSpecialistSpawner } from '../../ideation/src/relay/spawner.js';
 import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
 
 // Shared error handling
@@ -30,8 +31,6 @@ import {
   initChannelManagement,
   syncPlanChannels,
   initWebSocketProxy,
-  initPlannerLead,
-  stopPlannerLead,
   createSessionTimeoutService,
   initIdeationBridge,
   stopIdeationBridge,
@@ -39,10 +38,16 @@ import {
   planChannelMiddleware,
   qaChannelMiddleware,
   isConnected,
+  spawnAgent,
+  emitAgentStatusUpdate,
+  type AgentState,
 } from './relay/index.js';
 
 // Forge spawner
 import { spawnForgeTask, terminateForgeAgent } from './relay/forge-spawner.js';
+
+// Agent lifecycle
+import { AgentLifecycleManager } from './agents/lifecycle.js';
 
 // Server API routes (relay-aware channel handlers)
 import { createServerRouter } from './api/routes.js';
@@ -76,11 +81,6 @@ async function start(): Promise<void> {
   plannerService.initialize();
   console.log(`[planner] Initialized (database: ${DB_PATH})`);
 
-  // Initialize ideation service
-  ideationService = createIdeationService({ dbPath: IDEATION_DB_PATH, plannerUrl: `http://localhost:${PORT}` });
-  await ideationService.initialize();
-  console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
-
   // Create Express app
   const app = express();
   app.use(cors());
@@ -102,8 +102,7 @@ async function start(): Promise<void> {
 
   // Mount plugin routers
   app.use('/api', plannerService.router);
-  app.use('/api/ideation', ideationService.router);
-  // Forge router mounted after relay connection to detect mode (see below)
+  // Ideation and Forge routers mounted after relay connection to enable specialist spawning and mode detection
 
   // Attempt relay connection (non-blocking on failure)
   const relayConfig = getRelayConfig();
@@ -119,6 +118,23 @@ async function start(): Promise<void> {
   const mode = getRelayMode();
   console.log(`[relay] Mode: ${mode}`);
 
+  // Initialize ideation service (after relay connection to enable specialist spawning)
+  const specialistSpawner = isConnected()
+    ? createSpecialistSpawner({ spawnAgent })
+    : undefined;
+
+  ideationService = createIdeationService({
+    dbPath: IDEATION_DB_PATH,
+    plannerUrl: `http://localhost:${PORT}`,
+    spawnAgent: specialistSpawner,
+    reportStatus: (agentId, state, options) => {
+      emitAgentStatusUpdate(agentId, state as AgentState, options);
+    },
+  });
+  await ideationService.initialize();
+  app.use('/api/ideation', ideationService.router);
+  console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
+
   // Initialize forge service (after relay connection to enable real mode)
   const forgeMode: ForgeExecutionMode =
     (process.env.FORGE_MODE as ForgeExecutionMode) || (isConnected() ? 'real' : 'test');
@@ -133,8 +149,13 @@ async function start(): Promise<void> {
   app.use('/api/forge', forgeService.router);
   console.log(`[forge] Initialized (database: ${FORGE_DB_PATH}, mode: ${forgeMode})`);
 
+  // Initialize agent lifecycle manager (spawns/releases relay agents)
+  const lifecycle = new AgentLifecycleManager({
+    mcpServerUrl: `http://localhost:${PORT}`,
+  });
+
   // Initialize ideation bridge (routes relay messages to ideation package)
-  initIdeationBridge();
+  initIdeationBridge(lifecycle, ideationService.getStorage());
 
   // Initialize channel management
   initChannelManagement();
@@ -150,8 +171,7 @@ async function start(): Promise<void> {
     await syncIdeationSessionChannels(ideationStorage);
   }
 
-  // Initialize PlannerLead agent
-  initPlannerLead(storage);
+  // Note: PlannerLead agents are now spawned on-demand via AgentLifecycleManager
 
   // Create session timeout service
   const sessionTimeoutService = createSessionTimeoutService(storage);
@@ -176,7 +196,6 @@ async function start(): Promise<void> {
     console.log('  POST   /api/plans/:id/versions/:version/approve');
     console.log('  POST   /api/plans/:id/versions/:version/publish');
     console.log('  GET    /api/health/relay');
-    console.log('  GET    /api/health/planner-lead');
     console.log('  GET    /api/capabilities');
     console.log('  GET    /api/channels');
     console.log('  GET    /api/channels/:id/messages');
@@ -206,8 +225,8 @@ async function start(): Promise<void> {
   const shutdown = async (signal: string) => {
     console.log(`\n[server] Received ${signal}, shutting down gracefully...`);
 
-    // Stop PlannerLead service
-    stopPlannerLead();
+    // Release all spawned agents
+    await lifecycle.releaseAll();
 
     // Stop ideation bridge
     stopIdeationBridge();

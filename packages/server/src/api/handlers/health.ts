@@ -3,15 +3,13 @@
  *
  * Provides relay-aware health endpoints:
  * - GET /api/health/relay - Check relay daemon connection status
- * - GET /api/health/planner-lead - Check PlannerLead agent health
  */
 
 import type { Request, Response } from 'express';
 import { getRelayMode, getRelayConfig } from '../../relay/index.js';
-import { getPlannerLeadHealth, type PlannerLeadHealth } from '../../relay/planner-lead.js';
 
 export interface RelayHealthResponse {
-  status: 'connected' | 'disconnected' | 'error' | 'standalone';
+  status: 'connected' | 'disconnected' | 'error';
   socketPath: string;
   message?: string;
 }
@@ -32,18 +30,12 @@ export function createHealthHandlers() {
       let status: RelayHealthResponse['status'];
       let message: string;
 
-      switch (mode) {
-        case 'connected':
-          status = 'connected';
-          message = 'Relay daemon connected and ready';
-          break;
-        case 'mock':
-          status = 'standalone';
-          message = 'Running in mock mode (relay bypassed)';
-          break;
-        default:
-          status = 'disconnected';
-          message = 'Relay daemon not connected';
+      if (mode === 'connected') {
+        status = 'connected';
+        message = 'Relay daemon connected and ready';
+      } else {
+        status = 'disconnected';
+        message = 'Relay daemon not connected';
       }
 
       const response: RelayHealthResponse = {
@@ -52,15 +44,6 @@ export function createHealthHandlers() {
         message,
       };
       res.json(response);
-    },
-
-    /**
-     * GET /api/health/planner-lead
-     * Reports PlannerLead agent health and activity.
-     */
-    plannerLeadHealth: async (_req: Request, res: Response): Promise<void> => {
-      const health: PlannerLeadHealth = getPlannerLeadHealth();
-      res.json(health);
     },
   };
 }

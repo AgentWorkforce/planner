@@ -11,22 +11,25 @@ export interface WorkSectionProps {
   selectedStepId?: string;
   focusedStepId?: string;
   sheetOpen?: boolean;
+  hideHeader?: boolean;
   onScopeClick?: () => void;
   onStepClick?: (stepId: string) => void;
   className?: string;
 }
 
 /**
- * WorkSection - Groups StepNode components under a scope
+ * WorkSection - ASCII tree structure with box-drawing connectors
  *
- * Features:
- * - Collapsible via ScopeHeader
- * - Shows step list when expanded
- * - Compact layout for sidebar tree
+ * When expanded, renders steps with ├─ / └─ connectors and │ vertical trunk.
  *
- * Behavior:
- * - Collapsed at OVERVIEW level
- * - Expanded at SCOPE/STEP level
+ * ```
+ * ▼ scope-name                  0/6
+ *   packages/scope/
+ *   │
+ *   ├─ ○ Step one                 1
+ *   ├─ ○ Step two                 2
+ *   └─ ○ Step three
+ * ```
  */
 export function WorkSection({
   scope,
@@ -36,33 +39,56 @@ export function WorkSection({
   selectedStepId,
   focusedStepId,
   sheetOpen = false,
+  hideHeader = false,
   onScopeClick,
   onStepClick,
   className,
 }: WorkSectionProps) {
   return (
-    <div className={cn('space-y-1', className)}>
-      {/* Scope header */}
-      <ScopeHeader scope={scope} steps={steps} isExpanded={isExpanded} workspacePath={workspacePath} onClick={onScopeClick} />
+    <div className={cn('font-mono', className)}>
+      {/* Scope header — hidden when breadcrumb already shows scope */}
+      {!hideHeader && (
+        <ScopeHeader
+          scope={scope}
+          steps={steps}
+          isExpanded={isExpanded}
+          workspacePath={workspacePath}
+          onClick={onScopeClick}
+        />
+      )}
 
-      {/* Step list (only when expanded) */}
+      {/* Step list with box-drawing connectors */}
       {isExpanded && (
-        <div className="ml-4 space-y-0.5">
+        <div className={cn('text-sm', !hideHeader && 'ml-4')}>
           {steps.length === 0 ? (
-            <div className="px-2 py-2 text-xs text-text-muted">No steps in this scope</div>
+            <div className="flex items-center">
+              <span className="text-text-muted opacity-40 mr-1 select-none">└─</span>
+              <span className="text-xs text-text-muted italic">no steps</span>
+            </div>
           ) : (
-            steps.map((step) => {
+            steps.map((step, index) => {
+              const isLast = index === steps.length - 1;
               const isFocused = focusedStepId === step.step_id;
               const isFocusedAwaitingClick = isFocused && !sheetOpen;
+              const connector = isLast ? '└─' : '├─';
 
               return (
-                <StepNode
-                  key={step.step_id}
-                  step={step}
-                  isSelected={selectedStepId === step.step_id && sheetOpen}
-                  isFocusedAwaitingClick={isFocusedAwaitingClick}
-                  onClick={() => onStepClick?.(step.step_id)}
-                />
+                <div key={step.step_id} className="flex items-center">
+                  {/* Box-drawing connector */}
+                  <span className="text-text-muted opacity-40 flex-shrink-0 mr-1 select-none">
+                    {connector}
+                  </span>
+
+                  {/* Step content */}
+                  <div className="flex-1 min-w-0 py-0">
+                    <StepNode
+                      step={step}
+                      isSelected={selectedStepId === step.step_id && sheetOpen}
+                      isFocusedAwaitingClick={isFocusedAwaitingClick}
+                      onClick={() => onStepClick?.(step.step_id)}
+                    />
+                  </div>
+                </div>
               );
             })
           )}

@@ -2,8 +2,7 @@
  * Relay Client Integration for Ideation Package
  *
  * Provides relay messaging capabilities for the Interviewer service.
- * When running standalone, operates in mock mode.
- * When integrated with planner, can use shared relay connection.
+ * When integrated with planner server, uses shared relay connection via injected sender.
  */
 
 /**
@@ -55,7 +54,7 @@ export function sendChannelMessage(
   console.log(`[ideation-relay] sendChannelMessage: channel=${channel}, state=${connectionState}, hasSender=${!!injectedSender}`);
 
   if (connectionState !== 'connected') {
-    console.log(`[ideation-relay] Mock send to ${channel}: ${body.substring(0, 50)}...`);
+    console.log(`[ideation-relay] Not connected — message to ${channel} will not be delivered`);
     return false;
   }
 
@@ -72,8 +71,7 @@ export function sendChannelMessage(
     `[ideation-relay] Connected but no sender injected - message to ${channel} will not be delivered. ` +
     `Call setSender() to enable message sending.`
   );
-  console.log(`[ideation-relay] Send to ${channel} (standalone): ${body.substring(0, 50)}...`);
-  return false; // Return false since message wasn't actually sent
+  return false;
 }
 
 /**
@@ -107,14 +105,6 @@ export function onStateChange(callback: (state: ClientState) => void): () => voi
   return () => {
     stateChangeHandlers.delete(callback);
   };
-}
-
-/**
- * Get relay mode for the Interviewer.
- * Returns 'connected' if relay is available, 'mock' otherwise.
- */
-export function getRelayMode(): 'connected' | 'mock' {
-  return isConnected() ? 'connected' : 'mock';
 }
 
 /**

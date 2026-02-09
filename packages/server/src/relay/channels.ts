@@ -36,6 +36,13 @@ export function getPlanChannelId(planId: string): string {
 }
 
 /**
+ * Get channel ID for an ideation session.
+ */
+export function getSessionChannelId(sessionId: string): string {
+  return `#ideation-${sessionId.slice(0, 8)}`;
+}
+
+/**
  * Create the global #planner channel.
  * Called on server startup.
  */

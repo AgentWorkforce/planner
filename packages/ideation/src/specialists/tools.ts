@@ -5,13 +5,13 @@
  * Observations are freeform - intelligence lives in prompts, not schema validation.
  */
 
-import type Anthropic from '@anthropic-ai/sdk';
+import type { ToolDefinition } from '../interviewer/tools.js';
 
 // =============================================================================
 // Tool Definitions
 // =============================================================================
 
-export const SPECIALIST_TOOLS: Anthropic.Tool[] = [
+export const SPECIALIST_TOOLS: ToolDefinition[] = [
   {
     name: 'update_observations',
     description: 'Store your observations about the brainstorming session. Structure is freeform - use whatever makes sense for your domain. Always include a confidence field.',

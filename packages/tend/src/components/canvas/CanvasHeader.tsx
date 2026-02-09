@@ -133,7 +133,7 @@ function SessionTitleDropdown({
         <button
           onClick={() => setIsOpen(!isOpen)}
           onDoubleClick={handleTitleDoubleClick}
-          className="flex items-center gap-2 px-2 py-1 text-sm font-medium rounded-md hover:bg-muted transition-colors"
+          className="flex items-center gap-2 px-2 py-0.5 text-sm font-medium rounded-md hover:bg-muted transition-colors"
           aria-haspopup="listbox"
           aria-expanded={isOpen}
         >
@@ -202,7 +202,7 @@ export function SessionNav({
   return (
     <header
       className={cn(
-        'flex items-center justify-between px-2 md:px-4 py-2',
+        'flex items-center justify-between px-2 md:px-4 h-9 border-b border-border-subtle bg-[var(--color-bg-chrome)]',
         className,
       )}
     >
@@ -210,7 +210,7 @@ export function SessionNav({
       <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
         <button
           onClick={() => navigate('/')}
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--canvas-bg-subtle)] transition-colors shrink-0"
+          className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-[var(--canvas-bg-subtle)] transition-colors shrink-0"
           aria-label="Go back to dashboard"
         >
           <ArrowLeft className="w-4 h-4 text-[var(--canvas-text-primary)]" />

@@ -2,25 +2,21 @@
  * Relay Availability Service
  *
  * Single source of truth for whether relay features are active.
- * When unavailable, AI features should fall back to mock responses.
+ * When unavailable, endpoints return empty data with a disconnected mode indicator.
  */
 
 import { isConnected, getConnectionState, onStateChange, type ClientState } from './client.js';
 
-export type RelayMode = 'connected' | 'disconnected' | 'mock';
+export type RelayMode = 'connected' | 'disconnected';
 
 type ModeChangeCallback = (mode: RelayMode) => void;
 
 const modeChangeListeners: Set<ModeChangeCallback> = new Set();
-let forceMockMode = false;
 
 /**
  * Check if relay is available for use.
  */
 export function isRelayAvailable(): boolean {
-  if (forceMockMode) {
-    return false;
-  }
   return isConnected();
 }
 
@@ -28,9 +24,6 @@ export function isRelayAvailable(): boolean {
  * Get the current relay mode.
  */
 export function getRelayMode(): RelayMode {
-  if (forceMockMode) {
-    return 'mock';
-  }
   return isConnected() ? 'connected' : 'disconnected';
 }
 
@@ -44,19 +37,6 @@ export function onModeChange(callback: ModeChangeCallback): () => void {
   };
 }
 
-/**
- * Force mock mode (useful for testing or when daemon should be ignored).
- */
-export function setForceMockMode(enable: boolean): void {
-  const previousMode = getRelayMode();
-  forceMockMode = enable;
-  const newMode = getRelayMode();
-
-  if (previousMode !== newMode) {
-    notifyModeChange(newMode);
-  }
-}
-
 function notifyModeChange(mode: RelayMode): void {
   for (const listener of modeChangeListeners) {
     try {
@@ -68,9 +48,6 @@ function notifyModeChange(mode: RelayMode): void {
 }
 
 function mapStateToMode(state: ClientState): RelayMode {
-  if (forceMockMode) {
-    return 'mock';
-  }
   return state === 'READY' ? 'connected' : 'disconnected';
 }
 
@@ -83,6 +60,3 @@ onStateChange((state: ClientState) => {
     notifyModeChange(newMode);
   }
 });
-
-// Re-export types
-export type { RelayMode as RelayModeType };

@@ -33,6 +33,7 @@ interface AgentAvatarProps {
 
 // Role configuration with icons
 const ROLE_CONFIG: Record<AgentRole, { icon: string; label: string }> = {
+  interviewer: { icon: '🎙️', label: 'Interviewer' },
   architect: { icon: '🏛️', label: 'Architect' },
   'ui-designer': { icon: '🎨', label: 'UI Designer' },
   'data-modeler': { icon: '📊', label: 'Data Modeler' },

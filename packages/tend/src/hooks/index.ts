@@ -18,7 +18,6 @@ export { useSessionEvents } from './useSessionEvents';
 // Ideation features
 export { useConfidence } from './useConfidence';
 export { useUnderstanding } from './useUnderstanding';
-export { useSendMessage } from './useSendMessage';
 export { useIdeationApi } from './useIdeationApi';
 export { useBlocks } from './useBlocks';
 
@@ -65,3 +64,16 @@ export type { Agent as TabAgent } from './useAgents';
 // Plan steps
 export { usePlanSteps } from './usePlanSteps';
 export type { Step, UsePlanStepsReturn } from './usePlanSteps';
+
+// Relay channel hooks
+export { useRelayChannel } from './useRelayChannel';
+export type { UseRelayChannelResult } from './useRelayChannel';
+export { useSessionChannel } from './useSessionChannel';
+export { usePlanChannel } from './usePlanChannel';
+
+// Status line
+export { useStatusLine } from './useStatusLine';
+export type { StatusContent, MessageLevel, UseStatusLineReturn, WipeSignal } from './useStatusLine';
+
+// Frame player (animation system)
+export { useFramePlayer } from './useFramePlayer';

@@ -8,7 +8,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { createPlanChannel, getPlanChannelId, channelExists } from './channels.js';
 import { isConnected } from './client.js';
-import { notifyPlanReady } from './planner-lead.js';
 
 /**
  * Response body structure from POST /api/plans.
@@ -86,11 +85,7 @@ export function planChannelMiddleware(req: Request, res: Response, next: NextFun
 
               if (channelId) {
                 console.log(`[plan-channel-middleware] Created channel ${channelId} for plan ${planId}`);
-
-                // Notify PlannerLead of the new plan
-                notifyPlanReady(channelId, planId, goal || 'New plan', { context, stepCount }).catch((err) => {
-                  console.error(`[plan-channel-middleware] Error notifying PlannerLead:`, err);
-                });
+                // Note: Spawned PlannerLead agent will be notified via lifecycle manager
               }
             } catch (error) {
               // Log but don't fail - channel creation is non-critical
@@ -123,11 +118,7 @@ export function planChannelMiddleware(req: Request, res: Response, next: NextFun
                 console.log(`[plan-channel-middleware] Creating missing channel ${channelId} for plan ${planId}`);
                 createPlanChannel(planId, goal);
               }
-
-              // Notify PlannerLead of the updated plan
-              notifyPlanReady(channelId, planId, goal || 'Updated plan', { context, stepCount, source: 'version_creation' }).catch((err) => {
-                console.error(`[plan-channel-middleware] Error notifying PlannerLead:`, err);
-              });
+              // Note: Spawned PlannerLead agent will be notified via lifecycle manager
             } catch (error) {
               // Log but don't fail - channel operations are non-critical
               console.error(`[plan-channel-middleware] Error in version creation handler:`, error);
