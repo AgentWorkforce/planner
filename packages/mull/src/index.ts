@@ -57,3 +57,9 @@ export {
   DECISION_EVENT_TYPES,
   SESSION_END_EVENTS,
 } from './realtime/index.js';
+
+// API layer
+export * from './api/index.js';
+
+// Service factory
+export { createMullService, type MullServiceConfig, type MullService } from './service.js';

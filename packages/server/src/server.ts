@@ -15,6 +15,7 @@ import { createPlannerService, type PlannerService } from '../../planner/src/ind
 import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
 import { createSpecialistSpawner } from '../../ideation/src/relay/spawner.js';
 import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
+import { createMullService, type MullService } from '../../mull/src/index.js';
 
 // Shared error handling
 import { errorHandler } from '@plannr/errors';
@@ -44,7 +45,7 @@ import {
 } from './relay/index.js';
 
 // Forge spawner
-import { spawnForgeTask, terminateForgeAgent } from './relay/forge-spawner.js';
+import { spawnForgeTask, terminateForgeAgent, spawnGateAgent } from './relay/forge-spawner.js';
 
 // Agent lifecycle
 import { AgentLifecycleManager } from './agents/lifecycle.js';
@@ -62,6 +63,7 @@ const PORT = process.env.PORT || 3001;
 const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../../planner.db');
 const IDEATION_DB_PATH = process.env.IDEATION_DB_PATH || path.resolve(__dirname, '../../../ideation.db');
 const FORGE_DB_PATH = process.env.FORGE_DB_PATH || path.resolve(__dirname, '../../../forge.db');
+const MULL_MEMORY_DIR = process.env.MULL_MEMORY_DIR || path.resolve(__dirname, '../../../memory');
 
 // =============================================================================
 // Services
@@ -70,6 +72,7 @@ const FORGE_DB_PATH = process.env.FORGE_DB_PATH || path.resolve(__dirname, '../.
 let plannerService: PlannerService;
 let ideationService: IdeationService;
 let forgeService: ForgeService;
+let mullService: MullService;
 
 // =============================================================================
 // Main
@@ -144,10 +147,22 @@ async function start(): Promise<void> {
     mode: forgeMode,
     spawnTask: isConnected() ? spawnForgeTask : undefined,
     terminateAgent: isConnected() ? terminateForgeAgent : undefined,
+    spawnGateAgent: isConnected() ? spawnGateAgent : undefined,
+    plannerUrl: `http://localhost:${PORT}`,
+    repoRoot: process.cwd(),
+    worktreeBase: path.join(process.cwd(), '.forge-worktrees'),
   });
   await forgeService.initialize();
   app.use('/api/forge', forgeService.router);
   console.log(`[forge] Initialized (database: ${FORGE_DB_PATH}, mode: ${forgeMode})`);
+
+  // Initialize mull service (after planner and forge — reads their databases)
+  mullService = createMullService({
+    memoryDir: MULL_MEMORY_DIR,
+  });
+  await mullService.initialize();
+  app.use('/api/mull', mullService.router);
+  console.log(`[mull] Initialized (memoryDir: ${MULL_MEMORY_DIR})`);
 
   // Initialize agent lifecycle manager (spawns/releases relay agents)
   const lifecycle = new AgentLifecycleManager({
@@ -215,6 +230,12 @@ async function start(): Promise<void> {
     console.log('  POST   /api/forge/runs');
     console.log('  GET    /api/forge/runs/:id');
     console.log('  GET    /api/forge/runs/:id/events (SSE)');
+    console.log('');
+    console.log('Mull endpoints:');
+    console.log('  GET    /api/mull/status');
+    console.log('  POST   /api/mull/run');
+    console.log('  GET    /api/mull/topics');
+    console.log('  GET    /api/mull/topics/:slug');
   });
 
   // Initialize WebSocket proxy for relay communication
@@ -251,6 +272,7 @@ async function start(): Promise<void> {
     plannerService.shutdown();
     await ideationService.shutdown();
     forgeService.shutdown();
+    mullService.shutdown();
 
     // Exit after cleanup
     process.exit(0);
