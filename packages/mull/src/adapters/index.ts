@@ -9,18 +9,21 @@ export type {
 export {
   TrajectoryAdapterConfigSchema,
   RelayAdapterConfigSchema,
+  RelayDaemonAdapterConfigSchema,
   TranscriptAdapterConfigSchema,
   adapterConfigSchemas,
 } from './schemas.js';
 export type {
   TrajectoryAdapterConfig,
   RelayAdapterConfig,
+  RelayDaemonAdapterConfig,
   TranscriptAdapterConfig,
 } from './schemas.js';
 
 // Adapters
 export { TrajectoryAdapter } from './implementations/trajectory-adapter.js';
 export { RelayJsonlAdapter } from './implementations/relay-jsonl-adapter.js';
+export { RelayDaemonAdapter } from './implementations/relay-daemon-adapter.js';
 export { TranscriptAdapter } from './implementations/transcript-adapter.js';
 export { ForgeDbAdapter } from './implementations/forge-db-adapter.js';
 export type { ForgeDbAdapterConfig, UserTrajectoryEventRow, DerivedPreferenceRow } from './implementations/forge-db-adapter.js';
