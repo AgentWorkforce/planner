@@ -15,6 +15,12 @@ import { createPlannerClient } from './adapters/planner-client.js';
 import { WorktreeManager } from './services/worktree-manager.js';
 import { BuildCoordinator } from './services/build-coordinator.js';
 import { AnalysisTool } from './services/analysis-tool.js';
+import { createQuestionService } from './services/question-service.js';
+import { UserTrajectoryService } from './services/user-trajectory-service.js';
+import {
+  createAnswerNotificationService,
+  createNotifySubscribersFn,
+} from './mcp/answer-notification.js';
 
 // Domain exports
 export * from './domain/index.js';
@@ -321,6 +327,15 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     trajectoryCapture,
   });
 
+  // Create question-related services
+  const userTrajectoryService = new UserTrajectoryService(storage);
+  const answerNotificationService = createAnswerNotificationService(storage);
+  const notifySubscribersFn = createNotifySubscribersFn(answerNotificationService);
+  const questionService = createQuestionService(storage, trajectoryCapture, {
+    notifySubscribers: notifySubscribersFn,
+    userTrajectoryService,
+  });
+
   // Create router with scheduleReadyTasks callback and trajectory capture (for MCP routes)
   // gateRegistry is only created in real mode — undefined in test mode is fine (MCP tool will error gracefully)
   const router = createForgeRouter({
@@ -330,6 +345,8 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     plannerClient,
     buildCoordinator,
     gateRegistry,
+    questionService,
+    userTrajectoryService,
   });
 
   return {

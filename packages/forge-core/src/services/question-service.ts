@@ -12,6 +12,7 @@ import {
 } from '../domain/types.js';
 import type { TrajectoryCapture } from './trajectory-capture.js';
 import { TrajectoryEventType } from '../domain/trajectory-events.js';
+import type { UserTrajectoryService } from './user-trajectory-service.js';
 
 // ============================================
 // Question Service Types
@@ -95,6 +96,7 @@ export class QuestionService {
   private storage: ForgeStorage;
   private trajectoryCapture: TrajectoryCapture;
   private notifySubscribers?: NotifySubscribersFn;
+  private userTrajectoryService?: UserTrajectoryService;
 
   /** Default timeout for auto-defaulting in milliseconds (5 minutes) */
   private defaultTimeoutMs: number;
@@ -105,11 +107,13 @@ export class QuestionService {
     options?: {
       notifySubscribers?: NotifySubscribersFn;
       defaultTimeoutMs?: number;
+      userTrajectoryService?: UserTrajectoryService;
     }
   ) {
     this.storage = storage;
     this.trajectoryCapture = trajectoryCapture;
     this.notifySubscribers = options?.notifySubscribers;
+    this.userTrajectoryService = options?.userTrajectoryService;
     this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 5 * 60 * 1000; // 5 minutes
   }
 
@@ -356,6 +360,24 @@ export class QuestionService {
       },
       question.task_id
     );
+
+    // Record in user trajectory for preference learning
+    if (this.userTrajectoryService) {
+      try {
+        this.userTrajectoryService.recordUserDecision({
+          userId: answeredBy,
+          scope: 'run',
+          questionText: question.text,
+          selectedOption: answer,
+          runId: question.run_id,
+          taskId: question.task_id,
+          category: question.blocking_level,
+        });
+      } catch (err) {
+        // Don't let trajectory recording failures block the answer flow
+        console.error('[QuestionService] Failed to record user decision:', err);
+      }
+    }
 
     // Notify all subscribers (original agent + subscribers)
     const allAgentsToNotify = [question.agent_id, ...question.subscribers];
@@ -699,6 +721,7 @@ export function createQuestionService(
   options?: {
     notifySubscribers?: NotifySubscribersFn;
     defaultTimeoutMs?: number;
+    userTrajectoryService?: UserTrajectoryService;
   }
 ): QuestionService {
   return new QuestionService(storage, trajectoryCapture, options);
