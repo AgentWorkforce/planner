@@ -29,6 +29,13 @@ export class WorktreeManager {
     // Create base directory if it doesn't exist
     await execFileAsync('mkdir', ['-p', this.worktreeBase]);
 
+    // If the worktree directory already exists (e.g. from a previous failed run being resumed),
+    // reuse it — the completed work from the previous attempt is still there
+    if (existsSync(worktreePath)) {
+      console.log(`[WorktreeManager] Reusing existing worktree at ${worktreePath}`);
+      return worktreePath;
+    }
+
     // Create worktree with detached HEAD
     await execFileAsync('git', ['worktree', 'add', '--detach', worktreePath], {
       cwd: this.repoRoot,

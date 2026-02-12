@@ -24,6 +24,7 @@ import { TaskTimeoutManager, createTaskTimeoutManager } from './health-monitor.j
 import { ModelSelector, createModelSelector, type ModelSelectionResult } from './model-selector.js';
 import { ArtifactValidator, createArtifactValidator } from './artifact-validator.js';
 import type { GateService } from './gate-service.js';
+import { estimateComplexityScore } from './complexity-estimator.js';
 
 // ============================================
 // Types
@@ -172,6 +173,7 @@ export class RunService {
   private storage: ForgeStorage;
   private trajectoryCapture: TrajectoryCapture | null;
   private outcomeEmitter: OutcomeEmitter | null;
+  private retryTaskFn: RetryTaskFn;
 
   // DOT Framework services
   private budgetService: BudgetService;
@@ -186,6 +188,7 @@ export class RunService {
     this.storage = config.storage;
     this.trajectoryCapture = config.trajectoryCapture ?? null;
     this.outcomeEmitter = config.outcomeEmitter ?? null;
+    this.retryTaskFn = config.retryTask ?? (async () => {});
 
     // Create trajectory capture if not provided
     const trajectoryCapture = config.trajectoryCapture ??
@@ -200,12 +203,9 @@ export class RunService {
       trajectoryCapture
     );
 
-    // Retry task function - either provided or a no-op
-    const retryTask: RetryTaskFn = config.retryTask ?? (async () => {});
-
     this.taskFailureHandler = createTaskFailureHandler(
       config.storage,
-      retryTask,
+      this.retryTaskFn,
       {
         trajectoryCapture,
         gateService: config.gateService,
@@ -297,8 +297,9 @@ export class RunService {
       modelSelection: this.modelSelector.selectModelForTask({
         task,
         runId,
-        // Complexity score can be provided by plan step or estimated
-        complexityScore: undefined,
+        // Estimate complexity based on task metadata
+        complexityScore: estimateComplexityScore(task),
+        stepRole: task.owner_role,
       }),
     }));
 
@@ -515,6 +516,25 @@ export class RunService {
    */
   setOutcomeEmitter(emitter: OutcomeEmitter): void {
     this.outcomeEmitter = emitter;
+  }
+
+  /**
+   * Sets the retry task function.
+   * Called by orchestrator to wire the retry mechanism.
+   *
+   * @param retryFn - Function to retry a task
+   */
+  setRetryTaskFn(retryFn: RetryTaskFn): void {
+    this.retryTaskFn = retryFn;
+    // Update the task failure handler with the new retry function
+    this.taskFailureHandler = createTaskFailureHandler(
+      this.storage,
+      retryFn,
+      {
+        trajectoryCapture: this.trajectoryCapture ?? undefined,
+        gateService: undefined, // Gate service is set during construction
+      }
+    );
   }
 
   /**

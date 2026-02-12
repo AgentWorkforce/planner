@@ -101,6 +101,10 @@ export function updateTask(db: Database.Database, taskId: string, updates: Parti
     fields.push('child_run_id = @child_run_id');
     values.child_run_id = updates.child_run_id ?? null;
   }
+  if (updates.specification !== undefined) {
+    fields.push('specification = @specification');
+    values.specification = updates.specification ? JSON.stringify(updates.specification) : null;
+  }
 
   const stmt = db.prepare(`
     UPDATE tasks
@@ -165,4 +169,48 @@ export function getTaskByStepId(db: Database.Database, runId: string, stepId: st
   const row = stmt.get(runId, stepId);
   if (!row) return null;
   return rowToTask(row);
+}
+
+/**
+ * Find completed tasks by step_id (stable identifier across plan versions).
+ * Returns tasks that match the given step_id and have status = 'completed'.
+ * Optionally filters by scope for additional confidence.
+ */
+export function findCompletedTasksByStepId(
+  db: Database.Database,
+  stepId: string,
+  scope?: string
+): { task_id: string; run_id: string; step_title: string }[] {
+  if (scope) {
+    const stmt = db.prepare<[string, string], { task_id: string; run_id: string; step_title: string }>(`
+      SELECT task_id, run_id, step_title
+      FROM tasks
+      WHERE step_id = ? AND scope = ? AND status = 'completed'
+    `);
+    return stmt.all(stepId, scope);
+  } else {
+    const stmt = db.prepare<string, { task_id: string; run_id: string; step_title: string }>(`
+      SELECT task_id, run_id, step_title
+      FROM tasks
+      WHERE step_id = ? AND status = 'completed'
+    `);
+    return stmt.all(stepId);
+  }
+}
+
+/**
+ * Find completed tasks by scope and title for fuzzy deduplication.
+ * Returns tasks that match the given scope and step_title and have status = 'completed'.
+ */
+export function findCompletedTasksByTitle(
+  db: Database.Database,
+  scope: string,
+  stepTitle: string
+): { task_id: string; run_id: string }[] {
+  const stmt = db.prepare<[string, string], { task_id: string; run_id: string }>(`
+    SELECT task_id, run_id
+    FROM tasks
+    WHERE scope = ? AND step_title = ? AND status = 'completed'
+  `);
+  return stmt.all(scope, stepTitle);
 }

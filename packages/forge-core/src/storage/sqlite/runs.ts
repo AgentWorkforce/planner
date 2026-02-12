@@ -158,3 +158,20 @@ export function getActiveRuns(db: Database.Database): Run[] {
   const rows = stmt.all();
   return rows.map((row) => rowToRun(row));
 }
+
+/**
+ * Find completed runs for a given plan_id.
+ * Used for already-built detection to check if a plan has been executed before.
+ */
+export function findCompletedRunsForPlan(
+  db: Database.Database,
+  planId: string
+): { run_id: string; completed_at: string | null }[] {
+  const stmt = db.prepare<string, { run_id: string; completed_at: string | null }>(`
+    SELECT run_id, completed_at
+    FROM runs
+    WHERE plan_id = ? AND status = 'completed'
+    ORDER BY completed_at DESC
+  `);
+  return stmt.all(planId);
+}

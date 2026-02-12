@@ -14,10 +14,13 @@
  */
 
 import { execFile } from 'node:child_process';
+import { readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { ForgeStorage } from '../storage/interface.js';
 import type { RunService, TaskOutcomeEmission, RunOutcomeEmission } from './run-service.js';
+import { estimateComplexityLevel } from './complexity-estimator.js';
 
 const execFileAsync = promisify(execFile);
 import type { SpawnTaskFn, TerminateAgentFn, SpawnTaskOptions, AgentExitInfo } from './agent-spawner.js';
@@ -114,6 +117,8 @@ interface TaskPostResult {
     lint_passed?: boolean | null;
   };
   ac_results?: Array<{ ac_id: string; passed: boolean; evidence?: string }>;
+  /** Severity classification for retry behavior (fix_issues or clean_restart) */
+  severity?: 'fix_issues' | 'clean_restart';
 }
 
 // ============================================
@@ -159,6 +164,9 @@ export class Orchestrator {
     this.analysisTool = config.analysisTool;
     this.pollIntervalMs = config.pollIntervalMs ?? 2000;
     this.maxStallIterations = config.maxStallIterations ?? 50;
+
+    // Wire retry function to RunService
+    this.runService.setRetryTaskFn(this.retryTask.bind(this));
   }
 
   /**
@@ -172,6 +180,45 @@ export class Orchestrator {
       this.buildRunRegistry.set(buildId, runs);
     }
     runs.add(runId);
+  }
+
+  /**
+   * Retries a failed task by resetting its status and creating a new attempt.
+   * This function is wired to RunService's TaskFailureHandler for automatic retry.
+   */
+  private async retryTask(taskId: string): Promise<void> {
+    const task = this.storage.getTask(taskId);
+    if (!task) {
+      console.error(`[Orchestrator] Cannot retry task ${taskId}: not found`);
+      return;
+    }
+
+    const currentAttempt = task.current_attempt ?? 0;
+    const executionPolicy = this.storage.getRun(task.run_id)?.execution_policy ?? DEFAULT_EXECUTION_POLICY;
+    const maxRetries = executionPolicy.retry.max_retries_per_task;
+
+    // Check if retries remain
+    if (currentAttempt >= maxRetries) {
+      console.log(
+        `[Orchestrator] Cannot retry task ${task.step_id}: max retries (${maxRetries}) exceeded`
+      );
+      return;
+    }
+
+    console.log(
+      `[Orchestrator] Retrying task ${task.step_id} (attempt ${currentAttempt + 1}/${maxRetries})`
+    );
+
+    // Reset task to pending so it gets picked up by getReadyTasks
+    this.storage.updateTask(taskId, {
+      status: TaskStatus.Pending,
+    });
+
+    // Remove from active agents tracking if present
+    const agents = this.activeRuns.get(task.run_id);
+    if (agents) {
+      agents.delete(taskId);
+    }
   }
 
   /**
@@ -290,6 +337,8 @@ export class Orchestrator {
     let stallCount = 0;
     let lastPrepTier = -1; // Track which tier we last ran PREP for
     let lastLoggedParallelismBlocked = 0; // Avoid spamming "blocked by parallelism"
+    let prepInProgress = false; // Track if PREP is currently running in background
+    const tasksAwaitingPrep = new Set<string>(); // Tasks that should wait for PREP to complete
 
     // Main loop
     while (true) {
@@ -298,6 +347,43 @@ export class Orchestrator {
       if (!currentRun || currentRun.status === 'cancelled' || currentRun.status === 'failed') {
         console.log(`[Orchestrator] Run ${runId} was ${currentRun?.status ?? 'deleted'} externally, stopping`);
         return;
+      }
+
+      // Check for timed-out tasks
+      const timeoutManager = this.runService.getTaskTimeoutManager();
+      const timedOutTasks = timeoutManager.getAllTaskTimeouts()
+        .filter((result) => result.isTimedOut);
+
+      for (const timeoutResult of timedOutTasks) {
+        const task = this.storage.getTask(timeoutResult.taskId);
+        if (task && task.status === TaskStatus.Running) {
+          const timeoutSeconds = Math.round(timeoutResult.elapsedMs / 1000);
+          console.error(
+            `[Orchestrator] Task ${task.step_id} (${task.task_id}) timed out after ${timeoutSeconds}s`
+          );
+
+          // Mark task as failed
+          this.storage.updateTaskStatus(task.task_id, TaskStatus.Failed);
+
+          // Update attempt record with timeout
+          const attempts = this.storage.listAttemptsByTask(task.task_id);
+          if (attempts.length > 0) {
+            const lastAttempt = attempts[attempts.length - 1]!;
+            this.storage.updateAttempt(lastAttempt.attempt_id, {
+              outcome: AttemptOutcome.Timeout,
+              error: `Task timed out after ${timeoutSeconds}s`,
+            });
+          }
+
+          // Remove from active tracking
+          const agents = this.activeRuns.get(runId);
+          if (agents) {
+            agents.delete(task.task_id);
+          }
+
+          // Untrack from timeout manager (will be done by handleTimeout but be explicit)
+          timeoutManager.untrackTask(task.task_id);
+        }
       }
 
       // Get current state
@@ -310,21 +396,99 @@ export class Orchestrator {
         const pendingTasks = allTasks.filter(
           (t) => t.status === TaskStatus.Pending || t.status === TaskStatus.Queued
         );
+        const completedTasks = allTasks.filter((t) => t.status === TaskStatus.Completed);
+        const failedTasks = allTasks.filter((t) => t.status === TaskStatus.Failed);
 
         if (pendingTasks.length === 0) {
-          // All done
-          await this.finalizeRun(runId, startTime);
+          // All tasks resolved (either completed or failed)
+          if (failedTasks.length === 0) {
+            // All succeeded
+            await this.finalizeRun(runId, startTime);
+            return;
+          } else {
+            // Some failed — finalize with descriptive error
+            const failedStepIds = failedTasks.map((t) => t.step_id).join(', ');
+            this.failRun(
+              runId,
+              `Completed with failures: ${completedTasks.length}/${allTasks.length} succeeded, ` +
+              `${failedTasks.length} failed (${failedStepIds})`
+            );
+            return;
+          }
+        }
+
+        // No ready, no running, but have pending → analyze why
+        // Check if ALL pending tasks are blocked by failed dependencies (cascading failure)
+        const completedStepIds = new Set(completedTasks.map((t) => t.step_id));
+        const failedStepIds = new Set(failedTasks.map((t) => t.step_id));
+
+        let blockedByFailureCount = 0;
+        const blockedTasks: Task[] = [];
+
+        for (const task of pendingTasks) {
+          // Check if this task has at least one failed dependency
+          const hasFailedDep = task.dependencies.some((depStepId) => failedStepIds.has(depStepId));
+
+          if (hasFailedDep) {
+            blockedByFailureCount++;
+            blockedTasks.push(task);
+          }
+        }
+
+        if (blockedByFailureCount === pendingTasks.length) {
+          // ALL pending tasks are blocked by failed dependencies → cascading failure
+          console.log(
+            `[Orchestrator] Cascading failure detected: ${blockedByFailureCount} tasks blocked by upstream failures`
+          );
+
+          // Mark blocked tasks as failed with clear message
+          for (const task of blockedTasks) {
+            const failedDeps = task.dependencies.filter((depStepId) => failedStepIds.has(depStepId));
+            const blockMsg = `Blocked: upstream task${failedDeps.length > 1 ? 's' : ''} ${failedDeps.join(', ')} failed`;
+
+            this.storage.updateTask(task.task_id, { status: TaskStatus.Failed });
+
+            // Record error on latest attempt if it exists
+            const attempts = this.storage.listAttemptsByTask(task.task_id);
+            if (attempts.length > 0) {
+              const lastAttempt = attempts[attempts.length - 1]!;
+              this.storage.updateAttempt(lastAttempt.attempt_id, {
+                outcome: AttemptOutcome.Failure,
+                error: blockMsg,
+              });
+            }
+          }
+
+          // Finalize run immediately with cascading failure description
+          const totalFailed = failedTasks.length + blockedTasks.length;
+          const blockedStepIds = blockedTasks.map((t) => t.step_id).join(', ');
+          this.failRun(
+            runId,
+            `Cascading failure: ${completedTasks.length}/${allTasks.length} succeeded, ` +
+            `${failedTasks.length} failed, ${blockedTasks.length} blocked (${blockedStepIds})`
+          );
           return;
         }
 
-        // Stalled: no ready, no running, but have pending
+        // Some pending tasks have only completed/pending deps → possible circular dependency
+        // Increment stall counter and wait
         stallCount++;
         if (stallCount > this.maxStallIterations) {
+          const stuckTasks = pendingTasks.filter((t) => {
+            // Tasks that aren't blocked by failures but can't proceed
+            return !t.dependencies.some((depStepId) => failedStepIds.has(depStepId));
+          });
+
           console.error(
-            `[Orchestrator] Run ${runId} stalled with ${pendingTasks.length} pending tasks`,
-            pendingTasks.map((t) => ({ step_id: t.step_id, deps: t.dependencies }))
+            `[Orchestrator] Run ${runId} stalled with ${stuckTasks.length} stuck tasks (possible circular dependencies)`,
+            stuckTasks.map((t) => ({ step_id: t.step_id, deps: t.dependencies }))
           );
-          this.failRun(runId, 'Run stalled: circular dependencies or blocked tasks');
+
+          this.failRun(
+            runId,
+            `Run stalled: ${stuckTasks.length} tasks stuck with possible circular dependencies. ` +
+            `Stuck tasks: ${stuckTasks.map((t) => t.step_id).join(', ')}`
+          );
           return;
         }
 
@@ -339,30 +503,79 @@ export class Orchestrator {
       }
 
       // Detect tier boundary: no tasks running, new tasks ready → potential tier transition
-      if (runningTasks.length === 0 && readyTasks.length > 0 && tierMap) {
+      if (runningTasks.length === 0 && readyTasks.length > 0 && tierMap && !prepInProgress) {
         const currentTier = Math.min(
           ...readyTasks.map((t) => tierMap.get(t.step_id) ?? 0)
         );
 
-        // Count tasks in this tier
-        const tierTaskCount = readyTasks.filter(
+        // Count tasks in this tier and categorize by complexity
+        const currentTierTasks = readyTasks.filter(
           (t) => (tierMap.get(t.step_id) ?? 0) === currentTier
-        ).length;
+        );
         const minTierTasks = qualityConfig.prep_min_tier_tasks ?? 2;
 
         if (currentTier > lastPrepTier && this.analysisTool && qualityConfig.prep_enabled !== false
             && allTasks.length >= (qualityConfig.prep_min_tasks ?? 3)
-            && tierTaskCount >= minTierTasks) {
-          await this.runPrepPhase(runId, readyTasks, currentTier, tierMap, qualityConfig);
-          lastPrepTier = currentTier;
+            && currentTierTasks.length >= minTierTasks) {
+          // Optimization: Categorize tasks by complexity
+          const simpleTasks: Task[] = [];
+          const complexTasks: Task[] = [];
+
+          for (const task of currentTierTasks) {
+            const complexity = estimateComplexityLevel(task);
+            if (complexity === 'trivial' || complexity === 'simple') {
+              simpleTasks.push(task);
+            } else {
+              complexTasks.push(task);
+            }
+          }
+
+          // Skip PREP entirely if all tasks are trivial/simple
+          if (complexTasks.length === 0) {
+            console.log(
+              `[Orchestrator] Skipping PREP for tier ${currentTier} — all ${currentTierTasks.length} tasks are trivial/simple`
+            );
+            lastPrepTier = currentTier;
+          } else {
+            // Mark complex tasks as awaiting PREP, run PREP in background
+            for (const task of complexTasks) {
+              tasksAwaitingPrep.add(task.step_id);
+            }
+
+            prepInProgress = true;
+            const prepPromise = this.runPrepPhase(runId, readyTasks, currentTier, tierMap, qualityConfig);
+            lastPrepTier = currentTier;
+
+            console.log(
+              `[Orchestrator] Starting PREP for tier ${currentTier} in background (${complexTasks.length} complex, ${simpleTasks.length} simple tasks)`
+            );
+
+            // Run PREP in background, mark complete when done
+            prepPromise
+              .then(() => {
+                // Clear awaiting set - complex tasks can now proceed
+                tasksAwaitingPrep.clear();
+                prepInProgress = false;
+                console.log(`[Orchestrator] PREP complete for tier ${currentTier} — releasing complex tasks`);
+              })
+              .catch((err) => {
+                console.error(`[Orchestrator] PREP failed for tier ${currentTier}:`, err);
+                // Clear anyway - don't block tasks forever on PREP failure
+                tasksAwaitingPrep.clear();
+                prepInProgress = false;
+              });
+          }
         }
       }
 
       // Decide which tasks to dispatch
+      // Filter out tasks awaiting PREP (complex tasks in a tier where PREP is still running)
+      const readyAndUnblocked = readyTasks.filter((t) => !tasksAwaitingPrep.has(t.step_id));
+
       // Include running tasks from sister runs (same build) for cross-run scope coordination
       const sisterRunning = this.getSisterRunningTasks(runId);
       const allRunningTasks = [...runningTasks, ...sisterRunning];
-      const decision = this.runService.decideTaskDispatch(readyTasks, allRunningTasks, runId);
+      const decision = this.runService.decideTaskDispatch(readyAndUnblocked, allRunningTasks, runId);
 
       // Check budget
       if (!decision.budgetOk) {
@@ -410,6 +623,57 @@ export class Orchestrator {
   }
 
   /**
+   * Computes baseline scope boundary from plan data.
+   * Used when PREP didn't run for a task's scope — ensures workers still know what's off-limits.
+   */
+  private computeBaseScopeBoundary(
+    currentTask: Task,
+    allTasks: Task[]
+  ): { owned_paths: string[]; do_not_touch: string[] } {
+    const ownedPaths: string[] = [];
+    const doNotTouch: string[] = [];
+
+    // Current task owns its target_path
+    if (currentTask.target_path) {
+      ownedPaths.push(currentTask.target_path);
+    }
+
+    // All other scopes' target_paths are off-limits
+    const currentScope = currentTask.scope ?? 'default';
+    for (const task of allTasks) {
+      if (!task.target_path) continue;
+
+      const taskScope = task.scope ?? 'default';
+      if (taskScope !== currentScope) {
+        // Different scope — this is off-limits
+        doNotTouch.push(task.target_path);
+      }
+    }
+
+    // Common shared paths that need caution (derived heuristic)
+    const sharedPaths = [
+      'packages/shared-ui',
+      'packages/storage-base',
+      'packages/errors',
+      'domain/types.ts',
+      'shared/',
+    ];
+
+    // Add shared paths if they're not already in owned_paths
+    for (const sharedPath of sharedPaths) {
+      if (!ownedPaths.includes(sharedPath) && !doNotTouch.includes(sharedPath)) {
+        doNotTouch.push(sharedPath);
+      }
+    }
+
+    // Deduplicate
+    return {
+      owned_paths: [...new Set(ownedPaths)],
+      do_not_touch: [...new Set(doNotTouch)],
+    };
+  }
+
+  /**
    * Dispatches a single task to an agent, or creates a child run for sub-plan steps.
    */
   private async dispatchTask(task: Task, runId: string, recommendedModel: string): Promise<void> {
@@ -448,6 +712,23 @@ export class Orchestrator {
       };
       // Don't pass empty object
       if (Object.keys(prepFindings).length === 0) prepFindings = undefined;
+    }
+
+    // If no PREP findings, compute baseline scope boundary from plan data
+    if (!prepFindings || !prepFindings.scope_boundary) {
+      const allTasks = this.storage.listTasksByRun(runId);
+      const baseBoundary = this.computeBaseScopeBoundary(task, allTasks);
+
+      // Merge with existing prepFindings (PREP takes precedence for overlaps)
+      if (prepFindings) {
+        prepFindings.scope_boundary = baseBoundary;
+      } else {
+        prepFindings = { scope_boundary: baseBoundary };
+      }
+
+      console.log(
+        `[Orchestrator] Task ${task.step_id}: computed baseline scope boundary (${baseBoundary.do_not_touch.length} paths off-limits)`
+      );
     }
 
     // Build spawn options
@@ -734,11 +1015,15 @@ export class Orchestrator {
   ): Promise<void> {
     console.log(`[Orchestrator] Task ${task.step_id} completed`);
 
+    // Safety net: auto-commit uncommitted changes left by agents that forgot
+    await this.ensureWorkCommitted(task);
+
     const durationMs = Date.now() - tracker.startTime;
 
-    // Generate synthetic usage (in real deployment, get from agent)
-    const tokensUsed = Math.floor(Math.random() * 5000) + 1000;
-    const costUsd = tokensUsed * 0.000003;
+    // TODO: Parse real token usage from agent output/relay response
+    // Currently agent output is not captured by forge-spawner, so metrics are unavailable
+    const tokensUsed = 0; // Real token data not yet available from agents
+    const costUsd = 0; // Real cost data not yet available from agents
     const confidence = 0.95;
 
     // Validate with RunService
@@ -769,7 +1054,24 @@ export class Orchestrator {
         console.warn(
           `[Orchestrator] TASK_POST failed for ${task.step_id}: ${taskPostResult.reason}`
         );
-        this.storage.updateTaskStatus(task.task_id, TaskStatus.Failed);
+
+        // Store failure context in task specification for retry worker
+        const failureContext = {
+          failure_reason: taskPostResult.reason,
+          severity: taskPostResult.severity ?? 'fix_issues',
+          findings: taskPostResult.findings,
+          attempt: tracker.attemptNumber,
+        };
+
+        const existingSpec = task.specification ?? {};
+        this.storage.updateTask(task.task_id, {
+          status: TaskStatus.Failed,
+          specification: {
+            ...existingSpec,
+            retry_context: failureContext,
+          },
+        });
+
         await this.runService.handleTaskFailure(
           task,
           runId,
@@ -795,7 +1097,7 @@ export class Orchestrator {
       task_id: task.task_id,
       step_id: task.step_id,
       model_used: tracker.model,
-      complexity_estimate: 'simple',
+      complexity_estimate: estimateComplexityLevel(task),
       outcome: 'success',
       attempts: tracker.attemptNumber,
       duration_seconds: durationMs / 1000,
@@ -846,11 +1148,7 @@ export class Orchestrator {
       task_id: task.task_id,
       step_id: task.step_id,
       model_used: tracker.model,
-      // NOTE: complexity_estimate should come from plan step metadata, but the Task entity
-      // doesn't currently include it. This would require extending ForgeStep schema to include
-      // a complexity field from the planner, then populating it during run compilation.
-      // For now, defaulting to 'simple' - this can be wired when planner adds complexity estimates.
-      complexity_estimate: 'simple',
+      complexity_estimate: estimateComplexityLevel(task),
       outcome: 'failure',
       attempts: tracker.attemptNumber,
       duration_seconds: durationMs / 1000,
@@ -941,6 +1239,12 @@ export class Orchestrator {
     }
     this.runWorktrees.delete(runId);
 
+    // Clear timeout tracking for this run
+    const timeoutManager = this.runService.getTaskTimeoutManager();
+    for (const task of allTasks) {
+      timeoutManager.untrackTask(task.task_id);
+    }
+
     // Terminate any remaining agents (safety net — most should be released per-task)
     this.terminateRunAgents(runId);
     this.runTierMaps.delete(runId);
@@ -998,6 +1302,12 @@ export class Orchestrator {
     this.cleanupWorktree(runId).catch((err) => {
       console.warn(`[Orchestrator] Failed to cleanup worktree for run ${runId}:`, err);
     });
+
+    // Clear timeout tracking for this run
+    const timeoutManager = this.runService.getTaskTimeoutManager();
+    for (const task of allTasks) {
+      timeoutManager.untrackTask(task.task_id);
+    }
 
     // Terminate any remaining agents (safety net)
     this.terminateRunAgents(runId);
@@ -1057,8 +1367,8 @@ export class Orchestrator {
         const result = await this.analysisTool!.run(prompt, {
           model: qualityConfig.prep_model ?? 'sonnet',
           cwd: workspacePath,
-          timeoutMs: 300000, // 5 min for PREP (deep codebase analysis)
-          retries: 1, // 2 attempts max — PREP is non-blocking, don't waste time retrying
+          timeoutMs: qualityConfig.prep_timeout_ms ?? 90000,
+          retries: 0, // No retries — PREP is non-blocking, don't waste time
         });
 
         const findings = result.parsed ?? { raw: result.output };
@@ -1407,7 +1717,17 @@ ${workspacePath ? `## Workspace: ${workspacePath}` : ''}
         }
       }
       if (task.specification) {
-        prompt += `- Specification:\n\`\`\`json\n${JSON.stringify(task.specification, null, 2)}\n\`\`\`\n`;
+        const spec = task.specification as Record<string, unknown>;
+        if (spec.verify_only) {
+          prompt += `- **VERIFY ONLY** — code exists from a previous completed build. Verify quality, don't rebuild.\n`;
+        } else if (spec.already_built_hint) {
+          prompt += `- *Note:* Similar task was completed in a prior build. Check if code already exists before implementing.\n`;
+        }
+        // Show spec without the meta-flags
+        const { verify_only, already_built_hint, prior_run_id, ...cleanSpec } = spec;
+        if (Object.keys(cleanSpec).length > 0) {
+          prompt += `- Specification:\n\`\`\`json\n${JSON.stringify(cleanSpec, null, 2)}\n\`\`\`\n`;
+        }
       }
       prompt += `\n`;
     }
@@ -1417,11 +1737,17 @@ ${workspacePath ? `## Workspace: ${workspacePath}` : ''}
       prompt += `## Architecture Context\n\`\`\`json\n${JSON.stringify(runDoc.context, null, 2)}\n\`\`\`\n\n`;
     }
 
+    // Inject compact directory summary if workspace exists
+    const scopeStructure = this.mapScopeDirectories(scope, workspacePath);
+    if (scopeStructure) {
+      prompt += `## Scope Structure\n\n\`\`\`\n${scopeStructure}\`\`\`\n\n`;
+    }
+
     prompt += `## How to Analyze
 
 Use efficient codebase exploration tools — DO NOT read entire files line by line.
 
-1. **Map the scope**: Use Glob to find relevant files. Read file outlines (not full content) to understand structure.
+1. **Map the scope**: ${scopeStructure ? 'Use the Scope Structure above as your starting reference. ' : ''}Use Glob to find relevant files. Read file outlines (not full content) to understand structure.
 2. **Find existing patterns**: Search for similar implementations (e.g., existing routes, storage methods, domain types). Agents MUST follow these patterns.
 3. **Identify shared files**: Which files will multiple tasks touch? Flag merge conflict risks.
 4. **Define scope boundaries**: List which directories/files belong to this scope. Agents must NOT modify files outside their scope.
@@ -1447,13 +1773,74 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no explanation, no code bl
       "files_to_modify": ["specific files this task should create or edit"],
       "patterns_to_follow": "Which existing pattern to match and where to find the reference",
       "watch_out": "Specific pitfalls — wrong imports, missing exports, naming conventions",
-      "guidance": "Concise implementation approach"
+      "guidance": "Concise implementation approach",
+      "already_implemented": false,
+      "existing_files": []
     }
   },
   "warnings": ["anything that could cause problems across tasks"]
 }`;
 
     return prompt;
+  }
+
+  /**
+   * Returns a compact directory summary for a scope's src/ directory.
+   * Format: "  dir/  (N files)" per subdirectory, ~15 lines max.
+   */
+  private mapScopeDirectories(scope: string, workspacePath?: string): string {
+    if (!workspacePath) return '';
+
+    const srcDir = join(workspacePath, 'packages', scope, 'src');
+    try {
+      statSync(srcDir);
+    } catch {
+      return '';
+    }
+
+    const dirCounts = new Map<string, number>();
+    const rootFiles: string[] = [];
+
+    const walk = (dir: string) => {
+      let entries;
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git') continue;
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath);
+        } else if (/\.(ts|tsx)$/.test(entry.name) && !/\.test\.(ts|tsx)$/.test(entry.name)) {
+          const rel = relative(srcDir, dir);
+          if (rel === '') {
+            rootFiles.push(entry.name);
+          } else {
+            dirCounts.set(rel, (dirCounts.get(rel) ?? 0) + 1);
+          }
+        }
+      }
+    };
+
+    walk(srcDir);
+
+    if (dirCounts.size === 0 && rootFiles.length === 0) return '';
+
+    const lines: string[] = [`packages/${scope}/src/`];
+    // Sort directories alphabetically
+    const sortedDirs = [...dirCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [dir, count] of sortedDirs) {
+      lines.push(`  ${dir}/  (${count} files)`);
+    }
+    if (rootFiles.length > 0) {
+      const fileList = rootFiles.length <= 6
+        ? rootFiles.join(', ')
+        : `${rootFiles.slice(0, 5).join(', ')}, +${rootFiles.length - 5} more`;
+      lines.push(`  [root]  (${rootFiles.length} files: ${fileList})`);
+    }
+    return lines.join('\n') + '\n';
   }
 
   private buildTaskPostPrompt(
@@ -1481,7 +1868,18 @@ ${task.step_description ? `- Description: ${task.step_description}` : ''}
     if (prepGuidance) {
       const taskGuidance = (prepGuidance as any)?.task_guidance?.[task.step_id];
       if (taskGuidance) {
-        prompt += `\n## Expected Files\n\`\`\`json\n${JSON.stringify(taskGuidance.files_to_modify ?? taskGuidance, null, 2)}\n\`\`\`\n`;
+        prompt += `\n## PREP Analysis Context
+
+The PREP agent analyzed the codebase before this worker was dispatched and provided the following guidance:
+
+\`\`\`json
+${JSON.stringify(taskGuidance, null, 2)}
+\`\`\`
+
+**IMPORTANT**: If the worker followed PREP's recommendations (especially the \`guidance\`, \`patterns_to_follow\`, and \`watch_out\` fields), this should be evaluated as CORRECT behavior — even if the implementation differs from the literal acceptance criteria text. The worker was given these constraints by PREP and is expected to follow them.
+
+Only flag as a failure if the worker deviated from BOTH the acceptance criteria AND the PREP guidance without good reason.
+`;
       }
       const scopeBoundary = (prepGuidance as any)?.scope_boundary;
       if (scopeBoundary?.do_not_touch) {
@@ -1508,11 +1906,19 @@ ${task.step_description ? `- Description: ${task.step_description}` : ''}
 DO NOT read every file top-to-bottom. Use targeted searches: search for function names, type definitions, exports.
 Keep this fast — 60 seconds is the target.
 
+## Severity Classification (for failures)
+
+If you mark passed: false, classify the failure severity:
+
+- **fix_issues**: The commit is mostly correct but has specific problems. The retry worker should fix on top of the existing commit (small fixes, missing edge cases, minor bugs).
+- **clean_restart**: The commit is fundamentally wrong. The retry worker should start fresh with a different approach (the previous commit will be reverted).
+
 CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
 
 {
   "passed": true,
   "reason": "One sentence if failed",
+  "severity": "fix_issues|clean_restart (required if passed=false)",
   "ac_status": [{ "id": "ac_id", "met": true }],
   "issues": ["real bugs or missing functionality only"],
   "scope_violations": ["files modified outside expected scope, if any"],
@@ -1608,6 +2014,41 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Safety net: check for uncommitted changes in the worktree after task completion.
+   * If the agent forgot to commit, auto-commit with the forge marker so TASK_POST
+   * and downstream tasks can see the work.
+   */
+  private async ensureWorkCommitted(task: Task): Promise<void> {
+    const cwd = task.workspace_path;
+    if (!cwd) return;
+
+    try {
+      // Check for uncommitted changes
+      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd });
+      if (!status.trim()) return; // Clean worktree — agent committed properly
+
+      console.warn(
+        `[Orchestrator] Task ${task.step_id} has uncommitted changes — agent forgot to commit. Auto-committing.`
+      );
+
+      // Stage and commit with forge marker
+      await execFileAsync('git', ['add', '-A'], { cwd });
+      await execFileAsync('git', [
+        'commit', '-m',
+        `[forge:${task.task_id}] Auto-commit: agent completed without committing`,
+      ], { cwd });
+
+      console.log(`[Orchestrator] Auto-committed changes for task ${task.step_id}`);
+    } catch (err) {
+      // Non-fatal — log and continue. The work is still in the worktree even if commit fails.
+      console.warn(
+        `[Orchestrator] Failed to auto-commit for task ${task.step_id}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   /**

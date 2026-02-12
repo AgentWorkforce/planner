@@ -1,13 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { TendLayout } from '@/components/layout/TendLayout';
 import { StatusBar } from '@/components/status/StatusBar';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
-import { ConversationInput } from '@/components/conversation/ConversationInput';
 import { ProjectsColumn } from '@/components/dashboard/ProjectsColumn';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { TypingIndicator } from '@/components/chat/TypingIndicator';
-import { useDashboardChat } from '@/hooks/useDashboardChat';
+import { NewProjectModal } from '@/components/sessions/NewSessionModal';
 
 interface Project {
   id: string;
@@ -38,19 +36,11 @@ export function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Navigator AI conversation
-  const { messages, send, sending } = useDashboardChat();
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
   useEffect(() => {
     fetchProjects();
   }, []);
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -155,65 +145,21 @@ export function DashboardPage() {
     />
   );
 
-  // ─── Center: AI conversation with the Navigator ───
-  // (tend-spec.md §3.7: "Center: the AI discusses priorities, suggests next actions")
+  // ─── Center: contextual greeting ───
+  // Future: Navigator AI conversation (tend-spec.md §3.7)
   const center = (
-    <div className="flex flex-col h-full">
-      {/* Scrollable message area */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="flex flex-col justify-end min-h-full gap-3">
-          {/* Greeting as first assistant bubble — contextual based on project state */}
-          <div className="max-w-lg">
-            <div className="bg-bg-secondary rounded-2xl rounded-bl-sm px-5 py-4 shadow-sm">
-              <p className="text-text-primary text-sm leading-relaxed">
-                {greeting.main}
-              </p>
-              {greeting.sub && (
-                <p className="text-text-secondary text-sm leading-relaxed mt-1.5">
-                  {greeting.sub}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Conversation messages from Navigator AI */}
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={msg.role === 'user' ? 'flex justify-end' : ''}
-            >
-              <div
-                className={
-                  msg.role === 'user'
-                    ? 'max-w-lg bg-accent-primary/15 rounded-2xl rounded-br-sm px-5 py-3'
-                    : 'max-w-lg bg-bg-secondary rounded-2xl rounded-bl-sm px-5 py-4 shadow-sm'
-                }
-              >
-                <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap">
-                  {msg.content}
-                </p>
-              </div>
-            </div>
-          ))}
-
-          {/* Typing indicator while waiting for Navigator response */}
-          {sending && (
-            <div className="max-w-lg">
-              <TypingIndicator />
-            </div>
+    <div className="flex flex-col h-full items-center justify-center px-6 py-4">
+      <div className="max-w-lg">
+        <div className="bg-bg-secondary rounded-2xl px-5 py-4 shadow-sm">
+          <p className="text-text-primary text-sm leading-relaxed">
+            {greeting.main}
+          </p>
+          {greeting.sub && (
+            <p className="text-text-secondary text-sm leading-relaxed mt-1.5">
+              {greeting.sub}
+            </p>
           )}
-
-          <div ref={messagesEndRef} />
         </div>
-      </div>
-
-      {/* Chat input at bottom — sends to Navigator AI, NOT project creation */}
-      <div className="flex-shrink-0">
-        <ConversationInput
-          onSend={send}
-          disabled={sending}
-          placeholder="What would you like to work on?"
-        />
       </div>
     </div>
   );
@@ -265,10 +211,7 @@ export function DashboardPage() {
       <div className="px-4 pb-4">
         <div className="border-t border-border-subtle mb-3" />
         <button
-          onClick={() => {
-            const input = document.querySelector('[data-conversation-input]') as HTMLTextAreaElement;
-            input?.focus();
-          }}
+          onClick={() => setIsNewProjectOpen(true)}
           className="text-text-muted hover:text-text-secondary text-sm font-mono transition-colors"
         >
           [+ new]
@@ -278,13 +221,16 @@ export function DashboardPage() {
   );
 
   return (
-    <TendLayout
-      leftCollapsed={false}
-      nav={nav}
-      leftPanel={leftPanel}
-      center={center}
-      rightPanel={rightPanel}
-      statusBar={<StatusBar content={{ type: 'agents' }} connectionStatus="connected" />}
-    />
+    <>
+      <TendLayout
+        leftCollapsed={false}
+        nav={nav}
+        leftPanel={leftPanel}
+        center={center}
+        rightPanel={rightPanel}
+        statusBar={<StatusBar content={{ type: 'agents' }} connectionStatus="connected" />}
+      />
+      <NewProjectModal open={isNewProjectOpen} onOpenChange={setIsNewProjectOpen} />
+    </>
   );
 }

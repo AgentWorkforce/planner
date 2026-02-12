@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui';
 import { PlusIcon } from '@/components/icons';
-import { NewSessionModal } from './NewSessionModal';
+import { NewProjectModal } from './NewSessionModal';
 
 export function NewSessionButton() {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,7 +17,7 @@ export function NewSessionButton() {
         <PlusIcon size="sm" />
         New Session
       </Button>
-      <NewSessionModal open={isOpen} onOpenChange={setIsOpen} />
+      <NewProjectModal open={isOpen} onOpenChange={setIsOpen} />
     </>
   );
 }

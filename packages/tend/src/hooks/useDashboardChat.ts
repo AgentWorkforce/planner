@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 
 /**
- * Message in the dashboard conversation with the Navigator AI.
+ * Message in the dashboard conversation.
  */
 export interface DashboardMessage {
   id: string;
@@ -11,17 +11,55 @@ export interface DashboardMessage {
 }
 
 /**
- * useDashboardChat — talks to the Navigator AI at POST /api/ideation/navigator/chat.
+ * Derive a short project name from the user's full intent text.
+ * Takes the first line, capped at 100 chars.
+ */
+function deriveName(text: string): string {
+  const firstLine = (text.split('\n')[0] ?? text).trim();
+  if (firstLine.length <= 100) return firstLine;
+  return firstLine.slice(0, 97) + '...';
+}
+
+async function postJson<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function putJson<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * useDashboardChat — creates projects from the dashboard conversation input.
  *
- * The Navigator is a workflow guide that helps the user decide what to work on.
- * It has tools: list_sessions, recommend_action, start_new_session.
- * Conversation history is maintained locally (Navigator also keeps in-memory history
- * on the server side).
+ * When the user types their intent and hits Enter:
+ * 1. Creates a project with a short derived name
+ * 2. Creates an ideation session with the full text as initial_intent
+ * 3. Links the session to the project
+ * 4. Exposes a redirect URL for navigation
  */
 export function useDashboardChat() {
   const [messages, setMessages] = useState<DashboardMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [redirect, setRedirect] = useState<string | null>(null);
   const idCounter = useRef(0);
 
   const nextId = () => {
@@ -34,7 +72,7 @@ export function useDashboardChat() {
     setSending(true);
     setError(null);
 
-    // Add user message immediately
+    // Show user message immediately
     const userMsg: DashboardMessage = {
       id: nextId(),
       role: 'user',
@@ -44,35 +82,33 @@ export function useDashboardChat() {
     setMessages(prev => [...prev, userMsg]);
 
     try {
-      const response = await fetch('/api/ideation/navigator/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content }),
+      // 1. Create project with short name
+      const { project } = await postJson<{ project: { id: string } }>(
+        '/api/projects',
+        { name: deriveName(content) },
+      );
+
+      // 2. Create ideation session with full intent
+      const session = await postJson<{ id: string }>(
+        '/api/ideation/sessions',
+        { initial_intent: content },
+      );
+
+      // 3. Link session to project
+      await putJson('/api/projects/' + project.id, {
+        session_id: session.id,
       });
 
-      if (!response.ok) {
-        throw new Error(`Navigator unavailable (${response.status})`);
-      }
-
-      const data = await response.json();
-
-      // Add assistant response
-      const assistantMsg: DashboardMessage = {
-        id: nextId(),
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, assistantMsg]);
+      // 4. Navigate to the project
+      setRedirect(`/projects/${project.id}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to reach Navigator';
+      const message = err instanceof Error ? err.message : 'Failed to create project';
       setError(message);
 
-      // Add a fallback message so the user isn't left hanging
       const fallbackMsg: DashboardMessage = {
         id: nextId(),
         role: 'assistant',
-        content: "I couldn't connect to the AI right now. You can still browse your projects in the tree, or try again in a moment.",
+        content: `Something went wrong creating the project: ${message}`,
         timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, fallbackMsg]);
@@ -81,5 +117,5 @@ export function useDashboardChat() {
     }
   }, [sending]);
 
-  return { messages, send, sending, error };
+  return { messages, send, sending, error, redirect };
 }

@@ -5,7 +5,7 @@ import { useSessions } from '@/hooks/useSessions';
 import { useInitiatives } from '@/hooks/useInitiatives';
 import { SessionPhysicsBlock } from './SessionPhysicsBlock';
 import { InitiativeWells } from './InitiativeWells';
-import { NewSessionModal } from '@/components/sessions/NewSessionModal';
+import { NewProjectModal } from '@/components/sessions/NewSessionModal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
@@ -244,7 +244,7 @@ export function SessionsPhysicsColumn() {
       </div>
 
       {/* New Session Modal */}
-      <NewSessionModal
+      <NewProjectModal
         open={isNewSessionModalOpen}
         onOpenChange={setIsNewSessionModalOpen}
       />

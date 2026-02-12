@@ -101,6 +101,12 @@ export interface ForgeStorage {
    */
   setRunDocument(runId: string, document: Record<string, unknown>): void;
 
+  /**
+   * Find completed runs for a given plan_id.
+   * Used for already-built detection.
+   */
+  findCompletedRunsForPlan(planId: string): { run_id: string; completed_at: string | null }[];
+
   // ============================================
   // Task operations
   // ============================================
@@ -142,6 +148,22 @@ export interface ForgeStorage {
    * Gets task by step_id within a run
    */
   getTaskByStepId(runId: string, stepId: string): Task | null;
+
+  /**
+   * Find completed tasks by step_id (stable identifier across plan versions).
+   * Used for already-built detection (primary match).
+   * Returns task metadata from completed runs.
+   */
+  findCompletedTasksByStepId(
+    stepId: string,
+    scope?: string
+  ): { task_id: string; run_id: string; step_title: string }[];
+
+  /**
+   * Find completed tasks by scope and title for fuzzy deduplication.
+   * Used for already-built detection (fallback match).
+   */
+  findCompletedTasksByTitle(scope: string, stepTitle: string): { task_id: string; run_id: string }[];
 
   // ============================================
   // TaskAttempt operations

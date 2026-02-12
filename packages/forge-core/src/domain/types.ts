@@ -286,8 +286,8 @@ export type BudgetsConfig = z.infer<typeof BudgetsConfigSchema>;
  * Research basis: Reflexion 2023 - Self-correction with failure analysis +20-30% improvement
  */
 export const RetryConfigSchema = z.object({
-  /** Maximum retry attempts per task (default: 3) */
-  max_retries_per_task: z.number().int().min(0).default(3),
+  /** Maximum retry attempts per task (default: 1 - conservative) */
+  max_retries_per_task: z.number().int().min(0).default(1),
   /** Backoff strategy (default: exponential) */
   backoff: z.enum(['none', 'linear', 'exponential']).default('exponential'),
   /** Base seconds for backoff calculation (default: 30) */
@@ -325,8 +325,8 @@ export const RecoveryStrategySchema = z.nativeEnum(RecoveryStrategy);
 export const ParallelismConfigSchema = z.object({
   /** Maximum concurrent tasks across run (default: 5) */
   max_concurrent_tasks: z.number().int().positive().default(5),
-  /** Maximum concurrent tasks per scope (optional) */
-  max_concurrent_per_scope: z.number().int().positive().optional(),
+  /** Maximum concurrent tasks per scope (default: 2) */
+  max_concurrent_per_scope: z.number().int().positive().default(2),
   /** Prefer sequential execution within same scope (default: true — prevents file conflicts in shared worktrees) */
   prefer_sequential_in_scope: z.boolean().default(true),
 });
@@ -379,6 +379,8 @@ export const QualityConfigSchema = z.object({
   prep_min_tasks: z.number().int().min(1).default(3),
   /** Skip PREP for tiers with fewer tasks than this (default: 2) */
   prep_min_tier_tasks: z.number().int().min(1).default(2),
+  /** PREP timeout in milliseconds (default: 90000 = 90s) */
+  prep_timeout_ms: z.number().int().min(30000).default(90000),
 });
 
 export type QualityConfig = z.infer<typeof QualityConfigSchema>;
@@ -423,6 +425,10 @@ export const RunSchema = z.object({
   execution_policy: ExecutionPolicySchema.optional(),
   /** Workspace directory for agent execution (propagated to all tasks) */
   workspace_path: z.string().optional(),
+  /** Parent run ID if this run was spawned by a task in another run (hierarchical runs) */
+  parent_run_id: z.string().uuid().optional(),
+  /** Parent task ID that spawned this run (hierarchical runs) */
+  parent_task_id: z.string().uuid().optional(),
   started_at: z.string().datetime().optional(),
   completed_at: z.string().datetime().optional(),
   error: z.string().optional(),
@@ -474,6 +480,10 @@ export const TaskSchema = z.object({
   input_artifacts: z.array(ArtifactReferenceSchema).optional(),
   /** Artifacts this task produces as output (for dependency validation) */
   output_artifacts: z.array(ArtifactReferenceSchema).optional(),
+  /** Reference to a sub-plan that this step expands into (creates child Run) */
+  sub_plan_id: z.string().uuid().optional(),
+  /** Run ID of the child run created for this task (when sub_plan_id is set) */
+  child_run_id: z.string().uuid().optional(),
   /** Implementation specification from planner (target files, patterns, architecture) */
   specification: z.record(z.string(), z.unknown()).optional(),
   /** Target directory within workspace where agent should create files */
@@ -739,6 +749,10 @@ export interface CreateRunOptions {
   executionPolicy?: ExecutionPolicy;
   /** Workspace directory for agent execution */
   workspacePath?: string;
+  /** Parent run ID if this run was spawned by a task in another run */
+  parentRunId?: string;
+  /** Parent task ID that spawned this run */
+  parentTaskId?: string;
 }
 
 /**
@@ -754,6 +768,8 @@ export function createRun(forgePlan: ForgePlan, options?: CreateRunOptions): Run
     has_pending_gate: false,
     execution_policy: options?.executionPolicy,
     workspace_path: options?.workspacePath,
+    parent_run_id: options?.parentRunId,
+    parent_task_id: options?.parentTaskId,
     created_at: now,
     updated_at: now,
   };
@@ -777,7 +793,9 @@ export function createTask(runId: string, forgeStep: ForgeStep, workspacePath?: 
     workspace_path: workspacePath,
     step_description: forgeStep.description,
     acceptance_criteria: forgeStep.acceptance_criteria,
+    sub_plan_id: forgeStep.sub_plan_id,
     specification: forgeStep.specification,
+    target_path: forgeStep.target_path,
     created_at: now,
     updated_at: now,
   };

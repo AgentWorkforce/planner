@@ -313,6 +313,12 @@ export class BuildCoordinator {
           continue;
         }
 
+        // Mark tasks that overlap with already-completed builds
+        for (const runId of tierRunIds) {
+          const allTasks = this.storage.listTasksByRun(runId);
+          this.markAlreadyBuiltTasks(allTasks);
+        }
+
         // Start all runs (respecting concurrency limit via the orchestrator)
         for (const runId of tierRunIds) {
           this.scheduleReadyTasks(runId);
@@ -442,8 +448,11 @@ export class BuildCoordinator {
   }
 
   /**
-   * Resume a failed run: reset failed/pending tasks back to pending,
+   * Resume a failed run: reset failed tasks and their dependency chain back to pending,
    * keep completed tasks as-is, transition run back to running.
+   *
+   * Only resets tasks that were blocked by the specific failed tasks being retried,
+   * not ALL blocked tasks (which may be blocked by different failures).
    */
   private resumeFailedRun(buildId: string, runId: string, tier: number): string | null {
     try {
@@ -460,14 +469,28 @@ export class BuildCoordinator {
       }
 
       this.storage.transaction(() => {
-        // Reset failed tasks back to pending
+        // Step 1: Identify failed tasks (root causes)
+        const failedTasks = tasks.filter(t => t.status === TaskStatus.Failed);
+        const failedStepIds = new Set(failedTasks.map(t => t.step_id));
+
+        // Step 2: Find all tasks affected by these failures (transitive closure)
+        const affectedStepIds = this.findDependentTasks(tasks, failedStepIds);
+
+        // Step 3: Reset only tasks in the failure chain
+        let resetCount = 0;
         for (const task of tasks) {
-          if (task.status === TaskStatus.Failed) {
+          // Reset the failed task itself
+          if (task.status === TaskStatus.Failed && failedStepIds.has(task.step_id)) {
             this.storage.updateTask(task.task_id, { status: TaskStatus.Pending });
+            resetCount++;
           }
-          // Also reset blocked tasks that may have been blocked by the failed ones
-          if (task.status === TaskStatus.Blocked) {
+          // Reset blocked/pending tasks that depend on the failed tasks
+          else if (
+            (task.status === TaskStatus.Blocked || task.status === TaskStatus.Pending) &&
+            affectedStepIds.has(task.step_id)
+          ) {
             this.storage.updateTask(task.task_id, { status: TaskStatus.Pending });
+            resetCount++;
           }
         }
 
@@ -480,21 +503,62 @@ export class BuildCoordinator {
 
         // Update BuildRun status to running
         this.storage.updateBuildRunStatus(buildId, runId, BuildRunStatus.Running);
+
+        console.log(
+          `[BuildCoordinator] Resuming run ${runId}: ${completedCount} completed, ` +
+          `${failedCount} failed, ${resetCount} tasks reset in failure chain`
+        );
       });
 
       // Register for cross-run scope coordination
       this.registerBuildRun?.(buildId, runId);
-
-      console.log(
-        `[BuildCoordinator] Resuming run ${runId} (${completedCount} completed, ` +
-        `${failedCount} failed→pending, ${pendingCount} pending)`
-      );
 
       return runId;
     } catch (err) {
       console.error(`[BuildCoordinator] Failed to resume run ${runId}:`, err);
       return null;
     }
+  }
+
+  /**
+   * Finds all tasks that depend on the given set of step IDs (transitive closure).
+   * Returns a Set of step_ids that are affected by failures in the input set.
+   */
+  private findDependentTasks(tasks: Task[], failedStepIds: Set<string>): Set<string> {
+    const affected = new Set<string>();
+    const taskMap = new Map(tasks.map(t => [t.step_id, t]));
+
+    // Build reverse dependency map (step_id -> tasks that depend on it)
+    const dependents = new Map<string, Set<string>>();
+    for (const task of tasks) {
+      for (const depStepId of task.dependencies) {
+        if (!dependents.has(depStepId)) {
+          dependents.set(depStepId, new Set());
+        }
+        dependents.get(depStepId)!.add(task.step_id);
+      }
+    }
+
+    // BFS to find all transitively dependent tasks
+    const queue = Array.from(failedStepIds);
+    const visited = new Set<string>(failedStepIds);
+
+    while (queue.length > 0) {
+      const stepId = queue.shift()!;
+      const directDependents = dependents.get(stepId);
+
+      if (directDependents) {
+        for (const depStepId of directDependents) {
+          if (!visited.has(depStepId)) {
+            visited.add(depStepId);
+            affected.add(depStepId);
+            queue.push(depStepId);
+          }
+        }
+      }
+    }
+
+    return affected;
   }
 
   /**
@@ -560,6 +624,63 @@ export class BuildCoordinator {
     this.registerBuildRun?.(buildId, runId);
 
     return runId;
+  }
+
+  /**
+   * Mark tasks that overlap with already-completed builds.
+   * Checks for two conditions:
+   * 1. Sub-plan already built: If task.sub_plan_id references a plan that has completed runs
+   * 2. Fuzzy match: If scope+title matches a completed task from a previous build
+   */
+  private markAlreadyBuiltTasks(tasks: Task[]): void {
+    for (const task of tasks) {
+      // A) Check sub_plan_id — if this task references a sub-plan that's already been built
+      //    This is the strongest signal: exact sub-plan match
+      if (task.sub_plan_id) {
+        const completedRuns = this.storage.findCompletedRunsForPlan(task.sub_plan_id);
+        const firstRun = completedRuns[0];
+        if (firstRun) {
+          const spec = task.specification ? JSON.parse(JSON.stringify(task.specification)) : {};
+          spec.verify_only = true;
+          spec.prior_run_id = firstRun.run_id;
+          this.storage.updateTask(task.task_id, { specification: spec });
+          console.log(
+            `[BuildCoordinator] Task ${task.step_id} → sub-plan ${task.sub_plan_id} already built (run ${firstRun.run_id}) — marking verify_only`
+          );
+          continue; // Skip fallback checks
+        }
+      }
+
+      // B) Primary match: step_id (stable across plan versions)
+      //    High confidence — same step_id in same scope = same work
+      const stepIdMatches = this.storage.findCompletedTasksByStepId(task.step_id, task.scope);
+      if (stepIdMatches.length > 0) {
+        const match = stepIdMatches[0];
+        const spec = task.specification ? JSON.parse(JSON.stringify(task.specification)) : {};
+        spec.already_built = true;
+        spec.prior_run_id = match.run_id;
+        spec.prior_task_id = match.task_id;
+        this.storage.updateTask(task.task_id, { specification: spec });
+        console.log(
+          `[BuildCoordinator] Task ${task.step_id} (scope=${task.scope}) matches completed step_id — marking already_built`
+        );
+        continue; // Skip fallback checks
+      }
+
+      // C) Fallback match: scope + title (fuzzy)
+      //    Low confidence — title might have changed between versions
+      if (task.scope && task.step_title) {
+        const titleMatches = this.storage.findCompletedTasksByTitle(task.scope, task.step_title);
+        if (titleMatches.length > 0) {
+          const spec = task.specification ? JSON.parse(JSON.stringify(task.specification)) : {};
+          spec.already_built_hint = true;
+          this.storage.updateTask(task.task_id, { specification: spec });
+          console.log(
+            `[BuildCoordinator] Task ${task.step_id} matches completed title in scope=${task.scope} — marking already_built_hint (low confidence)`
+          );
+        }
+      }
+    }
   }
 
   /**

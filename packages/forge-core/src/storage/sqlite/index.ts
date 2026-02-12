@@ -118,6 +118,10 @@ export class SqliteForgeStorage extends BaseSqliteStorage implements ForgeStorag
     return Runs.setRunDocument(this.db, runId, document);
   }
 
+  findCompletedRunsForPlan(planId: string): { run_id: string; completed_at: string | null }[] {
+    return Runs.findCompletedRunsForPlan(this.db, planId);
+  }
+
   // ============================================
   // Task operations
   // ============================================
@@ -148,6 +152,17 @@ export class SqliteForgeStorage extends BaseSqliteStorage implements ForgeStorag
 
   getTaskByStepId(runId: string, stepId: string): Task | null {
     return Tasks.getTaskByStepId(this.db, runId, stepId);
+  }
+
+  findCompletedTasksByStepId(
+    stepId: string,
+    scope?: string
+  ): { task_id: string; run_id: string; step_title: string }[] {
+    return Tasks.findCompletedTasksByStepId(this.db, stepId, scope);
+  }
+
+  findCompletedTasksByTitle(scope: string, stepTitle: string): { task_id: string; run_id: string }[] {
+    return Tasks.findCompletedTasksByTitle(this.db, scope, stepTitle);
   }
 
   // ============================================

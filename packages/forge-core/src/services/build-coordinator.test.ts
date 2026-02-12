@@ -574,4 +574,326 @@ describe('BuildCoordinator', () => {
     expect(runDoc?.context).toEqual(planWithContext.context);
     expect(runDoc?.understanding).toEqual(planWithContext.understanding);
   });
+
+  it('should mark tasks with already-built hints when sub-plan already completed', async () => {
+    const subPlanId = crypto.randomUUID();
+    const parentPlanId = crypto.randomUUID();
+
+    // Create a sub-plan with one task
+    const subPlan: PlanVersion = {
+      ...createTestPlanVersion(subPlanId, 1),
+      steps: [
+        {
+          step_id: 'step-1',
+          title: 'Sub Task 1',
+          description: 'A sub task',
+          dependencies: [],
+        },
+      ],
+    };
+
+    // Create a parent plan that references the sub-plan
+    const parentPlan: PlanVersion = {
+      ...createTestPlanVersion(parentPlanId, 1),
+      steps: [
+        {
+          step_id: 'parent-step-1',
+          title: 'Parent Task',
+          description: 'Task with sub-plan',
+          sub_plan_id: subPlanId,
+          dependencies: [],
+        },
+      ],
+    };
+
+    plans.set(subPlanId, subPlan);
+    plans.set(parentPlanId, parentPlan);
+
+    // First: Execute the sub-plan to completion
+    const subRequest: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [subPlanId] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const subBuild = await coordinator.startBuild(subRequest);
+    await waitForBuildStatus(storage, subBuild.build_id, [BuildStatus.Completed], 15000);
+
+    // Second: Execute the parent plan
+    const parentRequest: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [parentPlanId] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const parentBuild = await coordinator.startBuild(parentRequest);
+    await waitForBuildStatus(storage, parentBuild.build_id, [BuildStatus.Completed], 15000);
+
+    // Verify that the parent task was marked with verify_only
+    const parentBuildRuns = storage.listBuildRunsByBuild(parentBuild.build_id);
+    const parentTasks = storage.listTasksByRun(parentBuildRuns[0].run_id);
+    const parentTask = parentTasks.find(t => t.step_id === 'parent-step-1');
+
+    expect(parentTask).toBeDefined();
+    expect(parentTask?.specification?.verify_only).toBe(true);
+    expect(parentTask?.specification?.prior_run_id).toBeDefined();
+  });
+
+  it('should mark tasks with already_built when step_id matches (primary match)', async () => {
+    const plan1Id = crypto.randomUUID();
+    const plan2Id = crypto.randomUUID();
+
+    // Create two plans with SAME step_id (simulating plan version evolution)
+    const plan1: PlanVersion = {
+      ...createTestPlanVersion(plan1Id, 1),
+      steps: [
+        {
+          step_id: 'shared-step-id',
+          title: 'Original Task Name',
+          description: 'First version',
+          scope: 'backend',
+          dependencies: [],
+        },
+      ],
+    };
+
+    const plan2: PlanVersion = {
+      ...createTestPlanVersion(plan2Id, 1),
+      steps: [
+        {
+          step_id: 'shared-step-id', // Same step_id (stable across versions)
+          title: 'Updated Task Name', // Different title (evolved)
+          description: 'Second version',
+          scope: 'backend',
+          dependencies: [],
+        },
+      ],
+    };
+
+    plans.set(plan1Id, plan1);
+    plans.set(plan2Id, plan2);
+
+    // First: Execute plan1 to completion
+    const request1: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [plan1Id] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const build1 = await coordinator.startBuild(request1);
+    await waitForBuildStatus(storage, build1.build_id, [BuildStatus.Completed], 15000);
+
+    // Get the prior run_id for verification
+    const buildRuns1 = storage.listBuildRunsByBuild(build1.build_id);
+    const tasks1 = storage.listTasksByRun(buildRuns1[0].run_id);
+    const task1 = tasks1.find(t => t.step_id === 'shared-step-id');
+    expect(task1).toBeDefined();
+
+    // Second: Execute plan2
+    const request2: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [plan2Id] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const build2 = await coordinator.startBuild(request2);
+    await waitForBuildStatus(storage, build2.build_id, [BuildStatus.Completed], 15000);
+
+    // Verify that plan2's task was marked with already_built (high confidence)
+    const buildRuns2 = storage.listBuildRunsByBuild(build2.build_id);
+    const tasks2 = storage.listTasksByRun(buildRuns2[0].run_id);
+    const task2 = tasks2.find(t => t.step_id === 'shared-step-id');
+
+    expect(task2).toBeDefined();
+    expect(task2?.specification?.already_built).toBe(true);
+    expect(task2?.specification?.prior_run_id).toBe(buildRuns1[0].run_id);
+    expect(task2?.specification?.prior_task_id).toBe(task1?.task_id);
+    // Should NOT have already_built_hint (that's for low confidence)
+    expect(task2?.specification?.already_built_hint).toBeUndefined();
+  });
+
+  it('should mark tasks with already_built_hint when scope+title matches completed task', async () => {
+    const plan1Id = crypto.randomUUID();
+    const plan2Id = crypto.randomUUID();
+
+    // Create two plans with same scope and step title
+    const plan1: PlanVersion = {
+      ...createTestPlanVersion(plan1Id, 1),
+      steps: [
+        {
+          step_id: 'step-1',
+          title: 'Shared Task Name',
+          description: 'First version',
+          scope: 'backend',
+          dependencies: [],
+        },
+      ],
+    };
+
+    const plan2: PlanVersion = {
+      ...createTestPlanVersion(plan2Id, 1),
+      steps: [
+        {
+          step_id: 'step-2',
+          title: 'Shared Task Name',
+          description: 'Second version',
+          scope: 'backend',
+          dependencies: [],
+        },
+      ],
+    };
+
+    plans.set(plan1Id, plan1);
+    plans.set(plan2Id, plan2);
+
+    // First: Execute plan1 to completion
+    const request1: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [plan1Id] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const build1 = await coordinator.startBuild(request1);
+    await waitForBuildStatus(storage, build1.build_id, [BuildStatus.Completed], 15000);
+
+    // Second: Execute plan2
+    const request2: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [plan2Id] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const build2 = await coordinator.startBuild(request2);
+    await waitForBuildStatus(storage, build2.build_id, [BuildStatus.Completed], 15000);
+
+    // Verify that plan2's task was marked with already_built_hint (low confidence)
+    const buildRuns2 = storage.listBuildRunsByBuild(build2.build_id);
+    const tasks2 = storage.listTasksByRun(buildRuns2[0].run_id);
+    const task2 = tasks2.find(t => t.step_id === 'step-2');
+
+    expect(task2).toBeDefined();
+    expect(task2?.specification?.already_built_hint).toBe(true);
+    // Should NOT have already_built (that's for high confidence)
+    expect(task2?.specification?.already_built).toBeUndefined();
+  });
+
+  // ============================================
+  // Test: Scoped Resume - Only Reset Dependent Tasks
+  // ============================================
+
+  it('should only reset tasks in the failure chain when resuming', async () => {
+    // Create a plan with mixed success and failure:
+    //   A (completed successfully)
+    //   B (depends on A, completed successfully)
+    //   C (independent, fails)
+    //   D (depends on C, blocked by C's failure)
+    //   E (depends on D, blocked transitively)
+    //   F (independent, blocked for different reason - e.g., waiting for gate)
+    const planId = crypto.randomUUID();
+    const complexPlan: PlanVersion = {
+      plan_id: planId,
+      version: 1,
+      status: 'approved',
+      summary: {
+        goal: 'Test selective resume of failure chain',
+        context: 'Mix of success, failure, and independent blocked tasks',
+      },
+      steps: [
+        { step_id: 'A', title: 'Task A', description: 'Success', dependencies: [] },
+        { step_id: 'B', title: 'Task B', description: 'Success (depends on A)', dependencies: ['A'] },
+        { step_id: 'C', title: 'Task C', description: 'Fails', dependencies: [] },
+        { step_id: 'D', title: 'Task D', description: 'Blocked by C', dependencies: ['C'] },
+        { step_id: 'E', title: 'Task E', description: 'Blocked by D (transitive)', dependencies: ['D'] },
+        { step_id: 'F', title: 'Task F', description: 'Blocked independently', dependencies: [] },
+      ],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    plans.set(planId, complexPlan);
+
+    // Create a build with this plan
+    const request: BuildRequest = {
+      tiers: [{ tier: 0, plan_ids: [planId] }],
+      concurrency_limit: 5,
+      skip_completed: false,
+    };
+
+    const build = await coordinator.startBuild(request);
+
+    // Wait for some execution (tasks will complete via TestExecutor)
+    await waitForBuildStatus(storage, build.build_id, [BuildStatus.Completed], 15000);
+
+    const buildRuns = storage.listBuildRunsByBuild(build.build_id);
+    const runId = buildRuns[0].run_id;
+
+    // Manually simulate the scenario:
+    // A, B completed successfully
+    // C failed
+    // D, E blocked by C's failure (cascade)
+    // F blocked independently (not related to C's failure)
+    storage.transaction(() => {
+      const tasks = storage.listTasksByRun(runId);
+      const taskA = tasks.find(t => t.step_id === 'A');
+      const taskB = tasks.find(t => t.step_id === 'B');
+      const taskC = tasks.find(t => t.step_id === 'C');
+      const taskD = tasks.find(t => t.step_id === 'D');
+      const taskE = tasks.find(t => t.step_id === 'E');
+      const taskF = tasks.find(t => t.step_id === 'F');
+
+      // A and B completed successfully - leave as-is (already completed by TestExecutor)
+      // We don't need to change these
+
+      // C failed
+      if (taskC) storage.updateTask(taskC.task_id, { status: 'failed' as any });
+
+      // D and E blocked by C's failure (orchestrator would set this)
+      if (taskD) storage.updateTask(taskD.task_id, { status: 'blocked' as any });
+      if (taskE) storage.updateTask(taskE.task_id, { status: 'blocked' as any });
+
+      // F blocked independently (e.g., waiting for manual gate, not related to C)
+      if (taskF) storage.updateTask(taskF.task_id, { status: 'blocked' as any });
+
+      // Mark run as failed
+      storage.updateRun(runId, { status: 'failed' as any });
+      storage.updateBuildRunStatus(build.build_id, runId, BuildRunStatus.Failed);
+    });
+
+    // Now call resumeFailedRun directly (simulates retryBuild logic)
+    const coordinator2 = new BuildCoordinator({
+      storage,
+      plannerClient,
+      scheduleReadyTasks: (runId: string) => {
+        testExecutor.scheduleReadyTasks(runId);
+      },
+      pollIntervalMs: 100,
+    });
+
+    // Access private method via reflection (TypeScript testing pattern)
+    const resumeMethod = (coordinator2 as any).resumeFailedRun.bind(coordinator2);
+    resumeMethod(build.build_id, runId, 0);
+
+    // Verify results:
+    // - A should remain completed (success, not affected)
+    // - B should remain completed (success, not affected)
+    // - C should be reset to pending (failed task, will be retried)
+    // - D should be reset to pending (depends on C, part of failure chain)
+    // - E should be reset to pending (depends on D, transitive dependency)
+    // - F should remain blocked (independent blockage, not in C's failure chain)
+
+    const tasksAfterResume = storage.listTasksByRun(runId);
+    const taskA = tasksAfterResume.find(t => t.step_id === 'A');
+    const taskB = tasksAfterResume.find(t => t.step_id === 'B');
+    const taskC = tasksAfterResume.find(t => t.step_id === 'C');
+    const taskD = tasksAfterResume.find(t => t.step_id === 'D');
+    const taskE = tasksAfterResume.find(t => t.step_id === 'E');
+    const taskF = tasksAfterResume.find(t => t.step_id === 'F');
+
+    expect(taskA?.status).toBe('completed'); // Success - not touched
+    expect(taskB?.status).toBe('completed'); // Success - not touched
+    expect(taskC?.status).toBe('pending');   // Failed task - reset for retry
+    expect(taskD?.status).toBe('pending');   // Direct dependent of C - reset
+    expect(taskE?.status).toBe('pending');   // Transitive dependent via D - reset
+    expect(taskF?.status).toBe('blocked');   // Independent blockage - NOT reset
+  });
 });

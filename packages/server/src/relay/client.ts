@@ -484,6 +484,17 @@ export async function releaseAgent(name: string): Promise<ReleaseResultPayload> 
       // Emit agent_left so UI knows agent is gone
       emitAgentLeft(name, 'released');
       console.log(`[relay] Released agent ${name}`);
+
+      // Deregister from relay registry to prevent agents.json bloat.
+      // Without this, every spawned agent stays in agents.json forever,
+      // causing CPU spiral as the daemon iterates over hundreds of stale entries.
+      try {
+        await client.removeAgent(name, { removeMessages: true });
+        console.log(`[relay] Deregistered agent ${name} from registry`);
+      } catch (removeErr) {
+        // Non-fatal — agent is already terminated, registry cleanup is best-effort
+        console.warn(`[relay] Failed to deregister agent ${name}: ${removeErr instanceof Error ? removeErr.message : removeErr}`);
+      }
     } else {
       console.error(`[relay] Failed to release agent ${name}: ${result.error}`);
     }
