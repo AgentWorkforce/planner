@@ -79,12 +79,23 @@ export async function executeTool(
           return { success: false, error: 'Planner service unavailable. No planner client configured.' };
         }
 
-        // Auto-redirect to graduate_blocks if curated blocks exist
+        // Auto-redirect to graduate_blocks if un-graduated curated blocks exist
+        const previouslyGraduatedIds = new Set<string>();
+        for (const send of session.planner_sends) {
+          const sendUnderstanding = (send.payload as Record<string, unknown>)?.understanding as Record<string, unknown> | undefined;
+          const graduatedMeta = sendUnderstanding?._graduated_blocks as { block_ids?: string[] } | undefined;
+          if (graduatedMeta?.block_ids) {
+            for (const id of graduatedMeta.block_ids) {
+              previouslyGraduatedIds.add(id);
+            }
+          }
+        }
+
         const curatedBlocks = (session.blocks || []).filter(
-          (b: Record<string, unknown>) => b.status === 'curated'
+          (b: Record<string, unknown>) => b.status === 'curated' && !previouslyGraduatedIds.has(b.id as string)
         );
         if (curatedBlocks.length > 0) {
-          console.log(`[tool-executor] send_to_planner redirected to graduate_blocks (${curatedBlocks.length} curated blocks found)`);
+          console.log(`[tool-executor] send_to_planner redirected to graduate_blocks (${curatedBlocks.length} un-graduated curated blocks found)`);
           const blockIds = curatedBlocks.map((b: Record<string, unknown>) => b.id as string);
           return executeTool(
             'graduate_blocks',
@@ -249,6 +260,30 @@ export async function executeTool(
 
         if (block_ids.length === 0) {
           return { success: false, error: 'No curated blocks to graduate. Curate some blocks first.' };
+        }
+
+        // Guard: prevent re-graduation of already-graduated blocks
+        const alreadyGraduatedIds: string[] = [];
+        for (const send of session.planner_sends) {
+          const sendUnderstanding = (send.payload as Record<string, unknown>)?.understanding as Record<string, unknown> | undefined;
+          const graduatedMeta = sendUnderstanding?._graduated_blocks as { block_ids?: string[] } | undefined;
+          if (graduatedMeta?.block_ids) {
+            for (const blockId of block_ids) {
+              if (graduatedMeta.block_ids.includes(blockId)) {
+                alreadyGraduatedIds.push(blockId);
+              }
+            }
+          }
+        }
+
+        if (alreadyGraduatedIds.length > 0) {
+          const uniqueIds = [...new Set(alreadyGraduatedIds)];
+          return {
+            success: false,
+            error: `Cannot re-graduate blocks that were already sent to the planner: ${uniqueIds.join(', ')}. ` +
+              `To update these blocks in the plan, send refinements as a message to the PlannerLead instead — ` +
+              `the planner agent has tools to modify individual steps without overwriting the entire plan.`,
+          };
         }
 
         // Validate all block_ids exist and are in curated/ready status

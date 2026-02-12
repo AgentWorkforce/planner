@@ -20,6 +20,27 @@ let client: RelayClient | null = null;
 let connectionState: ClientState = 'DISCONNECTED';
 let config: RelayConfig | null = null;
 
+/** Connection metrics for health monitoring and debugging */
+interface ConnectionMetrics {
+  connectCount: number;
+  disconnectCount: number;
+  lastConnectedAt: number | null;
+  lastDisconnectedAt: number | null;
+  lastError: string | null;
+  lastStateChangeAt: number;
+  currentStateDurationMs: number;
+}
+
+const metrics: ConnectionMetrics = {
+  connectCount: 0,
+  disconnectCount: 0,
+  lastConnectedAt: null,
+  lastDisconnectedAt: null,
+  lastError: null,
+  lastStateChangeAt: Date.now(),
+  currentStateDurationMs: 0,
+};
+
 const stateChangeListeners: Set<(state: ClientState) => void> = new Set();
 
 /** Message handler type */
@@ -85,12 +106,29 @@ export async function connect(): Promise<void> {
       connectionState = newState;
 
       if (oldState !== newState) {
-        console.log(`[relay] Connection state: ${oldState} -> ${newState}`);
+        const now = Date.now();
+        const prevDuration = now - metrics.lastStateChangeAt;
+        metrics.lastStateChangeAt = now;
+        metrics.currentStateDurationMs = 0;
+
+        if (newState === 'READY') {
+          metrics.connectCount++;
+          metrics.lastConnectedAt = now;
+          console.log(`[relay] Connection state: ${oldState} -> READY (was ${oldState} for ${(prevDuration / 1000).toFixed(1)}s, connects: ${metrics.connectCount})`);
+        } else if (newState === 'DISCONNECTED') {
+          metrics.disconnectCount++;
+          metrics.lastDisconnectedAt = now;
+          console.log(`[relay] Connection state: ${oldState} -> DISCONNECTED (was ${oldState} for ${(prevDuration / 1000).toFixed(1)}s, disconnects: ${metrics.disconnectCount})`);
+        } else {
+          console.log(`[relay] Connection state: ${oldState} -> ${newState}`);
+        }
+
         notifyStateChange(newState);
       }
     };
 
     client.onError = (error: Error) => {
+      metrics.lastError = error.message;
       console.error('[relay] Client error:', error.message);
     };
 
@@ -486,6 +524,16 @@ export function isAgentSpawned(name: string): boolean {
  */
 export function getSpawnedAgentChannel(name: string): string | undefined {
   return spawnedAgents.get(name)?.channelId;
+}
+
+/**
+ * Get relay connection metrics for health monitoring.
+ */
+export function getConnectionMetrics(): ConnectionMetrics {
+  return {
+    ...metrics,
+    currentStateDurationMs: Date.now() - metrics.lastStateChangeAt,
+  };
 }
 
 // Re-export types

@@ -1,7 +1,8 @@
 import { createContext, useContext, ReactNode, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
-import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion, getVersion } from '@/api';
+import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion, getVersion, getResolvedPlan } from '@/api';
+import type { ResolvedStep } from '@/api';
 import { usePlanEvents } from '@/hooks';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { STORAGE_KEYS } from '@/config/storage-keys';
@@ -66,6 +67,10 @@ interface PlanEditorContextValue {
   // Version switching
   switchVersion: (versionNumber: number) => Promise<void>;
 
+  // Coordination plan (sub-plan flattened view)
+  isCoordinationPlan: boolean;
+  resolvedSteps: ResolvedStep[];
+
   // Real-time sync
   isEventStreamConnected: boolean;
   eventStreamError: string | null;
@@ -123,6 +128,32 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
   const [hoveredStepId, setHoveredStepId] = useState<string | null>(null);
   const [hoveredDirection, setHoveredDirection] = useState<'incoming' | 'outgoing' | null>(null);
   const stepsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Coordination plan: resolved steps for flattened view
+  const [resolvedSteps, setResolvedSteps] = useState<ResolvedStep[]>([]);
+  const isCoordinationPlan = version?.steps.some((s) => s.sub_plan_id) ?? false;
+
+  // Fetch resolved data when this is a coordination plan
+  useEffect(() => {
+    if (!planId || !isCoordinationPlan) {
+      setResolvedSteps([]);
+      return;
+    }
+
+    let cancelled = false;
+    getResolvedPlan(planId).then((result) => {
+      if (!cancelled) {
+        setResolvedSteps(result.resolved_steps);
+      }
+    }).catch((err) => {
+      console.error('[PlanEditorContext] Failed to fetch resolved plan:', err);
+      if (!cancelled) {
+        setResolvedSteps([]);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [planId, isCoordinationPlan, version?.version]);
 
   // Scroll to and highlight a step (used by dependency indicator click)
   const handleScrollToStep = useCallback((stepId: string) => {
@@ -444,6 +475,8 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     setHoveredDirection,
     stepsContainerRef,
     handleScrollToStep,
+    isCoordinationPlan,
+    resolvedSteps,
     handleStepUpdate,
     handleStepDelete,
     handleGoalUpdate,

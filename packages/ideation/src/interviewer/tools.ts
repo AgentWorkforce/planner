@@ -166,7 +166,7 @@ export const INTERVIEWER_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'graduate_blocks',
-    description: 'Graduate curated blocks into structured plan steps. This is the PREFERRED way to send work to the planner — always use this instead of send_to_planner when curated blocks exist. Converts validated specialist-reviewed blocks into concrete plan steps.',
+    description: 'Graduate curated blocks into structured plan steps. This is the PREFERRED way to send work to the planner — always use this instead of send_to_planner when curated blocks exist. Converts validated specialist-reviewed blocks into concrete plan steps. NOTE: Each block can only be graduated once. Already-graduated blocks will be rejected — to update them after graduation, send changes as a message to the PlannerLead instead.',
     input_schema: {
       type: 'object' as const,
       properties: {
