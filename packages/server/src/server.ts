@@ -30,7 +30,7 @@ import {
   getRelayConfig,
   getRelayMode,
   initChannelManagement,
-  syncPlanChannels,
+  registerPlanChannels,
   initWebSocketProxy,
   createSessionTimeoutService,
   initIdeationBridge,
@@ -139,15 +139,20 @@ async function start(): Promise<void> {
   console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
 
   // Initialize forge service (after relay connection to enable real mode)
+  // NEVER silently fall back to test mode — test mode must be explicit via FORGE_MODE=test
   const forgeMode: ForgeExecutionMode =
-    (process.env.FORGE_MODE as ForgeExecutionMode) || (isConnected() ? 'real' : 'test');
+    (process.env.FORGE_MODE as ForgeExecutionMode) || 'real';
+
+  if (forgeMode === 'real' && !isConnected()) {
+    console.warn('[forge] WARNING: Relay not connected but mode is "real" — agents will fail until relay connects');
+  }
 
   forgeService = createForgeService({
     dbPath: FORGE_DB_PATH,
     mode: forgeMode,
-    spawnTask: isConnected() ? spawnForgeTask : undefined,
-    terminateAgent: isConnected() ? terminateForgeAgent : undefined,
-    spawnGateAgent: isConnected() ? spawnGateAgent : undefined,
+    spawnTask: spawnForgeTask,
+    terminateAgent: terminateForgeAgent,
+    spawnGateAgent: spawnGateAgent,
     plannerUrl: `http://localhost:${PORT}`,
     repoRoot: process.cwd(),
     worktreeBase: path.join(process.cwd(), '.forge-worktrees'),
@@ -175,11 +180,11 @@ async function start(): Promise<void> {
   // Initialize channel management
   initChannelManagement();
 
-  // Sync plan channels with existing plans
+  // Register plan channels with existing plans (lazy joining on first use)
   if (mode === 'connected') {
     const plans = storage.listPlans();
     const planIds = plans.map((p) => p.plan_id);
-    syncPlanChannels(planIds);
+    registerPlanChannels(planIds);
 
     // Sync ideation session channels with existing active sessions
     const ideationStorage = ideationService.getStorage();

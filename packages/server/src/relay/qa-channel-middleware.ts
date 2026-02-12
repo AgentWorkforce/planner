@@ -6,7 +6,7 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { getPlanChannelId } from './channels.js';
+import { getPlanChannelId, ensurePlanChannelJoined } from './channels.js';
 import { sendChannelMessage, isConnected } from './client.js';
 import type { QAMessagePayload, QuestionBlockingLevel } from './qa-message.js';
 
@@ -80,8 +80,15 @@ export function qaChannelMiddleware(req: Request, res: Response, next: NextFunct
               answeredAt: question.answered_at || new Date().toISOString(),
             };
 
-            // Get the plan channel
-            const channelId = getPlanChannelId(question.plan_id);
+            // Ensure channel is joined before sending
+            const channelId = ensurePlanChannelJoined(question.plan_id);
+
+            if (!channelId) {
+              console.warn(
+                `[qa-channel-middleware] Failed to join plan channel for plan ${question.plan_id}`
+              );
+              return;
+            }
 
             // Send to channel - pass qaMessage directly (sendChannelMessage wraps it in { data })
             const sent = sendChannelMessage(

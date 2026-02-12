@@ -37,6 +37,9 @@ const planChannelToSession = new Map<string, string>();
 /** Track joined plan channels for reconnection */
 const joinedPlanChannels = new Set<string>();
 
+/** Track channels actively joined this session (for reconnection) */
+const activelyJoinedChannels = new Set<string>();
+
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeMessage: (() => void) | null = null;
 let unsubscribeSessionCreated: (() => void) | null = null;
@@ -112,16 +115,12 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
         client.joinChannel(IDEATION_CHANNEL);
         console.log(`[ideation-bridge] Rejoined ${IDEATION_CHANNEL}`);
 
-        // Rejoin session channels
-        for (const channelId of joinedSessionChannels.keys()) {
+        // Only rejoin channels that were actively joined this session
+        for (const channelId of activelyJoinedChannels) {
           client.joinChannel(channelId);
-          console.log(`[ideation-bridge] Rejoined session channel ${channelId}`);
         }
-
-        // Rejoin plan channels
-        for (const channelId of joinedPlanChannels) {
-          client.joinChannel(channelId);
-          console.log(`[ideation-bridge] Rejoined plan channel ${channelId}`);
+        if (activelyJoinedChannels.size > 0) {
+          console.log(`[ideation-bridge] Rejoined ${activelyJoinedChannels.size} active channels`);
         }
       }
     }
@@ -223,6 +222,7 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
     if (client) {
       client.joinChannel(channelId);
       joinedSessionChannels.set(channelId, session.id);
+      activelyJoinedChannels.add(channelId);
       console.log(`[ideation-bridge] Joined session channel ${channelId}`);
     }
 
@@ -260,6 +260,7 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
     if (relayClient) {
       relayClient.joinChannel(planChannelId);
       joinedPlanChannels.add(planChannelId);
+      activelyJoinedChannels.add(planChannelId);
       planChannelToSession.set(planChannelId, session.id);
       console.log(`[ideation-bridge] Joined plan channel ${planChannelId} for session ${session.id}`);
     }
@@ -309,6 +310,9 @@ export function sendIdeationChannelMessage(
   const client = getClient();
   if (client) {
     const joined = client.joinChannel(channel);
+    if (joined && isIdeationChannel(channel)) {
+      activelyJoinedChannels.add(channel);
+    }
     console.log(`[ideation-bridge] Joined channel ${channel}: ${joined}`);
   } else {
     console.log(`[ideation-bridge] No client available for ${channel}`);
@@ -345,6 +349,7 @@ export function stopIdeationBridge(): void {
   joinedSessionChannels.clear();
   planChannelToSession.clear();
   joinedPlanChannels.clear();
+  activelyJoinedChannels.clear();
   lifecycleManager = null;
   ideationStorage = null;
   bridgeInitialized = false;
@@ -353,7 +358,8 @@ export function stopIdeationBridge(): void {
 
 /**
  * Sync ideation session channels with existing sessions in storage.
- * Call this on startup to join channels for existing active sessions.
+ * Call this on startup to register channels for existing active sessions.
+ * Channels are registered but not actively joined until needed.
  */
 export async function syncIdeationSessionChannels(storage: IdeationStorage): Promise<void> {
   if (!isServerRelayConnected()) {
@@ -373,13 +379,13 @@ export async function syncIdeationSessionChannels(storage: IdeationStorage): Pro
   for (const session of activeSessions) {
     const channelId = sessionChannelId(session.id);
     if (!joinedSessionChannels.has(channelId)) {
-      client.joinChannel(channelId);
+      // Register the mapping without joining (lazy join on first user interaction)
       joinedSessionChannels.set(channelId, session.id);
-      console.log(`[ideation-bridge] Synced session channel ${channelId}`);
+      console.log(`[ideation-bridge] Registered session channel ${channelId}`);
     }
   }
 
-  console.log(`[ideation-bridge] Synced ${activeSessions.length} session channels`);
+  console.log(`[ideation-bridge] Registered ${activeSessions.length} session channels`);
 }
 
 /**

@@ -72,7 +72,8 @@ export {
   channelExists,
   getAllChannels,
   initChannelManagement,
-  syncPlanChannels,
+  registerPlanChannels,
+  ensurePlanChannelJoined,
   type ChannelInfo,
 } from './channels.js';
 
