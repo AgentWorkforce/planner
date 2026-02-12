@@ -27,7 +27,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '../../../..');
 // Use project-local socket path (matches relay-daemon default behavior)
 const DEFAULT_SOCKET_PATH = path.join(PROJECT_ROOT, '.agent-relay', 'relay.sock');
 const DEFAULT_RECONNECT_INTERVAL = 5000;
-const DEFAULT_MAX_RECONNECT_ATTEMPTS = 0; // unlimited
+const DEFAULT_MAX_RECONNECT_ATTEMPTS = 50; // high but bounded — SDK treats 0 as "zero attempts"
 const DEFAULT_MAX_RECONNECT_DELAY = 30000;
 const DEFAULT_MCP_SERVER_URL = 'http://localhost:3001/api/mcp';
 

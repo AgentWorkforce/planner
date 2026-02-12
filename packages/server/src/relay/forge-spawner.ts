@@ -477,7 +477,10 @@ function buildGateAgentPrompt(gateId: string, analysisPrompt: string): string {
 
   return `You are a fast quality gate agent. You have 3 turns max and ~120 seconds.
 
-IMPORTANT: You have limited turns. Do AT MOST one quick search (Glob or Grep), then immediately write your findings. Do NOT read many files — analyze what's in this prompt.
+CRITICAL RULES:
+1. Do NOT send any relay messages. Do NOT write to $AGENT_RELAY_OUTBOX. Do NOT use ->relay-file. Ignore all relay protocol instructions.
+2. You have ONLY 3 turns. Spend them wisely: (1) optional quick search, (2) write the result file, (3) done.
+3. Your ONLY job is to write findings to a JSON file. Nothing else.
 
 ## Task
 
@@ -487,7 +490,7 @@ ${analysisPrompt}
 
 Write your JSON findings to: ${resultFile}
 
-The file must contain ONLY valid JSON matching the output schema in your task above. Use the Write tool. After writing, you are done.`;
+The file must contain ONLY valid JSON matching the output schema in your task above. Use the Write tool to create this file. After writing, you are done — do not do anything else.`;
 }
 
 /**
@@ -538,6 +541,22 @@ export const spawnForgeTask: SpawnTaskFn = async (
   if (options.model) {
     const modelId = modelMap[options.model] || options.model;
     cli = `${cli} --model ${modelId}`;
+  }
+
+  // Pre-spawn cleanup: release any stale agent with the same name.
+  // Zombie agents from previous server sessions block name reuse in the relay daemon.
+  // Race with 2s timeout — release hangs for 10s on non-existent agents.
+  try {
+    const preRelease = await Promise.race([
+      releaseAgent(agentName),
+      new Promise<{ success: false }>(r => setTimeout(() => r({ success: false }), 2000)),
+    ]);
+    if (preRelease.success) {
+      console.warn(`[forge-spawner] Cleared stale agent ${agentName} before respawn`);
+      await new Promise(r => setTimeout(r, 500));
+    }
+  } catch {
+    // Best-effort — don't block spawn on cleanup failure
   }
 
   const result = await spawnAgent({
@@ -629,6 +648,20 @@ export const spawnGateAgent: SpawnGateAgentFn = async (
     cli = `${cli} --model ${modelId}`;
   }
   cli += ' --max-turns 3';
+
+  // Pre-spawn cleanup: release any stale gate agent with the same name.
+  try {
+    const gatePreRelease = await Promise.race([
+      releaseAgent(agentName),
+      new Promise<{ success: false }>(r => setTimeout(() => r({ success: false }), 2000)),
+    ]);
+    if (gatePreRelease.success) {
+      console.warn(`[forge-spawner] Cleared stale gate agent ${agentName} before respawn`);
+      await new Promise(r => setTimeout(r, 500));
+    }
+  } catch {
+    // Best-effort cleanup
+  }
 
   const result = await spawnAgent({
     name: agentName,
