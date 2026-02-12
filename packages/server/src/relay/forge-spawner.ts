@@ -470,40 +470,19 @@ Do NOT push — just commit locally. After committing, call \`report_complete\`.
 function buildGateAgentPrompt(gateId: string, analysisPrompt: string): string {
   const resultFile = `/tmp/gate-${gateId}.json`;
 
-  return `You are a quality gate agent. Work fast — you have 90 seconds.
+  return `You are a fast quality gate agent. You have 3 turns max and ~120 seconds.
 
-## Efficiency Rules
+IMPORTANT: You have limited turns. Do AT MOST one quick search (Glob or Grep), then immediately write your findings. Do NOT read many files — analyze what's in this prompt.
 
-- Use Glob to find files by pattern, NOT by reading directories
-- Use Grep to search for symbols/patterns across files
-- Read file outlines first (small sections), not entire files
-- Search for specific function/type names instead of scanning line by line
-- Target: complete analysis in under 60 seconds
-
-## Your Task
+## Task
 
 ${analysisPrompt}
 
-## Reporting Results — CRITICAL
+## Output — WRITE THIS FILE IMMEDIATELY
 
-When done, write your findings as a JSON object to this exact file path:
+Write your JSON findings to: ${resultFile}
 
-${resultFile}
-
-Use the Write tool to write the file. The JSON must be a valid object matching the output schema described in your task above. Example:
-
-\`\`\`json
-{
-  "passed": true,
-  "summary": "All acceptance criteria met",
-  "issues": []
-}
-\`\`\`
-
-- Write findings to: ${resultFile}
-- The file must contain ONLY valid JSON (no markdown, no comments)
-- After writing the file, you are done — exit immediately
-- Do NOT call report_complete or curl anything (the orchestrator reads the file)`;
+The file must contain ONLY valid JSON matching the output schema in your task above. Use the Write tool. After writing, you are done.`;
 }
 
 /**
@@ -634,12 +613,17 @@ export const spawnGateAgent: SpawnGateAgentFn = async (
     'opus': 'claude-opus-4-6',
   };
 
-  // If model is specified, append --model flag to CLI
+  // Build CLI: model + max-turns limit.
+  // Gate agents must complete within a few turns — they analyze the prompt context,
+  // optionally do one quick file lookup, then write findings to file and exit.
+  // Without --max-turns, agents exhaust their session budget on extensive analysis
+  // and never reach the file-writing step (100% timeout observed).
   let cli = options.cli || 'claude';
   if (options.model) {
     const modelId = modelMap[options.model] || options.model;
     cli = `${cli} --model ${modelId}`;
   }
+  cli += ' --max-turns 3';
 
   const result = await spawnAgent({
     name: agentName,

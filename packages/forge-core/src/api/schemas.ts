@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RunStatusSchema, ForgePlanSchema } from '../domain/types.js';
+import { RunStatusSchema, ForgePlanSchema, AuditFindingSchema } from '../domain/types.js';
 import { BuildStatusSchema, BuildRunStatusSchema, BuildRequestSchema, BuildTierSchema } from '../domain/build-types.js';
 
 // ============================================
@@ -154,6 +154,7 @@ export const AttemptDetailSchema = z.object({
   outcome: z.string().optional(),
   error: z.string().optional(),
   agent_id: z.string().optional(),
+  audit_findings: z.array(AuditFindingSchema).optional(),
 });
 
 export type AttemptDetail = z.infer<typeof AttemptDetailSchema>;

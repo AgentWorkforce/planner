@@ -159,6 +159,10 @@ export class AnalysisTool {
       }
     });
 
+    // Prevent unhandled rejection if gate is rejected via rejectGate() in catch/finally
+    // while gatePromise is not yet being awaited (e.g., spawn fails before we reach await).
+    gatePromise.catch(() => {});
+
     try {
       const spawnResult = await this.spawnGateAgent!({
         gateId,

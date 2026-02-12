@@ -729,6 +729,30 @@ describe('AnalysisTool', () => {
       ).rejects.toThrow(/Gate agent exited/);
     });
 
+    it('should resolve gate from result file when agent exits', async () => {
+      const fs = await import('node:fs');
+      const gateRegistry = new GateResultRegistry();
+      const mockSpawnGate: SpawnGateAgentFn = vi.fn(async (options: SpawnGateOptions, onExited?) => {
+        // Simulate agent writing result file then exiting
+        const resultFile = `/tmp/gate-${options.gateId}.json`;
+        setTimeout(() => {
+          fs.writeFileSync(resultFile, JSON.stringify({ passed: true, summary: 'File-based result' }));
+          if (onExited) onExited(0);
+        }, 10);
+        return { agentId: `Gate-${options.gateId.slice(0, 8)}`, pid: 12345 };
+      });
+
+      const tool = new AnalysisTool({
+        gateRegistry,
+        spawnGateAgent: mockSpawnGate,
+      });
+
+      const result = await tool.run('Analyze', { retries: 0 });
+
+      expect(result.parsed).toEqual({ passed: true, summary: 'File-based result' });
+      expect(mockSpawnGate).toHaveBeenCalledTimes(1);
+    });
+
     it('should fall back to subprocess when gateRegistry is not provided', async () => {
       mockSpawn.mockReturnValue(
         createMockProcess({ stdout: '{"result": "subprocess ok"}' })

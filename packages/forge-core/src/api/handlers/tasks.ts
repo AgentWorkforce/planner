@@ -35,6 +35,8 @@ function toTaskSummary(task: Task): TaskSummary {
     step_title: task.step_title,
     status: task.status,
     dependencies: task.dependencies,
+    scope: task.scope,
+    owner_role: task.owner_role,
     current_attempt: task.current_attempt,
     agent_id: task.agent_id,
     gate_id: task.gate_id,
@@ -55,6 +57,7 @@ function toAttemptDetail(attempt: TaskAttempt): AttemptDetail {
     outcome: attempt.outcome,
     error: attempt.error,
     agent_id: attempt.agent_id,
+    audit_findings: attempt.audit_findings,
   };
 }
 
