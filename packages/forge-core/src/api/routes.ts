@@ -13,9 +13,13 @@ import { registerQuestionRoutes, type RegisterQuestionRoutesOptions } from './ro
 import { registerUserTrajectoryRoutes } from './routes/user-trajectory.js';
 import { registerGuardianRoutes } from './routes/guardians.js';
 import { registerMCPRoutes } from './routes/mcp.js';
+import { registerBuildRoutes } from './routes/builds.js';
 import type { GetAgentPresenceFn } from './handlers/agents.js';
 import type { TerminateActiveAgentsFn } from './handlers/run-control.js';
 import type { HealthCheckResponse } from './schemas.js';
+import type { PlannerClient } from '../adapters/planner-client.js';
+import type { BuildCoordinator } from '../services/build-coordinator.js';
+import type { GateResultRegistry } from '../services/gate-registry.js';
 
 // ============================================
 // Types
@@ -69,6 +73,21 @@ export interface ForgeRouterDeps {
    * Function to get agent presence information.
    */
   getAgentPresence?: GetAgentPresenceFn;
+
+  /**
+   * PlannerClient for fetching plans by reference (plan_id).
+   */
+  plannerClient?: PlannerClient;
+
+  /**
+   * BuildCoordinator for tiered multi-plan build execution.
+   */
+  buildCoordinator?: BuildCoordinator;
+
+  /**
+   * GateResultRegistry for quality gate result coordination.
+   */
+  gateRegistry?: GateResultRegistry;
 }
 
 /**
@@ -171,6 +190,7 @@ export function createForgeRouter(
     scheduleReadyTasks: deps.scheduleReadyTasks,
     terminateActiveAgents: deps.terminateActiveAgents,
     trajectoryCapture: deps.trajectoryCapture,
+    plannerClient: deps.plannerClient,
   };
   registerRunRoutes(router, deps.storage, runRoutesOptions);
 
@@ -216,6 +236,14 @@ export function createForgeRouter(
   if (deps.trajectoryCapture) {
     registerMCPRoutes(router, deps.storage, {
       trajectoryCapture: deps.trajectoryCapture,
+      gateRegistry: deps.gateRegistry,
+    });
+  }
+
+  // Build routes (if build coordinator provided)
+  if (deps.buildCoordinator) {
+    registerBuildRoutes(router, deps.storage, {
+      buildCoordinator: deps.buildCoordinator,
     });
   }
 

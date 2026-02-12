@@ -46,6 +46,15 @@ export interface TaskOutcomeEmission {
   cost_usd: number;
   confidence_score?: number;
   error_category?: string;
+  /** Automated verification results (from TASK_POST) */
+  verification?: {
+    tests_passed?: boolean | null;
+    build_passed?: boolean | null;
+    type_check_passed?: boolean | null;
+    lint_passed?: boolean | null;
+  };
+  /** Acceptance criteria results (from TASK_POST) */
+  ac_results?: Array<{ ac_id: string; passed: boolean; evidence?: string }>;
   timestamp: string;
   source?: 'test' | 'production' | 'training';
 }
@@ -65,6 +74,15 @@ export interface RunOutcomeEmission {
   total_cost_usd: number;
   replan_count: number;
   escalation_count: number;
+  /** Aggregate verification summary (from RUN_POST) */
+  verification_summary?: {
+    tests_passed_count: number;
+    tests_failed_count: number;
+    builds_passed_count: number;
+    builds_failed_count: number;
+    ac_met_count: number;
+    ac_total_count: number;
+  };
   timestamp: string;
   source?: 'test' | 'production' | 'training';
 }

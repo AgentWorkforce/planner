@@ -228,9 +228,20 @@ export type {
   SpawnTaskOptions,
   SpawnTaskResult,
   SpawnTaskFn,
+  OnAgentExitedFn,
+  AgentExitInfo,
   IsSpawnerAvailableFn,
   ForgeExecutionMode,
+  SpawnGateOptions,
+  SpawnGateResult,
+  SpawnGateAgentFn,
 } from './agent-spawner.js';
+
+// Gate result registry (quality gate coordination)
+export {
+  GateResultRegistry,
+  type GateResult,
+} from './gate-registry.js';
 
 // Orchestrator (real execution via RunService)
 export {
@@ -238,3 +249,21 @@ export {
   createOrchestrator,
   type OrchestratorConfig,
 } from './orchestrator.js';
+
+// Worktree manager (git worktree isolation for runs)
+export { WorktreeManager } from './worktree-manager.js';
+
+// Analysis tool (claude -p wrapper for PREP/POST quality gates)
+export {
+  AnalysisTool,
+  type AnalysisResult,
+  type AnalysisUsage,
+  type AnalysisToolConfig,
+} from './analysis-tool.js';
+
+// Build coordinator (tiered multi-plan builds)
+export {
+  BuildCoordinator,
+  createBuildCoordinator,
+  type BuildCoordinatorConfig,
+} from './build-coordinator.js';

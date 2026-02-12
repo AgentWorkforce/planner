@@ -24,6 +24,7 @@ import type {
   AcceptanceCriterion,
   TaskSnapshot,
 } from '../../domain/types.js';
+import type { Build, BuildTier, BuildStatus, BuildRun, BuildRunStatus } from '../../domain/build-types.js';
 import type {
   UserTrajectoryEvent,
   UserTrajectoryScope,
@@ -41,6 +42,8 @@ export interface RunRow {
   status: string;
   has_pending_gate: number;
   workspace_path: string | null;
+  parent_run_id: string | null;
+  parent_task_id: string | null;
   started_at: string | null;
   completed_at: string | null;
   error: string | null;
@@ -64,6 +67,9 @@ export interface TaskRow {
   agent_id: string | null;
   current_attempt: number | null;
   gate_id: string | null;
+  sub_plan_id: string | null;
+  child_run_id: string | null;
+  specification: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -227,6 +233,32 @@ export interface RunBudgetRow {
   updated_at: string;
 }
 
+export interface BuildRow {
+  build_id: string;
+  status: string;
+  tiers_json: string;
+  concurrency_limit: number;
+  skip_completed: number;
+  mode: string;
+  workspace_path: string | null;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface BuildRunRow {
+  build_id: string;
+  run_id: string;
+  plan_id: string;
+  plan_version: number | null;
+  tier: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================
 // Helper function for safe JSON parsing
 // ============================================
@@ -252,6 +284,8 @@ export function rowToRun(row: RunRow): Run {
     status: row.status as RunStatus,
     has_pending_gate: row.has_pending_gate === 1,
     workspace_path: row.workspace_path ?? undefined,
+    parent_run_id: row.parent_run_id ?? undefined,
+    parent_task_id: row.parent_task_id ?? undefined,
     started_at: row.started_at ?? undefined,
     completed_at: row.completed_at ?? undefined,
     error: row.error ?? undefined,
@@ -278,6 +312,11 @@ export function rowToTask(row: TaskRow): Task {
     agent_id: row.agent_id ?? undefined,
     current_attempt: row.current_attempt ?? undefined,
     gate_id: row.gate_id ?? undefined,
+    sub_plan_id: row.sub_plan_id ?? undefined,
+    child_run_id: row.child_run_id ?? undefined,
+    specification: row.specification
+      ? safeJsonParse<Record<string, unknown>>(row.specification, {}, `task ${row.task_id} specification`)
+      : undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -451,5 +490,35 @@ export function rowToTaskExecutionMetric(row: TaskExecutionMetricRow): TaskExecu
     outcome: row.outcome as AttemptOutcome | undefined,
     confidence: row.confidence ?? undefined,
     created_at: row.created_at,
+  };
+}
+
+export function rowToBuild(row: BuildRow): Build {
+  return {
+    build_id: row.build_id,
+    status: row.status as BuildStatus,
+    tiers: safeJsonParse<BuildTier[]>(row.tiers_json, [], `build ${row.build_id} tiers_json`),
+    concurrency_limit: row.concurrency_limit,
+    skip_completed: row.skip_completed === 1,
+    mode: row.mode,
+    workspace_path: row.workspace_path,
+    error: row.error,
+    created_at: row.created_at,
+    started_at: row.started_at,
+    completed_at: row.completed_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function rowToBuildRun(row: BuildRunRow): BuildRun {
+  return {
+    build_id: row.build_id,
+    run_id: row.run_id,
+    plan_id: row.plan_id,
+    plan_version: row.plan_version,
+    tier: row.tier,
+    status: row.status as BuildRunStatus,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   };
 }

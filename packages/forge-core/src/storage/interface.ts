@@ -23,6 +23,7 @@ import type {
   UserTrajectoryScope,
   DerivedPreference,
 } from '../domain/user-trajectory.js';
+import type { Build, BuildStatus, BuildRun, BuildRunStatus } from '../domain/build-types.js';
 
 /**
  * Filter options for trajectory event queries
@@ -89,6 +90,16 @@ export interface ForgeStorage {
    * Gets all active Runs (running or paused)
    */
   getActiveRuns(): Run[];
+
+  /**
+   * Get the raw document JSON stored with a run (plan-level context, understanding).
+   */
+  getRunDocument(runId: string): Record<string, unknown> | null;
+
+  /**
+   * Store a document JSON on a run (plan-level context, understanding).
+   */
+  setRunDocument(runId: string, document: Record<string, unknown>): void;
 
   // ============================================
   // Task operations
@@ -533,6 +544,69 @@ export interface ForgeStorage {
     cost_used_usd: number;
     cost_allowed_usd: number | null;
   } | null;
+
+  // ============================================
+  // Build operations
+  // ============================================
+
+  /**
+   * Creates a new Build
+   */
+  createBuild(build: Build): Build;
+
+  /**
+   * Gets a Build by ID
+   */
+  getBuild(buildId: string): Build | null;
+
+  /**
+   * Updates a Build with partial data
+   */
+  updateBuild(buildId: string, updates: Partial<Build>): Build | null;
+
+  /**
+   * Updates Build status
+   */
+  updateBuildStatus(buildId: string, status: BuildStatus): Build | null;
+
+  /**
+   * Lists Builds, optionally filtered by status
+   */
+  listBuilds(status?: BuildStatus): Build[];
+
+  /**
+   * Gets active Builds (pending or running)
+   */
+  getActiveBuilds(): Build[];
+
+  // ============================================
+  // BuildRun operations
+  // ============================================
+
+  /**
+   * Creates a new BuildRun
+   */
+  createBuildRun(buildRun: BuildRun): BuildRun;
+
+  /**
+   * Gets a BuildRun by build_id and run_id
+   */
+  getBuildRun(buildId: string, runId: string): BuildRun | null;
+
+  /**
+   * Updates BuildRun status
+   */
+  updateBuildRunStatus(buildId: string, runId: string, status: BuildRunStatus): BuildRun | null;
+
+  /**
+   * Lists all BuildRuns for a Build
+   */
+  listBuildRunsByBuild(buildId: string): BuildRun[];
+
+  /**
+   * Lists BuildRuns for a specific tier of a Build
+   */
+  listBuildRunsByTier(buildId: string, tier: number): BuildRun[];
 
   // ============================================
   // Transaction support

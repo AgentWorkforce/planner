@@ -28,6 +28,8 @@ export interface QueuedTask {
   step_id: string;
   /** Scope for per-scope limits (optional) */
   scope?: string;
+  /** Creation timestamp for stable ordering (plan step order) */
+  created_at?: string;
 }
 
 /**
@@ -225,7 +227,9 @@ export class TaskQueue {
   // ============================================
 
   /**
-   * Sorts tasks by scope, then by step_id within scope.
+   * Sorts tasks by scope, then by creation order within scope.
+   * created_at reflects plan step order (tasks are inserted in step_order).
+   * Falls back to step_id alphabetical if created_at is missing.
    */
   private sortByScope(tasks: QueuedTask[]): QueuedTask[] {
     return [...tasks].sort((a, b) => {
@@ -235,7 +239,11 @@ export class TaskQueue {
       if (scopeA !== scopeB) {
         return scopeA.localeCompare(scopeB);
       }
-      // Then sort by step_id within scope
+      // Then sort by creation order within scope (plan step order)
+      if (a.created_at && b.created_at) {
+        return a.created_at.localeCompare(b.created_at);
+      }
+      // Fallback to step_id if created_at not available
       return a.step_id.localeCompare(b.step_id);
     });
   }
@@ -260,6 +268,7 @@ export class TaskQueue {
       task_id: task.task_id,
       step_id: task.step_id,
       scope: task.scope,
+      created_at: task.created_at,
     };
   }
 }

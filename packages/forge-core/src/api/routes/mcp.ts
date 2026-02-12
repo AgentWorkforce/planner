@@ -9,6 +9,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { ForgeStorage } from '../../storage/interface.js';
 import type { TrajectoryCapture } from '../../services/trajectory-capture.js';
+import type { GateResultRegistry } from '../../services/gate-registry.js';
 import { tools, handleToolCallMCP } from '../../mcp/tools/index.js';
 import type { ToolHandlerContext } from '../../mcp/types.js';
 
@@ -18,6 +19,7 @@ import type { ToolHandlerContext } from '../../mcp/types.js';
 
 export interface RegisterMCPRoutesOptions {
   trajectoryCapture: TrajectoryCapture;
+  gateRegistry?: GateResultRegistry;
 }
 
 // ============================================
@@ -39,6 +41,7 @@ export function registerMCPRoutes(
   const context: ToolHandlerContext = {
     storage,
     trajectoryCapture: options.trajectoryCapture,
+    gateRegistry: options.gateRegistry,
   };
 
   // POST /mcp/tools/list — list available tools

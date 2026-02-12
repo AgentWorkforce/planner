@@ -29,6 +29,8 @@ export {
   validateForgePlan,
   validatePlanStructure,
   getTopologicalOrder,
+  computeDependencyTiers,
+  groupByScopeTier,
   type ValidationResult,
   type ValidationError,
   type ValidationErrorType,

@@ -114,6 +114,7 @@ export interface ToolDefinition {
 import type { ForgeStorage } from '../storage/interface.js';
 import type { TrajectoryCapture } from '../services/trajectory-capture.js';
 import type { HealthMonitor } from '../services/health-monitor.js';
+import type { GateResultRegistry } from '../services/gate-registry.js';
 
 /**
  * Context provided to tool handlers
@@ -122,6 +123,8 @@ export interface ToolHandlerContext {
   storage: ForgeStorage;
   trajectoryCapture: TrajectoryCapture;
   healthMonitor?: HealthMonitor;
+  /** Gate registry for quality gate result coordination */
+  gateRegistry?: GateResultRegistry;
   /** Send relay message to an agent */
   sendRelayMessage?: (agentId: string, message: Record<string, unknown>) => void;
   /** Emit SSE event */

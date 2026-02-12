@@ -233,6 +233,12 @@ export const ForgeStepSchema = z.object({
   repo_url: z.string().optional(),
   cli: z.string().optional(),
   audit: z.boolean().optional(),
+  /** Reference to a sub-plan that this step expands into (creates child Run) */
+  sub_plan_id: z.string().uuid().optional(),
+  /** Implementation specification from planner (target files, patterns, architecture) */
+  specification: z.record(z.string(), z.unknown()).optional(),
+  /** Target directory within workspace where agent should create files */
+  target_path: z.string().optional(),
 });
 
 export type ForgeStep = z.infer<typeof ForgeStepSchema>;
@@ -248,6 +254,10 @@ export const ForgePlanSchema = z.object({
     context: z.string().optional(),
   }),
   steps: z.array(ForgeStepSchema),
+  /** Architect context — design decisions, type definitions, patterns (plan-level) */
+  context: z.record(z.string(), z.unknown()).optional(),
+  /** Understanding — codebase observations, architectural insights (plan-level) */
+  understanding: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ForgePlan = z.infer<typeof ForgePlanSchema>;
@@ -261,8 +271,8 @@ export type ForgePlan = z.infer<typeof ForgePlanSchema>;
  * Research basis: METR 2025 - P(success) ~= (0.5)^(T/50min)
  */
 export const BudgetsConfigSchema = z.object({
-  /** Maximum time per task in seconds (default: 300 = 5 minutes) */
-  per_task_time_seconds: z.number().int().positive().default(300),
+  /** Maximum time per task in seconds (default: 900 = 15 minutes) */
+  per_task_time_seconds: z.number().int().positive().default(900),
   /** Maximum tokens per task (default: 100000) */
   per_task_token_limit: z.number().int().positive().default(100000),
   /** Maximum total cost for the entire run in USD (default: 10.0) */
@@ -317,8 +327,8 @@ export const ParallelismConfigSchema = z.object({
   max_concurrent_tasks: z.number().int().positive().default(5),
   /** Maximum concurrent tasks per scope (optional) */
   max_concurrent_per_scope: z.number().int().positive().optional(),
-  /** Prefer sequential execution within same scope (default: false) */
-  prefer_sequential_in_scope: z.boolean().default(false),
+  /** Prefer sequential execution within same scope (default: true — prevents file conflicts in shared worktrees) */
+  prefer_sequential_in_scope: z.boolean().default(true),
 });
 
 export type ParallelismConfig = z.infer<typeof ParallelismConfigSchema>;
@@ -349,6 +359,31 @@ export const ConfidenceConfigSchema = z.object({
 export type ConfidenceConfig = z.infer<typeof ConfidenceConfigSchema>;
 
 /**
+ * Quality gate configuration for PREP/POST phases.
+ * Controls automated analysis at tier boundaries and after task completion.
+ */
+export const QualityConfigSchema = z.object({
+  /** Run PREP analysis at tier boundaries (default: true) */
+  prep_enabled: z.boolean().default(true),
+  /** Run TASK_POST verification after each task (default: true) */
+  task_post_enabled: z.boolean().default(true),
+  /** Run RUN_POST integration review after all tasks (default: true) */
+  run_post_enabled: z.boolean().default(true),
+  /** Model for PREP analysis — deep codebase analysis benefits from stronger model */
+  prep_model: z.string().default('sonnet'),
+  /** Model for TASK_POST — fast quarter-review, haiku is sufficient */
+  task_post_model: z.string().default('haiku'),
+  /** Model for RUN_POST — integration review with focused prompt */
+  run_post_model: z.string().default('haiku'),
+  /** Skip PREP for runs with fewer tasks than this (default: 3) */
+  prep_min_tasks: z.number().int().min(1).default(3),
+  /** Skip PREP for tiers with fewer tasks than this (default: 2) */
+  prep_min_tier_tasks: z.number().int().min(1).default(2),
+});
+
+export type QualityConfig = z.infer<typeof QualityConfigSchema>;
+
+/**
  * ExecutionPolicy controls all DOT Framework knobs for a run.
  * All fields are optional with sensible defaults to maintain backward compatibility.
  */
@@ -363,6 +398,8 @@ export const ExecutionPolicySchema = z.object({
   replan: ReplanConfigSchema.default({}),
   /** Confidence thresholds */
   confidence: ConfidenceConfigSchema.default({}),
+  /** Quality gate configuration for PREP/POST phases */
+  quality: QualityConfigSchema.default({}),
 });
 
 export type ExecutionPolicy = z.infer<typeof ExecutionPolicySchema>;
@@ -437,6 +474,10 @@ export const TaskSchema = z.object({
   input_artifacts: z.array(ArtifactReferenceSchema).optional(),
   /** Artifacts this task produces as output (for dependency validation) */
   output_artifacts: z.array(ArtifactReferenceSchema).optional(),
+  /** Implementation specification from planner (target files, patterns, architecture) */
+  specification: z.record(z.string(), z.unknown()).optional(),
+  /** Target directory within workspace where agent should create files */
+  target_path: z.string().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -736,6 +777,7 @@ export function createTask(runId: string, forgeStep: ForgeStep, workspacePath?: 
     workspace_path: workspacePath,
     step_description: forgeStep.description,
     acceptance_criteria: forgeStep.acceptance_criteria,
+    specification: forgeStep.specification,
     created_at: now,
     updated_at: now,
   };
@@ -1139,7 +1181,7 @@ export const VALID_RUN_TRANSITIONS: Record<RunStatus, RunStatus[]> = {
   ],
   [RunStatus.Paused]: [RunStatus.Running, RunStatus.Cancelled],
   [RunStatus.Completed]: [],
-  [RunStatus.Failed]: [],
+  [RunStatus.Failed]: [RunStatus.Running], // Retry: resume failed run
   [RunStatus.Cancelled]: [],
 };
 

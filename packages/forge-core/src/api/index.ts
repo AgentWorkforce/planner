@@ -36,6 +36,7 @@ export {
   type RegisterQuestionRoutesOptions,
 } from './routes/questions.js';
 export { registerMCPRoutes, type RegisterMCPRoutesOptions } from './routes/mcp.js';
+export { registerBuildRoutes, type RegisterBuildRoutesOptions } from './routes/builds.js';
 
 // ============================================
 // Request/Response Schemas
@@ -86,6 +87,21 @@ export {
   // Health check
   HealthCheckResponseSchema,
   type HealthCheckResponse,
+  // Builds
+  BuildResponseSchema,
+  type BuildResponse,
+  BuildRunResponseSchema,
+  type BuildRunResponse,
+  CreateBuildResponseSchema,
+  type CreateBuildResponse,
+  ListBuildsResponseSchema,
+  type ListBuildsResponse,
+  BuildWithRunsResponseSchema,
+  type BuildWithRunsResponse,
+  BuildControlResponseSchema,
+  type BuildControlResponse,
+  ListBuildsQuerySchema,
+  type ListBuildsQuery,
 } from './schemas.js';
 
 // ============================================
@@ -232,3 +248,17 @@ export {
   type DismissQuestionHandlerFn,
   type GetQuestionHandlerFn,
 } from './handlers/questions.js';
+
+// ============================================
+// Build Handlers
+// ============================================
+
+export {
+  createBuildHandler,
+  listBuildsHandler,
+  getBuildHandler,
+  pauseBuildHandler,
+  resumeBuildHandler,
+  cancelBuildHandler,
+  type BuildHandlerDeps,
+} from './handlers/builds.js';

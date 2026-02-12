@@ -1,6 +1,7 @@
 import type { Router } from 'express';
 import type { ForgeStorage } from '../../storage/interface.js';
 import type { TrajectoryCapture } from '../../services/trajectory-capture.js';
+import type { PlannerClient } from '../../adapters/planner-client.js';
 import {
   createRunHandler,
   listRunsHandler,
@@ -37,6 +38,10 @@ export interface RegisterRunRoutesOptions {
    * TrajectoryCapture for event streaming and tracking.
    */
   trajectoryCapture?: TrajectoryCapture;
+  /**
+   * PlannerClient for fetching plans by reference (plan_id + version).
+   */
+  plannerClient?: PlannerClient;
 }
 
 // ============================================
@@ -70,6 +75,7 @@ export function registerRunRoutes(
     storage,
     trajectoryCapture: options?.trajectoryCapture,
     scheduleReadyTasks: options?.scheduleReadyTasks,
+    plannerClient: options?.plannerClient,
   };
 
   const controlHandlerDeps = {

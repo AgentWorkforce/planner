@@ -510,7 +510,7 @@ export class TaskTimeoutManager {
     if (this.trajectoryCapture) {
       this.trajectoryCapture.capture(
         info.runId,
-        'task_timeout' as any,
+        'task_timeout',
         {
           task_id: info.taskId,
           agent_id: info.agentId,

@@ -68,6 +68,9 @@ export const TrajectoryEventType = {
   RetrospectiveParseError: 'retrospective_parse_error',
   RetrospectiveValidationError: 'retrospective_validation_error',
 
+  // Timeout events
+  TaskTimeout: 'task_timeout',
+
   // Recovery events
   RecoveryStrategySelected: 'recovery_strategy_selected',
   TaskEscalated: 'task_escalated',
@@ -120,6 +123,7 @@ export const TrajectoryEventTypeSchema = z.enum([
   'retrospective_timeout',
   'retrospective_parse_error',
   'retrospective_validation_error',
+  'task_timeout',
   'recovery_strategy_selected',
   'task_escalated',
   'task_skipped',
@@ -480,6 +484,19 @@ export const GuardianTriggerReceivedPayloadSchema = z.object({
 export type GuardianTriggerReceivedPayload = z.infer<typeof GuardianTriggerReceivedPayloadSchema>;
 
 // ============================================
+// Timeout Event Payloads
+// ============================================
+
+export const TaskTimeoutPayloadSchema = z.object({
+  task_id: z.string().min(1),
+  agent_id: z.string().optional(),
+  timeout_ms: z.number().int().optional(),
+  started_at: z.string().optional(),
+});
+
+export type TaskTimeoutPayload = z.infer<typeof TaskTimeoutPayloadSchema>;
+
+// ============================================
 // Recovery Event Payloads
 // ============================================
 
@@ -585,6 +602,8 @@ export const TrajectoryPayloadSchemas: Record<TrajectoryEventType, z.ZodType> = 
   [TrajectoryEventType.RetrospectiveTimeout]: RetrospectiveTimeoutPayloadSchema,
   [TrajectoryEventType.RetrospectiveParseError]: RetrospectiveParseErrorPayloadSchema,
   [TrajectoryEventType.RetrospectiveValidationError]: RetrospectiveValidationErrorPayloadSchema,
+  // Timeout events
+  [TrajectoryEventType.TaskTimeout]: TaskTimeoutPayloadSchema,
   // Recovery events
   [TrajectoryEventType.RecoveryStrategySelected]: RecoveryStrategySelectedPayloadSchema,
   [TrajectoryEventType.TaskEscalated]: TaskEscalatedPayloadSchema,

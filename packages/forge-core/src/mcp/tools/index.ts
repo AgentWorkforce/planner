@@ -13,6 +13,7 @@ import { reportBlockedTool, handleReportBlocked } from './report-blocked.js';
 import { requestHumanInputTool, handleRequestHumanInput } from './request-human-input.js';
 import { recordDecisionTool, handleRecordDecision } from './record-decision.js';
 import { reportAuditResultTool, handleReportAuditResult } from './report-audit-result.js';
+import { reportGateResultTool, handleReportGateResult } from './report-gate-result.js';
 
 // ============================================
 // Tool Registry
@@ -28,6 +29,7 @@ export const tools: ToolDefinition[] = [
   requestHumanInputTool,
   recordDecisionTool,
   reportAuditResultTool,
+  reportGateResultTool,
 ];
 
 /**
@@ -56,6 +58,7 @@ const handlerRegistry = new Map<string, ToolHandler>([
   ['request_human_input', handleRequestHumanInput as ToolHandler],
   ['record_decision', handleRecordDecision as ToolHandler],
   ['report_audit_result', handleReportAuditResult as ToolHandler],
+  ['report_gate_result', handleReportGateResult as ToolHandler],
 ]);
 
 // ============================================
@@ -173,6 +176,7 @@ export {
   requestHumanInputTool,
   recordDecisionTool,
   reportAuditResultTool,
+  reportGateResultTool,
   // Handlers
   handleReportProgress,
   handleReportComplete,
@@ -180,6 +184,7 @@ export {
   handleRequestHumanInput,
   handleRecordDecision,
   handleReportAuditResult,
+  handleReportGateResult,
 };
 
 // Re-export types
@@ -207,3 +212,7 @@ export type {
   ReportAuditResultArgs,
   ReportAuditResultResult,
 } from './report-audit-result.js';
+export type {
+  ReportGateResultArgs,
+  ReportGateResultResult,
+} from './report-gate-result.js';

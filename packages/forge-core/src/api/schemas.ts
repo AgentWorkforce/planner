@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RunStatusSchema, ForgePlanSchema } from '../domain/types.js';
+import { BuildStatusSchema, BuildRunStatusSchema, BuildRequestSchema, BuildTierSchema } from '../domain/build-types.js';
 
 // ============================================
 // Create Run Request
@@ -28,8 +29,8 @@ export const CreateRunRequestSchema = z
      */
     workspace_path: z.string().optional(),
   })
-  .refine((data) => data.plan || (data.plan_id && data.plan_version), {
-    message: 'Either plan must be provided, or both plan_id and plan_version must be specified',
+  .refine((data) => data.plan || data.plan_id, {
+    message: 'Either plan or plan_id must be provided',
   });
 
 export type CreateRunRequest = z.infer<typeof CreateRunRequestSchema>;
@@ -118,6 +119,8 @@ export const TaskSummarySchema = z.object({
   step_title: z.string(),
   status: z.string(),
   dependencies: z.array(z.string()),
+  scope: z.string().optional(),
+  owner_role: z.string().optional(),
   current_attempt: z.number().int().optional(),
   agent_id: z.string().optional(),
   gate_id: z.string().uuid().optional(),
@@ -282,3 +285,95 @@ export const HealthCheckResponseSchema = z.object({
 });
 
 export type HealthCheckResponse = z.infer<typeof HealthCheckResponseSchema>;
+
+// ============================================
+// Build Schemas
+// ============================================
+
+/**
+ * Response for a Build.
+ */
+export const BuildResponseSchema = z.object({
+  build_id: z.string().uuid(),
+  status: BuildStatusSchema,
+  tiers: z.array(BuildTierSchema),
+  concurrency_limit: z.number().int(),
+  skip_completed: z.boolean(),
+  mode: z.string(),
+  workspace_path: z.string().nullable(),
+  error: z.string().nullable(),
+  created_at: z.string(),
+  started_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  updated_at: z.string(),
+});
+
+export type BuildResponse = z.infer<typeof BuildResponseSchema>;
+
+/**
+ * Response for a BuildRun.
+ */
+export const BuildRunResponseSchema = z.object({
+  build_id: z.string().uuid(),
+  run_id: z.string().uuid(),
+  plan_id: z.string().uuid(),
+  plan_version: z.number().int().nullable(),
+  tier: z.number().int(),
+  status: BuildRunStatusSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export type BuildRunResponse = z.infer<typeof BuildRunResponseSchema>;
+
+/**
+ * Response for creating a new build.
+ */
+export const CreateBuildResponseSchema = z.object({
+  build_id: z.string().uuid(),
+  status: BuildStatusSchema,
+  tiers_count: z.number().int(),
+  plans_count: z.number().int(),
+});
+
+export type CreateBuildResponse = z.infer<typeof CreateBuildResponseSchema>;
+
+/**
+ * Response for listing builds.
+ */
+export const ListBuildsResponseSchema = z.object({
+  builds: z.array(BuildResponseSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export type ListBuildsResponse = z.infer<typeof ListBuildsResponseSchema>;
+
+/**
+ * Full build details with all runs.
+ */
+export const BuildWithRunsResponseSchema = BuildResponseSchema.extend({
+  runs: z.array(BuildRunResponseSchema),
+});
+
+export type BuildWithRunsResponse = z.infer<typeof BuildWithRunsResponseSchema>;
+
+/**
+ * Response for build control operations (pause/resume/cancel).
+ */
+export const BuildControlResponseSchema = z.object({
+  build_id: z.string().uuid(),
+  status: BuildStatusSchema,
+  previous_status: BuildStatusSchema,
+  updated_at: z.string(),
+});
+
+export type BuildControlResponse = z.infer<typeof BuildControlResponseSchema>;
+
+/**
+ * Query parameters for listing builds.
+ */
+export const ListBuildsQuerySchema = z.object({
+  status: BuildStatusSchema.optional(),
+});
+
+export type ListBuildsQuery = z.infer<typeof ListBuildsQuerySchema>;

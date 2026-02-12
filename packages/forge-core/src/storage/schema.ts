@@ -30,12 +30,15 @@ CREATE TABLE IF NOT EXISTS runs (
   status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'paused', 'completed', 'failed', 'cancelled')),
   has_pending_gate INTEGER NOT NULL DEFAULT 0,
   workspace_path TEXT,
+  parent_run_id TEXT,
+  parent_task_id TEXT,
   started_at TEXT,
   completed_at TEXT,
   error TEXT,
   document TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (parent_run_id) REFERENCES runs(run_id) ON DELETE SET NULL
 )
 `;
 
@@ -78,9 +81,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   agent_id TEXT,
   current_attempt INTEGER,
   gate_id TEXT,
+  sub_plan_id TEXT,
+  child_run_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE,
+  FOREIGN KEY (child_run_id) REFERENCES runs(run_id) ON DELETE SET NULL
 )
 `;
 
@@ -600,6 +606,74 @@ CREATE TABLE IF NOT EXISTS run_budgets (
 `;
 
 // ============================================
+// Builds Table
+// ============================================
+
+/**
+ * SQL to create the builds table.
+ * Primary key is build_id (UUID).
+ * Stores build execution state for multi-plan tiered builds.
+ */
+export const CREATE_BUILDS_TABLE = `
+CREATE TABLE IF NOT EXISTS builds (
+  build_id TEXT PRIMARY KEY NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'paused', 'cancelled')),
+  tiers_json TEXT NOT NULL DEFAULT '[]',
+  concurrency_limit INTEGER NOT NULL DEFAULT 5,
+  skip_completed INTEGER NOT NULL DEFAULT 0,
+  mode TEXT NOT NULL DEFAULT 'real',
+  workspace_path TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  completed_at TEXT,
+  updated_at TEXT NOT NULL
+)
+`;
+
+/**
+ * Index for faster lookups by status on builds table.
+ */
+export const CREATE_BUILDS_STATUS_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_builds_status ON builds(status)
+`;
+
+/**
+ * SQL to create the build_runs table.
+ * Tracks which runs belong to which builds and their tier assignments.
+ * Composite primary key (build_id, run_id).
+ */
+export const CREATE_BUILD_RUNS_TABLE = `
+CREATE TABLE IF NOT EXISTS build_runs (
+  build_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  plan_id TEXT NOT NULL,
+  plan_version INTEGER,
+  tier INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (build_id, run_id),
+  FOREIGN KEY (build_id) REFERENCES builds(build_id) ON DELETE CASCADE,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+)
+`;
+
+/**
+ * Index for faster lookups by build_id on build_runs table.
+ */
+export const CREATE_BUILD_RUNS_BUILD_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_build_runs_build_id ON build_runs(build_id)
+`;
+
+/**
+ * Index for faster lookups by tier within a build.
+ */
+export const CREATE_BUILD_RUNS_TIER_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_build_runs_tier ON build_runs(build_id, tier)
+`;
+
+// ============================================
 // All Schema Statements
 // ============================================
 
@@ -656,6 +730,12 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_TASK_METRICS_RUN_TIMESTAMP_INDEX,
   CREATE_TASK_METRICS_MODEL_OUTCOME_INDEX,
   CREATE_RUN_BUDGETS_TABLE,
+  // Builds
+  CREATE_BUILDS_TABLE,
+  CREATE_BUILDS_STATUS_INDEX,
+  CREATE_BUILD_RUNS_TABLE,
+  CREATE_BUILD_RUNS_BUILD_INDEX,
+  CREATE_BUILD_RUNS_TIER_INDEX,
 ];
 
 /**
@@ -669,4 +749,11 @@ export const MIGRATION_STATEMENTS = [
   `ALTER TABLE runs ADD COLUMN workspace_path TEXT`,
   `ALTER TABLE tasks ADD COLUMN step_description TEXT`,
   `ALTER TABLE tasks ADD COLUMN acceptance_criteria TEXT`,
+  // Sub-plan hierarchy columns
+  `ALTER TABLE runs ADD COLUMN parent_run_id TEXT`,
+  `ALTER TABLE runs ADD COLUMN parent_task_id TEXT`,
+  `ALTER TABLE tasks ADD COLUMN sub_plan_id TEXT`,
+  `ALTER TABLE tasks ADD COLUMN child_run_id TEXT`,
+  // Specification column for step-level implementation details
+  `ALTER TABLE tasks ADD COLUMN specification TEXT`,
 ];

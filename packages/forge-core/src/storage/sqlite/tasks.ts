@@ -8,12 +8,14 @@ export function createTask(db: Database.Database, task: Task): Task {
     INSERT INTO tasks (
       task_id, run_id, step_id, step_title, status, dependencies,
       scope, owner_role, step_description, acceptance_criteria,
-      workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+      workspace_path, agent_id, current_attempt, gate_id,
+      sub_plan_id, child_run_id, specification, created_at, updated_at
     )
     VALUES (
       @task_id, @run_id, @step_id, @step_title, @status, @dependencies,
       @scope, @owner_role, @step_description, @acceptance_criteria,
-      @workspace_path, @agent_id, @current_attempt, @gate_id, @created_at, @updated_at
+      @workspace_path, @agent_id, @current_attempt, @gate_id,
+      @sub_plan_id, @child_run_id, @specification, @created_at, @updated_at
     )
   `);
   stmt.run({
@@ -31,6 +33,9 @@ export function createTask(db: Database.Database, task: Task): Task {
     agent_id: task.agent_id ?? null,
     current_attempt: task.current_attempt ?? null,
     gate_id: task.gate_id ?? null,
+    sub_plan_id: task.sub_plan_id ?? null,
+    child_run_id: task.child_run_id ?? null,
+    specification: task.specification ? JSON.stringify(task.specification) : null,
     created_at: task.created_at,
     updated_at: task.updated_at,
   });
@@ -41,7 +46,8 @@ export function getTask(db: Database.Database, taskId: string): Task | null {
   const stmt = db.prepare<string, TaskRow>(`
     SELECT task_id, run_id, step_id, step_title, status, dependencies,
            scope, owner_role, step_description, acceptance_criteria,
-           workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+           workspace_path, agent_id, current_attempt, gate_id,
+           sub_plan_id, child_run_id, specification, created_at, updated_at
     FROM tasks
     WHERE task_id = ?
   `);
@@ -87,6 +93,14 @@ export function updateTask(db: Database.Database, taskId: string, updates: Parti
     fields.push('dependencies = @dependencies');
     values.dependencies = JSON.stringify(updates.dependencies);
   }
+  if (updates.sub_plan_id !== undefined) {
+    fields.push('sub_plan_id = @sub_plan_id');
+    values.sub_plan_id = updates.sub_plan_id ?? null;
+  }
+  if (updates.child_run_id !== undefined) {
+    fields.push('child_run_id = @child_run_id');
+    values.child_run_id = updates.child_run_id ?? null;
+  }
 
   const stmt = db.prepare(`
     UPDATE tasks
@@ -106,7 +120,8 @@ export function listTasksByRun(db: Database.Database, runId: string): Task[] {
   const stmt = db.prepare<string, TaskRow>(`
     SELECT task_id, run_id, step_id, step_title, status, dependencies,
            scope, owner_role, step_description, acceptance_criteria,
-           workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+           workspace_path, agent_id, current_attempt, gate_id,
+           sub_plan_id, child_run_id, specification, created_at, updated_at
     FROM tasks
     WHERE run_id = ?
     ORDER BY created_at ASC
@@ -142,7 +157,8 @@ export function getTaskByStepId(db: Database.Database, runId: string, stepId: st
   const stmt = db.prepare<[string, string], TaskRow>(`
     SELECT task_id, run_id, step_id, step_title, status, dependencies,
            scope, owner_role, step_description, acceptance_criteria,
-           workspace_path, agent_id, current_attempt, gate_id, created_at, updated_at
+           workspace_path, agent_id, current_attempt, gate_id,
+           sub_plan_id, child_run_id, specification, created_at, updated_at
     FROM tasks
     WHERE run_id = ? AND step_id = ?
   `);

@@ -103,6 +103,12 @@ function transformStep(
   if (gate) {
     forgeStep.gate = gate;
   }
+  if (step.sub_plan_id) {
+    forgeStep.sub_plan_id = step.sub_plan_id;
+  }
+  if (step.specification) {
+    forgeStep.specification = step.specification;
+  }
 
   // Add resolved configuration from mappings
   if (repoConfig) {
@@ -112,6 +118,14 @@ function transformStep(
     forgeStep.cli = cliConfig.cli;
     if (cliConfig.audit !== undefined) {
       forgeStep.audit = cliConfig.audit;
+    }
+  }
+
+  // Extract target_path from specification if present
+  if (step.specification && typeof step.specification === 'object') {
+    const spec = step.specification as Record<string, unknown>;
+    if (typeof spec.target_path === 'string') {
+      forgeStep.target_path = spec.target_path;
     }
   }
 
@@ -149,6 +163,8 @@ export function transformToForgePlan(
       context: planVersion.summary.context,
     },
     steps,
+    context: planVersion.context,
+    understanding: planVersion.understanding,
   };
 
   return {

@@ -3,6 +3,9 @@ import type { ForgeStorage } from '../../storage/interface.js';
 import type { TrajectoryCapture } from '../../services/trajectory-capture.js';
 import type { ForgePlan, Run, Task, TaskStatus } from '../../domain/types.js';
 import { createRun, createTask, RunStatus, TaskStatus as TaskStatusEnum } from '../../domain/types.js';
+import type { PlannerClient } from '../../adapters/planner-client.js';
+import { transformToForgePlan } from '../../adapters/plan-transformer.js';
+import { createDefaultConfig } from '../../config/forge-config.js';
 import { TrajectoryEventType } from '../../domain/trajectory-events.js';
 import {
   CreateRunRequestSchema,
@@ -30,6 +33,7 @@ export interface RunHandlerDeps {
   storage: ForgeStorage;
   trajectoryCapture?: TrajectoryCapture;
   scheduleReadyTasks?: ScheduleReadyTasksFn;
+  plannerClient?: PlannerClient;
 }
 
 // ============================================
@@ -70,6 +74,8 @@ function toTaskSummary(task: Task): TaskSummary {
     step_title: task.step_title,
     status: task.status,
     dependencies: task.dependencies,
+    scope: task.scope,
+    owner_role: task.owner_role,
     current_attempt: task.current_attempt,
     agent_id: task.agent_id,
     gate_id: task.gate_id,
@@ -88,7 +94,7 @@ function toTaskSummary(task: Task): TaskSummary {
  * Creates a new run from a ForgePlan, creates all tasks, and starts execution.
  */
 export function createRunHandler(deps: RunHandlerDeps) {
-  return (req: Request, res: Response): void => {
+  return async (req: Request, res: Response): Promise<void> => {
     try {
       // Validate request body
       const bodyResult = CreateRunRequestSchema.safeParse(req.body);
@@ -106,17 +112,29 @@ export function createRunHandler(deps: RunHandlerDeps) {
       let plan: ForgePlan;
       if (body.plan) {
         plan = body.plan;
-      } else if (body.plan_id && body.plan_version) {
-        // For now, we only support inline plans
-        // In the future, this could fetch from Planner service
-        res.status(400).json({
-          error: 'Plan reference not yet supported. Please provide the full plan inline.',
-          code: 'PLAN_REFERENCE_NOT_SUPPORTED',
-        });
-        return;
+      } else if (body.plan_id) {
+        if (!deps.plannerClient) {
+          res.status(400).json({
+            error: 'Plan reference requires PlannerClient configuration.',
+            code: 'PLANNER_CLIENT_NOT_CONFIGURED',
+          });
+          return;
+        }
+        const planVersion = await deps.plannerClient.fetchPlanVersion(
+          body.plan_id,
+          body.plan_version
+        );
+        if (!planVersion) {
+          res.status(404).json({
+            error: `Plan not found: ${body.plan_id} v${body.plan_version ?? 'latest'}`,
+          });
+          return;
+        }
+        const transformResult = transformToForgePlan(planVersion, createDefaultConfig());
+        plan = transformResult.plan;
       } else {
         res.status(400).json({
-          error: 'Either plan or plan_id+plan_version must be provided',
+          error: 'Either plan or plan_id must be provided',
         });
         return;
       }
@@ -129,6 +147,15 @@ export function createRunHandler(deps: RunHandlerDeps) {
         // Create the run
         const newRun = createRun(plan, { workspacePath });
         const savedRun = deps.storage.createRun(newRun);
+
+        // Store plan-level context and understanding in run document
+        // These are passed to agents via the orchestrator for implementation guidance
+        const planDoc: Record<string, unknown> = {};
+        if (plan.context) planDoc.context = plan.context;
+        if (plan.understanding) planDoc.understanding = plan.understanding;
+        if (Object.keys(planDoc).length > 0) {
+          deps.storage.setRunDocument(savedRun.run_id, planDoc);
+        }
 
         // Create tasks from plan steps (propagate workspace_path to all tasks)
         const createdTasks: Task[] = [];

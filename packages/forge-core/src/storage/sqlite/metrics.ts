@@ -70,7 +70,7 @@ export function initRunBudget(
 ): void {
   const now = new Date().toISOString();
   const stmt = db.prepare(`
-    INSERT INTO run_budgets (
+    INSERT OR IGNORE INTO run_budgets (
       run_id, tokens_allowed, tokens_used, cost_allowed_usd, cost_used_usd, updated_at
     )
     VALUES (

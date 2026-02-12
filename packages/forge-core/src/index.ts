@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { type Router } from 'express';
 import { createForgeStorage, type ForgeStorage } from './storage/index.js';
 import { createForgeRouter } from './api/index.js';
@@ -6,8 +7,14 @@ import { createRunService, type OutcomeEmitter } from './services/run-service.js
 import { createOrchestrator } from './services/orchestrator.js';
 import { TrajectoryCapture } from './services/trajectory-capture.js';
 import { loadForgeConfig, createDefaultConfig, type ForgeConfig } from './config/forge-config.js';
-import type { ForgeExecutionMode, SpawnTaskFn } from './services/agent-spawner.js';
+import { TaskStatus } from './domain/types.js';
+import type { ForgeExecutionMode, SpawnTaskFn, SpawnGateAgentFn } from './services/agent-spawner.js';
 import type { TerminateAgentFn } from './services/recovery.js';
+import { GateResultRegistry } from './services/gate-registry.js';
+import { createPlannerClient } from './adapters/planner-client.js';
+import { WorktreeManager } from './services/worktree-manager.js';
+import { BuildCoordinator } from './services/build-coordinator.js';
+import { AnalysisTool } from './services/analysis-tool.js';
 
 // Domain exports
 export * from './domain/index.js';
@@ -65,9 +72,32 @@ export interface ForgeServiceConfig {
   terminateAgent?: TerminateAgentFn;
 
   /**
+   * Function to spawn quality gate agents — enables agent-based quality gates
+   */
+  spawnGateAgent?: SpawnGateAgentFn;
+
+  /**
    * Path to forge config YAML/JSON for role/scope mapping
    */
   forgeConfigPath?: string;
+
+  /**
+   * Base URL for the planner service (enables plan_id-based run creation and sub_plan_id resolution).
+   * Default: 'http://localhost:3001'
+   */
+  plannerUrl?: string;
+
+  /**
+   * Root of the git repository. When provided, enables git worktree isolation
+   * so each Forge run executes in its own worktree instead of the main checkout.
+   */
+  repoRoot?: string;
+
+  /**
+   * Base directory for worktree creation.
+   * Default: '<repoRoot>/.forge-worktrees'
+   */
+  worktreeBase?: string;
 }
 
 /**
@@ -98,6 +128,11 @@ export interface ForgeService {
    * The active execution mode for this service instance.
    */
   mode: ForgeExecutionMode;
+
+  /**
+   * BuildCoordinator for tiered multi-plan builds.
+   */
+  buildCoordinator: BuildCoordinator;
 }
 
 /**
@@ -128,33 +163,60 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
   const trajectoryCapture = new TrajectoryCapture(storage);
 
   // Create HTTP-based outcome emitter if tuner URL is provided
+  // Error suppression: only log first failure, then suppress for 60 seconds
+  let lastTaskErrorTime = 0;
+  let lastRunErrorTime = 0;
+  const ERROR_SUPPRESS_MS = 60000; // 60 seconds
+
   const outcomeEmitter: OutcomeEmitter | undefined = tunerUrl
     ? {
         async submitTaskOutcome(outcome) {
-          const res = await fetch(`${tunerUrl}/api/tuner/outcomes/task`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(outcome),
-          });
-          if (!res.ok) {
-            throw new Error(`Tuner API returned ${res.status}`);
+          try {
+            const res = await fetch(`${tunerUrl}/api/tuner/outcomes/task`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(outcome),
+            });
+            if (!res.ok) throw new Error(`Tuner API returned ${res.status}`);
+          } catch (err) {
+            const now = Date.now();
+            if (now - lastTaskErrorTime > ERROR_SUPPRESS_MS) {
+              lastTaskErrorTime = now;
+              throw err; // Re-throw so RunService logs it once
+            }
+            // Suppress — already logged recently
           }
         },
         async submitRunOutcome(outcome) {
-          const res = await fetch(`${tunerUrl}/api/tuner/outcomes/run`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(outcome),
-          });
-          if (!res.ok) {
-            throw new Error(`Tuner API returned ${res.status}`);
+          try {
+            const res = await fetch(`${tunerUrl}/api/tuner/outcomes/run`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(outcome),
+            });
+            if (!res.ok) throw new Error(`Tuner API returned ${res.status}`);
+          } catch (err) {
+            const now = Date.now();
+            if (now - lastRunErrorTime > ERROR_SUPPRESS_MS) {
+              lastRunErrorTime = now;
+              throw err;
+            }
+            // Suppress — already logged recently
           }
         },
       }
     : undefined;
 
+  // Create PlannerClient (shared — used by router for plan_id runs and orchestrator for sub_plan_id)
+  const plannerUrl = config.plannerUrl || 'http://localhost:3001';
+  const plannerClient = createPlannerClient({ base_url: plannerUrl, timeout_ms: 30000 });
+
   // Mode-specific initialization
   let scheduleReadyTasks: (runId: string) => void;
+  let registerBuildRunFn: ((buildId: string, runId: string) => void) | undefined;
+  let terminateRunAgentsFn: ((runId: string) => void) | undefined;
+  let worktreeManager: WorktreeManager | undefined;
+  let gateRegistry: GateResultRegistry | undefined;
   let shutdownHook: (() => void) | undefined;
 
   if (mode === 'real') {
@@ -173,11 +235,46 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
       forgeConfig = createDefaultConfig();
     }
 
-    // Create RunService
+    // Create RunService with timeout handlers wired to agent lifecycle
     const runService = createRunService({
       storage,
       trajectoryCapture,
       outcomeEmitter,
+      signalAgentShutdown: config.terminateAgent
+        ? async (agentId: string, reason: string) => {
+            console.log(`[ForgeService] Terminating timed-out agent ${agentId}: ${reason}`);
+            await config.terminateAgent!(agentId);
+          }
+        : undefined,
+      failTaskWithTimeout: async (taskId: string, runId: string) => {
+        const task = storage.getTask(taskId);
+        if (!task) return;
+        console.log(`[ForgeService] Failing timed-out task ${taskId} (run ${runId})`);
+        storage.updateTask(taskId, { status: TaskStatus.Failed });
+      },
+    });
+
+    // Create WorktreeManager if repoRoot is provided (enables worktree isolation)
+    worktreeManager = config.repoRoot
+      ? new WorktreeManager(
+          config.repoRoot,
+          config.worktreeBase || path.join(config.repoRoot, '.forge-worktrees')
+        )
+      : undefined;
+
+    if (worktreeManager) {
+      console.log('[ForgeService] Worktree isolation enabled');
+    }
+
+    // Create gate infrastructure for agent-based quality gates
+    gateRegistry = config.spawnGateAgent ? new GateResultRegistry() : undefined;
+
+    // Create AnalysisTool for PREP/POST quality gates
+    const analysisTool = new AnalysisTool({
+      cli: 'claude',
+      gateRegistry,
+      spawnGateAgent: config.spawnGateAgent,
+      terminateAgent: config.terminateAgent,
     });
 
     // Create Orchestrator
@@ -187,10 +284,16 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
       spawnTask: config.spawnTask,
       terminateAgent: config.terminateAgent,
       forgeConfig,
+      plannerClient,
+      worktreeManager,
+      analysisTool,
     });
 
     scheduleReadyTasks = (runId: string) => orchestrator.scheduleReadyTasks(runId);
+    registerBuildRunFn = (buildId: string, runId: string) => orchestrator.registerBuildRun(buildId, runId);
+    terminateRunAgentsFn = (runId: string) => orchestrator.terminateRunAgents(runId);
     shutdownHook = () => {
+      if (gateRegistry) gateRegistry.shutdown();
       orchestrator.shutdown();
       runService.shutdown();
     };
@@ -207,16 +310,32 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     console.log(`[ForgeService] ${source} mode executor ready`);
   }
 
+  // Create BuildCoordinator (shared across modes — uses scheduleReadyTasks)
+  const buildCoordinator = new BuildCoordinator({
+    storage,
+    plannerClient,
+    scheduleReadyTasks,
+    registerBuildRun: registerBuildRunFn,
+    terminateRunAgents: terminateRunAgentsFn,
+    worktreeManager,
+    trajectoryCapture,
+  });
+
   // Create router with scheduleReadyTasks callback and trajectory capture (for MCP routes)
+  // gateRegistry is only created in real mode — undefined in test mode is fine (MCP tool will error gracefully)
   const router = createForgeRouter({
     storage,
     trajectoryCapture,
     scheduleReadyTasks,
+    plannerClient,
+    buildCoordinator,
+    gateRegistry,
   });
 
   return {
     router,
     mode,
+    buildCoordinator,
     initialize: async () => {
       // Storage is initialized on creation, nothing async needed yet
     },

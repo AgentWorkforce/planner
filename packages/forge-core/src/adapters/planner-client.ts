@@ -37,6 +37,8 @@ export interface PlannerStep {
   acceptance_criteria?: PlannerAcceptanceCriterion[];
   gate?: PlannerGate;
   sub_plan_id?: string;
+  /** Implementation specification — target files, patterns, architecture notes */
+  specification?: Record<string, unknown>;
 }
 
 /**
@@ -56,6 +58,10 @@ export interface PlanVersion {
   status: PlanStatus;
   summary: PlannerSummary;
   steps: PlannerStep[];
+  /** Architect context — design decisions, type definitions, patterns */
+  context?: Record<string, unknown>;
+  /** Understanding — codebase observations, architectural insights */
+  understanding?: Record<string, unknown>;
   submitted_at?: string;
   approval_info?: {
     approved_by?: string;
@@ -103,8 +109,11 @@ export const PlanVersionResponseSchema = z.object({
         })
         .optional(),
       sub_plan_id: z.string().uuid().optional(),
+      specification: z.record(z.string(), z.unknown()).optional(),
     })
   ),
+  context: z.record(z.string(), z.unknown()).optional(),
+  understanding: z.record(z.string(), z.unknown()).optional(),
   submitted_at: z.string().datetime().optional(),
   approval_info: z
     .object({
@@ -309,8 +318,10 @@ export class PlannerClient {
       ? `/api/plans/${planId}/versions/${version}`
       : `/api/plans/${planId}/versions/latest`;
 
-    const response = await this.request<unknown>('GET', path);
-    return PlanVersionResponseSchema.parse(response);
+    const response = await this.request<Record<string, unknown>>('GET', path);
+    // API wraps version in { version: { ... } }
+    const versionData = response.version ?? response;
+    return PlanVersionResponseSchema.parse(versionData);
   }
 
   /**
