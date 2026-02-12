@@ -1,0 +1,126 @@
+{
+  "feature_id": "cultivate-storage",
+  "title": "SQLite Storage Layer",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain", "cultivate-errors"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement CultivateStorage interface and SqliteCultivateStorage class extending BaseSqliteStorage from @plannr/storage-base. Tables: signals, greenhouses, clusters, source_configs, filter_rules, ingestion_jobs, cultivate_config, with appropriate indexes for query performance. Full CRUD for all entities. Default Greenhouse auto-creation on initialize() when no greenhouses exist. Uses cultivate.db as the database file.",
+    "acceptance_criteria": [
+      { "id": "cs-ac1", "description": "CultivateStorage interface defines CRUD methods for all 7 tables" },
+      { "id": "cs-ac2", "description": "SqliteCultivateStorage extends BaseSqliteStorage with synchronous initializeSchema()" },
+      { "id": "cs-ac3", "description": "signals table has indexes on greenhouse_id, cluster_id, status, source_type+external_id (unique), created_at" },
+      { "id": "cs-ac4", "description": "greenhouses table stores mode, keyword_require (JSON), keyword_exclude (JSON), source_ids (JSON)" },
+      { "id": "cs-ac5", "description": "clusters table has index on greenhouse_id and trend" },
+      { "id": "cs-ac6", "description": "source_configs table stores auth as encrypted JSON, health status, consecutive_failures count" },
+      { "id": "cs-ac7", "description": "filter_rules table stores condition, effectiveness JSON, enabled flag" },
+      { "id": "cs-ac8", "description": "ingestion_jobs table tracks chunking progress with total_chunks, processed_chunks" },
+      { "id": "cs-ac9", "description": "On initialize(), if greenhouses table is empty, auto-creates a default Greenhouse (refinement mode, no keyword filters, all sources)" },
+      { "id": "cs-ac10", "description": "Signal queries support filtering by greenhouse_id, status, cluster_id with pagination (offset+limit)" },
+      { "id": "cs-ac11", "description": "cultivate_config table is a single-row key-value store for the current CultivateConfig JSON" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cs-s1",
+        "title": "Define CultivateStorage interface",
+        "scope": "cultivate",
+        "description": "Create src/storage/interface.ts. Define CultivateStorage interface with method signatures for all entities: signals (create, getById, update, list with filters, countByStatus, getByExternalId for dedup), greenhouses (create, getById, update, delete, list), clusters (create, getById, update, delete, listByGreenhouse, getByLabel), source_configs (create, getById, update, delete, list, updateHealth), filter_rules (create, getById, update, delete, list, updateEffectiveness), ingestion_jobs (create, getById, update, list), config (get, set). Also define query filter types for signal listing (SignalQueryFilters: greenhouse_id?, status?, cluster_id?, limit, offset).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Interface covers all 7 entity types with full CRUD" },
+          { "id": "ac2", "description": "Signal listing supports greenhouse_id, status, cluster_id filters with pagination" },
+          { "id": "ac3", "description": "getByExternalId(source_type, external_id) enables exact dedup checks" }
+        ]
+      },
+      {
+        "step_id": "cs-s2",
+        "title": "Implement SqliteCultivateStorage with migrations",
+        "scope": "cultivate",
+        "description": "Create src/storage/sqlite.ts. Implement SqliteCultivateStorage extending BaseSqliteStorage. In initializeSchema(), create all tables: signals (id TEXT PK, greenhouse_id TEXT NOT NULL, source_type TEXT, external_id TEXT, title TEXT, body TEXT, author TEXT, author_type TEXT, url TEXT, score REAL DEFAULT 0, scoring_factors TEXT/JSON, cluster_id TEXT, status TEXT DEFAULT 'pending', provenance TEXT/JSON, tags TEXT/JSON, created_at TEXT, updated_at TEXT, linked_plan_id TEXT), greenhouses, clusters, source_configs, filter_rules, ingestion_jobs, cultivate_config. Add UNIQUE constraint on signals(source_type, external_id, greenhouse_id). Create all indexes.",
+        "dependencies": ["cs-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All 7 tables created with correct column types and constraints" },
+          { "id": "ac2", "description": "signals(source_type, external_id, greenhouse_id) is UNIQUE for dedup" },
+          { "id": "ac3", "description": "Indexes created on: signals(greenhouse_id), signals(cluster_id), signals(status), signals(created_at), clusters(greenhouse_id), clusters(trend)" },
+          { "id": "ac4", "description": "initializeSchema() is idempotent (CREATE TABLE IF NOT EXISTS)" }
+        ]
+      },
+      {
+        "step_id": "cs-s3",
+        "title": "Implement signal CRUD operations",
+        "scope": "cultivate",
+        "description": "Implement signal methods: createSignal (INSERT with all fields, JSON.stringify for scoring_factors/provenance/tags), getSignalById, updateSignal (partial update with SET for provided fields, auto-update updated_at), listSignals (with SignalQueryFilters: WHERE clauses for greenhouse_id/status/cluster_id, ORDER BY created_at DESC, LIMIT/OFFSET), countSignalsByStatus (GROUP BY status for dashboard), getSignalByExternalId (for exact dedup lookup). Parse JSON fields back to objects on read.",
+        "dependencies": ["cs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createSignal returns the created signal with generated id" },
+          { "id": "ac2", "description": "updateSignal accepts partial updates and auto-sets updated_at" },
+          { "id": "ac3", "description": "listSignals supports all filter combinations and pagination" },
+          { "id": "ac4", "description": "JSON fields (scoring_factors, provenance, tags) are serialized on write and parsed on read" }
+        ]
+      },
+      {
+        "step_id": "cs-s4",
+        "title": "Implement greenhouse CRUD with default auto-creation",
+        "scope": "cultivate",
+        "description": "Implement greenhouse methods: createGreenhouse (INSERT with JSON serialization for keyword_require/keyword_exclude/source_ids arrays), getGreenhouseById, updateGreenhouse (partial), deleteGreenhouse, listGreenhouses. Add ensureDefaultGreenhouse() method called from initializeSchema(): if COUNT(*) FROM greenhouses = 0, insert a default greenhouse with name='Default', mode='refinement', empty keyword arrays, empty source_ids (all sources). JSON arrays for keyword_require, keyword_exclude, source_ids.",
+        "dependencies": ["cs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Default greenhouse created on first initialize() when table is empty" },
+          { "id": "ac2", "description": "Default greenhouse has mode='refinement', empty keyword filters, empty source_ids" },
+          { "id": "ac3", "description": "Subsequent initialize() calls do not create duplicate defaults" },
+          { "id": "ac4", "description": "keyword_require and keyword_exclude stored as JSON arrays" }
+        ]
+      },
+      {
+        "step_id": "cs-s5",
+        "title": "Implement cluster CRUD",
+        "scope": "cultivate",
+        "description": "Implement cluster methods: createCluster, getClusterById, updateCluster (partial — supports updating label, summary, signal_count, trend, velocity_weekly, velocity_monthly), deleteCluster, listClustersByGreenhouse (ORDER BY signal_count DESC), getClusterByLabel (for dedup during clustering). Trend and velocity fields default to 'stable' and 0 on creation.",
+        "dependencies": ["cs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createCluster defaults trend to 'stable', velocities to 0" },
+          { "id": "ac2", "description": "listClustersByGreenhouse returns clusters ordered by signal_count descending" },
+          { "id": "ac3", "description": "updateCluster supports partial updates for trend detection and recluster" }
+        ]
+      },
+      {
+        "step_id": "cs-s6",
+        "title": "Implement source_config CRUD",
+        "scope": "cultivate",
+        "description": "Implement source config methods: createSourceConfig (INSERT with auth as encrypted JSON string), getSourceConfigById, updateSourceConfig (partial), deleteSourceConfig, listSourceConfigs (with optional enabled filter), updateSourceHealth (dedicated method that updates health status, increments/resets consecutive_failures, sets last_error). The auth field stores an encrypted JSON string — encryption/decryption is handled by the auth-encryption feature, storage just persists the opaque string.",
+        "dependencies": ["cs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "updateSourceHealth atomically updates health, consecutive_failures, and last_error" },
+          { "id": "ac2", "description": "auth field stored as opaque encrypted string, not parsed by storage layer" },
+          { "id": "ac3", "description": "listSourceConfigs supports filtering by enabled status" }
+        ]
+      },
+      {
+        "step_id": "cs-s7",
+        "title": "Implement filter_rules, ingestion_jobs, and config tables",
+        "scope": "cultivate",
+        "description": "Implement remaining entity methods. FilterRules: create, getById, update, delete, list (with optional enabled filter), updateEffectiveness (update signals_matched and false_positive_rate). IngestionJobs: create, getById, update (status, processed_chunks), list (with status filter). CultivateConfig: getConfig (single row), setConfig (UPSERT). The config table is a single-row store with key='current' and value=JSON string of the full CultivateConfig.",
+        "dependencies": ["cs-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "updateEffectiveness atomically updates signals_matched and false_positive_rate for a filter rule" },
+          { "id": "ac2", "description": "IngestionJob update tracks chunking progress (processed_chunks increment)" },
+          { "id": "ac3", "description": "getConfig returns parsed CultivateConfig or null if not set" },
+          { "id": "ac4", "description": "setConfig upserts (INSERT OR REPLACE) the single config row" }
+        ]
+      }
+    ]
+  }
+}

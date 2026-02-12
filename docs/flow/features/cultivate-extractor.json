@@ -1,0 +1,68 @@
+{
+  "feature_id": "cultivate-extractor",
+  "title": "Tier 3 LLM Extraction (Sonnet)",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Structured extraction via Sonnet (configurable via CULTIVATE_EXTRACT_MODEL). Returns: summary, keywords, entities, aspects, quotes, reasoning, specificity, emotional_intensity, actionability. On failure: job fails, BullMQ retry, dead letter. No partial extraction.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "extractSignal() calls Sonnet with structured extraction prompt and returns complete ExtractionResult" },
+      { "id": "ac2", "description": "ExtractionResult contains all required fields: summary, keywords, entities, aspects, quotes, reasoning, specificity, emotional_intensity, actionability" },
+      { "id": "ac3", "description": "Uses JSON schema structured output to guarantee valid ExtractionResult shape from LLM" },
+      { "id": "ac4", "description": "On LLM failure, job fails entirely (no partial extraction) and enters BullMQ retry cycle" },
+      { "id": "ac5", "description": "After max BullMQ retries, failed job lands in dead letter queue" },
+      { "id": "ac6", "description": "Extraction model is configurable via CULTIVATE_EXTRACT_MODEL env var, defaulting to Sonnet" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "cx-s1",
+        "title": "Define ExtractionResult schema",
+        "scope": "cultivate",
+        "description": "Create Zod schema for ExtractionResult with all required fields: summary (string), keywords (string[]), entities (array of {name, type}), aspects (string[]), quotes (string[]), reasoning (string), specificity (number 0-1), emotional_intensity (number 0-1), actionability (number 0-1). Export both schema and inferred TypeScript type.",
+        "dependencies": []
+      },
+      {
+        "id": "cx-s2",
+        "title": "Build Sonnet extraction prompt",
+        "scope": "cultivate",
+        "description": "Design the system and user prompt template for structured signal extraction. The prompt instructs Sonnet to analyze raw signal content and produce all ExtractionResult fields. Include examples of expected output format and guidelines for scoring specificity, emotional_intensity, and actionability on 0-1 scales.",
+        "dependencies": ["cx-s1"]
+      },
+      {
+        "id": "cx-s3",
+        "title": "Implement extractSignal() function",
+        "scope": "cultivate",
+        "description": "Build the core extractSignal(rawContent: string, context: ExtractionContext) function that calls the Anthropic SDK with the extraction prompt and raw signal content. Parse the LLM response into a validated ExtractionResult. Throw on any validation failure to ensure no partial extractions.",
+        "dependencies": ["cx-s2"]
+      },
+      {
+        "id": "cx-s4",
+        "title": "Add JSON schema structured output",
+        "scope": "cultivate",
+        "description": "Configure the Anthropic API call to use JSON schema structured output (tool_use or json_mode) to guarantee the response conforms to ExtractionResult shape. This eliminates brittle text parsing and ensures type-safe extraction results directly from the LLM.",
+        "dependencies": ["cx-s3"]
+      },
+      {
+        "id": "cx-s5",
+        "title": "Handle errors for dead-letter",
+        "scope": "cultivate",
+        "description": "Implement error handling that ensures extraction failures propagate cleanly to BullMQ. On LLM API errors, rate limits, or validation failures, throw typed errors (SignalProcessingError) that BullMQ can catch for retry. After max retries exhausted, the job moves to dead letter. No try/catch swallowing — fail fast.",
+        "dependencies": ["cx-s3"]
+      },
+      {
+        "id": "cx-s6",
+        "title": "Add model configurability via env var",
+        "scope": "cultivate",
+        "description": "Read CULTIVATE_EXTRACT_MODEL from process.env to determine which Anthropic model to use for extraction. Default to claude-sonnet when not set. Validate the model name at startup. Pass the configured model to all extractSignal() Anthropic API calls.",
+        "dependencies": ["cx-s3"]
+      }
+    ]
+  }
+}

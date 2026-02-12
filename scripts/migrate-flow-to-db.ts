@@ -93,6 +93,20 @@ const INITIATIVES = {
     icon: '🧪',
     color: '#22d3ee',
   },
+  cultivate: {
+    id: deterministicUUID('cultivate-v1-initiative'),
+    name: 'Cultivate v1',
+    description: 'Signal intake & processing — watches, listens, gathers, scores, and clusters',
+    icon: '🌱',
+    color: '#10b981',
+  },
+  mull: {
+    id: deterministicUUID('mull-v1-initiative'),
+    name: 'Mull v1',
+    description: 'Cross-agent shared memory — knowledge extraction pipeline for agent reasoning capture',
+    icon: '🧠',
+    color: '#8b5cf6',
+  },
 } as const;
 
 /**
@@ -103,6 +117,8 @@ function getInitiativeForFeature(featureId: string): keyof typeof INITIATIVES {
   if (featureId.startsWith('forge-')) return 'forge';
   if (featureId.startsWith('tuner-')) return 'tuner';
   if (featureId === 'testbench' || featureId.startsWith('testbench-')) return 'testbench';
+  if (featureId === 'cultivate-package' || featureId.startsWith('cultivate-')) return 'cultivate';
+  if (featureId === 'mull-package' || featureId.startsWith('mull-')) return 'mull';
   // Default to planner for planner-*, flow-*, and any other features
   return 'planner';
 }
@@ -158,7 +174,8 @@ interface FlowPlanTests {
 }
 
 interface FlowStep {
-  step_id: string;
+  step_id?: string;
+  id?: string; // Some features use 'id' instead of 'step_id'
   title: string;
   scope?: string;
   description?: string;
@@ -166,12 +183,16 @@ interface FlowStep {
   owner_role?: string;
   acceptance_criteria?: FlowAcceptanceCriterion[];
   specification?: Record<string, unknown>; // Step-level specification (design, testing, etc.)
+  sub_feature?: string; // Which sub-feature this step belongs to (for epics with inline steps)
+  integration?: boolean; // Whether this step is a cross-scope integration step
 }
 
 interface SubFeatureRef {
-  feature_id: string;
+  feature_id?: string;
+  id?: string; // Some epics use 'id' instead of 'feature_id'
   title: string;
-  ref: string;
+  ref?: string;
+  [key: string]: unknown; // Some epics embed full feature data
 }
 
 // Flow understanding types (agent observations during ideation)
@@ -198,19 +219,24 @@ interface FlowFeature {
   type: 'epic' | 'feature';
   status: string;
   priority?: string;
+  component?: string;
   dependencies?: string[];
+  parent?: string;
+  design_reference?: string;
   summary?: {
     goal: string;
     context?: string;
     acceptance_criteria?: FlowAcceptanceCriterion[];
+    in_scope?: string[];
+    out_of_scope?: string[];
   };
   design_spec?: FlowDesignSpec;
   plan_tests?: FlowPlanTests;
   understanding?: FlowUnderstanding;
   context?: FlowContext;
-  sub_features?: SubFeatureRef[];
+  sub_features?: (SubFeatureRef | string)[];
   plan_implementation?: {
-    scopes: string[];
+    scopes: (string | { scope_id: string; name: string; description?: string })[];
     steps: FlowStep[];
   };
 }
@@ -445,7 +471,7 @@ function buildStepSpecification(
 
 async function migrate() {
   console.log('Starting migration from flow files to database...\n');
-  console.log(`Initiatives: ideation, planner, forge, tuner, testbench\n`);
+  console.log(`Initiatives: ideation, planner, forge, tuner, testbench, cultivate, mull\n`);
 
   // Read catalog
   const catalogPath = path.join(ROOT, 'docs/flow/catalog.json');
@@ -518,6 +544,8 @@ async function migrate() {
       version INTEGER NOT NULL,
       status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'published')),
       summary_json TEXT NOT NULL,
+      understanding_json TEXT NOT NULL DEFAULT '{}',
+      context_json TEXT NOT NULL DEFAULT '{}',
       submitted_at TEXT,
       approval_info_json TEXT,
       change_request_id TEXT,
@@ -528,6 +556,18 @@ async function migrate() {
       FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE CASCADE
     )
   `);
+
+  // Add columns if missing (for existing databases created before these columns existed)
+  try {
+    db.exec(`ALTER TABLE versions ADD COLUMN understanding_json TEXT NOT NULL DEFAULT '{}'`);
+  } catch {
+    // Column already exists, ignore
+  }
+  try {
+    db.exec(`ALTER TABLE versions ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`);
+  } catch {
+    // Column already exists, ignore
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS steps (
@@ -593,8 +633,8 @@ async function migrate() {
   `);
 
   const insertVersion = db.prepare(`
-    INSERT OR REPLACE INTO versions (plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO versions (plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, metadata_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertStep = db.prepare(`
@@ -629,6 +669,8 @@ async function migrate() {
     forge: 0,
     tuner: 0,
     testbench: 0,
+    cultivate: 0,
+    mull: 0,
   };
 
   // Second pass: import features
@@ -645,11 +687,20 @@ async function migrate() {
       // Create plan
       insertPlan.run(planId, defaultOrgId, initiativeId, now, now);
 
-      // Build summary
-      const summary = {
+      // Build summary — preserve all fields, not just goal/context
+      const summary: Record<string, unknown> = {
         goal: feature.summary?.goal || feature.title,
         context: feature.summary?.context,
       };
+      if (feature.summary?.acceptance_criteria) {
+        summary.acceptance_criteria = feature.summary.acceptance_criteria;
+      }
+      if (feature.summary?.in_scope) {
+        summary.in_scope = feature.summary.in_scope;
+      }
+      if (feature.summary?.out_of_scope) {
+        summary.out_of_scope = feature.summary.out_of_scope;
+      }
 
       // For approved status, add approval info
       const approvalInfo =
@@ -660,15 +711,28 @@ async function migrate() {
             })
           : null;
 
-      // Build understanding and context from flow feature
+      // Build understanding from flow feature
       const understandingJson = feature.understanding
         ? JSON.stringify(feature.understanding)
-        : null;
+        : '{}';
+
+      // Build context from flow feature (stored in dedicated context_json column)
       const contextJson = feature.context
         ? JSON.stringify(feature.context)
-        : null;
+        : '{}';
+
+      // Build metadata — store component, priority, feature-level dependencies, parent, and other extras
+      const metadata: Record<string, unknown> = {};
+      if (feature.component) metadata.component = feature.component;
+      if (feature.priority) metadata.priority = feature.priority;
+      if (feature.dependencies && feature.dependencies.length > 0) metadata.feature_dependencies = feature.dependencies;
+      if (feature.type === 'epic' && feature.sub_features) metadata.sub_features = feature.sub_features;
+      if (feature.parent) metadata.parent = feature.parent;
+      if (feature.design_reference) metadata.design_reference = feature.design_reference;
+      const metadataJson = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
 
       // Create version
+      // Columns: plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, metadata_json, created_at, updated_at
       insertVersion.run(
         planId,
         1, // version
@@ -678,6 +742,7 @@ async function migrate() {
         contextJson,
         status !== 'draft' ? now : null, // submitted_at
         approvalInfo,
+        metadataJson,
         now,
         now
       );
@@ -686,60 +751,41 @@ async function migrate() {
       const featureSpecification = buildStepSpecification(feature);
 
       // Determine what steps to create
-      let stepsToInsert: Array<{
-        step_id: string;
-        title: string;
-        scope?: string;
-        description?: string;
-        dependencies: string[];
-        owner_role?: string;
-        acceptance_criteria?: FlowAcceptanceCriterion[];
-        sub_plan_id?: string;
-        specification?: ReturnType<typeof buildStepSpecification>;
-      }> = [];
+      let stepsToInsert: Array<Record<string, unknown>> = [];
+      let stepKind = 'steps';
 
-      // If this is an epic with sub_features, create steps from sub_features
-      if (feature.type === 'epic' && feature.sub_features && feature.sub_features.length > 0) {
-        epicsWithSubPlans++;
-        for (const subFeature of feature.sub_features) {
-          const subPlanId = featureIdToPlanId.get(subFeature.feature_id);
-          if (subPlanId) {
-            // Look up the child feature to get its scope
-            const childFeature = allFeatures.get(subFeature.feature_id);
-            const scope = childFeature?.plan_implementation?.scopes?.[0];
+      // Build inline steps from plan_implementation.steps
+      const flowSteps = feature.plan_implementation?.steps || [];
 
-            stepsToInsert.push({
-              step_id: subFeature.feature_id, // Use feature_id as step_id for clarity
-              title: subFeature.title,
-              scope,
-              description: childFeature?.summary?.goal,
-              dependencies: [],
-              sub_plan_id: subPlanId,
-            });
-          }
-        }
-      } else {
-        // Regular feature: use plan_implementation.steps
-        const flowSteps = feature.plan_implementation?.steps || [];
+      if (flowSteps.length > 0) {
+        // Use plan_implementation.steps (works for both epics and regular features)
         for (let i = 0; i < flowSteps.length; i++) {
           const flowStep = flowSteps[i];
 
           // Build step specification:
           // - First step: merge feature-level spec with step-level spec
           // - Other steps: use step-level spec only
+          // Only use specification if it's an object (some feature files have string specs — those are descriptions)
+          const flowStepSpec = flowStep.specification && typeof flowStep.specification === 'object'
+            ? flowStep.specification
+            : undefined;
           let stepSpec: Record<string, unknown> | undefined;
           if (i === 0 && featureSpecification) {
-            // First step gets feature-level spec, merged with any step-level spec
-            stepSpec = flowStep.specification
-              ? { ...featureSpecification, ...flowStep.specification }
+            stepSpec = flowStepSpec
+              ? { ...featureSpecification, ...flowStepSpec }
               : featureSpecification;
-          } else if (flowStep.specification) {
-            // Other steps use their own specification if present
-            stepSpec = flowStep.specification;
+          } else if (flowStepSpec) {
+            stepSpec = flowStepSpec;
           }
 
-          stepsToInsert.push({
-            step_id: flowStep.step_id,
+          const stepId = flowStep.step_id || flowStep.id;
+          if (!stepId) {
+            console.warn(`  Warning: step ${i} in ${featureId} has no step_id or id, skipping`);
+            continue;
+          }
+
+          const step: Record<string, unknown> = {
+            step_id: stepId,
             title: flowStep.title,
             scope: flowStep.scope,
             description: flowStep.description,
@@ -747,8 +793,46 @@ async function migrate() {
             owner_role: flowStep.owner_role,
             acceptance_criteria: flowStep.acceptance_criteria,
             specification: stepSpec,
-          });
+          };
+          // Preserve sub_feature and integration fields if present
+          if (flowStep.sub_feature) step.sub_feature = flowStep.sub_feature;
+          if (flowStep.integration) step.integration = flowStep.integration;
+
+          stepsToInsert.push(step);
         }
+        stepKind = feature.type === 'epic' ? 'inline steps' : 'steps';
+      } else if (feature.type === 'epic' && feature.sub_features && feature.sub_features.length > 0) {
+        // Epic without inline steps: create steps from sub_features (pointer to child plans)
+        epicsWithSubPlans++;
+        for (const subFeature of feature.sub_features) {
+          // Handle both string[] and object[] sub_features (objects may use 'feature_id' or 'id')
+          const featureId = typeof subFeature === 'string' ? subFeature : (subFeature.feature_id || subFeature.id || '');
+          const subTitle = typeof subFeature === 'string' ? subFeature : subFeature.title;
+
+          const subPlanId = featureIdToPlanId.get(featureId);
+          if (subPlanId) {
+            const childFeature = allFeatures.get(featureId);
+            const rawScope = childFeature?.plan_implementation?.scopes?.[0];
+            const scope = typeof rawScope === 'string' ? rawScope : rawScope?.scope_id;
+
+            stepsToInsert.push({
+              step_id: featureId,
+              title: subTitle,
+              scope,
+              description: childFeature?.summary?.goal,
+              dependencies: [],
+              sub_plan_id: subPlanId,
+            });
+          } else {
+            // Sub-feature has no standalone file — create a placeholder step
+            stepsToInsert.push({
+              step_id: featureId,
+              title: subTitle,
+              dependencies: [],
+            });
+          }
+        }
+        stepKind = 'sub-plans';
       }
 
       // Delete existing steps and insert fresh (handles removed steps)
@@ -756,14 +840,11 @@ async function migrate() {
 
       let stepOrder = 0;
       for (const step of stepsToInsert) {
-        insertStep.run(planId, 1, step.step_id, stepOrder++, JSON.stringify(step));
+        insertStep.run(planId, 1, step.step_id as string, stepOrder++, JSON.stringify(step));
         stepsCount++;
       }
 
-      const stepInfo =
-        feature.type === 'epic' && feature.sub_features?.length
-          ? `${stepsToInsert.length} sub-plans`
-          : `${stepsToInsert.length} steps`;
+      const stepInfo = `${stepsToInsert.length} ${stepKind}`;
 
       // Track understanding and context
       if (feature.understanding && Object.keys(feature.understanding).length > 0) {

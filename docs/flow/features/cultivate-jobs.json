@@ -1,0 +1,122 @@
+{
+  "feature_id": "cultivate-jobs",
+  "title": "BullMQ Job Queue System",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-pipeline", "cultivate-adapters", "cultivate-decay-trends", "cultivate-sse"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement the BullMQ job queue system with 6 queues powering all async work in cultivate. poll-sources (concurrency 3, retry 3 exponential) calls adapter.poll(), performs exact dedup, and fans out one process-signal job per matching Greenhouse. process-signal (concurrency 5, retry 2) runs the full pipeline. ingest-document (concurrency 2, retry 1) chunks documents then enqueues N process-signal jobs. recluster runs weekly (Sun 03:00 UTC). decay runs daily (04:00 UTC). trend-detect runs hourly. All queues have dead letter handling with diagnostic context.",
+    "acceptance_criteria": [
+      { "id": "cj-ac1", "description": "poll-sources queue: concurrency 3, retry 3 with exponential backoff, calls adapter.poll() and performs exact dedup (source_type + external_id)" },
+      { "id": "cj-ac2", "description": "poll-sources worker fans out one process-signal job per matching Greenhouse for each raw event" },
+      { "id": "cj-ac3", "description": "process-signal queue: concurrency 5, retry 2, executes the full pipeline (Tier 0 → Tier 1 → Tier 2 → Tier 3 → Score → Cluster → Store → SSE)" },
+      { "id": "cj-ac4", "description": "ingest-document queue: concurrency 2, retry 1, chunks documents then enqueues N process-signal jobs (one per chunk)" },
+      { "id": "cj-ac5", "description": "recluster scheduled job runs weekly on Sunday at 03:00 UTC" },
+      { "id": "cj-ac6", "description": "decay scheduled job runs daily at 04:00 UTC" },
+      { "id": "cj-ac7", "description": "trend-detect scheduled job runs hourly" },
+      { "id": "cj-ac8", "description": "All 6 queues have dead letter handling that captures diagnostic context (job data, error message, stack trace, attempt count)" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cj-s1",
+        "title": "Add bullmq and ioredis dependencies",
+        "scope": "cultivate",
+        "description": "Add bullmq and ioredis as dependencies to packages/cultivate/package.json. Create src/jobs/index.ts as the module entry point. Define shared queue configuration types: QueueName enum, QueueConfig interface with concurrency, retries, backoff strategy, and cron schedule fields.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "bullmq and ioredis are listed in package.json dependencies" },
+          { "id": "ac2", "description": "QueueName enum defines all 6 queue names" },
+          { "id": "ac3", "description": "QueueConfig interface supports concurrency, retry, backoff, and cron fields" }
+        ]
+      },
+      {
+        "step_id": "cj-s2",
+        "title": "Implement queue creation with concurrency/retry configs",
+        "scope": "cultivate",
+        "description": "Create src/jobs/queues.ts. Implement createQueues(redisConnection) that creates all 6 BullMQ queues with their specific configurations: poll-sources (concurrency 3, retry 3, exponential backoff), process-signal (concurrency 5, retry 2), ingest-document (concurrency 2, retry 1), recluster (weekly Sun 03:00 UTC), decay (daily 04:00 UTC), trend-detect (hourly). Each queue shares the Redis connection. Export a CultivateQueues object containing all queue instances.",
+        "dependencies": ["cj-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All 6 queues are created with correct concurrency and retry settings" },
+          { "id": "ac2", "description": "Scheduled queues (recluster, decay, trend-detect) have correct cron expressions" },
+          { "id": "ac3", "description": "All queues share the provided Redis connection" }
+        ]
+      },
+      {
+        "step_id": "cj-s3",
+        "title": "Implement poll-sources worker (adapter poll + fan-out)",
+        "scope": "cultivate",
+        "description": "Create src/jobs/workers/poll-sources.ts. The worker calls adapter.poll() for the specified source config, performs exact dedup by checking source_type + external_id against storage, then determines which Greenhouses match the source. For each matching Greenhouse, enqueue one process-signal job with the normalized event and greenhouse_id. Handle adapter errors by updating source health (consecutive_failures counter, health status transitions per escalation policy).",
+        "dependencies": ["cj-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Worker calls adapter.poll() and receives raw events" },
+          { "id": "ac2", "description": "Exact dedup skips events already seen (source_type + external_id)" },
+          { "id": "ac3", "description": "Per-Greenhouse fan-out: one process-signal job per matching Greenhouse" },
+          { "id": "ac4", "description": "Source health updated on failure according to escalation policy" }
+        ]
+      },
+      {
+        "step_id": "cj-s4",
+        "title": "Implement process-signal worker (pipeline execution)",
+        "scope": "cultivate",
+        "description": "Create src/jobs/workers/process-signal.ts. The worker receives a normalized event + greenhouse_id, then runs the full pipeline: Tier 0 greenhouse gate → Tier 1 rule registry → Tier 2 ML classification → Tier 3 LLM extraction → scoring → clustering → storage → SSE broadcast. On filter rejection at any tier, record provenance and exit without error. On pipeline errors, throw to trigger BullMQ retry.",
+        "dependencies": ["cj-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Worker executes full pipeline in correct order" },
+          { "id": "ac2", "description": "Filtered signals exit gracefully with provenance recorded" },
+          { "id": "ac3", "description": "Pipeline errors trigger BullMQ retry mechanism" }
+        ]
+      },
+      {
+        "step_id": "cj-s5",
+        "title": "Implement ingest-document worker (chunking + enqueue)",
+        "scope": "cultivate",
+        "description": "Create src/jobs/workers/ingest-document.ts. The worker receives an ingestion job (filename, greenhouse_id), chunks the document using recursive splitting (with speaker-aware splitting for interview transcripts), updates IngestionJob status and progress (total_chunks, processed_chunks), then enqueues one process-signal job per chunk. Emit ingestion:progress SSE events during chunking and ingestion:complete when done.",
+        "dependencies": ["cj-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Documents are chunked using recursive splitting strategy" },
+          { "id": "ac2", "description": "Interview transcripts use speaker-aware chunking" },
+          { "id": "ac3", "description": "Each chunk becomes a separate process-signal job" },
+          { "id": "ac4", "description": "SSE events emitted for ingestion progress and completion" }
+        ]
+      },
+      {
+        "step_id": "cj-s6",
+        "title": "Implement scheduled jobs (decay/recluster/trend-detect)",
+        "scope": "cultivate",
+        "description": "Create src/jobs/workers/scheduled.ts. Implement three scheduled job processors: decay worker calls the decay engine for all greenhouses, recluster worker triggers Sonnet-based cluster review (merge/split/rename) per greenhouse, trend-detect worker runs hourly velocity calculation and emits cluster:trending SSE on transitions. Each scheduled worker processes all active greenhouses in sequence.",
+        "dependencies": ["cj-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Decay worker processes all greenhouses at daily 04:00 UTC" },
+          { "id": "ac2", "description": "Recluster worker runs Sonnet review at weekly Sun 03:00 UTC" },
+          { "id": "ac3", "description": "Trend-detect worker runs hourly and emits SSE on trend transitions" }
+        ]
+      },
+      {
+        "step_id": "cj-s7",
+        "title": "Add dead letter handling with diagnostic context",
+        "scope": "cultivate",
+        "description": "Create src/jobs/dead-letter.ts. Configure BullMQ dead letter handling for all 6 queues. When a job exhausts retries, move it to a dead letter state with full diagnostic context: original job data, error message, stack trace, attempt count, queue name, timestamps. Implement functions to list dead letter jobs, replay individual jobs (re-enqueue to original queue), replay all, and discard. These functions are consumed by the API layer.",
+        "dependencies": ["cj-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Failed jobs beyond retry limit are captured with full diagnostic context" },
+          { "id": "ac2", "description": "Dead letter jobs can be listed with pagination" },
+          { "id": "ac3", "description": "Individual dead letter jobs can be replayed to their original queue" },
+          { "id": "ac4", "description": "Bulk replay-all and discard operations are supported" }
+        ]
+      }
+    ]
+  }
+}

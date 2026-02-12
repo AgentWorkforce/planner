@@ -1,0 +1,92 @@
+{
+  "feature_id": "cultivate-recommender",
+  "title": "Recommendation Engine",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["cultivate-storage", "cultivate-clusterer"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement the recommendation engine that answers 'what should we build next?' by ranking clusters and using Sonnet to produce actionable recommendations. Selects top 15 clusters by avg_relevance multiplied by (1 + trend_velocity), requiring minimum 2 signals per cluster. A single Sonnet call produces up to 5 ranked recommendations with evidence backing. Results are cached for 15 minutes, with cache invalidation triggered by high-relevance signal ingestion. Filterable by Greenhouse.",
+    "acceptance_criteria": [
+      { "id": "cr-ac1", "description": "Top 15 clusters ranked by avg_relevance * (1 + trend_velocity) with minimum 2 signals" },
+      { "id": "cr-ac2", "description": "Single Sonnet call produces up to 5 ranked recommendations" },
+      { "id": "cr-ac3", "description": "Each recommendation includes title, reasoning, confidence, and supporting signal/cluster IDs" },
+      { "id": "cr-ac4", "description": "Results cached for 15 minutes per Greenhouse" },
+      { "id": "cr-ac5", "description": "Cache invalidated when a high-relevance signal is ingested" },
+      { "id": "cr-ac6", "description": "Recommendations filterable by Greenhouse ID" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cr-s1",
+        "title": "Implement cluster ranking (avg_relevance x trend_velocity)",
+        "scope": "cultivate",
+        "description": "Create src/recommender/index.ts. Implement rankClusters(greenhouse_id) function that queries all clusters for the greenhouse, filters to those with at least 2 signals, computes rank_score = avg_relevance * (1 + trend_velocity) for each cluster (where avg_relevance is the average score of the cluster's signals and trend_velocity is the cluster's computed velocity), sorts descending, and returns the top 15. Include the cluster's signals in the result for context assembly.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Clusters with fewer than 2 signals are excluded" },
+          { "id": "ac2", "description": "Rank formula: avg_relevance * (1 + trend_velocity)" },
+          { "id": "ac3", "description": "Returns top 15 clusters sorted by rank score descending" }
+        ]
+      },
+      {
+        "step_id": "cr-s2",
+        "title": "Build recommendation Sonnet prompt",
+        "scope": "cultivate",
+        "description": "Create the Sonnet prompt template for recommendation generation. The prompt receives the top 15 ranked clusters with their labels, summaries, signal titles, and velocity data. It asks Sonnet to produce up to 5 recommendations, each with: title (actionable initiative name), reasoning (why this matters based on signal evidence), confidence (0-1 score), supporting_signal_ids (which signals back this), and supporting_cluster_ids (which clusters inform this). Use JSON schema output format for structured extraction.",
+        "dependencies": ["cr-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Prompt includes cluster labels, summaries, signals, and velocity data" },
+          { "id": "ac2", "description": "Output schema enforces title, reasoning, confidence, supporting IDs" },
+          { "id": "ac3", "description": "Prompt requests up to 5 recommendations ranked by confidence" }
+        ]
+      },
+      {
+        "step_id": "cr-s3",
+        "title": "Implement generateRecommendations() function",
+        "scope": "cultivate",
+        "description": "Implement the main generateRecommendations(greenhouse_id) function. Calls rankClusters() to get top 15, assembles the Sonnet prompt, calls Anthropic SDK with structured output, parses the response into Recommendation objects (id, greenhouse_id, title, reasoning, confidence, supporting_signal_ids, supporting_cluster_ids, created_at), stores them in the recommendations table, and returns the list. Handle Sonnet errors gracefully (log and return empty array rather than failing).",
+        "dependencies": ["cr-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "End-to-end flow from cluster ranking to stored recommendations" },
+          { "id": "ac2", "description": "Recommendations stored in database with all required fields" },
+          { "id": "ac3", "description": "Sonnet errors handled gracefully without crashing" }
+        ]
+      },
+      {
+        "step_id": "cr-s4",
+        "title": "Add 15-min caching with invalidation on high-relevance signal",
+        "scope": "cultivate",
+        "description": "Implement a caching layer for recommendations. Cache is keyed by greenhouse_id with a 15-minute TTL. On cache hit, return cached recommendations without calling Sonnet. On cache miss, call generateRecommendations() and cache the result. Expose an invalidateRecommendationCache(greenhouse_id) function that is called by the pipeline when a signal with score above a high-relevance threshold (e.g., > 0.8) is ingested. Use in-memory Map with timestamp tracking for simplicity.",
+        "dependencies": ["cr-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cache returns stored recommendations within 15-minute window" },
+          { "id": "ac2", "description": "Cache miss triggers fresh Sonnet call" },
+          { "id": "ac3", "description": "Cache invalidated when high-relevance signal (> 0.8) is ingested" },
+          { "id": "ac4", "description": "Cache keyed per greenhouse_id for independent invalidation" }
+        ]
+      },
+      {
+        "step_id": "cr-s5",
+        "title": "Add Greenhouse filtering",
+        "scope": "cultivate",
+        "description": "Implement getRecommendations(greenhouse_id?) that supports both filtered and unfiltered access. When greenhouse_id is provided, return cached/fresh recommendations for that greenhouse. When omitted, return recommendations across all active greenhouses (querying each greenhouse's cache independently). Sort combined results by confidence descending. This function is the public API consumed by the REST layer.",
+        "dependencies": ["cr-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Single greenhouse query returns recommendations for that greenhouse only" },
+          { "id": "ac2", "description": "Omitted greenhouse_id returns recommendations across all greenhouses" },
+          { "id": "ac3", "description": "Combined results sorted by confidence descending" }
+        ]
+      }
+    ]
+  }
+}

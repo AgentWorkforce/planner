@@ -63,3 +63,4 @@ docs/*
 !docs/flow/
 !docs/flow/**
 docs/flow/**/.DS_Store
+packages/server/.forge-worktrees/

@@ -1,0 +1,153 @@
+{
+  "feature_id": "mull-builtin-adapters",
+  "title": "Built-in Generic Adapters",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types", "mull-adapter-system"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement three built-in adapters that read from common data formats and produce SessionData. These are generic — no dependency on any specific project or database. Each implements SessionAdapter including cursor-based incremental processing. Trajectory-file reads .trajectory.json files (the format used by AgentWorkforce/trajectories). Relay-JSONL reads agent-relay message archives (YYYY-MM-DD.jsonl). Transcript reads raw conversation logs (markdown, JSONL, plaintext).",
+    "acceptance_criteria": [
+      { "id": "mba-ac1", "description": "Trajectory adapter reads .trajectory.json files from configurable directory (default: .trajectories/)" },
+      { "id": "mba-ac2", "description": "Trajectory adapter maps: chapters → SessionEvent[] with type chapter_start" },
+      { "id": "mba-ac3", "description": "Trajectory adapter maps: events (prompts, tool calls) → SessionEvent[]" },
+      { "id": "mba-ac4", "description": "Trajectory adapter maps: retrospective.decisions → Decision[] with reasoning" },
+      { "id": "mba-ac5", "description": "Trajectory adapter maps: retrospective.summary → Retrospective" },
+      { "id": "mba-ac6", "description": "Trajectory adapter maps: artifacts → Artifact[]" },
+      { "id": "mba-ac7", "description": "Trajectory adapter maps: trail decision entries → Decision[] with pre-structured reasoning (high-value, minimal LLM needed)" },
+      { "id": "mba-ac8", "description": "Trajectory adapter supports completedOnly config (default: true) to filter by trajectory status" },
+      { "id": "mba-ac9", "description": "Relay-JSONL adapter reads YYYY-MM-DD.jsonl files from configurable directory" },
+      { "id": "mba-ac10", "description": "Relay-JSONL adapter maps: agent-to-agent messages → Message[] with agentName populated" },
+      { "id": "mba-ac11", "description": "Relay-JSONL adapter maps: broadcast messages → Message[] with role system" },
+      { "id": "mba-ac12", "description": "Relay-JSONL adapter maps: agent spawn/stop events → SessionEvent[] with type agent_spawned" },
+      { "id": "mba-ac13", "description": "Relay-JSONL adapter supports agentFilter config to limit to specific agents" },
+      { "id": "mba-ac14", "description": "Transcript adapter reads markdown, JSONL, or plaintext files from configurable path" },
+      { "id": "mba-ac15", "description": "Transcript adapter parses role/content pairs from each format" },
+      { "id": "mba-ac16", "description": "All adapters implement listSessions returning available session IDs with optional time range filtering" },
+      { "id": "mba-ac17", "description": "All adapters implement getCursor/setCursor for incremental processing" },
+      { "id": "mba-ac18", "description": "Transcript adapter uses explicit format field in config (format: 'markdown' | 'jsonl' | 'plaintext') — no auto-detection of transcript format" },
+      { "id": "mba-ac19", "description": "Trail decision entries produce Decision objects with Decision.source = 'trail' to mark their origin for downstream pre-structured handling" },
+      { "id": "mba-ac20", "description": "Relay-JSONL adapter groups continuous message streams into sessions using time-gap based grouping with configurable gap threshold (default: 30 minutes of inactivity)" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Trajectory .trajectory.json format has: chapters[], events[], retrospective{decisions[], summary}, artifacts[] — maps cleanly to SessionData",
+        "trail decision entries are the highest-signal input: already have title + reasoning → can become nuggets without LLM",
+        "Relay JSONL format: one JSON object per line, each with from, to, timestamp, body fields",
+        "Relay adapter needs to reconstruct 'sessions' from continuous message logs — grouping by time window or agent lifecycle",
+        "Transcript adapter is the simplest: parse role/content pairs, minimal structure",
+        "These adapters define what mull works with 'out of the box' — the generic formats any project could produce",
+        "Each adapter is a separate file: src/adapters/trajectory.ts, relay.ts, transcript.ts"
+      ],
+      "concerns": [
+        "Relay JSONL session boundary detection: messages are a continuous stream, need heuristic for session grouping",
+        "Transcript format detection: markdown vs JSONL vs plaintext — need format sniffing or explicit config"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-builtin-adapters",
+    "version": 1,
+    "status": "draft",
+    "scopes": [
+      {
+        "scope_id": "mull-trajectory-adapter",
+        "name": "Trajectory Adapter",
+        "description": "Adapter for reading .trajectory.json files and mapping to SessionData"
+      },
+      {
+        "scope_id": "mull-relay-adapter",
+        "name": "Relay-JSONL Adapter",
+        "description": "Adapter for reading agent-relay YYYY-MM-DD.jsonl message archives"
+      },
+      {
+        "scope_id": "mull-transcript-adapter",
+        "name": "Transcript Adapter",
+        "description": "Adapter for reading raw conversation logs in markdown, JSONL, or plaintext format"
+      },
+      {
+        "scope_id": "mull-adapter-tests",
+        "name": "Adapter Tests",
+        "description": "Test suite for all three built-in adapters"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mba-s1",
+        "title": "Implement trajectory adapter",
+        "scope": "mull-trajectory-adapter",
+        "description": "Build the trajectory adapter that reads .trajectory.json files from a configurable directory (default: .trajectories/). Maps trajectory structure to SessionData: chapters to SessionEvent[] with type chapter_start, events to SessionEvent[], retrospective.decisions to Decision[] with reasoning, retrospective.summary to Retrospective, artifacts to Artifact[]. Trail decision entries produce Decision objects with Decision.source = 'trail' to mark their origin for downstream pre-structured nugget handling. Supports completedOnly config (default: true) to filter by trajectory status. Implements listSessions, loadSession, getCursor, setCursor.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mba-s1-ac1", "description": "Reads .trajectory.json files from configurable directory (default: .trajectories/)" },
+          { "id": "mba-s1-ac2", "description": "Maps chapters to SessionEvent[] with type chapter_start, including chapter title and timestamp" },
+          { "id": "mba-s1-ac3", "description": "Maps events (prompts, tool calls) to SessionEvent[] with appropriate event types" },
+          { "id": "mba-s1-ac4", "description": "Maps retrospective.decisions to Decision[] preserving reasoning field" },
+          { "id": "mba-s1-ac5", "description": "Maps trail decision entries to Decision[] with Decision.source = 'trail' marker" },
+          { "id": "mba-s1-ac6", "description": "Maps retrospective.summary to Retrospective and artifacts to Artifact[]" },
+          { "id": "mba-s1-ac7", "description": "completedOnly config (default: true) filters trajectories by completion status" },
+          { "id": "mba-s1-ac8", "description": "listSessions returns file-derived session IDs with time range support" }
+        ],
+        "specification": "Location: src/adapters/trajectory.ts. Class TrajectoryAdapter implements SessionAdapter. Config type: TrajectoryAdapterConfig = { dir: string, completedOnly?: boolean }. Trail decisions identified by entries in the trajectory that have a 'trail' or 'decision' type marker — set Decision.source = 'trail' on these. File-based session IDs derived from trajectory filenames."
+      },
+      {
+        "step_id": "mba-s2",
+        "title": "Implement relay-JSONL adapter",
+        "scope": "mull-relay-adapter",
+        "description": "Build the relay-JSONL adapter that reads YYYY-MM-DD.jsonl files from a configurable directory. Each JSONL line is a JSON object with from, to, timestamp, body fields. Maps agent-to-agent messages to Message[] with agentName populated, broadcast messages to Message[] with role system, and agent spawn/stop events to SessionEvent[] with type agent_spawned. Groups continuous message streams into sessions using time-gap based grouping with configurable gap threshold (default: 30 minutes of inactivity). Supports agentFilter config to limit to specific agents.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mba-s2-ac1", "description": "Reads YYYY-MM-DD.jsonl files from configurable directory" },
+          { "id": "mba-s2-ac2", "description": "Maps agent-to-agent messages to Message[] with agentName populated from 'from' field" },
+          { "id": "mba-s2-ac3", "description": "Maps broadcast messages to Message[] with role 'system'" },
+          { "id": "mba-s2-ac4", "description": "Maps agent spawn/stop events to SessionEvent[] with type 'agent_spawned'" },
+          { "id": "mba-s2-ac5", "description": "Groups messages into sessions using time-gap based grouping: a gap of >= configurable threshold (default 30 min) between consecutive messages starts a new session" },
+          { "id": "mba-s2-ac6", "description": "agentFilter config limits output to messages involving specified agents" },
+          { "id": "mba-s2-ac7", "description": "listSessions returns session IDs derived from date files and gap-based grouping" }
+        ],
+        "specification": "Location: src/adapters/relay.ts. Class RelayJsonlAdapter implements SessionAdapter. Config type: RelayAdapterConfig = { dir: string, agentFilter?: string[], sessionGapMinutes?: number }. Default sessionGapMinutes: 30. Session IDs formatted as 'relay-{date}-{index}' where index is the session number within that day. Parse each line with JSON.parse, skip malformed lines with warning."
+      },
+      {
+        "step_id": "mba-s3",
+        "title": "Implement transcript adapter",
+        "scope": "mull-transcript-adapter",
+        "description": "Build the transcript adapter that reads raw conversation logs from a configurable path. Supports three formats specified by explicit format field in config: 'markdown' (## Role: content blocks), 'jsonl' (one JSON object per line with role/content fields), and 'plaintext' (line-based with role prefix patterns). No auto-detection of format — the config must specify which format to use. Parses role/content pairs into Message[]. Implements listSessions, loadSession, getCursor, setCursor.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mba-s3-ac1", "description": "Reads files from configurable path" },
+          { "id": "mba-s3-ac2", "description": "Config requires explicit format field: 'markdown' | 'jsonl' | 'plaintext' — no auto-detection" },
+          { "id": "mba-s3-ac3", "description": "Markdown format: parses ## Role\\ncontent blocks into Message[]" },
+          { "id": "mba-s3-ac4", "description": "JSONL format: parses {role, content} JSON objects per line into Message[]" },
+          { "id": "mba-s3-ac5", "description": "Plaintext format: parses 'Role: content' line patterns into Message[]" },
+          { "id": "mba-s3-ac6", "description": "listSessions returns file-derived session IDs" },
+          { "id": "mba-s3-ac7", "description": "Throws descriptive error if format field is missing from config" }
+        ],
+        "specification": "Location: src/adapters/transcript.ts. Class TranscriptAdapter implements SessionAdapter. Config type: TranscriptAdapterConfig = { path: string, format: 'markdown' | 'jsonl' | 'plaintext' }. Each file is one session. Session ID derived from filename (stem without extension). For markdown: split on /^## \\w+/m. For JSONL: JSON.parse each line. For plaintext: regex /^(\\w+):\\s+(.+)$/."
+      },
+      {
+        "step_id": "mba-s4",
+        "title": "Write adapter tests",
+        "scope": "mull-adapter-tests",
+        "description": "Comprehensive test suite for all three built-in adapters. Tests trajectory adapter mapping correctness (chapters, events, decisions, trail decisions with source='trail', retrospective, artifacts, completedOnly filtering). Tests relay-JSONL adapter message mapping, session grouping by time gap, agentFilter, broadcast handling. Tests transcript adapter for all three formats, explicit format requirement, error on missing format. Tests cursor-based incremental loading for each adapter.",
+        "dependencies": ["mba-s1", "mba-s2", "mba-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mba-s4-ac1", "description": "Trajectory adapter tests: chapter mapping, event mapping, decision mapping with trail source marker, retrospective mapping, artifact mapping, completedOnly filtering" },
+          { "id": "mba-s4-ac2", "description": "Relay adapter tests: message mapping with agentName, broadcast as system role, spawn events, time-gap session grouping at 30min default and custom thresholds, agentFilter" },
+          { "id": "mba-s4-ac3", "description": "Transcript adapter tests: markdown parsing, JSONL parsing, plaintext parsing, error when format missing from config" },
+          { "id": "mba-s4-ac4", "description": "Incremental loading tests: cursor-based filtering returns only data after cursor timestamp for each adapter" },
+          { "id": "mba-s4-ac5", "description": "Edge case tests: empty files, malformed JSONL lines (skipped with warning), missing directories" }
+        ],
+        "specification": "Location: src/adapters/__tests__/trajectory.test.ts, relay.test.ts, transcript.test.ts. Use Vitest. Create fixture files in __tests__/fixtures/ for each adapter format. Use tmp directories for cursor tests. Mock filesystem where appropriate for isolation."
+      }
+    ]
+  }
+}

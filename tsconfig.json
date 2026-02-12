@@ -10,7 +10,8 @@
     { "path": "./packages/ideation-ui" },
     { "path": "./packages/forge-ui" },
     { "path": "./packages/shared-ui" },
-    { "path": "./packages/tend" }
+    { "path": "./packages/tend" },
+    { "path": "./packages/mull" }
   ],
   "include": [],
   "exclude": ["node_modules", "dist"]

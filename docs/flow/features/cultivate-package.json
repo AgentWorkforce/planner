@@ -1,0 +1,157 @@
+{
+  "feature_id": "cultivate-package",
+  "title": "cultivate: Signal Intake & Processing System",
+  "type": "epic",
+  "status": "approved",
+  "priority": "critical",
+  "component": "cultivate",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Build cultivate — the sensory system that watches, listens, gathers, scores, and clusters signals from external channels. A complete intake pipeline: Sources → Adapters → BullMQ → Three-Tier Filter → LLM Extract → Score → Cluster → SQLite → API+SSE. Greenhouses control focus. Tuner manages weights. No fallbacks, fail fast everywhere.",
+    "in_scope": [
+      "Domain types with Zod schemas (Signal, Cluster, Greenhouse, Recommendation, ScoringFactors, CultivateWeights, CultivateConfig, CultivateOutcome, FilterRule, SourceConfig, IngestionJob, RawEvent, NormalizedEvent, ExtractionResult, StepProvenance, AuthorType, AdapterType, all enums)",
+      "Cultivate-specific error types (CultivateStartupError, CultivateInternalError, SignalFilteredError, SignalProcessingError)",
+      "SQLite storage extending @plannr/storage-base with full migration system",
+      "SSE broadcaster as shared infrastructure (used by pipeline, jobs, trend detection — not trapped in API layer)",
+      "4 generic adapter types (poll_api, webhook, push, structured_pull) with SourceAdapter interface",
+      "All 30+ source presets across 5 tiers organized as factory functions",
+      "Source health escalation policy (1 fail → warn, 3 → unhealthy + SSE, 10 → disabled, auth error → immediate disable)",
+      "Auth encryption (AES-256-GCM) for source credentials",
+      "BullMQ job queue with Redis (6 queues: poll-sources, process-signal, ingest-document, recluster, decay, trend-detect)",
+      "Greenhouse gate (Tier 0): keyword require/exclude filtering",
+      "Rule Registry (Tier 1): Tuner-managed deterministic filter rules with effectiveness tracking",
+      "Local ML classification (Tier 2): Transformers.js zero-shot classifier, required at startup",
+      "LLM extraction (Tier 3): Sonnet structured extraction with JSON schema output",
+      "8-factor scoring with Tuner-managed weights per Greenhouse (recency, specificity, source_authority, repetition, emotional_intensity, strategic_fit, actionability, content_quality)",
+      "Grounded theory clustering via Haiku with auto-summary regeneration",
+      "Exact dedup (source_type + external_id) and near dedup (cluster + keyword overlap)",
+      "Document ingestion with chunking (recursive + speaker-aware for interviews) — pre-pipeline, in ingest-document worker",
+      "Signal decay engine (90-day half-life, daily scheduled job)",
+      "Trend detection (hourly, weekly/monthly velocity per cluster)",
+      "Weekly recluster (merge/split review via Sonnet)",
+      "Recommendation engine ('what should we build next?' via Sonnet, cached 15min)",
+      "Full REST API (Greenhouses, Signals, Clusters, Sources, Presets, Ingestion, Recommendations, Filter Rules, Dead Letter, Webhooks)",
+      "SSE event system (signal:new, signal:updated, cluster:new, cluster:updated, cluster:trending, ingestion:progress, ingestion:complete, source:error, source:auth_expired)",
+      "Dead letter queue (list, replay, replay-all, discard)",
+      "Tuner integration — dedicated feature: CultivateConfig polling (5 min), CultivateOutcome recording on link/dismiss, learning loop semantics",
+      "Default Greenhouse auto-creation on first start (refinement mode, all sources, no keyword filters)",
+      "Model name configurability via CULTIVATE_EXTRACT_MODEL and CULTIVATE_CLUSTER_MODEL env vars",
+      "Server mount as Express plugin at /api/cultivate",
+      "Fail-fast startup sequence: Redis → SQLite → Transformers.js → Anthropic API → Tuner config → Queues → Scheduled jobs"
+    ],
+    "out_of_scope": [
+      "UI/dashboard (tend renders cultivate data)",
+      "Cross-Greenhouse pattern recognition",
+      "Vector search / embeddings",
+      "Decision-making (cultivate scores, humans decide)",
+      "Public-facing feedback portal",
+      "Sub-second latency (polling intervals are minutes)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "cultivate refuses to start if Redis is unavailable, throwing CultivateStartupError('REDIS_UNAVAILABLE')" },
+      { "id": "ac2", "description": "cultivate refuses to start if Transformers.js model fails to load, throwing CultivateStartupError('ML_MODEL_LOAD_FAILED')" },
+      { "id": "ac3", "description": "cultivate refuses to start if Anthropic API health check fails, throwing CultivateStartupError('ANTHROPIC_UNAVAILABLE')" },
+      { "id": "ac4", "description": "A manually created signal traverses the full pipeline: Tier 0 → Tier 1 → Tier 2 → Tier 3 → Score → Cluster → Store → SSE broadcast" },
+      { "id": "ac5", "description": "Signals that fail Tier 1 rules are rejected with clear reason, never reaching the LLM" },
+      { "id": "ac6", "description": "Signals that fail Tier 2 ML classification are rejected, never reaching Sonnet extraction" },
+      { "id": "ac7", "description": "Dead-lettered signals (failed after BullMQ retries) are visible via GET /api/cultivate/dead-letter and replayable" },
+      { "id": "ac8", "description": "No partial signals exist in storage — a signal completes the full pipeline or doesn't enter the system" },
+      { "id": "ac9", "description": "Greenhouses independently filter, score, and cluster signals — same source can produce different scores in different Greenhouses. Clusters never span Greenhouses." },
+      { "id": "ac10", "description": "All 30+ source presets are registered and retrievable via GET /api/cultivate/presets" },
+      { "id": "ac11", "description": "Source credentials are encrypted at rest using AES-256-GCM derived from CULTIVATE_SECRET" },
+      { "id": "ac12", "description": "Decay job marks signals below 0.15 threshold as 'decayed', linked signals are exempt" },
+      { "id": "ac13", "description": "Trend detection classifies clusters as rising/stable/declining and emits cluster:trending SSE on transition to rising" },
+      { "id": "ac14", "description": "GET /api/cultivate/recommendations returns evidence-backed suggestions ranked by confidence, filterable by Greenhouse" },
+      { "id": "ac15", "description": "Source health policy: 3 consecutive failures → unhealthy + SSE, 10 → disabled, auth errors → immediate disable" },
+      { "id": "ac16", "description": "Package exports createCultivateService() following the same plugin pattern as planner, ideation, forge" },
+      { "id": "ac17", "description": "When cultivate starts with no Greenhouses, a default Greenhouse is auto-created in refinement mode with all configured sources and no keyword filters" },
+      { "id": "ac18", "description": "Tuner config is polled every 5 minutes from GET /api/tuner/config/cultivate. Link/dismiss actions post CultivateOutcome to POST /api/tuner/outcomes/cultivate." },
+      { "id": "ac19", "description": "A raw event from a source shared by 2 Greenhouses produces 2 independent process-signal jobs (one per matching Greenhouse)" },
+      { "id": "ac20", "description": "CULTIVATE_EXTRACT_MODEL and CULTIVATE_CLUSTER_MODEL env vars configure which Anthropic models are used for extraction and clustering" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Follows exact same plugin pattern as planner/ideation/forge: createXxxService() → { router, initialize, shutdown }",
+        "Storage extends BaseSqliteStorage from @plannr/storage-base with synchronous initializeSchema()",
+        "Server mounts at app.use('/api/cultivate', cultivateService.router)",
+        "Uses @plannr/errors for consistent error handling (NotFoundError, BadRequestError, ValidationError, etc.)",
+        "Redis is NEW infrastructure — not used by any other package yet. BullMQ is a new dependency.",
+        "Transformers.js (@huggingface/transformers) is a new dependency — ~100MB model download on first run",
+        "The monorepo uses 'type: module' (ESM) throughout",
+        "better-sqlite3 is already a root dependency, Express 5.2.1, Zod 3.23.8",
+        "Anthropic SDK already available at root level",
+        "SSE broadcaster must be shared infrastructure — pipeline, jobs, and trend detection all emit events. Cannot live inside API layer or circular deps result.",
+        "Tuner integration follows the pattern of tuner-forge-integration and tuner-ideation-consumption: dedicated feature with client code, config polling, and outcome recording.",
+        "Chunking is PRE-pipeline (in ingest-document worker), not part of the process-signal pipeline. Each chunk becomes a separate signal.",
+        "Poll-sources worker handles per-Greenhouse fan-out: raw event → determine matching Greenhouses → enqueue one process-signal per match.",
+        "Clusters are scoped per-Greenhouse and never span Greenhouses — this is an architectural invariant.",
+        "Default Greenhouse auto-creation on first start ensures zero-config usability."
+      ],
+      "questions": [],
+      "concerns": [
+        "Redis adds operational complexity — first package requiring it",
+        "Transformers.js model download on first startup could be slow",
+        "BullMQ workers in same process — memory considerations with ML model loaded"
+      ],
+      "confidence": "confident"
+    },
+    "security": {
+      "observations": [
+        "AES-256-GCM encryption for all source credentials (tokens, API keys, secrets)",
+        "CULTIVATE_SECRET env var required for encryption key derivation",
+        "HMAC webhook verification for incoming webhooks",
+        "No public-facing endpoints — all behind existing auth boundary",
+        "Source config validation via Zod prevents injection in endpoint templates"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "pattern": "Express plugin (createCultivateService) mounted by server",
+      "storage": "SQLite via @plannr/storage-base, separate cultivate.db",
+      "queue": "BullMQ + Redis, 6 queues, single-process workers",
+      "ml": "Transformers.js zero-shot classification (Xenova/mobilebert-uncased-mnli)",
+      "llm_extract": "Anthropic Sonnet for extraction (configurable via CULTIVATE_EXTRACT_MODEL)",
+      "llm_cluster": "Anthropic Haiku for clustering (configurable via CULTIVATE_CLUSTER_MODEL)",
+      "llm_recommend": "Anthropic Sonnet for recommendations and recluster",
+      "sse": "SSEBroadcaster as shared infrastructure — instantiated in startup, injected into pipeline/jobs/API",
+      "tuner": "Dedicated cultivate-tuner feature: config polling, outcome recording, learning loop",
+      "no_fallbacks": "Every dependency required at startup. No mock mode. No graceful degradation."
+    }
+  },
+
+  "sub_features": [
+    "cultivate-domain",
+    "cultivate-errors",
+    "cultivate-storage",
+    "cultivate-sse",
+    "cultivate-auth-encryption",
+    "cultivate-filter-rules",
+    "cultivate-filter-tier2",
+    "cultivate-extractor",
+    "cultivate-scorer",
+    "cultivate-clusterer",
+    "cultivate-dedup",
+    "cultivate-pipeline",
+    "cultivate-adapters",
+    "cultivate-presets",
+    "cultivate-jobs",
+    "cultivate-decay-trends",
+    "cultivate-recommender",
+    "cultivate-tuner",
+    "cultivate-api",
+    "cultivate-startup",
+    "cultivate-server-mount"
+  ],
+
+  "plan_implementation": {
+    "scopes": ["cultivate", "server"],
+    "steps": []
+  }
+}

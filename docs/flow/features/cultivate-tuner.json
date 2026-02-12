@@ -1,0 +1,95 @@
+{
+  "feature_id": "cultivate-tuner",
+  "title": "Tuner Integration",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["cultivate-domain", "cultivate-storage", "cultivate-scorer", "cultivate-filter-rules"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Integrate cultivate with the Tuner service for adaptive learning. Config polling: GET /api/tuner/config/cultivate every 5 minutes to retrieve scoring weights, filter rule toggles, tier thresholds, and model overrides. Outcome recording: POST /api/tuner/outcomes/cultivate on link/dismiss/ignore/started_project actions to feed the learning loop. On first run or when Tuner is unavailable, fall back to hardcoded defaults. Learning loop semantics: Tuner uses outcomes to adjust weights and rules over time.",
+    "acceptance_criteria": [
+      { "id": "ct-ac1", "description": "TunerClient polls GET /api/tuner/config/cultivate every 5 minutes" },
+      { "id": "ct-ac2", "description": "Config includes scoring weights per greenhouse, filter rule enabled/disabled states, tier thresholds, and model overrides" },
+      { "id": "ct-ac3", "description": "Outcome recording posts to POST /api/tuner/outcomes/cultivate on link, dismiss, ignore, and started_project actions" },
+      { "id": "ct-ac4", "description": "Learning loop signals include boost (link), dampen (dismiss), flag (ignore pattern), and promote (started_project)" },
+      { "id": "ct-ac5", "description": "Falls back to hardcoded defaults on first run or when Tuner is unavailable" },
+      { "id": "ct-ac6", "description": "Config changes from Tuner are applied without restart" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "ct-s1",
+        "title": "Implement TunerClient for config polling",
+        "scope": "cultivate",
+        "description": "Create src/tuner/client.ts. Implement TunerClient class that polls GET /api/tuner/config/cultivate every 5 minutes using a setInterval. Parse the response as CultivateConfig (weights per greenhouse, filter_rules enabled/disabled map, tier1_strictness, tier2_threshold, extract_model, cluster_model). Cache the latest config in memory. Expose getCurrentConfig() for synchronous access by pipeline components. Handle network errors gracefully with logging.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Polls Tuner endpoint every 5 minutes" },
+          { "id": "ac2", "description": "Parses response into CultivateConfig type" },
+          { "id": "ac3", "description": "getCurrentConfig() returns cached config synchronously" },
+          { "id": "ac4", "description": "Network errors logged without crashing" }
+        ]
+      },
+      {
+        "step_id": "ct-s2",
+        "title": "Implement config application (weights, rules, thresholds)",
+        "scope": "cultivate",
+        "description": "Create src/tuner/config-applier.ts. Implement logic to apply CultivateConfig to the running system. When new config arrives: update scoring weights per greenhouse (used by scorer), update filter rule enabled/disabled states (used by rule registry), update tier1_strictness and tier2_threshold (used by Tier 1 and Tier 2 filters), update model names if overridden (used by extractor and clusterer). Each component reads from the TunerClient's cached config, so applying means updating the cache and optionally notifying components.",
+        "dependencies": ["ct-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Scoring weights updated per greenhouse when config changes" },
+          { "id": "ac2", "description": "Filter rule toggles applied to rule registry" },
+          { "id": "ac3", "description": "Tier thresholds updated for ML classifier and rule engine" },
+          { "id": "ac4", "description": "Model overrides applied to extractor and clusterer" }
+        ]
+      },
+      {
+        "step_id": "ct-s3",
+        "title": "Implement outcome recording (link/dismiss/ignore/started_project)",
+        "scope": "cultivate",
+        "description": "Create src/tuner/outcomes.ts. Implement recordOutcome(outcome: CultivateOutcome) that posts to POST /api/tuner/outcomes/cultivate. Outcome types: link (user linked signal to a plan — boost signal), dismiss (user dismissed signal — dampen signal), ignore (signal ignored over time threshold — flag pattern), started_project (plan created from recommendation — promote pattern). Each outcome includes signal_id, action, greenhouse_id, metadata (optional context like plan_id for links), and timestamp. Fire-and-forget: don't block pipeline on Tuner availability.",
+        "dependencies": ["ct-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All 4 outcome types posted to Tuner endpoint" },
+          { "id": "ac2", "description": "Outcome payload includes signal_id, action, greenhouse_id, metadata, timestamp" },
+          { "id": "ac3", "description": "Fire-and-forget: pipeline not blocked by Tuner unavailability" }
+        ]
+      },
+      {
+        "step_id": "ct-s4",
+        "title": "Add learning loop signals (boost/dampen/flag)",
+        "scope": "cultivate",
+        "description": "Implement the semantic mapping from user actions to learning loop signals. When a link outcome is recorded, include a 'boost' signal indicating the scoring factors that contributed to the linked signal's score. When a dismiss outcome is recorded, include a 'dampen' signal with the factors that may be over-weighted. When an ignore pattern is detected, include a 'flag' signal indicating possible filter gap. When started_project is recorded, include a 'promote' signal for the clusters involved. This metadata helps Tuner adjust weights intelligently.",
+        "dependencies": ["ct-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Link actions produce boost signals with contributing scoring factors" },
+          { "id": "ac2", "description": "Dismiss actions produce dampen signals with over-weighted factors" },
+          { "id": "ac3", "description": "Ignore patterns produce flag signals for filter gaps" },
+          { "id": "ac4", "description": "Started_project actions produce promote signals for involved clusters" }
+        ]
+      },
+      {
+        "step_id": "ct-s5",
+        "title": "Add fallback to hardcoded defaults on first run",
+        "scope": "cultivate",
+        "description": "Implement default config in src/tuner/defaults.ts. Define DEFAULT_CULTIVATE_CONFIG with sensible starting values: equal weights (0.125 each for 8 scoring factors), all filter rules enabled, tier1_strictness=0.5, tier2_threshold=0.3, no model overrides (use env var defaults). TunerClient initializes with these defaults. On successful first poll, defaults are replaced. If Tuner never responds, defaults persist indefinitely. Log clearly whether running with Tuner config or defaults.",
+        "dependencies": ["ct-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Default config provides equal weights for all 8 scoring factors" },
+          { "id": "ac2", "description": "TunerClient starts with defaults and updates on first successful poll" },
+          { "id": "ac3", "description": "Clear logging indicates whether Tuner config or defaults are active" },
+          { "id": "ac4", "description": "System operates indefinitely with defaults if Tuner is unavailable" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "feature_id": "cultivate-errors",
+  "title": "Error Types",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Define all cultivate-specific error types extending @plannr/errors. CultivateStartupError covers fatal startup failures with error codes (REDIS_UNAVAILABLE, DB_INIT_FAILED, ML_MODEL_LOAD_FAILED, ANTHROPIC_UNAVAILABLE). CultivateInternalError covers unexpected runtime failures. SignalFilteredError covers intentional signal rejections at any filter tier. SignalProcessingError covers pipeline failures that should dead-letter. All errors carry diagnostic context for debugging.",
+    "acceptance_criteria": [
+      { "id": "ce-ac1", "description": "CultivateStartupError has code property with values: REDIS_UNAVAILABLE, DB_INIT_FAILED, ML_MODEL_LOAD_FAILED, ANTHROPIC_UNAVAILABLE" },
+      { "id": "ce-ac2", "description": "CultivateStartupError carries diagnostic context: which dependency failed, connection details (sanitized), retry attempts" },
+      { "id": "ce-ac3", "description": "CultivateInternalError wraps unexpected errors with stack trace and operation context" },
+      { "id": "ce-ac4", "description": "SignalFilteredError includes filter_tier (0|1|2), rule_name (for tier 1), reason string, and signal metadata" },
+      { "id": "ce-ac5", "description": "SignalProcessingError includes pipeline_step, signal_id, original error, and is used to route signals to dead letter queue" },
+      { "id": "ce-ac6", "description": "All errors extend base Error class and are instanceof-checkable" },
+      { "id": "ce-ac7", "description": "All error types exported from package root" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "ce-s1",
+        "title": "Define CultivateStartupError with error codes",
+        "scope": "cultivate",
+        "description": "Create src/errors.ts. Define CultivateStartupErrorCode type as union: 'REDIS_UNAVAILABLE' | 'DB_INIT_FAILED' | 'ML_MODEL_LOAD_FAILED' | 'ANTHROPIC_UNAVAILABLE'. Implement CultivateStartupError class extending Error with: code (CultivateStartupErrorCode), diagnostics object (dependency name, sanitized connection info, retry count), and a static factory for each code. The startup sequence uses these to fail fast with clear diagnostics.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CultivateStartupError('REDIS_UNAVAILABLE') creates error with correct code and message" },
+          { "id": "ac2", "description": "diagnostics object includes dependency, connectionInfo (sanitized — no passwords), retryAttempts" },
+          { "id": "ac3", "description": "instanceof CultivateStartupError returns true" }
+        ]
+      },
+      {
+        "step_id": "ce-s2",
+        "title": "Define CultivateInternalError",
+        "scope": "cultivate",
+        "description": "Implement CultivateInternalError class extending Error for unexpected runtime failures. Properties: operation (string describing what was being done), cause (original Error), context (Record<string, unknown> with relevant state). This is the catch-all for 'this should not happen' scenarios that need investigation.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CultivateInternalError wraps original error in cause property" },
+          { "id": "ac2", "description": "operation string describes the failed operation (e.g., 'cluster-assignment', 'score-computation')" },
+          { "id": "ac3", "description": "context carries arbitrary key-value diagnostics" }
+        ]
+      },
+      {
+        "step_id": "ce-s3",
+        "title": "Define SignalFilteredError and SignalProcessingError",
+        "scope": "cultivate",
+        "description": "Implement SignalFilteredError for intentional signal rejections. Properties: filter_tier (0 | 1 | 2), rule_name (string, populated for tier 1 rules), reason (human-readable rejection reason), signal_metadata ({source_type, external_id, greenhouse_id}). This is NOT an error condition — it's the expected path for noise rejection. Implement SignalProcessingError for pipeline failures that should dead-letter. Properties: pipeline_step (string), signal_id (string), cause (original Error). Used by BullMQ workers to decide dead-letter routing.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SignalFilteredError.filter_tier is 0, 1, or 2" },
+          { "id": "ac2", "description": "SignalFilteredError.rule_name is populated for tier 1 (e.g., 'noise_reject'), empty for tier 0/2" },
+          { "id": "ac3", "description": "SignalProcessingError.pipeline_step identifies where failure occurred (e.g., 'tier3-extraction', 'scoring')" },
+          { "id": "ac4", "description": "SignalProcessingError carries signal_id for dead-letter tracking" }
+        ]
+      },
+      {
+        "step_id": "ce-s4",
+        "title": "Add diagnostic context helpers",
+        "scope": "cultivate",
+        "description": "Add utility functions: sanitizeConnectionInfo(url: string) strips passwords/tokens from connection strings for safe logging. formatStartupDiagnostics(error: CultivateStartupError) returns a formatted multi-line string for console output during startup failures. isRetryableError(error: Error) determines if a SignalProcessingError should be retried or dead-lettered based on the pipeline_step and cause type.",
+        "dependencies": ["ce-s1", "ce-s2", "ce-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "sanitizeConnectionInfo('redis://user:pass@host:6379') returns 'redis://user:***@host:6379'" },
+          { "id": "ac2", "description": "formatStartupDiagnostics produces clear multi-line output with error code, dependency, and action items" },
+          { "id": "ac3", "description": "isRetryableError returns false for auth errors, true for transient network errors" }
+        ]
+      },
+      {
+        "step_id": "ce-s5",
+        "title": "Export all error types from index",
+        "scope": "cultivate",
+        "description": "Export all error classes (CultivateStartupError, CultivateInternalError, SignalFilteredError, SignalProcessingError), the CultivateStartupErrorCode type, and utility functions (sanitizeConnectionInfo, formatStartupDiagnostics, isRetryableError) from the package index. Ensure consumers can import { CultivateStartupError } from '@plannr/cultivate'.",
+        "dependencies": ["ce-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All error classes importable from package root" },
+          { "id": "ac2", "description": "CultivateStartupErrorCode type importable from package root" },
+          { "id": "ac3", "description": "Utility functions importable from package root" }
+        ]
+      }
+    ]
+  }
+}

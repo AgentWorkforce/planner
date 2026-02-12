@@ -1,0 +1,96 @@
+{
+  "feature_id": "cultivate-decay-trends",
+  "title": "Signal Decay + Trend Detection + Weekly Recluster",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["cultivate-storage", "cultivate-clusterer", "cultivate-scorer", "cultivate-sse"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement the three temporal maintenance systems for cultivate signals and clusters. Decay: daily job applies exponential decay with 90-day half-life (Tuner-adjustable), linked signals are exempt, signals falling below 0.15 threshold transition to 'decayed' status. Trend detection: hourly job computes weekly (weight 0.7) and monthly (weight 0.3) velocity per cluster, classifies as rising/stable/declining, emits cluster:trending SSE on transition to rising. Weekly recluster: Sonnet-powered cluster review that can merge, split, or rename clusters.",
+    "acceptance_criteria": [
+      { "id": "cdt-ac1", "description": "Decay engine applies exponential decay with 90-day half-life to signal scores" },
+      { "id": "cdt-ac2", "description": "Signals with linked_plan_id are exempt from decay" },
+      { "id": "cdt-ac3", "description": "Signals with decayed score below 0.15 transition to 'decayed' status" },
+      { "id": "cdt-ac4", "description": "Decay half-life is Tuner-adjustable (falls back to 90-day default)" },
+      { "id": "cdt-ac5", "description": "Trend detection computes velocity using weekly (0.7) + monthly (0.3) weighted signals per cluster" },
+      { "id": "cdt-ac6", "description": "Clusters are classified as rising/stable/declining based on velocity" },
+      { "id": "cdt-ac7", "description": "cluster:trending SSE event emitted when a cluster transitions to rising" },
+      { "id": "cdt-ac8", "description": "Weekly recluster uses Sonnet to review clusters and can merge, split, or rename them" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cdt-s1",
+        "title": "Implement decay engine (exponential decay, half-life, linked-exempt, threshold)",
+        "scope": "cultivate",
+        "description": "Create src/temporal/decay.ts. Implement DecayEngine class with applyDecay(greenhouse_id) method. Formula: decayed_score = original_score * (0.5 ^ (days_since_created / half_life_days)). Default half-life is 90 days. Skip signals where linked_plan_id is not null. After applying decay, any signal whose score falls below 0.15 gets status updated to 'decayed'. Batch update signals in storage. Return count of decayed signals for logging.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exponential decay formula correctly applied with configurable half-life" },
+          { "id": "ac2", "description": "Linked signals (linked_plan_id not null) are skipped" },
+          { "id": "ac3", "description": "Signals below 0.15 threshold transition to decayed status" },
+          { "id": "ac4", "description": "Batch storage update for efficiency" }
+        ]
+      },
+      {
+        "step_id": "cdt-s2",
+        "title": "Implement trend detection (velocity calculation, classification)",
+        "scope": "cultivate",
+        "description": "Create src/temporal/trends.ts. Implement TrendDetector class with detectTrends(greenhouse_id) method. For each cluster in the greenhouse, count signals added in the last 7 days (weekly velocity) and last 30 days (monthly velocity). Compute weighted velocity: 0.7 * weekly_velocity + 0.3 * (monthly_velocity / 4). Classify: rising if velocity > threshold, declining if velocity < lower_threshold, stable otherwise. Store velocity_weekly and velocity_monthly on the cluster record. Return list of clusters whose trend classification changed.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Weekly and monthly velocity computed per cluster" },
+          { "id": "ac2", "description": "Weighted velocity formula: 0.7 * weekly + 0.3 * (monthly / 4)" },
+          { "id": "ac3", "description": "Classification thresholds produce rising/stable/declining" },
+          { "id": "ac4", "description": "Cluster records updated with new velocity and trend values" }
+        ]
+      },
+      {
+        "step_id": "cdt-s3",
+        "title": "Add SSE emission on trend transitions",
+        "scope": "cultivate",
+        "description": "Integrate trend detection with SSE broadcaster. After detectTrends() identifies clusters whose trend changed, emit cluster:trending SSE events for clusters transitioning to 'rising'. Event payload includes cluster_id, greenhouse_id, label, previous_trend, new_trend, velocity_weekly, velocity_monthly. Only emit on transition TO rising (not on every hourly run if already rising).",
+        "dependencies": ["cdt-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SSE event emitted only when cluster transitions TO rising" },
+          { "id": "ac2", "description": "Event payload includes cluster details and velocity data" },
+          { "id": "ac3", "description": "No duplicate emissions for clusters already classified as rising" }
+        ]
+      },
+      {
+        "step_id": "cdt-s4",
+        "title": "Implement weekly recluster via Sonnet (merge/split/rename)",
+        "scope": "cultivate",
+        "description": "Create src/temporal/recluster.ts. Implement Reclusterer class with recluster(greenhouse_id) method. Gathers all active clusters with their signal summaries, sends to Sonnet with a structured prompt asking it to review cluster organization and suggest: merges (combine overlapping clusters), splits (break apart overly broad clusters), renames (update labels for clarity). Apply the suggested operations to storage: merge updates signal cluster_ids, split creates new clusters and reassigns signals, rename updates cluster label/summary. Regenerate cluster summaries after changes.",
+        "dependencies": ["cdt-s1", "cdt-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Sonnet receives cluster summaries and signal counts for review" },
+          { "id": "ac2", "description": "Merge operation combines clusters and updates signal assignments" },
+          { "id": "ac3", "description": "Split operation creates new clusters and reassigns signals" },
+          { "id": "ac4", "description": "Rename operation updates cluster labels and summaries" }
+        ]
+      },
+      {
+        "step_id": "cdt-s5",
+        "title": "Add Tuner-adjustable decay parameters",
+        "scope": "cultivate",
+        "description": "Integrate the decay engine with Tuner configuration. The decay half-life, threshold, and linked-exempt behavior should be configurable via CultivateConfig from the Tuner. On each decay run, read current config (from Tuner cache or defaults). Defaults: half_life_days=90, decay_threshold=0.15, linked_exempt=true. If Tuner is unavailable, use hardcoded defaults. Log the active config values at the start of each decay run.",
+        "dependencies": ["cdt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Decay parameters sourced from Tuner config when available" },
+          { "id": "ac2", "description": "Hardcoded defaults used when Tuner is unavailable" },
+          { "id": "ac3", "description": "Active config values logged at start of each decay run" }
+        ]
+      }
+    ]
+  }
+}

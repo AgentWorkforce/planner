@@ -1,0 +1,182 @@
+{
+  "feature_id": "mull-realtime-triggers",
+  "title": "Event-Driven Real-Time Triggers",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["mull-server-plugin"],
+  "parent": "mull-integration",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement event-driven triggers that run mull incrementally during live sessions, not just post-hoc via CLI. Two trigger layers matching the two pipeline stages. Deterministic layer runs on every significant event ($0, <100ms — no reason to batch). LLM layer is batched: triggered when 3+ new entities accumulate, on a decision-type event (immediate high-signal), on a timer (~20 min), or when a session ends. Hooks into existing server event infrastructure (trajectory event creation, forge lifecycle events, relay message flow).",
+    "acceptance_criteria": [
+      { "id": "mrt-ac1", "description": "Deterministic layer triggers on: decision_recorded, retrospective_recorded, chapter_start, gate_approved, gate_rejected events" },
+      { "id": "mrt-ac2", "description": "Deterministic trigger runs extractEntities + extractFacts + matchTopics for the new event only (incremental)" },
+      { "id": "mrt-ac3", "description": "Deterministic trigger completes in <100ms, never blocks the event source" },
+      { "id": "mrt-ac4", "description": "LLM layer triggers when: 3+ new entities accumulated since last LLM run" },
+      { "id": "mrt-ac5", "description": "LLM layer triggers on timer: every ~20 minutes during active sessions" },
+      { "id": "mrt-ac6", "description": "LLM layer triggers on session end: final sweep when run completes, agent released, or session explicitly closed" },
+      { "id": "mrt-ac7", "description": "LLM trigger runs full synthesis + merge + TOC rebuild for accumulated PreExtract" },
+      { "id": "mrt-ac8", "description": "Entity accumulator tracks new entities per session since last LLM run" },
+      { "id": "mrt-ac9", "description": "Triggers are non-blocking: deterministic runs inline, LLM runs in background (does not block event processing)" },
+      { "id": "mrt-ac10", "description": "Trigger registration hooks into TrajectoryCapture.on('trajectory') for forge events and TrajectoryService.recordDecision() for planner events" },
+      { "id": "mrt-ac11", "description": "EntityAccumulatorState persisted to .mull/accumulators/{session-id}.json — survives server restarts" },
+      { "id": "mrt-ac12", "description": "Triggers can be disabled via config (for environments where only CLI/API-triggered mull is desired)" },
+      { "id": "mrt-ac13", "description": "LLM layer triggers independently on decision-type events (decision_recorded, retrospective_recorded) regardless of entity count — these are high-signal events that warrant immediate LLM processing" },
+      { "id": "mrt-ac14", "description": "RetrospectiveService.on('retrospective_recorded') hook triggers both deterministic and LLM layers — retrospectives contain taskId, agentId, LinkedRetrospective" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Two-tier triggering mirrors the two-stage pipeline perfectly: cheap deterministic on every event, expensive LLM batched",
+        "Deterministic at <100ms means it can run synchronously in the event handler without impacting latency",
+        "LLM batching needs a state machine per session: count entities, check timer, detect session end",
+        "Entity accumulator is the bridge between deterministic triggers and LLM triggers — it tracks what's new since last LLM run",
+        "Session end detection: forge run_completed, agent release event, or explicit API call",
+        "Timer-based trigger prevents knowledge from sitting unprocessed during long sessions",
+        "This is the most integration-heavy feature — hooks into both forge and planner event flows",
+        "Decision-type events are independently high-signal enough to warrant immediate LLM processing, not just entity counting",
+        "Exact hook locations: TrajectoryCapture.on('trajectory') emits for all forge trajectory events; RetrospectiveService.on('retrospective_recorded') emits with taskId, agentId, LinkedRetrospective"
+      ],
+      "concerns": [
+        "Timer management: multiple active sessions each with their own timer — need per-session timer tracking",
+        "Background LLM processing: if LLM call fails, accumulated entities should be preserved for next trigger",
+        "Server restart: trigger state (accumulators, timers) needs to survive restart — .mull/ persistence",
+        "EntityAccumulatorState files could grow large in very active sessions — need a size/age cleanup strategy"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "version": 1,
+    "scopes": ["mull", "server"],
+    "steps": [
+      {
+        "step_id": "mrt-s1",
+        "title": "Define EntityAccumulatorState and TriggerConfig types",
+        "scope": "mull",
+        "description": "Create packages/mull/src/triggers/types.ts. Define:\n\n1) EntityAccumulatorState: { sessionId: string, entities: ExtractedEntity[], facts: ExtractedFact[], topicMatches: TopicMatch[], entityCount: number, lastDeterministicAt: string, lastLlmRunAt: string | null, createdAt: string }\n\n2) TriggerConfig: { enabled: boolean, entityThreshold: number (default 3), timerIntervalMinutes: number (default 20), persistDir: string (default '.mull/accumulators'), decisionTriggersLlm: boolean (default true) }\n\n3) TriggerEvent: { type: 'trajectory' | 'retrospective' | 'decision', source: 'forge' | 'planner', sessionId: string, eventType: string, payload: unknown, timestamp: string }\n\n4) LlmTriggerReason: 'entity_threshold' | 'decision_event' | 'timer' | 'session_end' | 'retrospective'",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s1-ac1", "description": "EntityAccumulatorState tracks entities, facts, topicMatches, and timing metadata per session" },
+          { "id": "mrt-s1-ac2", "description": "TriggerConfig includes all configurable parameters with sensible defaults" },
+          { "id": "mrt-s1-ac3", "description": "TriggerEvent captures source (forge/planner), event type, and raw payload" },
+          { "id": "mrt-s1-ac4", "description": "LlmTriggerReason enum covers all 5 trigger conditions" }
+        ]
+      },
+      {
+        "step_id": "mrt-s2",
+        "title": "Implement EntityAccumulator with file-based persistence",
+        "scope": "mull",
+        "description": "Create packages/mull/src/triggers/entity-accumulator.ts. The EntityAccumulator manages per-session state that bridges deterministic triggers to LLM triggers.\n\nMethods:\n- getState(sessionId): Load from .mull/accumulators/{session-id}.json, return EntityAccumulatorState or create empty state\n- addEntities(sessionId, entities, facts, topicMatches): Append to the accumulator arrays, increment entityCount, update lastDeterministicAt, persist to file\n- markLlmRun(sessionId): Reset entity arrays (they've been processed), update lastLlmRunAt, persist\n- clearSession(sessionId): Delete the accumulator file (session complete, all processed)\n- listActiveSessions(): List all .json files in accumulators dir, return sessionIds\n- shouldTriggerLlm(sessionId, triggerEvent): Decision logic — returns { shouldTrigger: boolean, reason: LlmTriggerReason | null }:\n  - entityCount >= entityThreshold (default 3) -> reason: 'entity_threshold'\n  - triggerEvent.type === 'decision' && config.decisionTriggersLlm -> reason: 'decision_event'\n  - triggerEvent.type === 'retrospective' -> reason: 'retrospective' (always triggers LLM)\n  - called from timer -> reason: 'timer'\n  - called from session end -> reason: 'session_end'\n\nFile persistence: JSON.stringify with 2-space indent. Read with try/catch for corrupt files (return empty state).",
+        "dependencies": ["mrt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s2-ac1", "description": "EntityAccumulator persists state to .mull/accumulators/{session-id}.json" },
+          { "id": "mrt-s2-ac2", "description": "addEntities appends to arrays, increments count, persists" },
+          { "id": "mrt-s2-ac3", "description": "markLlmRun resets entity arrays after LLM processing" },
+          { "id": "mrt-s2-ac4", "description": "shouldTriggerLlm evaluates all 5 trigger conditions" },
+          { "id": "mrt-s2-ac5", "description": "Corrupt accumulator files handled gracefully (return empty state, log warning)" },
+          { "id": "mrt-s2-ac6", "description": "listActiveSessions returns all session IDs with active accumulators" }
+        ]
+      },
+      {
+        "step_id": "mrt-s3",
+        "title": "Implement DeterministicTriggerHandler",
+        "scope": "mull",
+        "description": "Create packages/mull/src/triggers/deterministic-trigger.ts. Implements the fast, synchronous trigger that runs on every significant event.\n\nHandler function: handleDeterministicTrigger(event: TriggerEvent, accumulator: EntityAccumulator, pipeline: MullPipeline): void\n\n1) Convert the TriggerEvent into a minimal SessionData (single event, single decision/retrospective)\n2) Run pipeline.extractEntities(sessionData) — deterministic, <100ms\n3) Run pipeline.extractFacts(sessionData) — deterministic, <100ms\n4) Run pipeline.matchTopics(entities, facts) — deterministic, <100ms\n5) Add results to accumulator: accumulator.addEntities(sessionId, entities, facts, topicMatches)\n\nThis handler MUST be synchronous and complete in <100ms. It runs inline in the event callback. No async operations, no LLM calls, no file I/O beyond the accumulator persistence (which is a single synchronous fs.writeFileSync).",
+        "dependencies": ["mrt-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s3-ac1", "description": "Runs extractEntities + extractFacts + matchTopics for the single event" },
+          { "id": "mrt-s3-ac2", "description": "Completes in <100ms — no async operations, no LLM calls" },
+          { "id": "mrt-s3-ac3", "description": "Adds extracted results to the EntityAccumulator" },
+          { "id": "mrt-s3-ac4", "description": "Never blocks the calling event handler" }
+        ],
+        "specification": "Location: packages/mull/src/triggers/deterministic-trigger.ts. The handler is synchronous by design — uses extractEntities/extractFacts/matchTopics which are all pure computation (compromise.js NLP, regex, file reads). Accumulator persistence uses fs.writeFileSync (synchronous, single file write). The <100ms budget: compromise.js processes ~1MB/sec, a single event payload is ~1-5KB, so NLP extraction is <5ms. File reads for matchTopics are cached per session."
+      },
+      {
+        "step_id": "mrt-s4",
+        "title": "Implement LlmBatchTriggerHandler",
+        "scope": "mull",
+        "description": "Create packages/mull/src/triggers/llm-batch-trigger.ts. Implements the batched LLM trigger that runs when sufficient material has accumulated.\n\nHandler function: async handleLlmBatchTrigger(sessionId: string, reason: LlmTriggerReason, accumulator: EntityAccumulator, pipeline: MullPipeline): Promise<MergeResult>\n\n1) Load accumulated state: accumulator.getState(sessionId)\n2) If empty (no entities), return early with empty MergeResult\n3) Run pipeline.synthesize(accumulatedEntities, facts, topicMatches) — LLM call, async\n4) Run pipeline.merge(synthesisResult) — writes to topic files\n5) Run pipeline.rebuildTOC() — updates index\n6) Call accumulator.markLlmRun(sessionId) — reset for next batch\n7) Return MergeResult\n\nThis handler runs in the background (not blocking the event source). Errors are caught and logged — accumulated entities are preserved (markLlmRun not called) so they'll be retried on next trigger. If an LLM run is already in progress for this session, skip (debounce).",
+        "dependencies": ["mrt-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s4-ac1", "description": "Runs full synthesis + merge + TOC rebuild on accumulated entities" },
+          { "id": "mrt-s4-ac2", "description": "Runs asynchronously, never blocks event processing" },
+          { "id": "mrt-s4-ac3", "description": "On failure, accumulated entities preserved (not cleared) for retry" },
+          { "id": "mrt-s4-ac4", "description": "Debounce: skips if LLM run already in progress for same session" },
+          { "id": "mrt-s4-ac5", "description": "Calls accumulator.markLlmRun only on success" }
+        ]
+      },
+      {
+        "step_id": "mrt-s5",
+        "title": "Implement per-session timer management",
+        "scope": "mull",
+        "description": "Create packages/mull/src/triggers/session-timer.ts. Manages per-session timers that trigger the LLM batch handler at regular intervals during active sessions.\n\nClass SessionTimerManager:\n- startTimer(sessionId, intervalMinutes, callback): Start a setInterval for the session. callback is () => handleLlmBatchTrigger(sessionId, 'timer', ...). Store timer reference in Map<sessionId, NodeJS.Timeout>.\n- resetTimer(sessionId): Clear and restart the timer (called when deterministic trigger runs, to reset the countdown).\n- stopTimer(sessionId): Clear the timer. Called on session end.\n- stopAll(): Clear all timers. Called on server shutdown.\n- getActiveTimers(): Return list of sessionIds with active timers.\n\nTimers are NOT persisted — they're recreated on server restart by checking active accumulators. On server startup, call listActiveSessions() from the accumulator, and for each session that has entities but lastLlmRunAt older than intervalMinutes, trigger an immediate LLM run.",
+        "dependencies": ["mrt-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s5-ac1", "description": "Per-session timers stored in Map<sessionId, Timeout>" },
+          { "id": "mrt-s5-ac2", "description": "resetTimer clears and restarts countdown" },
+          { "id": "mrt-s5-ac3", "description": "stopAll clears all timers for graceful shutdown" },
+          { "id": "mrt-s5-ac4", "description": "On server restart, checks active accumulators and triggers overdue LLM runs" }
+        ]
+      },
+      {
+        "step_id": "mrt-s6",
+        "title": "Implement event listener registration with exact hook points",
+        "scope": "server",
+        "description": "Create packages/mull/src/triggers/event-hooks.ts and integrate with the server's event infrastructure. Register listeners at the exact hook points in the codebase:\n\n1) Forge trajectory events: TrajectoryCapture.on('trajectory', (event) => { ... })\n   - TrajectoryCapture emits 'trajectory' after validating payload and storing in SQLite\n   - Filter to high-signal event types (same list as forge adapter)\n   - Map to TriggerEvent and dispatch to deterministic handler\n   - Check shouldTriggerLlm and dispatch to LLM handler if needed\n\n2) Forge retrospective events: RetrospectiveService.on('retrospective_recorded', (data) => { ... })\n   - RetrospectiveService emits 'retrospective_recorded' with { taskId, agentId, LinkedRetrospective }\n   - Always triggers BOTH deterministic and LLM handlers (retrospectives are highest signal)\n\n3) Planner trajectory events: Hook into TrajectoryService.recordDecision() path\n   - After storage.createTrajectoryEvent() succeeds, emit to trigger handler\n   - All planner decisions trigger deterministic handler\n   - decision_recorded type triggers LLM handler independently (high-signal)\n\nExport a registerMullTriggers(services: { trajectoryCapture, retrospectiveService, trajectoryService }, config: TriggerConfig, pipeline, accumulator) function that wires up all listeners.\n\nIf config.enabled === false, registerMullTriggers is a no-op.",
+        "dependencies": ["mrt-s3", "mrt-s4", "mrt-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s6-ac1", "description": "Hooks into TrajectoryCapture.on('trajectory') for forge events" },
+          { "id": "mrt-s6-ac2", "description": "Hooks into RetrospectiveService.on('retrospective_recorded') for retrospective events" },
+          { "id": "mrt-s6-ac3", "description": "Hooks into planner TrajectoryService.recordDecision() path" },
+          { "id": "mrt-s6-ac4", "description": "Retrospective events always trigger both deterministic and LLM handlers" },
+          { "id": "mrt-s6-ac5", "description": "Decision events independently trigger LLM handler (high-signal, regardless of entity count)" },
+          { "id": "mrt-s6-ac6", "description": "config.enabled === false makes registerMullTriggers a no-op" },
+          { "id": "mrt-s6-ac7", "description": "registerMullTriggers accepts service references and wires all listeners in one call" }
+        ],
+        "specification": "The hook points are:\n- TrajectoryCapture (forge-core): EventEmitter that emits 'trajectory' after capture() validates and stores the event. Payload is the validated TrajectoryEvent.\n- RetrospectiveService (forge-core): EventEmitter that emits 'retrospective_recorded' with { taskId: string, agentId: string, retrospective: LinkedRetrospective }.\n- TrajectoryService (planner): recordDecision() calls storage.createTrajectoryEvent(). The hook should wrap or listen to the storage layer, not modify recordDecision itself."
+      },
+      {
+        "step_id": "mrt-s7",
+        "title": "Implement session end detection and final sweep",
+        "scope": "mull",
+        "description": "Add session end detection that triggers a final LLM sweep. Session end signals:\n\n1) Forge run completion: Listen for run_completed or run_failed trajectory events. When detected, trigger LLM with reason='session_end', then stop the session timer and clear the accumulator after processing.\n\n2) Agent release: When an agent_released event is detected and it was the last active agent in the session, treat as session end.\n\n3) Explicit API call: POST /api/mull/sessions/:sessionId/end triggers final sweep programmatically.\n\n4) Timer expiry without new events: If the 20-min timer fires and no new entities were added since last timer fire, treat as session idle — do a final sweep and stop the timer.\n\nAll session end paths: trigger LLM batch, wait for completion, then call accumulator.clearSession(sessionId) and timerManager.stopTimer(sessionId).",
+        "dependencies": ["mrt-s4", "mrt-s5", "mrt-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s7-ac1", "description": "run_completed/run_failed events trigger final LLM sweep" },
+          { "id": "mrt-s7-ac2", "description": "Last agent release in session triggers final sweep" },
+          { "id": "mrt-s7-ac3", "description": "POST /api/mull/sessions/:sessionId/end triggers final sweep" },
+          { "id": "mrt-s7-ac4", "description": "Idle timer (no new entities since last timer) triggers final sweep and stops timer" },
+          { "id": "mrt-s7-ac5", "description": "After final sweep: accumulator cleared, timer stopped" }
+        ],
+        "specification": "Location: packages/mull/src/triggers/session-end.ts. Export detectSessionEnd(event: TriggerEvent): boolean and handleSessionEnd(sessionId: string, accumulator, timerManager, pipeline): Promise<void>. Session end detection in event hooks: run_completed/run_failed are detected from forge trajectory events with those event_types. Idle detection: SessionTimerManager tracks lastEntityAddedAt per session — if timer fires and lastEntityAddedAt === previous timer's lastEntityAddedAt, it's idle. API endpoint: add POST /sessions/:sessionId/end route to the mull service router."
+      },
+      {
+        "step_id": "mrt-s8",
+        "title": "Write tests for triggers, accumulator, and timer management",
+        "scope": "mull",
+        "description": "Create packages/mull/src/triggers/__tests__/triggers.test.ts. Tests:\n\nEntityAccumulator:\n- addEntities persists to file, increments count\n- markLlmRun resets arrays but preserves timing metadata\n- shouldTriggerLlm: returns true for entity_threshold (3+), decision_event, retrospective, timer, session_end\n- Corrupt file handling (returns empty state)\n- listActiveSessions returns correct session IDs\n\nDeterministicTriggerHandler:\n- Completes in <100ms (performance assertion)\n- Extracts entities and adds to accumulator\n- Never makes async calls\n\nLlmBatchTriggerHandler:\n- Runs synthesis + merge on accumulated entities\n- Clears accumulator on success\n- Preserves accumulator on failure\n- Debounces concurrent runs\n\nSessionTimerManager:\n- Timer fires at configured interval\n- resetTimer restarts countdown\n- stopTimer clears timer\n- stopAll clears all timers\n\nEvent hooks:\n- Forge trajectory event triggers deterministic handler\n- Retrospective event triggers both handlers\n- Decision event triggers LLM handler independently\n- config.enabled=false prevents registration\n\nSession end:\n- run_completed triggers final sweep\n- Accumulator cleared after final sweep\n\nUse Vitest with vi.useFakeTimers() for timer tests. Mock pipeline and adapters.",
+        "dependencies": ["mrt-s2", "mrt-s3", "mrt-s4", "mrt-s5", "mrt-s6", "mrt-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrt-s8-ac1", "description": "EntityAccumulator tests cover persistence, reset, trigger conditions, corruption handling" },
+          { "id": "mrt-s8-ac2", "description": "DeterministicTriggerHandler tests verify <100ms performance and accumulator updates" },
+          { "id": "mrt-s8-ac3", "description": "LlmBatchTriggerHandler tests verify success path, failure preservation, debounce" },
+          { "id": "mrt-s8-ac4", "description": "Timer tests use vi.useFakeTimers() for deterministic timing" },
+          { "id": "mrt-s8-ac5", "description": "Event hook tests verify correct dispatch for each event type" },
+          { "id": "mrt-s8-ac6", "description": "Session end tests verify final sweep and cleanup" },
+          { "id": "mrt-s8-ac7", "description": "All tests pass with Vitest" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "feature_id": "mull-integration",
+  "title": "Mull Plannr Integration",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "component": "mull",
+  "dependencies": ["mull-package"],
+  "summary": {
+    "goal": "Connect mull to the plannr monorepo's actual data sources. The generic core reads files; this integration layer reads from our SQLite databases and daemon storage. Three distinct adapters (planner.db, forge.db, relay daemon), each a separate concern with different schemas and data shapes. Plus server plugin mount for HTTP access and event-driven triggers for real-time memory extraction during live sessions. These adapters live alongside the generic core in packages/mull/ but are clearly separated — they import from the project's storage packages.",
+    "in_scope": [
+      "Planner DB adapter: reads DecisionEvent from planner.db trajectory_events table",
+      "Forge DB adapter: reads TrajectoryEvent (40+ types) + Retrospective + UserTrajectoryEvent + DerivedPreference from forge.db",
+      "Relay daemon adapter: reads from .agent-relay/ SQLite or JSONL archives",
+      "Express plugin mount at /api/mull for server integration",
+      "REST endpoints: POST /run (trigger), GET /status (stats), GET /topics, GET /topics/:slug",
+      "Event-driven triggers: deterministic on decision/chapter events, LLM batched on threshold/timer/session-end"
+    ],
+    "out_of_scope": [
+      "UI for viewing memory (agents use grep/ripgrep/tilth)",
+      "Modifying any existing planner/forge/relay data (mull is read-only)",
+      "Relay SDK dependency in generic adapters (that stays in integration)"
+    ],
+    "acceptance_criteria": [
+      { "id": "mi-ac1", "description": "Planner adapter reads DecisionEvents from planner.db and produces SessionData with populated decisions[]" },
+      { "id": "mi-ac2", "description": "Forge adapter reads TrajectoryEvents from forge.db and maps 40+ event types to appropriate SessionEvent types" },
+      { "id": "mi-ac3", "description": "Forge adapter maps Retrospective (summary, approach, decisions[], challenges[], learnings[], suggestions[], confidence) to SessionData.retrospective" },
+      { "id": "mi-ac4", "description": "Forge adapter maps UserTrajectoryEvent (user decision patterns) as high-signal Decision inputs" },
+      { "id": "mi-ac5", "description": "Forge adapter maps DerivedPreference (confidence-scored learned preferences) as Context nugget candidates" },
+      { "id": "mi-ac6", "description": "Relay daemon adapter reads from .agent-relay/ daemon storage — both SQLite and JSONL fallback" },
+      { "id": "mi-ac7", "description": "Multi-adapter merge: planner decisions + forge trajectory + relay messages for same plan/run merged by timestamp" },
+      { "id": "mi-ac8", "description": "POST /api/mull/run accepts { sessionId?, planId?, runId?, force? } and triggers mull pipeline" },
+      { "id": "mi-ac9", "description": "GET /api/mull/status returns { topicCount, lastUpdated, recentSessions[], memoryDir }" },
+      { "id": "mi-ac10", "description": "Event-driven: deterministic layer runs on decision_recorded, retrospective_recorded, chapter_start events" },
+      { "id": "mi-ac11", "description": "Event-driven: LLM layer batches and runs when 3+ new entities accumulated or timer (20 min) or session ends" },
+      { "id": "mi-ac12", "description": "All integration adapters are read-only — never modify source databases" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Three distinct data sources with completely different schemas — each needs its own adapter, not one monolithic adapter",
+        "Planner DecisionEvent: question_text, options_presented, selected_option, reasoning → maps cleanly to Decision type",
+        "Forge has 40+ event types but only ~10 are high-signal for mull: decision_recorded, checkpoint_created, retrospective_recorded, agent_spawned, task_completed, task_failed, gate_reached, budget_warning",
+        "Forge Retrospective is richer than spec's generic interface: has approach, decisions[] with linked_event_ids, suggestions[] — these are all valuable nugget sources",
+        "UserTrajectoryEvent captures user decision patterns with scope (global/project/run) — already-distilled preferences",
+        "DerivedPreference has confidence scores and evidence counts — valuable metadata for nugget confidence",
+        "Session ID mapping: planner uses plan_id, forge uses run_id, relay uses its own session concept — need mapping layer",
+        "Server plugin follows existing pattern: export createRouter(), mount at /api/mull",
+        "Event triggers align with existing SSE patterns in the server"
+      ],
+      "concerns": [
+        "Schema coupling: integration adapters depend on planner/forge storage schemas — version changes need coordination",
+        "Real-time triggers must be non-blocking — extraction in <100ms, but LLM batching needs background processing",
+        "Session identity: how does a 'plan_id' in planner map to a 'run_id' in forge? They're different lifecycle stages of same work."
+      ],
+      "confidence": "forming"
+    }
+  },
+  "context": {
+    "architect": {
+      "planner_trajectory_table": "trajectory_events: event_id TEXT PK, type TEXT, question_id TEXT, asking_agent TEXT, question_text TEXT, context_provided TEXT, options_presented_json TEXT, selected_option TEXT, free_text_response TEXT, reasoning TEXT, plan_id TEXT FK, step_id TEXT, timestamp TEXT",
+      "forge_trajectory_table": "trajectory_events: event_id TEXT PK, run_id TEXT FK, task_id TEXT FK, event_type TEXT, payload TEXT (JSON), timestamp TEXT",
+      "forge_retrospective_shape": "{ summary: string, approach: string, decisions: [{question, chosen, reasoning, linked_event_ids?}], challenges: string[], learnings: string[], suggestions: string[], confidence: number }",
+      "forge_user_trajectory_table": "user_trajectory_events: event_id TEXT PK, user_id TEXT, scope TEXT, question_text TEXT, selected_option TEXT, reasoning TEXT, run_id TEXT, task_id TEXT, project_id TEXT, category TEXT, timestamp TEXT",
+      "forge_user_preferences_table": "user_preferences: preference_id TEXT PK, user_id TEXT, scope TEXT, category TEXT, value TEXT, confidence REAL, evidence_count INTEGER, last_expressed TEXT, is_override INTEGER, created_at TEXT, updated_at TEXT",
+      "relay_storage": ".agent-relay/messages/ directory with YYYY-MM-DD.jsonl files; daemon also has SQLite in .agent-relay/",
+      "high_signal_forge_events": ["decision_recorded", "checkpoint_created", "retrospective_recorded", "agent_spawned", "task_completed", "task_failed", "gate_reached", "gate_approved", "gate_rejected", "budget_warning", "recovery_strategy_selected"],
+      "server_mount_pattern": "app.use('/api/mull', createMullRouter(config))"
+    }
+  },
+  "sub_features": [
+    { "id": "mull-planner-db-adapter", "title": "Planner DB Trajectory Adapter" },
+    { "id": "mull-forge-db-adapter", "title": "Forge DB Trajectory & Retrospective Adapter" },
+    { "id": "mull-relay-daemon-adapter", "title": "Relay Daemon Storage Adapter" },
+    { "id": "mull-server-plugin", "title": "Server Plugin Mount & REST API" },
+    { "id": "mull-realtime-triggers", "title": "Event-Driven Real-Time Triggers" }
+  ]
+}

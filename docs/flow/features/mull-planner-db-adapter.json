@@ -1,0 +1,120 @@
+{
+  "feature_id": "mull-planner-db-adapter",
+  "title": "Planner DB Trajectory Adapter",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types", "mull-adapter-system"],
+  "parent": "mull-integration",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement a SessionAdapter that reads DecisionEvent records from the planner.db trajectory_events table. This is the simplest integration adapter — one table, one event type (decision), clear field mapping. Sessions are identified by plan_id. Each DecisionEvent has: question_text, options_presented (JSON array), selected_option, free_text_response, reasoning, asking_agent, step_id. These map directly to SessionData.decisions[] with high fidelity. The adapter uses better-sqlite3 to read planner.db directly.",
+    "acceptance_criteria": [
+      { "id": "mpda-ac1", "description": "Adapter reads from planner.db trajectory_events table using better-sqlite3" },
+      { "id": "mpda-ac2", "description": "Sessions identified by plan_id — listSessions returns distinct plan_ids" },
+      { "id": "mpda-ac3", "description": "DecisionEvent.question_text + selected_option + reasoning -> Decision with title, chosen, reasoning" },
+      { "id": "mpda-ac4", "description": "DecisionEvent.options_presented_json (minus selected) -> Decision.rejected[]" },
+      { "id": "mpda-ac5", "description": "DecisionEvent.asking_agent -> Message with agentName (so we know which agent made the decision)" },
+      { "id": "mpda-ac6", "description": "DecisionEvent.step_id -> metadata on the Decision (links decision to specific plan step)" },
+      { "id": "mpda-ac7", "description": "listSessions supports time range filtering (after/before) using timestamp column" },
+      { "id": "mpda-ac8", "description": "getCursor/setCursor track last processed timestamp per plan_id" },
+      { "id": "mpda-ac9", "description": "Incremental: when cursor exists, only return events after cursor timestamp" },
+      { "id": "mpda-ac10", "description": "Read-only: never INSERT/UPDATE/DELETE on planner.db" },
+      { "id": "mpda-ac11", "description": "Config: { dbPath: string } — path to planner.db file" },
+      { "id": "mpda-ac12", "description": "Opens planner.db with { readonly: true } flag in better-sqlite3 — enforced at connection level, not just by convention" },
+      { "id": "mpda-ac13", "description": "Decision.source field set to 'trail' for well-structured decisions from trajectory_events (distinguishes from inferred decisions)" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Planner trajectory_events is the simplest source: one event type (decision), well-structured fields",
+        "options_presented_json is a JSON string of string[] — needs JSON.parse, then filter out selected_option for rejected[]",
+        "asking_agent field tells us which agent asked the question — useful for multi-agent session context",
+        "step_id links to specific plan step — enables topic routing by plan scope",
+        "DB path can be configured or defaulted to ./planner.db",
+        "better-sqlite3 is already a dependency in the monorepo (storage-base uses it)",
+        "Uses better-sqlite3 directly (NOT BaseSqliteStorage) — mull is read-only over planner's DB, not the owner"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "version": 1,
+    "scopes": ["mull"],
+    "steps": [
+      {
+        "step_id": "mpda-s1",
+        "title": "Create PlannerDbAdapter class with read-only connection",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/planner-db-adapter.ts. Implement a class PlannerDbAdapter that implements SessionAdapter. Constructor accepts { dbPath: string }. Opens planner.db using better-sqlite3 with { readonly: true } flag — this enforces read-only at the SQLite connection level. Do NOT extend BaseSqliteStorage (that is for DB owners; mull is a read-only consumer). Store the db instance as a private field. Implement close() to cleanly shut down the connection.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mpda-s1-ac1", "description": "PlannerDbAdapter class created implementing SessionAdapter interface" },
+          { "id": "mpda-s1-ac2", "description": "Constructor opens planner.db with better-sqlite3({ readonly: true })" },
+          { "id": "mpda-s1-ac3", "description": "Does NOT extend BaseSqliteStorage" },
+          { "id": "mpda-s1-ac4", "description": "close() method shuts down the db connection" }
+        ],
+        "specification": "Location: packages/mull/src/adapters/planner-db-adapter.ts. Uses better-sqlite3 directly (NOT @plannr/storage-base). Config type: PlannerDbAdapterConfig = { dbPath: string }. Constructor: this.db = new Database(config.dbPath, { readonly: true }). Implements SessionAdapter interface. Planner trajectory_events schema: event_id TEXT PK, type TEXT, question_id TEXT, asking_agent TEXT, question_text TEXT, context_provided TEXT, options_presented_json TEXT, selected_option TEXT, free_text_response TEXT, reasoning TEXT, plan_id TEXT FK, step_id TEXT, timestamp TEXT."
+      },
+      {
+        "step_id": "mpda-s2",
+        "title": "Implement listSessions with time range filtering",
+        "scope": "mull",
+        "description": "Implement listSessions(filter?: { after?: string, before?: string }): SessionRef[]. Query: SELECT DISTINCT plan_id, MIN(timestamp) as first_event, MAX(timestamp) as last_event, COUNT(*) as event_count FROM trajectory_events GROUP BY plan_id. Apply WHERE timestamp > ? / timestamp < ? clauses when after/before filters provided. Return SessionRef[] with id=plan_id, type='planner-trajectory', firstEvent, lastEvent, eventCount.",
+        "dependencies": ["mpda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mpda-s2-ac1", "description": "Returns distinct plan_ids as SessionRef objects" },
+          { "id": "mpda-s2-ac2", "description": "Supports after/before time range filtering on timestamp column" },
+          { "id": "mpda-s2-ac3", "description": "SessionRef includes firstEvent, lastEvent, eventCount metadata" }
+        ]
+      },
+      {
+        "step_id": "mpda-s3",
+        "title": "Implement getSession with DecisionEvent to Decision mapping",
+        "scope": "mull",
+        "description": "Implement getSession(sessionId: string): SessionData. Query trajectory_events WHERE plan_id = ? ORDER BY timestamp ASC. For each row, map fields: question_text -> Decision.title, selected_option -> Decision.chosen, reasoning -> Decision.reasoning, asking_agent -> Decision.agentName. Parse options_presented_json with JSON.parse, filter out selected_option to build Decision.rejected[]. Set Decision.source = 'trail' to mark these as well-structured decisions from the trajectory table (as opposed to inferred decisions from message parsing). Attach step_id as Decision.metadata.stepId. Wrap all decisions into a SessionData with sessionId=plan_id, decisions[], messages=[] (no raw messages from this source).",
+        "dependencies": ["mpda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mpda-s3-ac1", "description": "Maps question_text -> title, selected_option -> chosen, reasoning -> reasoning" },
+          { "id": "mpda-s3-ac2", "description": "Parses options_presented_json, filters out selected to build rejected[]" },
+          { "id": "mpda-s3-ac3", "description": "Sets Decision.source = 'trail' for all mapped decisions" },
+          { "id": "mpda-s3-ac4", "description": "Attaches step_id as metadata.stepId on each Decision" },
+          { "id": "mpda-s3-ac5", "description": "asking_agent mapped to Decision.agentName" },
+          { "id": "mpda-s3-ac6", "description": "Defensive JSON.parse with try/catch — malformed options_presented_json results in empty rejected[], not a crash" }
+        ]
+      },
+      {
+        "step_id": "mpda-s4",
+        "title": "Implement cursor tracking for incremental processing",
+        "scope": "mull",
+        "description": "Implement getCursor(sessionId: string): string | null and setCursor(sessionId: string, cursor: string): void. Cursors are stored in .mull/cursors/planner/{plan_id}.json with { lastTimestamp: string, lastProcessedAt: string }. getCursor reads the file and returns lastTimestamp. setCursor writes the file. When getSession is called and a cursor exists, add WHERE timestamp > ? to only return events after the cursor. This enables incremental processing — only new decisions since last mull run.",
+        "dependencies": ["mpda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mpda-s4-ac1", "description": "Cursors persisted to .mull/cursors/planner/{plan_id}.json" },
+          { "id": "mpda-s4-ac2", "description": "getCursor returns lastTimestamp string or null if no cursor file" },
+          { "id": "mpda-s4-ac3", "description": "setCursor writes cursor file with lastTimestamp and lastProcessedAt" },
+          { "id": "mpda-s4-ac4", "description": "getSession respects cursor — only returns events after cursor timestamp when cursor exists" }
+        ]
+      },
+      {
+        "step_id": "mpda-s5",
+        "title": "Write tests with in-memory SQLite",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/__tests__/planner-db-adapter.test.ts. Use better-sqlite3 with ':memory:' to create a test database. Create the trajectory_events table with the same schema as planner's migration. Insert test DecisionEvent rows with known values. Test: listSessions returns correct plan_ids, getSession maps all fields correctly, options_presented_json parsing produces correct rejected[], cursor tracking filters events incrementally, time range filtering works, malformed JSON in options_presented_json handled gracefully, empty result sets return empty arrays. Use Vitest.",
+        "dependencies": ["mpda-s2", "mpda-s3", "mpda-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mpda-s5-ac1", "description": "Tests use in-memory SQLite with planner trajectory_events schema" },
+          { "id": "mpda-s5-ac2", "description": "Tests cover: listSessions, getSession field mapping, rejected[] derivation, cursor tracking, time range filtering" },
+          { "id": "mpda-s5-ac3", "description": "Tests cover edge cases: malformed JSON, empty result sets, missing optional fields" },
+          { "id": "mpda-s5-ac4", "description": "All tests pass with Vitest" }
+        ]
+      }
+    ]
+  }
+}

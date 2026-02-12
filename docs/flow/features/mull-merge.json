@@ -1,0 +1,181 @@
+{
+  "feature_id": "mull-topic-file-system",
+  "title": "Topic File System & Index Generation",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement pipeline Step 8 (mergeIntoTopicFiles) and Step 6 (rebuildTOC). This is the output layer: reading, writing, and merging topic files in memory/. Topic files are markdown with YAML frontmatter, organized by topic slug (e.g., auth-oauth.md). The core invariant: merge by slug, never blind append — re-running never creates duplicates. Sections are ordered: Decisions, Constraints, Patterns, Gotchas, Context. Empty sections are omitted. Frontmatter tracks sessions[], tags[], updated date. The index (memory/index.md) is rebuilt from all topic file frontmatter after every write. The filesystem IS the database.",
+    "acceptance_criteria": [
+      { "id": "mtf-ac1", "description": "mergeIntoTopicFiles(nuggets, memoryDir) writes nuggets to correct topic files, creating new files as needed" },
+      { "id": "mtf-ac2", "description": "Existing nuggets with same slug are updated in-place, never duplicated" },
+      { "id": "mtf-ac3", "description": "Topic file frontmatter has: topic (slug), updated (ISO date), sessions[] (session IDs), tags[] (string array)" },
+      { "id": "mtf-ac4", "description": "Topic file body has sections in fixed order: ## Decisions, ## Constraints, ## Patterns, ## Gotchas, ## Context" },
+      { "id": "mtf-ac5", "description": "Empty sections (no nuggets of that category) are omitted entirely from the file" },
+      { "id": "mtf-ac6", "description": "Each nugget renders as: ### slug-name\\ndescription\\n**Why**/**Rejected**/**Fix**/**Workaround** as appropriate\\n**Caused**: related-slug (if present)\\n**When**: date (session id)" },
+      { "id": "mtf-ac7", "description": "Frontmatter sessions[] array grows as new sessions contribute nuggets (never shrinks)" },
+      { "id": "mtf-ac8", "description": "Frontmatter tags[] is the union of all nugget tags for that topic" },
+      { "id": "mtf-ac9", "description": "gray-matter used for YAML frontmatter parsing and writing" },
+      { "id": "mtf-ac10", "description": "rebuildTOC(memoryDir) regenerates memory/index.md from all .md files in memory/ (excluding index.md itself)" },
+      { "id": "mtf-ac11", "description": "Index file has YAML frontmatter: updated (ISO timestamp), topics (count)" },
+      { "id": "mtf-ac12", "description": "Index body is a markdown table: | Topic | Tags | Sessions | Updated |" },
+      { "id": "mtf-ac13", "description": "rebuildTOC runs after every mergeIntoTopicFiles call" },
+      { "id": "mtf-ac14", "description": "readTopicFile(slug, memoryDir) returns parsed topic with frontmatter and nuggets" },
+      { "id": "mtf-ac15", "description": "MergeResult returned: topicsUpdated[], topicsCreated[], nuggetsWritten count" },
+      { "id": "mtf-ac16", "description": "Topic filename is kebab-case slug: {slug}.md (e.g., auth-oauth.md)" },
+      { "id": "mtf-ac17", "description": "Concurrent write safety: uses atomic write pattern (write to .tmp file, then rename to final path) plus per-topic advisory file lock via .mull/locks/ directory" },
+      { "id": "mtf-ac18", "description": "Causal link validation: warn (not error) when Nugget.caused references a slug not found in memory/ — log the missing reference but continue writing" },
+      { "id": "mtf-ac19", "description": "Scope tracking in frontmatter: tags[] includes scope-derived tags when available (e.g., 'scope:backend', 'scope:frontend') sourced from nugget or session metadata" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "gray-matter handles the markdown/frontmatter boundary — parse frontmatter, get body, write both back",
+        "Slug-based merge is the key invariant: regex match ### {slug} in existing file content, replace the block if found, append if not",
+        "Section ordering is fixed per spec: Decisions → Constraints → Patterns → Gotchas → Context",
+        "The merge operation must preserve existing nuggets from other sessions — it's additive/update, never destructive",
+        "Frontmatter sessions[] is an append-only set — tracks which sessions contributed to this topic",
+        "Index rebuild is a full scan: read all .md frontmatter in memory/, sort, write table",
+        "This module has no LLM dependency — it's pure file I/O and string manipulation",
+        "readTopicFile is needed by matchTopics in the extraction layer (to read frontmatter tags)"
+      ],
+      "concerns": [
+        "Concurrent writes: two mull processes writing to same topic file simultaneously could corrupt it — file locking or write ordering needed",
+        "Slug regex matching in markdown: need to handle ### with various whitespace and content patterns",
+        "Large topic files: if a topic accumulates 50+ nuggets over many sessions, rendering and merging performance"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-topic-file-system",
+    "version": 1,
+    "status": "draft",
+    "scopes": [
+      {
+        "scope_id": "mull-merge-read",
+        "name": "Topic File Reader",
+        "description": "Reading and parsing topic files with frontmatter and nugget extraction"
+      },
+      {
+        "scope_id": "mull-merge-write",
+        "name": "Topic File Writer",
+        "description": "Writing topic files with atomic writes, locking, and merge logic"
+      },
+      {
+        "scope_id": "mull-merge-toc",
+        "name": "TOC Generator",
+        "description": "Index file generation from topic file frontmatter"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mtf-s1",
+        "title": "Implement readTopicFile parser",
+        "scope": "mull-merge-read",
+        "description": "Build readTopicFile(slug, memoryDir) that reads a topic markdown file and returns parsed structure. Uses gray-matter to parse YAML frontmatter (topic, updated, sessions[], tags[]). Parses markdown body to extract individual nuggets by matching ### slug-name headers. Each nugget extracted with its category (determined by which ## section it falls under), body text, caused references, and When metadata. Returns null if file doesn't exist.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mtf-s1-ac1", "description": "Reads {slug}.md from memoryDir and parses YAML frontmatter via gray-matter" },
+          { "id": "mtf-s1-ac2", "description": "Extracts frontmatter fields: topic, updated, sessions[], tags[]" },
+          { "id": "mtf-s1-ac3", "description": "Parses body to extract nuggets by ### slug-name headers" },
+          { "id": "mtf-s1-ac4", "description": "Each extracted nugget has: slug, category (from parent ## section), body, caused (if present), when (if present)" },
+          { "id": "mtf-s1-ac5", "description": "Returns null if file does not exist (not an error)" }
+        ],
+        "specification": "Location: src/merge/reader.ts. Export readTopicFile(slug: string, memoryDir: string): ParsedTopicFile | null. ParsedTopicFile: { frontmatter: TopicFrontmatter, nuggets: ParsedNugget[] }. Use gray-matter for frontmatter. Split body by /^### /m to find nugget boundaries. Determine category by tracking which ## section each ### falls under."
+      },
+      {
+        "step_id": "mtf-s2",
+        "title": "Implement writeTopicFile with atomic writes and locking",
+        "scope": "mull-merge-write",
+        "description": "Build writeTopicFile(topicSlug, frontmatter, body, memoryDir) that writes a topic file atomically. Uses atomic write pattern: write content to {slug}.md.tmp, then rename to {slug}.md. Per-topic advisory locking via .mull/locks/{slug}.lock files — acquire lock before write, release after rename. Lock acquisition uses exponential backoff with a max wait of 5 seconds. Creates memoryDir and .mull/locks/ directories if they don't exist.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mtf-s2-ac1", "description": "Writes to {slug}.md.tmp first, then renames to {slug}.md (atomic write)" },
+          { "id": "mtf-s2-ac2", "description": "Per-topic advisory lock file at .mull/locks/{slug}.lock acquired before write" },
+          { "id": "mtf-s2-ac3", "description": "Lock acquisition uses exponential backoff, max 5 second wait" },
+          { "id": "mtf-s2-ac4", "description": "Lock released after successful rename (or on error)" },
+          { "id": "mtf-s2-ac5", "description": "Creates memoryDir and .mull/locks/ directories if they don't exist" },
+          { "id": "mtf-s2-ac6", "description": "gray-matter used to stringify frontmatter + body for output" }
+        ],
+        "specification": "Location: src/merge/writer.ts. Export writeTopicFile(slug: string, frontmatter: TopicFrontmatter, body: string, memoryDir: string): Promise<void>. Lock implementation: fs.writeFileSync(lockPath, pid, { flag: 'wx' }) for exclusive creation. On EEXIST, check if lock is stale (>30s old), remove and retry. Use try/finally for lock release (fs.unlinkSync). Rename via fs.renameSync for atomic move."
+      },
+      {
+        "step_id": "mtf-s3",
+        "title": "Implement mergeNuggetIntoSection with causal link validation",
+        "scope": "mull-merge-write",
+        "description": "Build the core merge logic: mergeIntoTopicFiles(nuggets, memoryDir, sessionId) that writes nuggets to the correct topic files. For each topic: read existing file (or start empty), merge new nuggets by slug (update in-place or append), reorder sections in fixed order (Decisions, Constraints, Patterns, Gotchas, Context), omit empty sections, update frontmatter (sessions[] append, tags[] union with scope-derived tags, updated timestamp). Validate causal links: warn (not error) when Nugget.caused references a slug not found in memory/. Returns MergeResult.",
+        "dependencies": ["mtf-s1", "mtf-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mtf-s3-ac1", "description": "Groups nuggets by topic, merges each topic file independently" },
+          { "id": "mtf-s3-ac2", "description": "Existing nuggets with same slug are replaced in-place, never duplicated" },
+          { "id": "mtf-s3-ac3", "description": "Sections ordered: Decisions, Constraints, Patterns, Gotchas, Context — empty sections omitted" },
+          { "id": "mtf-s3-ac4", "description": "Frontmatter sessions[] grows (append-only), tags[] is union of all nugget tags including scope-derived tags (e.g., 'scope:backend')" },
+          { "id": "mtf-s3-ac5", "description": "Causal link validation: warns when Nugget.caused references a slug not found in memory/, does not error" },
+          { "id": "mtf-s3-ac6", "description": "Each nugget rendered as: ### slug-name, description, metadata lines (**Why**, **Caused**, **When**)" },
+          { "id": "mtf-s3-ac7", "description": "Returns MergeResult: { topicsUpdated: string[], topicsCreated: string[], nuggetsWritten: number }" },
+          { "id": "mtf-s3-ac8", "description": "New topic files created for nuggets targeting topics that don't exist yet" }
+        ],
+        "specification": "Location: src/merge/merge.ts. Export mergeIntoTopicFiles(nuggets: Nugget[], memoryDir: string, sessionId: string): Promise<MergeResult>. Group nuggets by topic slug. For each group: readTopicFile, merge nuggets (find ### {slug} block via regex, replace or append), rebuild section structure, update frontmatter, writeTopicFile. Causal validation: scan all .md filenames in memoryDir to build slug set, warn for references outside set. Scope tags: if nugget has scope metadata, add 'scope:{value}' to tags[]."
+      },
+      {
+        "step_id": "mtf-s4",
+        "title": "Implement rebuildTOC index generator",
+        "scope": "mull-merge-toc",
+        "description": "Build rebuildTOC(memoryDir) that regenerates memory/index.md from all topic file frontmatter. Reads all .md files in memoryDir (excluding index.md), parses each file's YAML frontmatter. Writes index.md with YAML frontmatter (updated: ISO timestamp, topics: count) and a markdown table body: | Topic | Tags | Sessions | Updated |. Sorted by topic name alphabetically. Uses atomic write pattern for index.md itself.",
+        "dependencies": ["mtf-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mtf-s4-ac1", "description": "Reads all .md files in memoryDir except index.md" },
+          { "id": "mtf-s4-ac2", "description": "Parses YAML frontmatter from each topic file" },
+          { "id": "mtf-s4-ac3", "description": "Writes index.md with frontmatter: updated (ISO timestamp), topics (count)" },
+          { "id": "mtf-s4-ac4", "description": "Index body is markdown table: | Topic | Tags | Sessions | Updated |" },
+          { "id": "mtf-s4-ac5", "description": "Topics sorted alphabetically by name" },
+          { "id": "mtf-s4-ac6", "description": "Uses atomic write pattern for index.md" }
+        ],
+        "specification": "Location: src/merge/toc.ts. Export rebuildTOC(memoryDir: string): Promise<void>. Read directory listing, filter .md files excluding index.md, parse each with gray-matter (frontmatter only — no need to parse body). Build markdown table rows. Sort by topic slug. Write via atomic pattern (index.md.tmp → rename). Tags formatted as comma-separated in table cell. Sessions as count. Updated as ISO date."
+      },
+      {
+        "step_id": "mtf-s5",
+        "title": "Implement file locking utilities",
+        "scope": "mull-merge-write",
+        "description": "Build reusable file locking utilities for concurrent write safety. Advisory lock files in .mull/locks/ directory. Lock acquisition with exclusive file creation (wx flag), exponential backoff on contention, stale lock detection (>30s age). Lock release with cleanup. Used by both writeTopicFile and rebuildTOC.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mtf-s5-ac1", "description": "acquireLock(name, mullDir) creates exclusive lock file at .mull/locks/{name}.lock" },
+          { "id": "mtf-s5-ac2", "description": "Exponential backoff on contention: 10ms, 20ms, 40ms, ..., up to 5s total wait" },
+          { "id": "mtf-s5-ac3", "description": "Stale lock detection: locks older than 30 seconds are considered stale and removed" },
+          { "id": "mtf-s5-ac4", "description": "releaseLock(name, mullDir) removes the lock file" },
+          { "id": "mtf-s5-ac5", "description": "withLock(name, mullDir, fn) helper wraps an async function in acquire/release with try/finally" }
+        ],
+        "specification": "Location: src/merge/lock.ts. Export acquireLock(name: string, mullDir?: string): Promise<void>, releaseLock(name: string, mullDir?: string): void, withLock<T>(name: string, mullDir: string, fn: () => Promise<T>): Promise<T>. Lock file contains PID and timestamp as JSON. Stale detection: JSON.parse lock file, check if Date.now() - timestamp > 30000. Default mullDir: '.mull'."
+      },
+      {
+        "step_id": "mtf-s6",
+        "title": "Write topic file system tests",
+        "scope": "mull-merge-toc",
+        "description": "Comprehensive test suite for topic file reading, writing, merging, TOC generation, locking, and edge cases. Tests: readTopicFile parsing correctness, writeTopicFile atomic write (verify .tmp file doesn't persist), mergeIntoTopicFiles slug-based dedup (re-run produces no duplicates), section ordering, frontmatter growth, causal link validation warnings, scope tag tracking, rebuildTOC correctness, concurrent write safety (parallel writes don't corrupt), and empty/missing directory handling.",
+        "dependencies": ["mtf-s1", "mtf-s2", "mtf-s3", "mtf-s4", "mtf-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mtf-s6-ac1", "description": "Reader tests: frontmatter parsed correctly, nuggets extracted by section, missing file returns null" },
+          { "id": "mtf-s6-ac2", "description": "Writer tests: atomic write verified (no .tmp left behind), directories created if missing" },
+          { "id": "mtf-s6-ac3", "description": "Merge tests: slug dedup (same nugget twice = one entry), section ordering enforced, empty sections omitted, frontmatter sessions[] grows, tags[] unions" },
+          { "id": "mtf-s6-ac4", "description": "Causal validation tests: warning logged for missing referenced slug, no error thrown" },
+          { "id": "mtf-s6-ac5", "description": "Scope tag tests: nuggets with scope metadata produce 'scope:X' tags in frontmatter" },
+          { "id": "mtf-s6-ac6", "description": "TOC tests: index.md generated with correct table, sorted alphabetically, excludes index.md from listing" },
+          { "id": "mtf-s6-ac7", "description": "Lock tests: concurrent acquireLock calls serialize correctly, stale locks cleaned up" }
+        ],
+        "specification": "Location: src/merge/__tests__/merge.test.ts. Use Vitest. Use tmp directories for all file I/O tests. Create realistic topic files with frontmatter and nuggets as fixtures. For concurrent write tests, use Promise.all with multiple merge calls targeting the same topic. Verify final file content is valid and complete."
+      }
+    ]
+  }
+}

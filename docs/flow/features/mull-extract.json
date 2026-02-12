@@ -1,0 +1,188 @@
+{
+  "feature_id": "mull-deterministic-extraction",
+  "title": "Deterministic Extraction Layer",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types", "mull-adapter-system"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement pipeline Steps 2-5: the deterministic extraction layer that transforms SessionData into PreExtract. Four distinct functions, each with clear inputs and outputs. extractEntities uses compromise.js for NLP entity extraction with a custom tech lexicon. extractFacts pulls structural facts from events. matchTopics compares entities against existing memory/ files. filterTranscript extracts only decision-adjacent exchanges. The output PreExtract is the stage boundary — everything downstream may use LLM. This stage does ~80% of the value work at $0 cost and <100ms.",
+    "acceptance_criteria": [
+      { "id": "mde-ac1", "description": "extractEntities(sessionData) uses compromise.js to extract: topic keywords, technology names (OAuth, PKCE, SQLite...), file paths, function names, proper nouns" },
+      { "id": "mde-ac2", "description": "Entity extraction includes custom lexicon for common tech terms that compromise.js doesn't know natively" },
+      { "id": "mde-ac3", "description": "extractEntities processes both messages[].content and events[].description" },
+      { "id": "mde-ac4", "description": "extractFacts(sessionData) produces Fact[] from: tool calls made, files modified, errors encountered, status transitions, decision points with timestamps" },
+      { "id": "mde-ac5", "description": "extractFacts treats trajectory decisions and retrospective as high-signal: extracts as pre-structured facts with type 'decision' or 'retrospective'" },
+      { "id": "mde-ac6", "description": "matchTopics(entities, memoryDir) reads existing memory/ filenames and YAML frontmatter tags" },
+      { "id": "mde-ac7", "description": "matchTopics returns TopicMatch[] with confidence scores (0-1) and isNew flag for proposed new topics" },
+      { "id": "mde-ac8", "description": "matchTopics uses entity text overlap with filename stems and frontmatter tags for scoring" },
+      { "id": "mde-ac9", "description": "filterTranscript(sessionData, entities) extracts only exchanges around key decision points, not full history" },
+      { "id": "mde-ac10", "description": "For trajectory sources, chapter boundaries and decision events guide filterTranscript window selection" },
+      { "id": "mde-ac11", "description": "For relay sources, agent-to-agent decisions and broadcasts are prioritized over routine messages" },
+      { "id": "mde-ac12", "description": "Full extraction pipeline (all 4 functions) runs in <100ms for a typical 1-hour session" },
+      { "id": "mde-ac13", "description": "Zero API calls — entire stage is pure computation" },
+      { "id": "mde-ac14", "description": "Output PreExtract contains: sessionId, source, entities[], facts[], topicMatches[], filteredTranscript[], existingTopics[]" },
+      { "id": "mde-ac15", "description": "buildPreExtract(sessionData, memoryDir) composes all 4 functions and returns PreExtract" },
+      { "id": "mde-ac16", "description": "Topic assignment algorithm: confidence threshold (default 0.3) — entities with no match above threshold are grouped by co-occurrence into new topic proposals" },
+      { "id": "mde-ac17", "description": "extractFacts sets Fact.isPreStructured = true for trail decisions (Decision.source = 'trail'), marking them for direct nugget conversion downstream" },
+      { "id": "mde-ac18", "description": "filterTranscript window: +/-3 messages around decision events for relay/transcript sources; expand to chapter boundary for trajectory sources" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The 4 functions have clear dependency chain: entities → matchTopics (needs entities), filterTranscript (needs entities), facts (independent)",
+        "So extractEntities and extractFacts can run in parallel, then matchTopics and filterTranscript can use entity results",
+        "compromise.js processes ~1MB/sec — a 1-hour session transcript is typically 50-200KB, so <200ms even without parallelism",
+        "Custom tech lexicon needed because compromise.js is general English NLP — TypeScript, OAuth, PKCE, SQLite, etc. are not in its default lexicon",
+        "matchTopics is a simple scoring function: count entity overlaps with existing topic filenames and frontmatter tags",
+        "filterTranscript is the most heuristic-heavy function — needs empirical tuning for window size around decisions",
+        "Spec says ~200 lines for extract.ts — this is achievable because each function is focused"
+      ],
+      "concerns": [
+        "compromise.js custom lexicon maintenance: tech terms evolve, new frameworks appear",
+        "filterTranscript window size: too small loses context (agent won't understand nugget), too large wastes LLM tokens",
+        "matchTopics with empty memory/ directory: all entities become 'new topic' proposals — need sensible grouping heuristic"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-deterministic-extraction",
+    "version": 1,
+    "status": "draft",
+    "scopes": [
+      {
+        "scope_id": "mull-extract-entities",
+        "name": "Entity Extraction",
+        "description": "NLP-based entity extraction using compromise.js with custom tech lexicon"
+      },
+      {
+        "scope_id": "mull-extract-facts",
+        "name": "Fact Extraction",
+        "description": "Structural fact extraction from session events and decisions"
+      },
+      {
+        "scope_id": "mull-extract-topics",
+        "name": "Topic Matching",
+        "description": "Entity-to-topic matching with confidence scoring and new topic proposals"
+      },
+      {
+        "scope_id": "mull-extract-transcript",
+        "name": "Transcript Filtering",
+        "description": "Decision-adjacent transcript extraction with source-aware windowing"
+      },
+      {
+        "scope_id": "mull-extract-compose",
+        "name": "PreExtract Compositor",
+        "description": "Composition function that orchestrates all extraction stages"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mde-s1",
+        "title": "Implement extractEntities with tech lexicon",
+        "scope": "mull-extract-entities",
+        "description": "Build extractEntities(sessionData) using compromise.js for NLP entity extraction. Create a custom tech lexicon that registers common technology terms (OAuth, PKCE, SQLite, TypeScript, React, Vitest, etc.) as proper nouns so compromise.js recognizes them. Extract: topic keywords, technology names, file paths (regex pattern for path-like strings), function names (camelCase/PascalCase patterns), proper nouns. Process both messages[].content and events[].description. Return Entity[] with text, type, and frequency count.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mde-s1-ac1", "description": "Uses compromise.js with .extend() to register custom tech lexicon" },
+          { "id": "mde-s1-ac2", "description": "Tech lexicon includes common terms: OAuth, PKCE, SQLite, TypeScript, React, Vitest, Express, Zod, etc." },
+          { "id": "mde-s1-ac3", "description": "Extracts topic keywords, technology names, file paths, function names, proper nouns" },
+          { "id": "mde-s1-ac4", "description": "Processes both messages[].content and events[].description" },
+          { "id": "mde-s1-ac5", "description": "Returns Entity[] with text, type (keyword|tech|filepath|function|noun), and frequency" },
+          { "id": "mde-s1-ac6", "description": "Deduplicates entities by normalized text, summing frequency counts" }
+        ],
+        "specification": "Location: src/extract/entities.ts. Export extractEntities(sessionData: SessionData): Entity[]. Use compromise.plugin() to register tech lexicon as { words: { 'OAuth': 'ProperNoun', ... } }. File paths detected via regex /[\\/\\w-]+\\.\\w{1,10}/. Function names via /\\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\\b/ (camelCase) and /\\b[A-Z][a-zA-Z0-9]+\\b/ (PascalCase, filtered against lexicon). Lexicon stored as separate const for easy extension."
+      },
+      {
+        "step_id": "mde-s2",
+        "title": "Implement extractFacts with isPreStructured flag",
+        "scope": "mull-extract-facts",
+        "description": "Build extractFacts(sessionData) that produces Fact[] from structural session data. Extracts facts from: tool calls made (type: 'tool_call'), files modified (type: 'file_modified'), errors encountered (type: 'error'), status transitions (type: 'status_change'), decision points with timestamps (type: 'decision'). For trail decisions (Decision.source = 'trail'), sets Fact.isPreStructured = true, marking them for direct nugget conversion without LLM processing. Retrospective summaries extracted as type 'retrospective' facts.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mde-s2-ac1", "description": "Extracts tool call facts from events with type tool_call" },
+          { "id": "mde-s2-ac2", "description": "Extracts file modification facts from events with file paths" },
+          { "id": "mde-s2-ac3", "description": "Extracts error facts from events with error indicators" },
+          { "id": "mde-s2-ac4", "description": "Extracts decision facts from Decision[] with reasoning preserved" },
+          { "id": "mde-s2-ac5", "description": "Trail decisions (Decision.source = 'trail') produce facts with Fact.isPreStructured = true" },
+          { "id": "mde-s2-ac6", "description": "Each fact includes timestamp, type, description, and optional metadata" }
+        ],
+        "specification": "Location: src/extract/facts.ts. Export extractFacts(sessionData: SessionData): Fact[]. Fact type: { type: string, description: string, timestamp: string, isPreStructured?: boolean, metadata?: Record<string, unknown> }. Check decision.source === 'trail' to set isPreStructured. Process sessionData.events, sessionData.decisions, sessionData.retrospective in order."
+      },
+      {
+        "step_id": "mde-s3",
+        "title": "Implement matchTopics with confidence threshold",
+        "scope": "mull-extract-topics",
+        "description": "Build matchTopics(entities, memoryDir) that reads existing memory/ filenames and their YAML frontmatter tags, then scores each entity against existing topics. Confidence scoring based on entity text overlap with filename stems and frontmatter tags. Entities above confidence threshold (default 0.3) are matched to existing topics. Entities below threshold are grouped by co-occurrence (entities that appear in the same messages/events) into new topic proposals with isNew = true. Returns TopicMatch[] with confidence scores.",
+        "dependencies": ["mde-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mde-s3-ac1", "description": "Reads existing memory/ filenames and parses YAML frontmatter tags using gray-matter" },
+          { "id": "mde-s3-ac2", "description": "Scores entities against topic filename stems and frontmatter tags" },
+          { "id": "mde-s3-ac3", "description": "Confidence threshold default 0.3: entities above threshold matched to existing topics" },
+          { "id": "mde-s3-ac4", "description": "Entities below threshold grouped by co-occurrence into new topic proposals with isNew = true" },
+          { "id": "mde-s3-ac5", "description": "Returns TopicMatch[] with topicSlug, confidence (0-1), isNew flag, and matched entities" },
+          { "id": "mde-s3-ac6", "description": "Empty memory/ directory: all entities become new topic proposals grouped by co-occurrence" }
+        ],
+        "specification": "Location: src/extract/topics.ts. Export matchTopics(entities: Entity[], memoryDir: string, opts?: { threshold?: number }): TopicMatch[]. Read all .md files in memoryDir (excluding index.md), parse frontmatter with gray-matter. Score: exact match on filename stem = 1.0, partial match (substring or tag overlap) = 0.3-0.8. Co-occurrence grouping: entities appearing in the same 3+ messages are proposed as a single topic. Proposed topic slug generated from highest-frequency entity in the group."
+      },
+      {
+        "step_id": "mde-s4",
+        "title": "Implement filterTranscript with source-aware windowing",
+        "scope": "mull-extract-transcript",
+        "description": "Build filterTranscript(sessionData, entities) that extracts only decision-adjacent exchanges from the session data. For trajectory sources: expand window to chapter boundary around decision events (include entire chapter containing the decision). For relay/transcript sources: use +/-3 messages around decision events. Decision events identified from sessionData.decisions timestamps. For relay sources, prioritize agent-to-agent decisions and broadcasts over routine messages. Returns FilteredExcerpt[] with excerpted messages and the decision context.",
+        "dependencies": ["mde-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mde-s4-ac1", "description": "Extracts exchanges around decision events, not full session history" },
+          { "id": "mde-s4-ac2", "description": "Trajectory sources: window expands to chapter boundary (entire chapter containing the decision)" },
+          { "id": "mde-s4-ac3", "description": "Relay/transcript sources: window is +/-3 messages around decision event timestamp" },
+          { "id": "mde-s4-ac4", "description": "Relay sources prioritize agent-to-agent decisions and broadcasts over routine messages" },
+          { "id": "mde-s4-ac5", "description": "Returns FilteredExcerpt[] with messages, decision context, and source metadata" },
+          { "id": "mde-s4-ac6", "description": "Overlapping windows are merged to avoid duplicate messages in output" }
+        ],
+        "specification": "Location: src/extract/transcript.ts. Export filterTranscript(sessionData: SessionData, entities: Entity[]): FilteredExcerpt[]. Detect source type from sessionData metadata or events (chapter_start events indicate trajectory). For +/-3 window: binary search messages by timestamp to find nearest, take slice. For chapter expansion: find chapter_start events, use as window boundaries. Merge overlapping FilteredExcerpts by checking message overlap."
+      },
+      {
+        "step_id": "mde-s5",
+        "title": "Implement buildPreExtract compositor",
+        "scope": "mull-extract-compose",
+        "description": "Build buildPreExtract(sessionData, memoryDir) that composes all 4 extraction functions and returns a PreExtract object. Runs extractEntities and extractFacts in parallel (they are independent). Then runs matchTopics and filterTranscript (both depend on entities). Assembles the PreExtract with: sessionId, source, entities[], facts[], topicMatches[], filteredTranscript[], existingTopics[]. The PreExtract is the stage boundary — everything downstream may use LLM.",
+        "dependencies": ["mde-s1", "mde-s2", "mde-s3", "mde-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mde-s5-ac1", "description": "Composes all 4 extraction functions into single buildPreExtract call" },
+          { "id": "mde-s5-ac2", "description": "Runs extractEntities and extractFacts in parallel (Promise.all)" },
+          { "id": "mde-s5-ac3", "description": "Runs matchTopics and filterTranscript after entities are available" },
+          { "id": "mde-s5-ac4", "description": "Output PreExtract contains: sessionId, source, entities[], facts[], topicMatches[], filteredTranscript[], existingTopics[]" },
+          { "id": "mde-s5-ac5", "description": "Full pipeline runs in <100ms for a typical 1-hour session" },
+          { "id": "mde-s5-ac6", "description": "Zero API calls — entire stage is pure computation" }
+        ],
+        "specification": "Location: src/extract/index.ts. Export buildPreExtract(sessionData: SessionData, memoryDir: string): Promise<PreExtract>. Use Promise.all([extractEntities(sessionData), extractFacts(sessionData)]) for parallel phase. Then sequential: matchTopics(entities, memoryDir), filterTranscript(sessionData, entities). existingTopics populated from matchTopics results where isNew === false."
+      },
+      {
+        "step_id": "mde-s6",
+        "title": "Write extraction layer tests",
+        "scope": "mull-extract-compose",
+        "description": "Comprehensive test suite for all extraction functions. Tests entity extraction with tech lexicon recognition, fact extraction with isPreStructured flag on trail decisions, topic matching with confidence threshold and co-occurrence grouping, transcript filtering with source-aware windowing (+/-3 and chapter boundaries), and buildPreExtract composition. Include performance test verifying <100ms for typical session size.",
+        "dependencies": ["mde-s1", "mde-s2", "mde-s3", "mde-s4", "mde-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mde-s6-ac1", "description": "Entity extraction tests: tech terms recognized via lexicon, file paths extracted, function names extracted, deduplication works" },
+          { "id": "mde-s6-ac2", "description": "Fact extraction tests: tool calls, file modifications, errors, decisions extracted; trail decisions have isPreStructured=true" },
+          { "id": "mde-s6-ac3", "description": "Topic matching tests: confidence scoring correct, threshold filtering works, co-occurrence grouping for below-threshold entities, empty memory/ dir handled" },
+          { "id": "mde-s6-ac4", "description": "Transcript filtering tests: +/-3 window for relay/transcript, chapter boundary expansion for trajectory, overlapping windows merged" },
+          { "id": "mde-s6-ac5", "description": "buildPreExtract composition test: all fields populated, parallel execution verified" },
+          { "id": "mde-s6-ac6", "description": "Performance test: extraction completes in <100ms for 200KB session data" }
+        ],
+        "specification": "Location: src/extract/__tests__/extract.test.ts. Use Vitest. Create realistic SessionData fixtures. For topic matching tests, create tmp memory/ directories with sample .md files and frontmatter. Use performance.now() for timing assertions."
+      }
+    ]
+  }
+}

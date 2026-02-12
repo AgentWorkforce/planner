@@ -1,0 +1,81 @@
+{
+  "feature_id": "forge-builds",
+  "title": "Forge Builds: Multi-Plan Execution Coordination",
+  "type": "epic",
+  "status": "draft",
+  "priority": "critical",
+  "component": "forge-core",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Add a generic multi-plan execution layer to Forge that accepts a pre-computed DAG of plan references organized into tiers, executes them as coordinated runs tier-by-tier, and tracks aggregate build state. Any client (Planner, testbench, CLI) can submit a build request — Forge doesn't care about the source, it just executes.",
+    "in_scope": [
+      "Build entity with tier-based execution model",
+      "builds + build_runs tables in forge.db",
+      "Tier-by-tier execution: complete tier N before starting tier N+1",
+      "Parallel execution within tiers (up to concurrency limit)",
+      "Build-level pause/resume/cancel propagating to child runs",
+      "Failure handling: failed run blocks dependent tiers, siblings continue",
+      "Incremental builds: skip plans with recent successful completions",
+      "Build progress SSE events",
+      "Plan fetching via PlannerClient at execution time (not at proposal time)"
+    ],
+    "out_of_scope": [
+      "Dependency graph resolution (that's Planner's job — Forge receives pre-computed tiers)",
+      "Build proposal/analysis (Planner computes this by querying Forge for run history)",
+      "UI for builds (separate feature in planner-ui)",
+      "Plan approval workflow (plans must be approved before build)",
+      "Cross-build coordination (running build A and build B simultaneously with shared state)"
+    ],
+    "acceptance_criteria": [
+      { "id": "fb-ac1", "description": "POST /api/forge/builds accepts tiers of plan_ids and creates a build with child runs" },
+      { "id": "fb-ac2", "description": "Build executes tier 0 runs immediately, waits for all to complete before advancing to tier 1" },
+      { "id": "fb-ac3", "description": "Within a tier, runs execute in parallel up to the configured concurrency limit" },
+      { "id": "fb-ac4", "description": "If a run in tier N fails, tier N+1 is blocked but other tier N runs continue to completion" },
+      { "id": "fb-ac5", "description": "Build-level pause stops scheduling new runs and pauses in-progress runs" },
+      { "id": "fb-ac6", "description": "Build-level cancel cancels all in-progress and queued runs" },
+      { "id": "fb-ac7", "description": "GET /api/forge/builds/:id returns build status with per-tier, per-run progress" },
+      { "id": "fb-ac8", "description": "GET /api/forge/builds/:id/events streams SSE events for build-level state changes" },
+      { "id": "fb-ac9", "description": "Builds with skip_completed=true skip plans that have a recent successful run" },
+      { "id": "fb-ac10", "description": "A single-plan build (1 tier, 1 plan) works identically to the existing POST /runs flow" },
+      { "id": "fb-ac11", "description": "Build correctly fetches each plan from Planner via PlannerClient before creating runs" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Forge is intentionally a single-plan executor — builds add a layer ABOVE runs, not replacing them",
+        "The existing orchestrator handles tasks within a run; the build coordinator handles runs within a build",
+        "sub_plan_id support in orchestrator is hierarchical (parent embeds child) — builds are lateral (independent plans coordinated)",
+        "Test mode (TestExecutor) should work with builds — each run in the build uses test execution",
+        "PlannerClient already exists and can fetch plans — builds just call it per plan in each tier",
+        "The build coordinator is conceptually similar to the orchestrator but at a higher level of abstraction",
+        "Builds are ephemeral execution state — they don't need versioning or approval (that's the plans themselves)"
+      ],
+      "questions": [
+        "Should builds support 'retry tier' (re-run all failed runs in a tier)?",
+        "What happens if a plan was modified between proposal and execution? Use version pinning?",
+        "Should the concurrency limit be per-tier or per-build?"
+      ],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "pattern": "Forge owns build execution state, Planner owns build resolution/proposal",
+      "rationale": "Build is execution state (runs, progress, failures). Keeping it in forge.db avoids cross-DB sync. Makes Forge's builds API generically usable by any client.",
+      "execution_model": "Tier-based DAG: tiers execute sequentially, plans within a tier execute in parallel. Same model as CI/CD pipeline stages.",
+      "storage": "Two new tables in forge.db: builds (build state) and build_runs (maps runs to builds with tier info)",
+      "relationship_to_runs": "A build creates N runs. Each run is a standard Forge run. The build coordinator monitors and advances tiers."
+    }
+  },
+
+  "sub_features": [
+    "forge-build-domain",
+    "forge-build-storage",
+    "forge-build-coordinator",
+    "forge-build-api"
+  ]
+}
