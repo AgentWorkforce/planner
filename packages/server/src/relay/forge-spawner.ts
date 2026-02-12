@@ -250,8 +250,11 @@ function buildTaskPrompt(options: SpawnTaskOptions): string {
 You MUST commit your changes BEFORE calling report_complete. The orchestrator tracks work by commits.
 
 \`\`\`bash
-git add -A && git commit -m "[forge:${options.taskId}] Brief description of what was implemented"
+git add <files you changed> && git commit -m "[forge:${options.taskId}] Brief description of what was implemented"
 \`\`\`
+
+**IMPORTANT: Only stage files you created or modified.** Other agents may be working in parallel.
+Do NOT use \`git add -A\` or \`git add .\` — stage specific files to avoid committing another agent's in-progress work.
 
 The commit message MUST start with \`[forge:${options.taskId}]\`. After committing, call \`report_complete\`.
 **If you skip the commit, your work may be lost.**
@@ -436,9 +439,11 @@ When you have finished your implementation and verified it meets the acceptance 
 you MUST commit your changes BEFORE reporting completion:
 
 \`\`\`bash
-git add -A
+git add <files you changed>
 git commit -m "[forge:${options.taskId}] Brief description of what was implemented"
 \`\`\`
+
+**IMPORTANT: Only stage files you created or modified.** Do NOT use \`git add -A\` or \`git add .\` — other agents may be working in parallel in the same worktree. Stage specific files to avoid committing another agent's in-progress work.
 
 The commit message MUST start with \`[forge:${options.taskId}]\` — this marker lets the
 orchestrator identify exactly which files you changed for per-task verification.

@@ -14,8 +14,8 @@
  */
 
 import { execFile } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import path, { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { ForgeStorage } from '../storage/interface.js';
@@ -235,6 +235,23 @@ export class Orchestrator {
 
     for (const run of allRuns) {
       try {
+        // Check if workspace_path exists — if it was deleted, clear it for fresh worktree
+        if (run.workspace_path && !existsSync(run.workspace_path)) {
+          console.log(
+            `[Orchestrator] Run ${run.run_id} has stale workspace_path (${run.workspace_path}) — clearing for fresh worktree`
+          );
+          // Clear the run's workspace_path
+          this.storage.updateRun(run.run_id, { workspace_path: undefined });
+          // Clear workspace_path for all tasks in this run
+          const allTasksInRun = this.storage.listTasksByRun(run.run_id);
+          for (const task of allTasksInRun) {
+            this.storage.updateTask(task.task_id, { workspace_path: undefined });
+          }
+        } else if (run.workspace_path && existsSync(run.workspace_path)) {
+          // Workspace exists — track it in the in-memory map
+          this.runWorktrees.set(run.run_id, run.workspace_path);
+        }
+
         // Check if any tasks are still "running" — these agents are dead (server restarted)
         const tasks = this.storage.listTasksByRun(run.run_id);
         const runningTasks = tasks.filter((t) => t.status === TaskStatus.Running);
@@ -1265,9 +1282,31 @@ export class Orchestrator {
 
     await this.runService.emitRunOutcome(outcome);
 
+    // Check for uncommitted work in the worktree before declaring done
+    const worktreePath = this.runWorktrees.get(runId);
+    if (worktreePath && existsSync(worktreePath) && worktreePath.includes('.forge-worktrees/')) {
+      try {
+        const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd: worktreePath });
+        if (status.trim()) {
+          console.warn(
+            `[Orchestrator] Run ${runId} has uncommitted changes at finalization — auto-committing`
+          );
+          await execFileAsync('git', ['add', '.'], { cwd: worktreePath });
+          await execFileAsync('git', [
+            'commit', '-m',
+            `[forge:${runId}] Finalization: uncommitted work`,
+          ], { cwd: worktreePath });
+        }
+      } catch (err) {
+        console.warn(
+          `[Orchestrator] Run ${runId} finalization git check failed:`,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
     // Worktree is kept on success — it contains the agent's work.
     // User reviews/merges via `git worktree list` and then cleans up.
-    const worktreePath = this.runWorktrees.get(runId);
     if (worktreePath) {
       console.log(
         `[Orchestrator] Run ${runId} complete. Worktree preserved at ${worktreePath}`
@@ -2064,9 +2103,28 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
     const cwd = task.workspace_path;
     if (!cwd) return;
 
+    // Resolve to absolute path
+    const resolvedCwd = path.resolve(cwd);
+
+    // Safety guard: ensure path contains .forge-worktrees/
+    if (!resolvedCwd.includes('.forge-worktrees/')) {
+      console.warn(
+        `[Orchestrator] Task ${task.step_id}: workspace_path "${resolvedCwd}" is not a worktree — skipping auto-commit`
+      );
+      return;
+    }
+
+    // Safety guard: ensure directory exists
+    if (!existsSync(resolvedCwd)) {
+      console.warn(
+        `[Orchestrator] Task ${task.step_id}: workspace_path "${resolvedCwd}" does not exist — skipping auto-commit`
+      );
+      return;
+    }
+
     try {
       // Check for uncommitted changes
-      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd });
+      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd: resolvedCwd });
       if (!status.trim()) return; // Clean worktree — agent committed properly
 
       console.warn(
@@ -2074,11 +2132,11 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
       );
 
       // Stage and commit with forge marker
-      await execFileAsync('git', ['add', '-A'], { cwd });
+      await execFileAsync('git', ['add', '.'], { cwd: resolvedCwd });
       await execFileAsync('git', [
         'commit', '-m',
         `[forge:${task.task_id}] Auto-commit: agent completed without committing`,
-      ], { cwd });
+      ], { cwd: resolvedCwd });
 
       console.log(`[Orchestrator] Auto-committed changes for task ${task.step_id}`);
     } catch (err) {
