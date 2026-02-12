@@ -4,6 +4,7 @@ import { SummarySchema, type Summary } from './summary.js';
 import { StepSchema } from './step.js';
 import { ApprovalInfoSchema } from './workflow.js';
 import { DecompositionConfigSchema, type DecompositionConfig } from './decomposition-config.js';
+import { ContextSchema, type Context } from './context.js';
 
 /**
  * PlanSource tracks where a plan originated from.
@@ -53,6 +54,7 @@ export const PlanVersionSchema = z.object({
   summary: SummarySchema,
   steps: z.array(StepSchema),
   understanding: UnderstandingSchema.optional(),
+  context: ContextSchema.optional(),
   submitted_at: z.string().datetime().optional(),
   approval_info: ApprovalInfoSchema.optional(),
   change_request_id: z.string().uuid().optional(),

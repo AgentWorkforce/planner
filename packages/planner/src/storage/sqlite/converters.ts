@@ -1,4 +1,5 @@
 import type { Plan, PlanVersion, PlanSource, Understanding } from '../../domain/plan.js';
+import type { Context } from '../../domain/context.js';
 import type { Step } from '../../domain/step.js';
 import type { Summary } from '../../domain/summary.js';
 import type { PlanStatus } from '../../domain/status.js';
@@ -64,6 +65,7 @@ export interface VersionRow {
   status: string;
   summary_json: string;
   understanding_json: string | null;
+  context_json: string | null;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -218,6 +220,9 @@ export function rowToVersion(row: VersionRow, steps: Step[]): PlanVersion {
   const understanding = row.understanding_json
     ? (JSON.parse(row.understanding_json) as Understanding)
     : undefined;
+  const context = row.context_json
+    ? (JSON.parse(row.context_json) as Context)
+    : undefined;
   const version: PlanVersion = {
     plan_id: row.plan_id,
     version: row.version,
@@ -225,6 +230,7 @@ export function rowToVersion(row: VersionRow, steps: Step[]): PlanVersion {
     summary: JSON.parse(row.summary_json) as Summary,
     steps,
     understanding: understanding && Object.keys(understanding).length > 0 ? understanding : undefined,
+    context: context && Object.keys(context).length > 0 ? context : undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

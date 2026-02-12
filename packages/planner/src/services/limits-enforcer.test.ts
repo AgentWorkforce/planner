@@ -10,6 +10,8 @@ import {
   validateSubPlanDepth,
   validateAllSubPlanDepths,
   validateAllLimits,
+  validateSubPlanReferences,
+  validateSubPlansPublished,
   getStepDistributionSummary,
   type PlanStorage,
 } from './limits-enforcer.js';
@@ -37,7 +39,8 @@ function makeSteps(count: number, scope?: string): ReturnType<typeof createStep>
 
 function createMockStorage(plans: Map<string, PlanVersion>): PlanStorage {
   return {
-    getPlanVersion: async (planId: string) => plans.get(planId) ?? null,
+    getLatestVersion: (planId: string) => plans.get(planId) ?? null,
+    getPlan: (planId: string) => plans.has(planId) ? { plan_id: planId } as any : null,
   };
 }
 
@@ -170,16 +173,16 @@ describe('validatePlanLimits', () => {
 // ============================================
 
 describe('validateSubPlanDepth', () => {
-  it('should return valid for plan with no sub-plans', async () => {
+  it('should return valid for plan with no sub-plans', () => {
     const pv = makePlanVersion(makeSteps(3, 'api'));
     const storage = createMockStorage(new Map([[PLAN_ID, pv]]));
 
-    const result = await validateSubPlanDepth(PLAN_ID, storage);
+    const result = validateSubPlanDepth(PLAN_ID, storage);
     expect(result.valid).toBe(true);
     expect(result.depth).toBe(1);
   });
 
-  it('should return valid for depth within limit', async () => {
+  it('should return valid for depth within limit', () => {
     // PLAN_ID -> SUB_PLAN_A -> SUB_PLAN_B (depth 3, limit 3)
     const pvC = makePlanVersion(makeSteps(2, 'api'));
     const pvB = makePlanVersion(
@@ -196,13 +199,13 @@ describe('validateSubPlanDepth', () => {
     ]);
     const storage = createMockStorage(plans);
 
-    const result = await validateSubPlanDepth(PLAN_ID, storage, 3);
+    const result = validateSubPlanDepth(PLAN_ID, storage, 3);
     expect(result.valid).toBe(true);
     expect(result.depth).toBe(3);
     expect(result.path).toEqual([PLAN_ID, SUB_PLAN_A, SUB_PLAN_B]);
   });
 
-  it('should return error when depth exceeds limit', async () => {
+  it('should return error when depth exceeds limit', () => {
     // 4 levels deep with max_depth = 2
     const pvD = makePlanVersion(makeSteps(1));
     const pvC = makePlanVersion(
@@ -223,12 +226,12 @@ describe('validateSubPlanDepth', () => {
     ]);
     const storage = createMockStorage(plans);
 
-    const result = await validateSubPlanDepth(PLAN_ID, storage, 2);
+    const result = validateSubPlanDepth(PLAN_ID, storage, 2);
     expect(result.valid).toBe(false);
     expect(result.error).toContain('exceeds maximum');
   });
 
-  it('should detect circular references', async () => {
+  it('should detect circular references', () => {
     // PLAN_ID -> SUB_PLAN_A -> PLAN_ID (circular)
     const pvA = makePlanVersion(
       [createStep('Sub', { sub_plan_id: SUB_PLAN_A })],
@@ -243,12 +246,12 @@ describe('validateSubPlanDepth', () => {
     ]);
     const storage = createMockStorage(plans);
 
-    const result = await validateSubPlanDepth(PLAN_ID, storage, 5);
+    const result = validateSubPlanDepth(PLAN_ID, storage, 5);
     expect(result.valid).toBe(false);
     expect(result.error).toContain('Circular');
   });
 
-  it('should handle non-existent sub-plan gracefully', async () => {
+  it('should handle non-existent sub-plan gracefully', () => {
     const pv = makePlanVersion(
       [createStep('Sub', { sub_plan_id: SUB_PLAN_A })],
     );
@@ -257,15 +260,15 @@ describe('validateSubPlanDepth', () => {
     ]);
     const storage = createMockStorage(plans);
 
-    const result = await validateSubPlanDepth(PLAN_ID, storage);
+    const result = validateSubPlanDepth(PLAN_ID, storage);
     // Non-existent plan is not an error, traversal just stops
     expect(result.valid).toBe(true);
   });
 
-  it('should use default max_depth when not specified', async () => {
+  it('should use default max_depth when not specified', () => {
     const pv = makePlanVersion(makeSteps(2));
     const storage = createMockStorage(new Map([[PLAN_ID, pv]]));
-    const result = await validateSubPlanDepth(PLAN_ID, storage);
+    const result = validateSubPlanDepth(PLAN_ID, storage);
     expect(result.maxDepth).toBe(DEFAULT_DECOMPOSITION_CONFIG.max_depth);
   });
 });
@@ -275,26 +278,26 @@ describe('validateSubPlanDepth', () => {
 // ============================================
 
 describe('validateAllSubPlanDepths', () => {
-  it('should return valid for plan without sub-plans', async () => {
+  it('should return valid for plan without sub-plans', () => {
     const pv = makePlanVersion(makeSteps(3, 'api'));
     const storage = createMockStorage(new Map());
-    const result = await validateAllSubPlanDepths(pv, storage);
+    const result = validateAllSubPlanDepths(pv, storage);
     expect(result.valid).toBe(true);
   });
 
-  it('should error when sub-plans are not allowed', async () => {
+  it('should error when sub-plans are not allowed', () => {
     const config = createDecompositionConfig({ allowSubPlans: false });
     const pv = makePlanVersion(
       [createStep('Sub', { sub_plan_id: SUB_PLAN_A })],
       { decomposition_config: config }
     );
     const storage = createMockStorage(new Map());
-    const result = await validateAllSubPlanDepths(pv, storage);
+    const result = validateAllSubPlanDepths(pv, storage);
     expect(result.valid).toBe(false);
     expect(result.errors[0]).toContain('not allowed');
   });
 
-  it('should validate each sub-plan reference independently', async () => {
+  it('should validate each sub-plan reference independently', () => {
     const pv = makePlanVersion([
       createStep('Sub A', { sub_plan_id: SUB_PLAN_A }),
       createStep('Sub B', { sub_plan_id: SUB_PLAN_B }),
@@ -307,7 +310,100 @@ describe('validateAllSubPlanDepths', () => {
       [SUB_PLAN_B, { ...pvB, plan_id: SUB_PLAN_B } as PlanVersion],
     ]);
     const storage = createMockStorage(plans);
-    const result = await validateAllSubPlanDepths(pv, storage);
+    const result = validateAllSubPlanDepths(pv, storage);
+    expect(result.valid).toBe(true);
+  });
+});
+
+// ============================================
+// validateSubPlanReferences
+// ============================================
+
+describe('validateSubPlanReferences', () => {
+  it('should return valid for plan without sub-plans', () => {
+    const pv = makePlanVersion(makeSteps(3, 'api'));
+    const storage = createMockStorage(new Map());
+    const result = validateSubPlanReferences(pv, storage);
+    expect(result.valid).toBe(true);
+  });
+
+  it('should error when sub-plan does not exist', () => {
+    const pv = makePlanVersion([
+      createStep('Sub', { sub_plan_id: SUB_PLAN_A }),
+    ]);
+    const storage = createMockStorage(new Map());
+    const result = validateSubPlanReferences(pv, storage);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('does not exist');
+  });
+
+  it('should warn when sub-plan has no versions', () => {
+    const pv = makePlanVersion([
+      createStep('Sub', { sub_plan_id: SUB_PLAN_A }),
+    ]);
+    // Plan exists but no version in the map (getPlan returns truthy, getLatestVersion returns null)
+    const storage: PlanStorage = {
+      getPlan: (planId: string) => planId === SUB_PLAN_A ? { plan_id: SUB_PLAN_A } as any : null,
+      getLatestVersion: () => null,
+    };
+    const result = validateSubPlanReferences(pv, storage);
+    expect(result.valid).toBe(true); // warnings only
+    expect(result.warnings[0]).toContain('no versions');
+  });
+
+  it('should pass when all references are valid', () => {
+    const pv = makePlanVersion([
+      createStep('Sub A', { sub_plan_id: SUB_PLAN_A }),
+      createStep('Sub B', { sub_plan_id: SUB_PLAN_B }),
+    ]);
+    const pvA = makePlanVersion(makeSteps(1));
+    const pvB = makePlanVersion(makeSteps(1));
+    const plans = new Map<string, PlanVersion>([
+      [SUB_PLAN_A, { ...pvA, plan_id: SUB_PLAN_A } as PlanVersion],
+      [SUB_PLAN_B, { ...pvB, plan_id: SUB_PLAN_B } as PlanVersion],
+    ]);
+    const storage = createMockStorage(plans);
+    const result = validateSubPlanReferences(pv, storage);
+    expect(result.valid).toBe(true);
+  });
+});
+
+// ============================================
+// validateSubPlansPublished
+// ============================================
+
+describe('validateSubPlansPublished', () => {
+  it('should return valid for plan without sub-plans', () => {
+    const pv = makePlanVersion(makeSteps(3, 'api'));
+    const storage = createMockStorage(new Map());
+    const result = validateSubPlansPublished(pv, storage);
+    expect(result.valid).toBe(true);
+  });
+
+  it('should error when sub-plan is not published', () => {
+    const pv = makePlanVersion([
+      createStep('Sub', { sub_plan_id: SUB_PLAN_A }),
+    ]);
+    const pvA = makePlanVersion(makeSteps(1)); // status defaults to 'draft'
+    const plans = new Map<string, PlanVersion>([
+      [SUB_PLAN_A, { ...pvA, plan_id: SUB_PLAN_A } as PlanVersion],
+    ]);
+    const storage = createMockStorage(plans);
+    const result = validateSubPlansPublished(pv, storage);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('must be published first');
+  });
+
+  it('should pass when all sub-plans are published', () => {
+    const pv = makePlanVersion([
+      createStep('Sub', { sub_plan_id: SUB_PLAN_A }),
+    ]);
+    const pvA = makePlanVersion(makeSteps(1), { status: 'published' as any });
+    const plans = new Map<string, PlanVersion>([
+      [SUB_PLAN_A, { ...pvA, plan_id: SUB_PLAN_A } as PlanVersion],
+    ]);
+    const storage = createMockStorage(plans);
+    const result = validateSubPlansPublished(pv, storage);
     expect(result.valid).toBe(true);
   });
 });
@@ -317,32 +413,32 @@ describe('validateAllSubPlanDepths', () => {
 // ============================================
 
 describe('validateAllLimits', () => {
-  it('should combine step limits and depth validation', async () => {
+  it('should combine step limits and depth validation', () => {
     // 20 steps in one scope (triggers warning) + no sub-plans
     const pv = makePlanVersion(makeSteps(20, 'backend'));
     const storage = createMockStorage(new Map());
-    const result = await validateAllLimits(pv, storage);
+    const result = validateAllLimits(pv, storage);
     expect(result.valid).toBe(true); // step limit is warning only
     expect(result.warnings.length).toBe(1);
     expect(result.errors).toEqual([]);
   });
 
-  it('should aggregate errors from depth validation', async () => {
+  it('should aggregate errors from depth validation', () => {
     const config = createDecompositionConfig({ allowSubPlans: false });
     const pv = makePlanVersion(
       [createStep('Sub', { sub_plan_id: SUB_PLAN_A })],
       { decomposition_config: config }
     );
     const storage = createMockStorage(new Map());
-    const result = await validateAllLimits(pv, storage);
+    const result = validateAllLimits(pv, storage);
     expect(result.valid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
   });
 
-  it('should return valid for well-formed plan', async () => {
+  it('should return valid for well-formed plan', () => {
     const pv = makePlanVersion(makeSteps(5, 'api'));
     const storage = createMockStorage(new Map());
-    const result = await validateAllLimits(pv, storage);
+    const result = validateAllLimits(pv, storage);
     expect(result.valid).toBe(true);
     expect(result.warnings).toEqual([]);
     expect(result.errors).toEqual([]);

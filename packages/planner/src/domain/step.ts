@@ -36,6 +36,8 @@ export const StepSchema = z.object({
   language_tier: LanguageTierSchema.optional(),
   /** DOT Framework: Input/output contract for the step */
   contract: TaskContractSchema.optional(),
+  /** Implementation specification — target files, patterns, architecture notes */
+  specification: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type Step = z.infer<typeof StepSchema>;

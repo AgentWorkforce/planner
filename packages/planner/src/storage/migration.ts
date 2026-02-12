@@ -34,6 +34,9 @@ export function runMigrations(db: Database.Database): void {
 
   // 7. Add understanding_json column to versions if missing
   migrateVersionsUnderstanding(db);
+
+  // 8. Add context_json column to versions if missing
+  migrateVersionsContext(db);
 }
 
 /**
@@ -173,5 +176,20 @@ function migrateVersionsUnderstanding(db: Database.Database): void {
   if (!hasUnderstanding) {
     // Add column with default value for existing versions
     db.exec(`ALTER TABLE versions ADD COLUMN understanding_json TEXT NOT NULL DEFAULT '{}'`);
+  }
+}
+
+/**
+ * Adds context_json column to versions table if missing.
+ * Stores structured role-keyed decisions (architect, designer, etc.) from planning.
+ */
+function migrateVersionsContext(db: Database.Database): void {
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(versions)`)
+    .all();
+  const hasContext = columns.some((c) => c.name === 'context_json');
+
+  if (!hasContext) {
+    db.exec(`ALTER TABLE versions ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`);
   }
 }

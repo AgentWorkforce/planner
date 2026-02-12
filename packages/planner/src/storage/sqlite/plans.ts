@@ -150,6 +150,7 @@ interface PlanWithAttentionRow {
   status: string;
   summary_json: string;
   understanding_json: string | null;
+  context_json: string | null;
   submitted_at: string | null;
   approval_info_json: string | null;
   change_request_id: string | null;
@@ -198,6 +199,7 @@ export function listPlansWithAttention(
       v.status,
       v.summary_json,
       v.understanding_json,
+      v.context_json,
       v.submitted_at,
       v.approval_info_json,
       v.change_request_id,
@@ -251,6 +253,7 @@ export function listPlansWithAttention(
           status: row.status,
           summary_json: row.summary_json,
           understanding_json: row.understanding_json,
+          context_json: row.context_json,
           submitted_at: row.submitted_at,
           approval_info_json: row.approval_info_json,
           change_request_id: row.change_request_id,

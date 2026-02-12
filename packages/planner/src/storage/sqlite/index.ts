@@ -1,5 +1,6 @@
 import { BaseSqliteStorage } from '@plannr/storage-base';
-import type { Plan, PlanVersion } from '../../domain/plan.js';
+import type { Plan, PlanVersion, Understanding } from '../../domain/plan.js';
+import type { Context } from '../../domain/context.js';
 import type { PlanStatus } from '../../domain/status.js';
 import type { ApprovalInfo } from '../../domain/workflow.js';
 import type {
@@ -172,6 +173,30 @@ export class SqliteStorage extends BaseSqliteStorage implements PlanStorage {
     status: PlanStatus
   ): PlanVersion | null {
     return Versions.updateVersionStatus(this.db, planId, version, status);
+  }
+
+  updateVersionContext(
+    planId: string,
+    version: number,
+    context: Context
+  ): PlanVersion | null {
+    return Versions.updateVersionContext(this.db, planId, version, context);
+  }
+
+  updateVersionUnderstanding(
+    planId: string,
+    version: number,
+    understanding: Understanding
+  ): PlanVersion | null {
+    return Versions.updateVersionUnderstanding(this.db, planId, version, understanding);
+  }
+
+  getSubPlanIds(planId: string): string[] {
+    return Versions.getSubPlanIds(this.db, planId);
+  }
+
+  getDependentPlanIds(planId: string): string[] {
+    return Versions.getDependentPlanIds(this.db, planId);
   }
 
   // ============================================

@@ -121,7 +121,7 @@ export function getVersionByChangeRequest(
   changeRequestId: string
 ): PlanVersion | null {
   const versionStmt = db.prepare<string, VersionRow>(`
-    SELECT plan_id, version, status, summary_json, understanding_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
+    SELECT plan_id, version, status, summary_json, understanding_json, context_json, submitted_at, approval_info_json, change_request_id, metadata_json, created_at, updated_at
     FROM versions
     WHERE change_request_id = ?
   `);

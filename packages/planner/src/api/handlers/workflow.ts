@@ -14,6 +14,10 @@ import {
   mergeValidationIntoResponse,
 } from '../middleware/dot-validation.js';
 import { summarizeComplexity } from '../../services/complexity-estimator.js';
+import {
+  validateSubPlanReferences,
+  validateSubPlansPublished,
+} from '../../services/limits-enforcer.js';
 
 interface VersionParams {
   id: string;
@@ -100,6 +104,12 @@ export function createWorkflowHandlers(storage: PlanStorage) {
           throw badRequest(check.error!);
         }
 
+        // Validate sub-plan references exist (hard error if missing)
+        const refCheck = validateSubPlanReferences(version, storage);
+        if (!refCheck.valid) {
+          throw badRequest(`Sub-plan validation failed: ${refCheck.errors.join('; ')}`);
+        }
+
         const approvalInfo = {
           approver: body.approver,
           approved_at: new Date().toISOString(),
@@ -117,7 +127,13 @@ export function createWorkflowHandlers(storage: PlanStorage) {
           console.log(`[workflow] Session ${session.session_id} completed on plan approval (standalone mode)`);
         }
 
-        res.json({ version: updated });
+        // Include sub-plan warnings in response (e.g., unapproved sub-plans)
+        const response: Record<string, unknown> = { version: updated };
+        if (refCheck.warnings.length > 0) {
+          response.sub_plan_warnings = refCheck.warnings;
+        }
+
+        res.json(response);
       } catch (err) {
         next(err);
       }
@@ -148,6 +164,12 @@ export function createWorkflowHandlers(storage: PlanStorage) {
         const check = canPublish(version.status);
         if (!check.valid) {
           throw badRequest(check.error!);
+        }
+
+        // Hard block: all referenced sub-plans must be published
+        const subPlanCheck = validateSubPlansPublished(version, storage);
+        if (!subPlanCheck.valid) {
+          throw badRequest(`Cannot publish: ${subPlanCheck.errors.join('; ')}`);
         }
 
         const updated = storage.updateVersionStatus(

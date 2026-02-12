@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS versions (
   status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'published')),
   summary_json TEXT NOT NULL,
   understanding_json TEXT NOT NULL DEFAULT '{}',
+  context_json TEXT NOT NULL DEFAULT '{}',
   submitted_at TEXT,
   approval_info_json TEXT,
   change_request_id TEXT,

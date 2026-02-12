@@ -1,4 +1,5 @@
-import type { Plan, PlanVersion } from '../domain/plan.js';
+import type { Plan, PlanVersion, Understanding } from '../domain/plan.js';
+import type { Context } from '../domain/context.js';
 import type { PlanStatus } from '../domain/status.js';
 import type { ApprovalInfo } from '../domain/workflow.js';
 import type { ChangeRequest, ChangeRequestStatus, RevisionStatus } from '../domain/change-request.js';
@@ -110,6 +111,20 @@ export interface PlanStorage {
     version: number,
     status: PlanStatus
   ): PlanVersion | null;
+  updateVersionContext(
+    planId: string,
+    version: number,
+    context: Context
+  ): PlanVersion | null;
+  updateVersionUnderstanding(
+    planId: string,
+    version: number,
+    understanding: Understanding
+  ): PlanVersion | null;
+
+  // Sub-plan hierarchy queries
+  getSubPlanIds(planId: string): string[];
+  getDependentPlanIds(planId: string): string[];
 
   // Workflow operations
   submitVersion(planId: string, version: number): PlanVersion | null;
