@@ -381,6 +381,8 @@ export const QualityConfigSchema = z.object({
   prep_min_tier_tasks: z.number().int().min(1).default(2),
   /** PREP timeout in milliseconds (default: 90000 = 90s) */
   prep_timeout_ms: z.number().int().min(30000).default(90000),
+  /** TASK_POST timeout in milliseconds (default: 120000 = 120s) */
+  task_post_timeout_ms: z.number().int().min(30000).default(120000),
 });
 
 export type QualityConfig = z.infer<typeof QualityConfigSchema>;

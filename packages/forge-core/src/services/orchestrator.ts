@@ -222,6 +222,41 @@ export class Orchestrator {
   }
 
   /**
+   * Recover runs that were in progress when the server last shut down.
+   * Called once during server startup after orchestrator initialization.
+   */
+  async recoverRunningRuns(): Promise<void> {
+    // Find all runs with status "running"
+    const allRuns = this.storage.listRuns(RunStatus.Running);
+
+    if (allRuns.length === 0) return;
+
+    console.log(`[Orchestrator] Recovering ${allRuns.length} running run(s) from previous instance`);
+
+    for (const run of allRuns) {
+      try {
+        // Check if any tasks are still "running" — these agents are dead (server restarted)
+        const tasks = this.storage.listTasksByRun(run.run_id);
+        const runningTasks = tasks.filter((t) => t.status === TaskStatus.Running);
+
+        // Reset running tasks to pending (their agents are dead)
+        for (const task of runningTasks) {
+          this.storage.updateTask(task.task_id, { status: TaskStatus.Pending });
+          console.log(`[Orchestrator] Reset orphaned task ${task.step_id} to pending`);
+        }
+
+        // Re-start execution for this run (only if not already active)
+        if (!this.runLoopActive.get(run.run_id)) {
+          this.scheduleReadyTasks(run.run_id);
+          console.log(`[Orchestrator] Recovered run ${run.run_id}`);
+        }
+      } catch (err) {
+        console.error(`[Orchestrator] Failed to recover run ${run.run_id}:`, err);
+      }
+    }
+  }
+
+  /**
    * Entry point: schedule ready tasks for a run.
    * Called by run handler after run creation or gate approval.
    * Kicks off executeRun asynchronously (fire-and-forget).
@@ -911,13 +946,17 @@ export class Orchestrator {
 
       // Check if task status changed (agent finished)
       if (task.status === TaskStatus.Completed) {
+        // Release agent immediately - it's done, no need to wait for TASK_POST gate evaluation
+        this.releaseAgentProcess(tracker.agentId);
+        agentTrackers.delete(taskId);
+        console.log(`[Orchestrator] Released agent ${tracker.agentId} for task ${task.step_id} (before TASK_POST)`);
         await this.handleTaskCompletion(task, runId, tracker);
-        this.releaseAgentProcess(tracker.agentId);
-        agentTrackers.delete(taskId);
       } else if (task.status === TaskStatus.Failed) {
-        await this.handleTaskFailure(task, runId, tracker);
+        // Release agent immediately - failure handling doesn't need the worker alive
         this.releaseAgentProcess(tracker.agentId);
         agentTrackers.delete(taskId);
+        console.log(`[Orchestrator] Released agent ${tracker.agentId} for task ${task.step_id} (before failure handling)`);
+        await this.handleTaskFailure(task, runId, tracker);
       }
     }
 
@@ -1439,7 +1478,7 @@ export class Orchestrator {
       const result = await this.analysisTool!.run(prompt, {
         model: qualityConfig.task_post_model ?? 'haiku',
         cwd: workspacePath,
-        timeoutMs: 90000, // 90s — quarter review should be fast
+        timeoutMs: qualityConfig.task_post_timeout_ms ?? 120000,
       });
 
       const parsed = result.parsed;

@@ -464,13 +464,13 @@ Do NOT push — just commit locally. After committing, call \`report_complete\`.
 
 /**
  * Build quality gate agent prompt.
- * Wraps the analysis task with MCP instructions for reporting findings.
+ * Uses file-based result passing: agent writes JSON findings to a known file path,
+ * and the orchestrator reads it when the agent exits. No curl needed.
  */
 function buildGateAgentPrompt(gateId: string, analysisPrompt: string): string {
-  const port = process.env.PORT || '3001';
-  const baseUrl = `http://localhost:${port}/api/forge`;
+  const resultFile = `/tmp/gate-${gateId}.json`;
 
-  return `You are a quality gate agent. Work fast — you have 60-90 seconds.
+  return `You are a quality gate agent. Work fast — you have 90 seconds.
 
 ## Efficiency Rules
 
@@ -484,28 +484,26 @@ function buildGateAgentPrompt(gateId: string, analysisPrompt: string): string {
 
 ${analysisPrompt}
 
-## Reporting Results — REQUIRED
+## Reporting Results — CRITICAL
 
-When done, write findings to a temp file and curl it (avoids shell quoting issues):
+When done, write your findings as a JSON object to this exact file path:
 
-\`\`\`bash
-cat > /tmp/gate-${gateId.slice(0, 8)}.json << 'GATE_EOF'
+${resultFile}
+
+Use the Write tool to write the file. The JSON must be a valid object matching the output schema described in your task above. Example:
+
+\`\`\`json
 {
-  "name": "report_gate_result",
-  "arguments": {
-    "gate_id": "${gateId}",
-    "findings": <YOUR_JSON_FINDINGS>
-  }
+  "passed": true,
+  "summary": "All acceptance criteria met",
+  "issues": []
 }
-GATE_EOF
-curl -s -X POST ${baseUrl}/mcp/tools/call -H "Content-Type: application/json" -d @/tmp/gate-${gateId.slice(0, 8)}.json
 \`\`\`
 
-- gate_id: ${gateId}
-- findings: JSON object matching the output schema in your task above
-- Do NOT call report_complete (that's for task agents)
-- ALWAYS write JSON to file first, then curl with -d @file (complex JSON breaks inline curl)
-- The orchestrator is waiting — report as soon as you have findings`;
+- Write findings to: ${resultFile}
+- The file must contain ONLY valid JSON (no markdown, no comments)
+- After writing the file, you are done — exit immediately
+- Do NOT call report_complete or curl anything (the orchestrator reads the file)`;
 }
 
 /**

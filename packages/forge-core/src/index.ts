@@ -224,6 +224,7 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
   let worktreeManager: WorktreeManager | undefined;
   let gateRegistry: GateResultRegistry | undefined;
   let shutdownHook: (() => void) | undefined;
+  let recoverRunningRunsFn: (() => Promise<void>) | undefined;
 
   if (mode === 'real') {
     // Real mode: Orchestrator + RunService + agent spawning
@@ -298,6 +299,7 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     scheduleReadyTasks = (runId: string) => orchestrator.scheduleReadyTasks(runId);
     registerBuildRunFn = (buildId: string, runId: string) => orchestrator.registerBuildRun(buildId, runId);
     terminateRunAgentsFn = (runId: string) => orchestrator.terminateRunAgents(runId);
+    recoverRunningRunsFn = () => orchestrator.recoverRunningRuns();
     shutdownHook = () => {
       if (gateRegistry) gateRegistry.shutdown();
       orchestrator.shutdown();
@@ -354,7 +356,12 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     mode,
     buildCoordinator,
     initialize: async () => {
-      // Storage is initialized on creation, nothing async needed yet
+      // Storage is initialized on creation
+
+      // Recover running runs from previous server instance (real mode only)
+      if (recoverRunningRunsFn) {
+        await recoverRunningRunsFn();
+      }
     },
     shutdown: () => {
       if (shutdownHook) {

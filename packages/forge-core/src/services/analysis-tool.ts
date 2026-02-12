@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import type { GateResultRegistry } from './gate-registry.js';
 import type { SpawnGateAgentFn } from './agent-spawner.js';
 
@@ -126,8 +127,9 @@ export class AnalysisTool {
 
   /**
    * Spawns a gate agent via relay to perform the analysis.
-   * The agent reports findings back through the report_gate_result MCP tool,
-   * which resolves the Promise created in GateResultRegistry.
+   * Uses file-based result passing: agent writes findings to /tmp/gate-{id}.json,
+   * and the onExited callback reads the file to resolve the gate Promise.
+   * This avoids the fragile curl-based MCP reporting that caused 100% timeouts.
    */
   private async runViaAgent(
     prompt: string,
@@ -141,6 +143,7 @@ export class AnalysisTool {
     const modelName = MODEL_MAP[modelKey] ?? MODEL_MAP['sonnet'] ?? 'claude-sonnet-4-5-20250929';
     const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
     const gateId = randomUUID();
+    const resultFilePath = `/tmp/gate-${gateId}.json`;
 
     // Track spawned agent so we can terminate it on timeout
     let spawnedAgentId: string | undefined;
@@ -164,16 +167,35 @@ export class AnalysisTool {
         cli: this.cli,
         model: modelKey,
       }, (exitCode) => {
-        // Agent died before reporting — reject the gate
-        if (this.gateRegistry!.hasPendingGate(gateId)) {
-          this.gateRegistry!.rejectGate(gateId, `Gate agent exited (code: ${exitCode}) before reporting results`);
+        // Agent exited — check for result file before rejecting
+        if (!this.gateRegistry!.hasPendingGate(gateId)) return;
+
+        try {
+          if (existsSync(resultFilePath)) {
+            const raw = readFileSync(resultFilePath, 'utf-8');
+            const findings = JSON.parse(raw);
+            console.log(`[AnalysisTool] Gate ${gateId} — read findings from ${resultFilePath}`);
+            this.gateRegistry!.resolveGate(gateId, findings);
+            // Clean up temp file
+            try { unlinkSync(resultFilePath); } catch { /* best effort */ }
+          } else {
+            this.gateRegistry!.rejectGate(
+              gateId,
+              `Gate agent exited (code: ${exitCode}) without writing result file`
+            );
+          }
+        } catch (err) {
+          this.gateRegistry!.rejectGate(
+            gateId,
+            `Gate agent exited but result file was invalid: ${err instanceof Error ? err.message : String(err)}`
+          );
         }
       });
 
       spawnedAgentId = spawnResult.agentId;
       console.log(`[AnalysisTool] Spawned gate agent ${spawnResult.agentId} for gate ${gateId}`);
 
-      // Await the gate result (resolved when agent calls report_gate_result)
+      // Await the gate result (resolved when agent exits and result file is read)
       const gateResult = await gatePromise;
 
       return {
@@ -195,6 +217,8 @@ export class AnalysisTool {
           console.warn(`[AnalysisTool] Failed to terminate gate agent ${spawnedAgentId}:`, err);
         });
       }
+      // Clean up result file (in case timeout killed agent before onExited ran)
+      try { if (existsSync(resultFilePath)) unlinkSync(resultFilePath); } catch { /* best effort */ }
     }
   }
 
