@@ -18,6 +18,11 @@ export class WorktreeManager {
     private readonly worktreeBase: string
   ) {}
 
+  /** The root of the git repository. */
+  get root(): string {
+    return this.repoRoot;
+  }
+
   /**
    * Create a git worktree for a run.
    * Uses detached HEAD from current branch so work is isolated.

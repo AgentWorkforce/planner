@@ -1299,15 +1299,9 @@ export class Orchestrator {
       }
     }
 
-    // Worktree is kept on success — it contains the agent's work.
-    // User reviews/merges via `git worktree list` and then cleans up.
-    if (worktreePath) {
-      console.log(
-        `[Orchestrator] Run ${runId} complete. Worktree preserved at ${worktreePath}`
-      );
-      console.log(
-        `[Orchestrator] Review changes: cd ${worktreePath} && git diff`
-      );
+    // Merge worktree commits back to the base branch, then clean up.
+    if (worktreePath && this.worktreeManager) {
+      await this.mergeWorktreeCommits(runId, worktreePath);
     }
     this.runWorktrees.delete(runId);
 
@@ -2073,6 +2067,87 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
   /**
    * Cleans up the worktree for a completed or failed run.
    */
+  /**
+   * Merges forge commits from a worktree back to the current branch.
+   * Worktrees use detached HEAD, so commits would be orphaned without this.
+   * Cherry-picks [forge:*] commits in order, then removes the worktree.
+   */
+  private async mergeWorktreeCommits(runId: string, worktreePath: string): Promise<void> {
+    try {
+      // Get the worktree HEAD
+      const { stdout: worktreeHead } = await execFileAsync(
+        'git', ['rev-parse', 'HEAD'], { cwd: worktreePath }
+      );
+      const worktreeHeadHash = worktreeHead.trim();
+
+      // Get the current branch HEAD from the main repo
+      const repoRoot = this.worktreeManager!.root;
+      const { stdout: branchHead } = await execFileAsync(
+        'git', ['rev-parse', 'HEAD'], { cwd: repoRoot }
+      );
+      const branchHeadHash = branchHead.trim();
+
+      if (worktreeHeadHash === branchHeadHash) {
+        console.log(`[Orchestrator] Run ${runId}: worktree HEAD matches branch HEAD, no commits to merge`);
+      } else {
+        // Find forge commits on worktree that aren't on the branch
+        const { stdout: commitList } = await execFileAsync(
+          'git', [
+            'log', '--oneline', '--reverse',
+            '--fixed-strings', '--grep=[forge:',
+            `${branchHeadHash}..${worktreeHeadHash}`,
+          ],
+          { cwd: worktreePath }
+        );
+
+        const commits = commitList.trim().split('\n').filter(Boolean);
+
+        if (commits.length > 0) {
+          const commitHashes = commits.map(line => line.split(' ')[0]!);
+          console.log(
+            `[Orchestrator] Run ${runId}: merging ${commitHashes.length} forge commits to branch`
+          );
+
+          // Cherry-pick each commit to the main repo
+          for (const hash of commitHashes) {
+            try {
+              await execFileAsync(
+                'git', ['cherry-pick', '--no-edit', hash],
+                { cwd: repoRoot }
+              );
+            } catch (cpErr) {
+              // Conflict — abort and warn. Worktree is preserved for manual merge.
+              console.warn(
+                `[Orchestrator] Run ${runId}: cherry-pick conflict on ${hash}, aborting merge`
+              );
+              await execFileAsync(
+                'git', ['cherry-pick', '--abort'],
+                { cwd: repoRoot }
+              ).catch(() => {});
+              console.warn(
+                `[Orchestrator] Run ${runId}: worktree preserved at ${worktreePath} for manual merge`
+              );
+              return; // Don't remove worktree — user needs to resolve
+            }
+          }
+          console.log(
+            `[Orchestrator] Run ${runId}: successfully merged ${commitHashes.length} commits`
+          );
+        } else {
+          console.log(`[Orchestrator] Run ${runId}: no forge commits to merge`);
+        }
+      }
+
+      // Remove worktree after successful merge
+      await this.worktreeManager!.remove(worktreePath);
+    } catch (err) {
+      console.warn(
+        `[Orchestrator] Run ${runId}: worktree merge failed, preserving for manual review:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
   private async cleanupWorktree(runId: string): Promise<void> {
     const worktreePath = this.runWorktrees.get(runId);
     if (worktreePath && this.worktreeManager) {
