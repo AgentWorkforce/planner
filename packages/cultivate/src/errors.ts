@@ -221,17 +221,37 @@ export class CultivateInternalError extends Error {
 }
 
 /**
+ * Signal metadata for tracking filtered signals
+ */
+export interface SignalMetadata {
+  source_type: string;
+  external_id: string;
+  greenhouse_id?: string;
+}
+
+/**
  * Signal filtered by pipeline (expected behavior, not an error)
+ *
+ * This is NOT an error condition — it's the expected path for noise rejection.
  */
 export class SignalFilteredError extends Error {
+  public readonly filter_tier: 0 | 1 | 2;
+  public readonly rule_name: string;
   public readonly reason: string;
-  public readonly tier: number;
+  public readonly signal_metadata: SignalMetadata;
 
-  constructor(tier: number, reason: string) {
-    super(`Signal filtered at Tier ${tier}: ${reason}`);
+  constructor(
+    filter_tier: 0 | 1 | 2,
+    reason: string,
+    signal_metadata: SignalMetadata,
+    rule_name = ''
+  ) {
+    super(`Signal filtered at Tier ${filter_tier}: ${reason}`);
     this.name = 'SignalFilteredError';
-    this.tier = tier;
+    this.filter_tier = filter_tier;
+    this.rule_name = rule_name;
     this.reason = reason;
+    this.signal_metadata = signal_metadata;
 
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, SignalFilteredError);
@@ -240,17 +260,21 @@ export class SignalFilteredError extends Error {
 }
 
 /**
- * Signal processing error (retryable)
+ * Signal processing error for pipeline failures that should dead-letter
+ *
+ * Used by BullMQ workers to decide dead-letter routing.
  */
 export class SignalProcessingError extends Error {
-  public readonly signal_id?: string;
-  public readonly step: string;
+  public readonly pipeline_step: string;
+  public readonly signal_id: string;
+  public readonly cause: Error;
 
-  constructor(step: string, message: string, signal_id?: string) {
-    super(`Signal processing failed at ${step}: ${message}`);
+  constructor(pipeline_step: string, signal_id: string, cause: Error) {
+    super(`Signal processing failed at ${pipeline_step}: ${cause.message}`);
     this.name = 'SignalProcessingError';
-    this.step = step;
+    this.pipeline_step = pipeline_step;
     this.signal_id = signal_id;
+    this.cause = cause;
 
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, SignalProcessingError);
