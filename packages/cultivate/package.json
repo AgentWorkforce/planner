@@ -1,0 +1,37 @@
+{
+  "name": "@plannr/cultivate",
+  "version": "0.1.0",
+  "description": "Cultivate - Signal intake and processing system",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@huggingface/transformers": "^3.3.1",
+    "@plannr/errors": "*",
+    "@plannr/storage-base": "*",
+    "better-sqlite3": "^11.7.0",
+    "bullmq": "^5.36.2",
+    "express": "^5.2.1",
+    "ioredis": "^5.4.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.11.0",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.2.2",
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
