@@ -287,3 +287,71 @@ export const IngestionJobSchema = z.object({
   created_at: z.string(),
 });
 export type IngestionJob = z.infer<typeof IngestionJobSchema>;
+
+/**
+ * Pipeline stage progression tracking for signals
+ */
+export const StepProvenanceSchema = z.object({
+  step: z.string(), // Pipeline stage name (e.g., 'filter', 'extract', 'score', 'cluster')
+  timestamp: z.string(), // ISO 8601 timestamp
+  details: z.record(z.unknown()).optional(), // Optional metadata about the step
+});
+export type StepProvenance = z.infer<typeof StepProvenanceSchema>;
+
+/**
+ * Signal - Core entity representing a single captured signal from a source
+ */
+export const SignalSchema = z.object({
+  id: z.string(),
+  greenhouse_id: z.string(),
+  source_type: AdapterTypeSchema,
+  external_id: z.string(),
+  title: z.string(),
+  body: z.string(),
+  author: z.string(),
+  author_type: AuthorTypeSchema,
+  url: z.string().optional(),
+  score: z.number(),
+  scoring_factors: ScoringFactorsSchema,
+  cluster_id: z.string().optional(),
+  status: SignalStatusSchema,
+  provenance: z.array(StepProvenanceSchema), // Pipeline stage history
+  tags: z.array(z.string()),
+  created_at: z.string(),
+  updated_at: z.string(),
+  linked_plan_id: z.string().optional(),
+});
+export type Signal = z.infer<typeof SignalSchema>;
+
+/**
+ * Greenhouse - Topic-based signal collection with filtering criteria
+ */
+export const GreenhouseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  mode: GreenhouseModeSchema,
+  keyword_require: z.array(z.string()), // All required keywords
+  keyword_exclude: z.array(z.string()), // Exclusion keywords
+  source_ids: z.array(z.string()), // Connected source configurations
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Greenhouse = z.infer<typeof GreenhouseSchema>;
+
+/**
+ * Cluster - Grouped signals with shared themes/patterns
+ */
+export const ClusterSchema = z.object({
+  id: z.string(),
+  greenhouse_id: z.string(),
+  label: z.string(), // Human-readable cluster label
+  summary: z.string(), // AI-generated summary of cluster themes
+  signal_count: z.number(),
+  trend: ClusterTrendSchema,
+  velocity_weekly: z.number(), // Signals per week
+  velocity_monthly: z.number(), // Signals per month
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Cluster = z.infer<typeof ClusterSchema>;
