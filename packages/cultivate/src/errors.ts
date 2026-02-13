@@ -195,13 +195,23 @@ export class CultivateStartupError extends Error {
 
 /**
  * Internal processing error (non-fatal, for logging)
+ *
+ * Used for unexpected runtime failures that need investigation.
  */
 export class CultivateInternalError extends Error {
+  public readonly operation: string;
+  public readonly cause: Error;
   public readonly context: Record<string, unknown>;
 
-  constructor(message: string, context: Record<string, unknown> = {}) {
-    super(message);
+  constructor(
+    operation: string,
+    cause: Error,
+    context: Record<string, unknown> = {}
+  ) {
+    super(`Internal error during ${operation}: ${cause.message}`);
     this.name = 'CultivateInternalError';
+    this.operation = operation;
+    this.cause = cause;
     this.context = context;
 
     if (Error.captureStackTrace) {
