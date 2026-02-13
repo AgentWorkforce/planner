@@ -21,26 +21,161 @@ export type CultivateStartupErrorCode =
   | 'QUEUE_INIT_FAILED';
 
 /**
+ * Diagnostic information for startup errors
+ */
+export interface CultivateStartupDiagnostics {
+  /** Name of the dependency that failed */
+  dependency: string;
+  /** Sanitized connection info (no passwords or secrets) */
+  connectionInfo: string;
+  /** Number of retry attempts made */
+  retryAttempts: number;
+}
+
+/**
  * Error thrown during Cultivate startup when a required dependency fails
  */
 export class CultivateStartupError extends Error {
   public readonly code: CultivateStartupErrorCode;
   public readonly cause: unknown;
+  public readonly diagnostics?: CultivateStartupDiagnostics;
 
   constructor(
     code: CultivateStartupErrorCode,
     message: string,
-    cause: unknown = null
+    cause: unknown = null,
+    diagnostics?: CultivateStartupDiagnostics
   ) {
     super(message);
     this.name = 'CultivateStartupError';
     this.code = code;
     this.cause = cause;
+    this.diagnostics = diagnostics;
 
     // Maintain proper stack trace for where our error was thrown (Node.js specific)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, CultivateStartupError);
     }
+  }
+
+  /**
+   * Static factory: Redis unavailable
+   */
+  static redisUnavailable(
+    connectionInfo: string,
+    cause: unknown,
+    retryAttempts = 0
+  ): CultivateStartupError {
+    return new CultivateStartupError(
+      'REDIS_UNAVAILABLE',
+      `Failed to connect to Redis: ${connectionInfo}`,
+      cause,
+      {
+        dependency: 'Redis',
+        connectionInfo,
+        retryAttempts,
+      }
+    );
+  }
+
+  /**
+   * Static factory: SQLite initialization failed
+   */
+  static sqliteInitFailed(
+    dbPath: string,
+    cause: unknown,
+    retryAttempts = 0
+  ): CultivateStartupError {
+    return new CultivateStartupError(
+      'SQLITE_INIT_FAILED',
+      `Failed to initialize SQLite storage at ${dbPath}`,
+      cause,
+      {
+        dependency: 'SQLite',
+        connectionInfo: dbPath,
+        retryAttempts,
+      }
+    );
+  }
+
+  /**
+   * Static factory: ML model load failed
+   */
+  static mlModelLoadFailed(
+    modelName: string,
+    cause: unknown,
+    retryAttempts = 0
+  ): CultivateStartupError {
+    return new CultivateStartupError(
+      'ML_MODEL_LOAD_FAILED',
+      `Failed to load ML model: ${modelName}`,
+      cause,
+      {
+        dependency: 'Transformers.js',
+        connectionInfo: modelName,
+        retryAttempts,
+      }
+    );
+  }
+
+  /**
+   * Static factory: Anthropic API unavailable
+   */
+  static anthropicUnavailable(
+    reason: string,
+    cause: unknown,
+    retryAttempts = 0
+  ): CultivateStartupError {
+    return new CultivateStartupError(
+      'ANTHROPIC_UNAVAILABLE',
+      `Anthropic API unavailable: ${reason}`,
+      cause,
+      {
+        dependency: 'Anthropic API',
+        connectionInfo: reason,
+        retryAttempts,
+      }
+    );
+  }
+
+  /**
+   * Static factory: Tuner unavailable
+   */
+  static tunerUnavailable(
+    tunerUrl: string,
+    cause: unknown,
+    retryAttempts = 0
+  ): CultivateStartupError {
+    return new CultivateStartupError(
+      'TUNER_UNAVAILABLE',
+      `Tuner service unreachable at ${tunerUrl}`,
+      cause,
+      {
+        dependency: 'Tuner',
+        connectionInfo: tunerUrl,
+        retryAttempts,
+      }
+    );
+  }
+
+  /**
+   * Static factory: Queue initialization failed
+   */
+  static queueInitFailed(
+    queueName: string,
+    cause: unknown,
+    retryAttempts = 0
+  ): CultivateStartupError {
+    return new CultivateStartupError(
+      'QUEUE_INIT_FAILED',
+      `Failed to initialize queue: ${queueName}`,
+      cause,
+      {
+        dependency: 'BullMQ',
+        connectionInfo: queueName,
+        retryAttempts,
+      }
+    );
   }
 
   /**
@@ -52,6 +187,7 @@ export class CultivateStartupError extends Error {
       code: this.code,
       message: this.message,
       cause: this.cause instanceof Error ? this.cause.message : String(this.cause),
+      diagnostics: this.diagnostics,
       stack: this.stack,
     };
   }
