@@ -402,6 +402,19 @@ async function start(): Promise<void> {
       console.log('[server] WebSocket server closed');
     });
 
+    // Shutdown cultivate service BEFORE HTTP server closes
+    // This allows in-flight requests to complete properly
+    if (cultivateService) {
+      try {
+        console.log('[server] Shutting down cultivate service...');
+        await cultivateService.shutdown();
+        console.log('[server] ✓ Cultivate service shutdown complete');
+      } catch (error) {
+        console.error('[server] ✗ Error during cultivate shutdown:', error);
+        // Continue with remaining shutdowns - don't block other services
+      }
+    }
+
     // Close HTTP server
     server.close(() => {
       console.log('[server] HTTP server closed');
@@ -410,14 +423,11 @@ async function start(): Promise<void> {
     // Disconnect relay
     destroyRelay();
 
-    // Shutdown services
+    // Shutdown remaining services
     plannerService.shutdown();
     await ideationService.shutdown();
     forgeService.shutdown();
     mullService.shutdown();
-    if (cultivateService) {
-      await cultivateService.shutdown();
-    }
 
     // Exit after cleanup
     process.exit(0);
