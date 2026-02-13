@@ -2,6 +2,23 @@
  * Cultivate package exports
  */
 
+// =============================================================================
+// Plugin Service (for mounting in planner backend)
+// =============================================================================
+
+export { createCultivateService } from './service.js';
+export type { CultivateServiceConfig } from './service.js';
+
+// =============================================================================
+// API Routes
+// =============================================================================
+
+export { createCultivateRouter } from './routes.js';
+
+// =============================================================================
+// Core Startup & Initialization
+// =============================================================================
+
 export { startCultivate } from './startup.js';
 export { CultivateStorage } from './storage/index.js';
 export { createSSEBroadcaster } from './sse/broadcaster.js';

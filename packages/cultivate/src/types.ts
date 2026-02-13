@@ -122,4 +122,5 @@ export interface CultivateService {
   router: Router;
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
+  getContext?: () => CultivateContext | undefined;
 }
