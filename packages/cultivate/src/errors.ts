@@ -4,12 +4,20 @@
 
 /**
  * Startup error codes
+ *
+ * - REDIS_UNAVAILABLE: Redis connection refused or timeout
+ * - SQLITE_INIT_FAILED: Migration or file access error
+ * - ML_MODEL_LOAD_FAILED: Transformers.js model download or load failure
+ * - ANTHROPIC_UNAVAILABLE: API key missing or health check failed
+ * - TUNER_UNAVAILABLE: Tuner service unreachable (warning only, not thrown)
+ * - QUEUE_INIT_FAILED: BullMQ queue creation error
  */
 export type CultivateStartupErrorCode =
   | 'REDIS_UNAVAILABLE'
   | 'SQLITE_INIT_FAILED'
   | 'ML_MODEL_LOAD_FAILED'
   | 'ANTHROPIC_UNAVAILABLE'
+  | 'TUNER_UNAVAILABLE'
   | 'QUEUE_INIT_FAILED';
 
 /**
