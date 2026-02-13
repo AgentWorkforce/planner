@@ -22,6 +22,11 @@ import {
   type MullService,
   type TriggerCleanupFn,
 } from '../../mull/src/index.js';
+import {
+  createCultivateService,
+  CultivateStartupError,
+  type CultivateService,
+} from '../../cultivate/src/index.js';
 
 // Mull adapter implementations + bridge
 import {
@@ -99,6 +104,7 @@ let plannerService: PlannerService;
 let ideationService: IdeationService;
 let forgeService: ForgeService;
 let mullService: MullService;
+let cultivateService: CultivateService | undefined;
 let mullTriggerCleanup: TriggerCleanupFn | null = null;
 
 // =============================================================================
@@ -187,6 +193,51 @@ async function start(): Promise<void> {
   await forgeService.initialize();
   app.use('/api/forge', forgeService.router);
   console.log(`[forge] Initialized (database: ${FORGE_DB_PATH}, mode: ${forgeMode})`);
+
+  // Initialize cultivate service (after existing services)
+  if (serverConfig.cultivate.secret) {
+    console.log('[cultivate] Attempting to initialize...');
+    cultivateService = createCultivateService({
+      dbPath: serverConfig.cultivate.dbPath,
+      redis: {
+        host: new URL(serverConfig.cultivate.redisUrl).hostname,
+        port: parseInt(new URL(serverConfig.cultivate.redisUrl).port || '6379'),
+      },
+      encryptionSecret: serverConfig.cultivate.secret,
+      extractModel: serverConfig.cultivate.extractModel,
+      clusterModel: serverConfig.cultivate.clusterModel,
+    });
+
+    try {
+      await cultivateService.initialize();
+      app.use('/api/cultivate', cultivateService.router);
+      console.log(`[cultivate] ✅ Initialized (database: ${serverConfig.cultivate.dbPath})`);
+    } catch (error) {
+      if (error instanceof CultivateStartupError) {
+        console.error(`[cultivate] Startup error [${error.code}]: ${error.message}`);
+        if (error.diagnostics) {
+          console.error(`[cultivate] Diagnostics:`, error.diagnostics);
+        }
+
+        if (serverConfig.cultivateRequired) {
+          console.error('[cultivate] CULTIVATE_REQUIRED=true, aborting server startup');
+          throw error;
+        } else {
+          console.warn('[cultivate] ⚠ Continuing without cultivate (CULTIVATE_REQUIRED=false)');
+          cultivateService = undefined;
+        }
+      } else {
+        // Unknown error - rethrow
+        throw error;
+      }
+    }
+  } else {
+    if (serverConfig.cultivateRequired) {
+      console.error('[cultivate] CULTIVATE_SECRET not provided but CULTIVATE_REQUIRED=true');
+      throw new Error('CULTIVATE_SECRET is required when CULTIVATE_REQUIRED=true');
+    }
+    console.log('[cultivate] Skipped (CULTIVATE_SECRET not provided)');
+  }
 
   // Initialize mull service (after planner and forge — reads their databases)
   mullService = createMullService({
@@ -364,6 +415,9 @@ async function start(): Promise<void> {
     await ideationService.shutdown();
     forgeService.shutdown();
     mullService.shutdown();
+    if (cultivateService) {
+      await cultivateService.shutdown();
+    }
 
     // Exit after cleanup
     process.exit(0);

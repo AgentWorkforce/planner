@@ -16,11 +16,12 @@ export interface ServerConfig {
   forgeDbPath: string;
   mullMemoryDir: string;
   cultivate: CultivateConfig;
+  cultivateRequired: boolean;
 }
 
 export interface CultivateConfig {
   dbPath: string;
-  secret: string; // Required, no default
+  secret?: string; // Optional - server can start without cultivate
   redisUrl: string;
   extractModel?: string;
   clusterModel?: string;
@@ -28,14 +29,17 @@ export interface CultivateConfig {
 
 /**
  * Get server configuration from environment variables with sensible defaults.
- * Throws an error if CULTIVATE_SECRET is not provided.
+ * Throws an error if CULTIVATE_SECRET is not provided and CULTIVATE_REQUIRED is true.
  */
 export function getServerConfig(): ServerConfig {
-  // Validate required env vars
+  // Parse CULTIVATE_REQUIRED env var (default: false for backward compatibility)
+  const cultivateRequired = process.env.CULTIVATE_REQUIRED === 'true';
   const cultivateSecret = process.env.CULTIVATE_SECRET;
-  if (!cultivateSecret) {
+
+  // Validate required env vars if cultivate is required
+  if (cultivateRequired && !cultivateSecret) {
     throw new Error(
-      'CULTIVATE_SECRET environment variable is required but not provided. ' +
+      'CULTIVATE_SECRET environment variable is required when CULTIVATE_REQUIRED=true. ' +
       'It is needed for auth encryption and has no default value.'
     );
   }
@@ -57,6 +61,7 @@ export function getServerConfig(): ServerConfig {
     ideationDbPath,
     forgeDbPath,
     mullMemoryDir,
+    cultivateRequired,
     cultivate: {
       dbPath: cultivateDbPath,
       secret: cultivateSecret,
