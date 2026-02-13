@@ -19,6 +19,11 @@ export type {
   MullAdapter,
   NuggetSynthesizer,
   TopicStore,
+  DryRunDetails,
+  DryRunEntity,
+  DryRunFact,
+  DryRunTopicMatch,
+  DryRunNugget,
 } from './domain/types.js';
 
 export { SessionRefSchema, AdapterConfigSchema, MullConfigSchema } from './domain/types.js';
@@ -29,11 +34,16 @@ export { mullAll, type MullAllOptions } from './mull-all.js';
 
 // Config
 export { resolveConfig } from './config/resolve.js';
+export { resolveAdapters, createAdapterFromFlags, mapToAdapterSpecificConfig } from './config/resolve-adapters.js';
 
 // Pipeline steps
 export { buildPreExtract } from './pipeline/extract.js';
 export { synthesizeNuggets } from './pipeline/synthesize.js';
 export { extractTrailDecisions } from './pipeline/extract-trail-decisions.js';
+export { extractDryRunDetails } from './pipeline/extract-dry-run-details.js';
+
+// CLI display
+export { formatDryRunOutput } from './cli/format-dry-run.js';
 
 // Routing
 export { normalizeSessionRef, routeSessionRef } from './routing/session-ref-router.js';

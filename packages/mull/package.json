@@ -5,6 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "mull": "./src/cli.ts"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -13,6 +16,7 @@
   },
   "dependencies": {
     "@plannr/errors": "^0.1.0",
+    "commander": "^12.1.0",
     "better-sqlite3": "^11.10.0",
     "commander": "^12.1.0",
     "express": "^5.2.1",

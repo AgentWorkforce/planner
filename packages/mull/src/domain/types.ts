@@ -49,6 +49,32 @@ export const MullConfigSchema = z.object({
 export type MullConfig = z.infer<typeof MullConfigSchema>;
 
 // ---------------------------------------------------------------------------
+// Progress callback types
+// ---------------------------------------------------------------------------
+
+export type ProgressStage =
+  | 'loading'
+  | 'extracting'
+  | 'synthesizing'
+  | 'merging'
+  | 'done';
+
+export interface ProgressUpdate {
+  stage: ProgressStage;
+  sessionId: string;
+  counts?: {
+    messages?: number;
+    entities?: number;
+    facts?: number;
+    nuggets?: number;
+    topicsCreated?: number;
+    topicsUpdated?: number;
+  };
+}
+
+export type ProgressCallback = (update: ProgressUpdate) => void;
+
+// ---------------------------------------------------------------------------
 // MullOptions — runtime options passed to mull()
 // ---------------------------------------------------------------------------
 
@@ -64,6 +90,9 @@ export interface MullOptions {
 
   /** Ignore cursor position, re-process entire session from the start. */
   force?: boolean;
+
+  /** Progress callback for stage-by-stage updates. */
+  onProgress?: ProgressCallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +140,46 @@ export interface MergeResult {
 }
 
 // ---------------------------------------------------------------------------
+// Dry-run details — rich pipeline data returned in dry-run mode
+// ---------------------------------------------------------------------------
+
+export interface DryRunEntity {
+  text: string;
+  type: 'person' | 'tool' | 'concept' | 'file' | 'service' | 'other';
+  count: number;
+}
+
+export interface DryRunFact {
+  slug: string;
+  text: string;
+  source?: string;
+  isPreStructured: boolean;
+}
+
+export interface DryRunTopicMatch {
+  topicSlug: string;
+  score: number;
+  isNew: boolean;
+  matchedEntities: string[];
+}
+
+export interface DryRunNugget {
+  id: string;
+  content: string;
+  topic: string;
+  confidence: number;
+  category?: string;
+}
+
+export interface DryRunDetails {
+  entities: DryRunEntity[];
+  facts: DryRunFact[];
+  topicMatches: DryRunTopicMatch[];
+  nuggets: DryRunNugget[];
+  messagesProcessed: number;
+}
+
+// ---------------------------------------------------------------------------
 // MullResult — the final output of mull()
 // ---------------------------------------------------------------------------
 
@@ -125,6 +194,9 @@ export interface MullResult extends MergeResult {
    * and the cursor is advanced.
    */
   llmFailed: boolean;
+
+  /** Populated only in dry-run mode with detailed extraction/synthesis data. */
+  dryRunDetails?: DryRunDetails;
 }
 
 // ---------------------------------------------------------------------------

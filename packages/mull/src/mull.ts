@@ -2,6 +2,7 @@ import { resolveConfig } from './config/resolve.js';
 import { buildPreExtract } from './pipeline/extract.js';
 import { synthesizeNuggets } from './pipeline/synthesize.js';
 import { extractTrailDecisions } from './pipeline/extract-trail-decisions.js';
+import { extractDryRunDetails } from './pipeline/extract-dry-run-details.js';
 import { FileTopicStore } from './defaults/topic-store.js';
 import { PassthroughSynthesizer } from './defaults/passthrough-synthesizer.js';
 import { routeSessionRef } from './routing/session-ref-router.js';
@@ -75,6 +76,7 @@ export async function mull(
   opts: MullPipelineOptions = {},
 ): Promise<MullResult> {
   const errors: PipelineError[] = [];
+  const onProgress = opts.onProgress;
 
   // 1. Resolve config
   const config: MullConfig = resolveConfig(opts.config);
@@ -95,6 +97,8 @@ export async function mull(
   const adapter = routeSessionRef(sessionRef, adapters);
 
   // 3. Load session data (respecting cursor unless force mode)
+  onProgress?.({ stage: 'loading', sessionId: sessionRef.id });
+
   let cursor: string | null = null;
   if (!opts.force) {
     try {
@@ -130,10 +134,17 @@ export async function mull(
 
   // No new messages to process
   if (sessionData.messages.length === 0) {
+    onProgress?.({ stage: 'done', sessionId: sessionRef.id, counts: {} });
     return { ...EMPTY_RESULT, errors };
   }
 
   // 4. Build PreExtract
+  onProgress?.({
+    stage: 'extracting',
+    sessionId: sessionRef.id,
+    counts: { messages: sessionData.messages.length },
+  });
+
   let preExtract;
   try {
     preExtract = await buildPreExtract(sessionData, config, topicStore);
@@ -150,6 +161,12 @@ export async function mull(
   }
 
   // 5. Synthesize nuggets (with partial failure fallback to trail decisions)
+  onProgress?.({
+    stage: 'synthesizing',
+    sessionId: sessionRef.id,
+    counts: { messages: preExtract.messages.length },
+  });
+
   const synthesisResult = await synthesizeNuggets(preExtract, config, synthesizer);
   errors.push(...synthesisResult.errors);
 
@@ -168,22 +185,43 @@ export async function mull(
   }
 
   if (nuggets.length === 0) {
+    onProgress?.({
+      stage: 'done',
+      sessionId: sessionRef.id,
+      counts: { nuggets: 0 },
+    });
     return { ...EMPTY_RESULT, llmFailed, errors };
   }
 
-  // 6. Dry run: return estimated result without writing
+  // 6. Dry run: return estimated result with detailed extraction data
   if (opts.dryRun) {
     const uniqueTopics = new Set(nuggets.map(n => n.topic));
+    const dryRunDetails = extractDryRunDetails(preExtract, nuggets);
+    onProgress?.({
+      stage: 'done',
+      sessionId: sessionRef.id,
+      counts: {
+        nuggets: nuggets.length,
+        topicsUpdated: uniqueTopics.size,
+      },
+    });
     return {
       topicsUpdated: uniqueTopics.size,
       topicsCreated: 0,
       nuggetsWritten: nuggets.length,
       errors,
       llmFailed,
+      dryRunDetails,
     };
   }
 
   // 7. Merge nuggets into topic files
+  onProgress?.({
+    stage: 'merging',
+    sessionId: sessionRef.id,
+    counts: { nuggets: nuggets.length },
+  });
+
   let mergeResult;
   try {
     mergeResult = await topicStore.merge(nuggets, config.memoryDir);
@@ -228,6 +266,16 @@ export async function mull(
       // Non-fatal: data was written, but next run may reprocess some messages
     }
   }
+
+  onProgress?.({
+    stage: 'done',
+    sessionId: sessionRef.id,
+    counts: {
+      nuggets: mergeResult.nuggetsWritten,
+      topicsCreated: mergeResult.topicsCreated,
+      topicsUpdated: mergeResult.topicsUpdated,
+    },
+  });
 
   return {
     topicsUpdated: mergeResult.topicsUpdated,
