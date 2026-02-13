@@ -383,6 +383,12 @@ export const QualityConfigSchema = z.object({
   prep_timeout_ms: z.number().int().min(30000).default(300000),
   /** TASK_POST timeout in milliseconds (default: 300000 = 5min) */
   task_post_timeout_ms: z.number().int().min(30000).default(300000),
+  /** Run feature-level AC audit after RUN_POST (default: true) */
+  run_post_ac_audit: z.boolean().default(true),
+  /** Model for AC audit — deeper reasoning benefits from stronger model */
+  run_post_ac_model: z.string().default('sonnet'),
+  /** AC audit timeout in milliseconds (default: 300000 = 5min) */
+  run_post_ac_timeout_ms: z.number().int().min(30000).default(300000),
 });
 
 export type QualityConfig = z.infer<typeof QualityConfigSchema>;

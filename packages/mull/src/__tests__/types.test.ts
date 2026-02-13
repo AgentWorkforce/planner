@@ -185,7 +185,7 @@ describe('ArtifactSchema', () => {
 describe('SessionDataSchema', () => {
   const validSessionData = {
     sessionId: 'sess-001',
-    source: 'trajectory',
+    source: 'trail',
     startedAt: ISO_TIMESTAMP,
     messages: [validMessage()],
     events: [validSessionEvent()],
@@ -194,7 +194,7 @@ describe('SessionDataSchema', () => {
   it('should validate SessionData with all required fields (AC1)', () => {
     const result = SessionDataSchema.parse(validSessionData);
     expect(result.sessionId).toBe('sess-001');
-    expect(result.source).toBe('trajectory');
+    expect(result.source).toBe('trail');
     expect(result.messages).toHaveLength(1);
     expect(result.events).toHaveLength(1);
   });
@@ -590,9 +590,9 @@ describe('SessionRefSchema', () => {
 
 describe('AdapterConfigSchema', () => {
   it('should route trajectory variant (AC4)', () => {
-    const result = AdapterConfigSchema.parse({ type: 'trajectory', basePath: '/data' });
-    expect(result.type).toBe('trajectory');
-    if (result.type === 'trajectory') {
+    const result = AdapterConfigSchema.parse({ type: 'trail', basePath: '/data' });
+    expect(result.type).toBe('trail');
+    if (result.type === 'trail') {
       expect(result.basePath).toBe('/data');
     }
   });
@@ -647,7 +647,7 @@ describe('AdapterConfigSchema', () => {
   });
 
   it('should reject missing required field for variant', () => {
-    expect(() => AdapterConfigSchema.parse({ type: 'trajectory' })).toThrow();
+    expect(() => AdapterConfigSchema.parse({ type: 'trail' })).toThrow();
     expect(() => AdapterConfigSchema.parse({ type: 'relay' })).toThrow();
     expect(() => AdapterConfigSchema.parse({ type: 'transcript' })).toThrow();
     expect(() => AdapterConfigSchema.parse({ type: 'custom' })).toThrow();
@@ -659,7 +659,7 @@ describe('AdapterConfigSchema', () => {
 describe('MullConfigSchema', () => {
   const validConfig = {
     memoryDir: '.mull',
-    adapters: [{ type: 'trajectory' as const, basePath: '/data' }],
+    adapters: [{ type: 'trail' as const, basePath: '/data' }],
     llm: { model: 'claude-sonnet-4-5-20250929' },
     extraction: {},
   };

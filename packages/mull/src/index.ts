@@ -2,11 +2,19 @@
 export type {
   SessionRef,
   SessionMessage,
+  SessionDecision,
+  SessionEvent,
+  SessionRetrospective,
   SessionData,
   AdapterConfig,
   MullConfig,
   MullOptions,
+  ExtractedEntity,
+  ExtractedFact,
+  TopicMatch,
+  FilteredExcerpt,
   PreExtract,
+  NuggetCategory,
   Nugget,
   SynthesisResult,
   TopicMergeResult,
@@ -48,6 +56,12 @@ export { formatDryRunOutput } from './cli/format-dry-run.js';
 // Routing
 export { normalizeSessionRef, routeSessionRef } from './routing/session-ref-router.js';
 
+// Adapter bridge (SessionAdapter → MullAdapter)
+export { toMullAdapter, toMullAdapters, ADAPTER_REF_ROUTING, ADAPTER_SESSION_TYPE } from './adapters/adapter-bridge.js';
+
+// Synthesizers
+export { LlmSynthesizer, type LlmSynthesizerOptions } from './synthesizers/llm-synthesizer.js';
+
 // Default implementations
 export { FileTopicStore } from './defaults/topic-store.js';
 export { PassthroughSynthesizer } from './defaults/passthrough-synthesizer.js';
@@ -56,6 +70,9 @@ export { PassthroughSynthesizer } from './defaults/passthrough-synthesizer.js';
 export {
   TriggerManager,
   type TriggerManagerEvents,
+  registerMullTriggers,
+  type RegisterTriggersConfig,
+  type TriggerCleanupFn,
   type ForgeTrajectoryEvent,
   type PlannerDecisionEvent,
   type RelayMessageEvent,

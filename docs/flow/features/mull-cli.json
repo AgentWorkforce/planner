@@ -40,7 +40,7 @@
   "plan_implementation": {
     "plan_id": "mull-cli",
     "version": 1,
-    "status": "draft",
+    "status": "verified",
     "scopes": [
       {
         "scope_id": "mull-cli-core",
@@ -169,6 +169,29 @@
         ],
         "specification": "Location: src/__tests__/cli.test.ts. Use Vitest. Mock mull() and mullAll() from pipeline module. Use commander's .parseAsync(['node', 'mull', ...args]) for argument testing. Capture console.log output via vi.spyOn. Mock process.exit to verify exit codes. Use tmp directories for config file tests."
       }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "pass",
+    "criteria": [
+      { "id": "mcli-ac1", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:235-296" },
+      { "id": "mcli-ac2", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:115-214" },
+      { "id": "mcli-ac3", "status": "satisfied", "evidence": "packages/mull/src/config/resolve-adapters.ts:56-66" },
+      { "id": "mcli-ac4", "status": "satisfied", "evidence": "packages/mull/src/config/resolve-adapters.ts:67-70" },
+      { "id": "mcli-ac5", "status": "satisfied", "evidence": "packages/mull/src/config/resolve-adapters.ts:75-78" },
+      { "id": "mcli-ac6", "status": "satisfied", "evidence": "packages/mull/src/mull.ts:197-215, packages/mull/src/cli/format-dry-run.ts" },
+      { "id": "mcli-ac7", "status": "satisfied", "evidence": "packages/mull/src/mull.ts:103-115" },
+      { "id": "mcli-ac8", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:44,87-89" },
+      { "id": "mcli-ac9", "status": "satisfied", "evidence": "packages/mull/src/config/resolve.ts:85-107" },
+      { "id": "mcli-ac10", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:160-186,244-270" },
+      { "id": "mcli-ac11", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:136,231-233,294" },
+      { "id": "mcli-ac12", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:26-45" },
+      { "id": "mcli-ac13", "status": "satisfied", "evidence": "packages/mull/package.json:8-10" }
+    ],
+    "drift": [
+      { "finding": "relay-daemon adapter type supported beyond documented 3 sources", "file": "packages/mull/src/config/resolve-adapters.ts", "action": "document" },
+      { "finding": "Unsafe type cast SessionAdapter[] as MullAdapter[]", "file": "packages/mull/src/cli.ts:116,240", "action": "fix type bridge or align interfaces" }
     ]
   }
 }

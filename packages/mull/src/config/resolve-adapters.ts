@@ -2,7 +2,7 @@
  * Bridge between generic AdapterConfig (from config files / CLI flags)
  * and the adapter-specific config schemas expected by createAdapter().
  *
- * Generic config format:  { type: 'trajectory', dir: '.trajectories/' }
+ * Generic config format:  { type: 'trail', dir: '.trajectories/' }
  * Specific config format: { dbPath: '.trajectories/' }
  *
  * This module handles the mapping between the two, so that config files
@@ -19,10 +19,11 @@ import type { MullConfig, AdapterConfig } from '../domain/types.js';
  *
  * The generic config uses `dir` as a universal path field.
  * Each adapter type maps it to its own config key:
- *   - trajectory  → { dbPath: dir }
+ *   - trail       → { dbPath: dir }
  *   - relay       → { dataDir: dir }
  *   - relay-daemon → { dataDir: dir }
  *   - transcript  → { transcriptsDir: dir }
+ *   - forge       → { dbPath: dir }
  *
  * Extra fields from .passthrough() are forwarded as-is.
  */
@@ -33,7 +34,7 @@ export function mapToAdapterSpecificConfig(
   const { type, dir, ...rest } = generic;
 
   switch (type) {
-    case 'trajectory':
+    case 'trail':
       return { dbPath: dir ?? '.trajectories/', ...rest };
     case 'relay':
       return { dataDir: dir ?? '.agent-relay/', ...rest };
@@ -41,6 +42,8 @@ export function mapToAdapterSpecificConfig(
       return { dataDir: dir ?? '.agent-relay/', ...rest };
     case 'transcript':
       return { transcriptsDir: dir ?? './transcripts/', ...rest };
+    case 'forge':
+      return { dbPath: dir ?? './forge.db', ...rest };
     default:
       // Unknown adapter type — pass through everything and let factory validate
       return { dir, ...rest };
@@ -60,8 +63,8 @@ export function createAdapterFromFlags(
   _format?: string,
 ): SessionAdapter {
   switch (source) {
-    case 'trajectory':
-      return createAdapter('trajectory' as AdapterType, {
+    case 'trail':
+      return createAdapter('trail' as AdapterType, {
         dbPath: dir ?? '.trajectories/',
       });
     case 'relay':
@@ -76,10 +79,14 @@ export function createAdapterFromFlags(
       return createAdapter('transcript' as AdapterType, {
         transcriptsDir: path ?? './transcripts/',
       });
+    case 'forge':
+      return createAdapter('forge' as AdapterType, {
+        dbPath: dir ?? './forge.db',
+      });
     default:
       throw new Error(
         `Unknown adapter source: '${source}'. ` +
-        `Expected one of: trajectory, relay, relay-daemon, transcript`,
+        `Expected one of: trail, relay, relay-daemon, transcript, forge`,
       );
   }
 }

@@ -84,7 +84,7 @@ function makeSynthesizer(overrides: Partial<NuggetSynthesizer> = {}): NuggetSynt
 function makeTopicStore(overrides: Partial<TopicStore> = {}): TopicStore {
   return {
     listTopics: vi.fn<() => Promise<string[]>>().mockResolvedValue(['general']),
-    merge: vi.fn<(nuggets: Nugget[], dir: string) => Promise<TopicMergeResult>>().mockResolvedValue({
+    merge: vi.fn<(nuggets: Nugget[], dir: string, sessionId: string) => Promise<TopicMergeResult>>().mockResolvedValue({
       topicsUpdated: 1,
       topicsCreated: 0,
       nuggetsWritten: 2,
@@ -385,18 +385,36 @@ describe('mull()', () => {
   // -------------------------------------------------------------------------
 
   describe('partial failure handling', () => {
+    // Adapter with structured decisions — trail decision shortcut extracts these
+    function makeDecisionAdapter(): MullAdapter {
+      return makeAdapter({
+        loadSession: vi.fn<(ref: SessionRef, opts?: { after?: string }) => Promise<SessionData>>().mockResolvedValue({
+          ref: REF,
+          messages: [
+            { id: 'msg-1', role: 'user', content: 'Should we use OAuth?', timestamp: '2026-01-01T00:00:00Z' },
+            { id: 'msg-2', role: 'assistant', content: 'Yes, OAuth 2.0 with PKCE', timestamp: '2026-01-01T00:01:00Z' },
+          ],
+          decisions: [
+            { id: 'dec-1', description: 'Use OAuth 2.0 with PKCE for auth', rationale: 'Need third-party provider support', timestamp: '2026-01-01T00:01:00Z' },
+            { id: 'dec-2', description: 'Use SQLite for local storage', rationale: 'Simpler than PostgreSQL for MVP', timestamp: '2026-01-01T00:02:00Z' },
+          ],
+        }),
+      });
+    }
+
     it('falls back to trail decision nuggets when LLM synthesis throws', async () => {
       const failingSynthesizer = makeSynthesizer({
         synthesize: vi.fn<() => Promise<SynthesisResult>>().mockRejectedValue(new Error('LLM timeout')),
       });
+      const decisionAdapter = makeDecisionAdapter();
 
       const result = await mull(REF, {
-        adapters: [adapter],
+        adapters: [decisionAdapter],
         synthesizer: failingSynthesizer,
         topicStore,
       });
 
-      // Trail decision nuggets were written (2 non-system messages)
+      // Trail decision nuggets were written (2 structured decisions)
       expect(result.nuggetsWritten).toBe(2);
       expect(result.llmFailed).toBe(true);
     });
@@ -405,9 +423,10 @@ describe('mull()', () => {
       const failingSynthesizer = makeSynthesizer({
         synthesize: vi.fn<() => Promise<SynthesisResult>>().mockRejectedValue(new Error('LLM timeout')),
       });
+      const decisionAdapter = makeDecisionAdapter();
 
       const result = await mull(REF, {
-        adapters: [adapter],
+        adapters: [decisionAdapter],
         synthesizer: failingSynthesizer,
         topicStore,
       });
@@ -420,36 +439,37 @@ describe('mull()', () => {
       expect(topicStore.merge).toHaveBeenCalledOnce();
       expect(topicStore.rebuildToc).toHaveBeenCalledOnce();
       // Cursor was still advanced
-      expect(adapter.setCursor).toHaveBeenCalledWith(REF, 'msg-2');
+      expect(decisionAdapter.setCursor).toHaveBeenCalledWith(REF, 'msg-2');
     });
 
-    it('trail decision nuggets have low confidence (0.3)', async () => {
+    it('trail decision nuggets have structured confidence (0.8)', async () => {
       const failingSynthesizer = makeSynthesizer({
         synthesize: vi.fn<() => Promise<SynthesisResult>>().mockRejectedValue(new Error('LLM timeout')),
       });
 
       await mull(REF, {
-        adapters: [adapter],
+        adapters: [makeDecisionAdapter()],
         synthesizer: failingSynthesizer,
         topicStore,
       });
 
-      // Verify the nuggets passed to merge have low confidence
+      // Verify the nuggets passed to merge have structured decision confidence
       const mergeCall = (topicStore.merge as ReturnType<typeof vi.fn>).mock.calls[0];
       const nuggets = mergeCall![0] as Nugget[];
       expect(nuggets).toHaveLength(2);
       for (const nugget of nuggets) {
-        expect(nugget.confidence).toBe(0.3);
+        expect(nugget.confidence).toBe(0.8); // default for pre-structured decisions
+        expect(nugget.category).toBe('Decisions');
       }
     });
 
-    it('trail decision nuggets preserve original message content', async () => {
+    it('trail decision nuggets preserve decision descriptions', async () => {
       const failingSynthesizer = makeSynthesizer({
         synthesize: vi.fn<() => Promise<SynthesisResult>>().mockRejectedValue(new Error('LLM timeout')),
       });
 
       await mull(REF, {
-        adapters: [adapter],
+        adapters: [makeDecisionAdapter()],
         synthesizer: failingSynthesizer,
         topicStore,
       });
@@ -457,8 +477,8 @@ describe('mull()', () => {
       const mergeCall = (topicStore.merge as ReturnType<typeof vi.fn>).mock.calls[0];
       const nuggets = mergeCall![0] as Nugget[];
       const contents = nuggets.map(n => n.content);
-      expect(contents).toContain('Hello');
-      expect(contents).toContain('Hi there');
+      expect(contents).toContain('Use OAuth 2.0 with PKCE for auth');
+      expect(contents).toContain('Use SQLite for local storage');
     });
   });
 
@@ -509,9 +529,11 @@ describe('mull()', () => {
 
       // Structural content is identical (nugget IDs differ due to UUID but
       // content, topic assignment, and structure match)
-      // Extract just the content lines (skip nugget ID comment lines)
+      // Extract just the content lines (skip nugget ID comments and updated timestamp)
       const contentLines = (text: string) =>
-        text.split('\n').filter(l => !l.startsWith('<!-- nugget:'));
+        text.split('\n').filter(l =>
+          !l.startsWith('<!-- nugget:') && !l.startsWith("updated:")
+        );
 
       expect(contentLines(file1)).toEqual(contentLines(file2));
     });

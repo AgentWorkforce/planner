@@ -2,7 +2,7 @@
   "feature_id": "forge-api",
   "title": "Forge REST API",
   "type": "feature",
-  "status": "draft",
+  "status": "verified",
   "priority": "high",
   "parent": "forge-core",
   "dependencies": ["forge-storage", "forge-task-queue", "forge-relay-integration"],
@@ -48,6 +48,26 @@
       "sse_endpoint": "/runs/:id/events",
       "auth": "TBD - start with API key, add OAuth later"
     }
+  },
+
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "pass",
+    "criteria": [
+      { "id": "fa-ac1", "status": "satisfied", "evidence": "api/routes/runs.ts:19 POST /runs; api/handlers/runs.ts:56-168 creates run, schedules tasks, returns run_id" },
+      { "id": "fa-ac2", "status": "satisfied", "evidence": "api/routes/runs.ts:23 GET /runs; api/handlers/runs.ts:170-211 status filter + pagination via ListRunsQuerySchema" },
+      { "id": "fa-ac3", "status": "satisfied", "evidence": "api/routes/runs.ts:25 GET /runs/:id; api/handlers/runs.ts:213-241 RunWithTasksResponse includes all tasks" },
+      { "id": "fa-ac4", "status": "satisfied", "evidence": "api/routes/runs.ts:28 POST /runs/:id/pause; api/handlers/run-control.ts:36-91 validates transition, sets Paused" },
+      { "id": "fa-ac5", "status": "satisfied", "evidence": "api/routes/runs.ts:29 POST /runs/:id/resume; api/handlers/run-control.ts:93-175 resets blocked tasks, calls scheduleReadyTasks" },
+      { "id": "fa-ac6", "status": "satisfied", "evidence": "api/routes/runs.ts:30 POST /runs/:id/cancel; api/handlers/run-control.ts:177-237 terminates active agents, sets Cancelled" },
+      { "id": "fa-ac7", "status": "satisfied", "evidence": "api/routes/runs.ts:33 GET /runs/:id/tasks/:taskId; api/handlers/tasks.ts:54-103 returns attempts + artifacts" },
+      { "id": "fa-ac8", "status": "satisfied", "evidence": "api/routes/runs.ts:36-40 GET /runs/:id/events; api/handlers/sse.ts:218-323 SSE with Last-Event-ID reconnection + 30s heartbeat" },
+      { "id": "fa-ac9", "status": "satisfied", "evidence": "api/routes.ts:135-182 GET /health returns status, version, uptime, active_runs, active_agents" },
+      { "id": "fa-ac10", "status": "satisfied", "evidence": "api/routes/agents.ts:35 GET /agents; api/handlers/agents.ts:100-159 merges relay presence + DB task state" }
+    ],
+    "drift": [
+      { "finding": "Bonus endpoints beyond spec: GET /runs/counts (dashboard counts), GET /runs/:id/tasks/:taskId/retrospective", "file": "api/handlers/runs.ts:243-273, api/handlers/tasks.ts:105-200", "action": "note" }
+    ]
   },
 
   "plan_implementation": {

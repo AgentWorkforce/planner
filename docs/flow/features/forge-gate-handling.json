@@ -47,6 +47,25 @@
     }
   },
 
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "fgh-ac1", "status": "satisfied", "evidence": "domain/types.ts:214-219 GateConfigSchema; services/gate-service.ts:108-115 detectAndCreateGate checks gate.type" },
+      { "id": "fgh-ac2", "status": "partial", "note": "gate-service.ts:121-125 sets AwaitingApproval, but detectAndCreateGate never called during task dispatch — gates created post-completion via report-complete MCP tool" },
+      { "id": "fgh-ac3", "status": "satisfied", "evidence": "services/gate-service.ts:127-128 updateRunGateFlag(true); storage/sqlite/runs.ts:124-126; domain/types.ts:425 has_pending_gate field" },
+      { "id": "fgh-ac4", "status": "satisfied", "evidence": "services/gate-service.ts:297-319 listPendingGates; api/handlers/gates.ts:204-233 GET /gates/pending" },
+      { "id": "fgh-ac5", "status": "satisfied", "evidence": "services/gate-service.ts:162-217 approveGate clears flag + calls scheduleReadyTasks; api/handlers/gates.ts:72-134 POST /gates/:taskId/approve" },
+      { "id": "fgh-ac6", "status": "satisfied", "evidence": "services/gate-service.ts:235-283 rejectGate fails task; api/handlers/gates.ts:141-197 POST /gates/:taskId/reject with reason" },
+      { "id": "fgh-ac7", "status": "satisfied", "evidence": "api/handlers/sse.ts:334-396 gateEventsSSEHandler; api/routes/gates.ts:58-60 /gates/events endpoint" },
+      { "id": "fgh-ac8", "status": "satisfied", "evidence": "storage/sqlite/gates.ts:84-98 stores decided_by, decided_at, comment; storage/schema.ts:183-193 gates table schema" }
+    ],
+    "drift": [
+      { "finding": "detectAndCreateGate exists but never called during task dispatch — gates are post-completion approval points, not pre-spawn blockers", "file": "services/orchestrator.ts", "action": "note" },
+      { "finding": "GateService is optional throughout codebase; gate detection disconnected from orchestrator execution flow", "file": "services/gate-service.ts", "action": "note" }
+    ]
+  },
+
   "plan_implementation": {
     "scopes": ["forge-core"],
     "steps": [

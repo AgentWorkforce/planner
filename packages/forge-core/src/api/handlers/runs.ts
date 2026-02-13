@@ -151,6 +151,7 @@ export function createRunHandler(deps: RunHandlerDeps) {
         // Store plan-level context and understanding in run document
         // These are passed to agents via the orchestrator for implementation guidance
         const planDoc: Record<string, unknown> = {};
+        planDoc.summary = plan.summary;
         if (plan.context) planDoc.context = plan.context;
         if (plan.understanding) planDoc.understanding = plan.understanding;
         if (Object.keys(planDoc).length > 0) {

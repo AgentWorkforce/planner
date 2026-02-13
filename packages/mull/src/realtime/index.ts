@@ -1,6 +1,13 @@
 // Real-time trigger system
 export { TriggerManager, type TriggerManagerEvents } from './trigger-manager.js';
 
+// Event hooks for wiring triggers to event sources
+export {
+  registerMullTriggers,
+  type RegisterTriggersConfig,
+  type TriggerCleanupFn,
+} from './event-hooks.js';
+
 // Trigger types
 export type {
   ForgeTrajectoryEvent,

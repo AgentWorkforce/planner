@@ -178,5 +178,30 @@
         ]
       }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "mrt-ac1", "status": "satisfied", "evidence": "packages/mull/src/realtime/types.ts:119-131" },
+      { "id": "mrt-ac2", "status": "satisfied", "evidence": "packages/mull/src/realtime/deterministic.ts:27-345" },
+      { "id": "mrt-ac3", "status": "satisfied", "evidence": "packages/mull/src/realtime/deterministic.ts (all sync functions)" },
+      { "id": "mrt-ac4", "status": "satisfied", "evidence": "packages/mull/src/realtime/llm-batch.ts:35-67" },
+      { "id": "mrt-ac5", "status": "satisfied", "evidence": "packages/mull/src/realtime/trigger-manager.ts:223-240" },
+      { "id": "mrt-ac6", "status": "satisfied", "evidence": "packages/mull/src/realtime/trigger-manager.ts:307-322" },
+      { "id": "mrt-ac7", "status": "satisfied", "evidence": "packages/mull/src/realtime/trigger-manager.ts:277-281" },
+      { "id": "mrt-ac8", "status": "satisfied", "evidence": "packages/mull/src/realtime/accumulator.ts:68-84" },
+      { "id": "mrt-ac9", "status": "satisfied", "evidence": "packages/mull/src/realtime/trigger-manager.ts:261-302" },
+      { "id": "mrt-ac10", "status": "partial", "note": "TriggerManager exists but hook wiring to forge/planner services not implemented" },
+      { "id": "mrt-ac11", "status": "satisfied", "evidence": "packages/mull/src/realtime/accumulator.ts:18-25" },
+      { "id": "mrt-ac12", "status": "missing", "note": "No enabled/disabled toggle in TriggerConfig" },
+      { "id": "mrt-ac13", "status": "satisfied", "evidence": "packages/mull/src/realtime/llm-batch.ts:47-50" },
+      { "id": "mrt-ac14", "status": "partial", "note": "RetrospectiveService emits event but no subscriber in mull" }
+    ],
+    "drift": [
+      { "finding": "File locking for concurrent trigger safety", "file": "packages/mull/src/memory/file-lock.ts", "action": "document" },
+      { "finding": "Relay message filtering (>50 chars, exclude system)", "file": "packages/mull/src/realtime/deterministic.ts:288-323", "action": "document" },
+      { "finding": "Concurrent LLM prevention via activeLlmRuns set", "file": "packages/mull/src/realtime/trigger-manager.ts:271-273", "action": "document" }
+    ]
   }
 }

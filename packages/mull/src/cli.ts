@@ -9,7 +9,8 @@ import { createAdapterFromFlags, resolveAdapters } from './config/resolve-adapte
 import { mull } from './mull.js';
 import { normalizeSessionRef } from './routing/session-ref-router.js';
 import { formatDryRunOutput } from './cli/format-dry-run.js';
-import type { MullConfig, AdapterConfig, MullAdapter, SessionRef } from './domain/types.js';
+import { toMullAdapters, ADAPTER_SESSION_TYPE } from './adapters/adapter-bridge.js';
+import type { MullConfig, AdapterConfig, SessionRef } from './domain/types.js';
 import type { SessionAdapter } from './adapters/core-types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +37,7 @@ program
   )
   .argument('[session-id]', 'Session ID to process (omit for --all mode)')
   .option('--all', 'Process all unprocessed sessions from configured adapters')
-  .option('--source <type>', 'Adapter source type (trajectory, relay, transcript)')
+  .option('--source <type>', 'Adapter source type (trail, relay, transcript, forge)')
   .option('--dir <path>', 'Data directory for the adapter (used with --source)')
   .option('--path <path>', 'File path for transcript adapter (used with --source transcript)')
   .option('--dry-run', 'Preview extraction results without writing files')
@@ -113,7 +114,7 @@ program
 
     // --- Pipeline execution ---
     if (opts.all) {
-      const mullAdapters = adapters as unknown as MullAdapter[];
+      const mullAdapters = toMullAdapters(adapters);
 
       // Collect all session refs from all adapters, deduplicating
       const seen = new Set<string>();
@@ -235,9 +236,13 @@ program
       console.log(`Processing session ${sessionId}...\n`);
 
       try {
-        const sessionRef = normalizeSessionRef(sessionId!);
+        // Determine SessionRef type from --source flag or adapter types
+        const refType = opts.source
+          ? (ADAPTER_SESSION_TYPE[opts.source] ?? 'plan_id')
+          : (adapters.length === 1 && adapters[0] ? (ADAPTER_SESSION_TYPE[adapters[0].type] ?? 'plan_id') : 'plan_id');
+        const sessionRef: SessionRef = { type: refType as SessionRef['type'], id: sessionId! };
         const result = await mull(sessionRef, {
-          adapters: adapters as unknown as MullAdapter[],
+          adapters: toMullAdapters(adapters),
           config: configOverrides,
           dryRun: opts.dryRun,
           force: opts.force,

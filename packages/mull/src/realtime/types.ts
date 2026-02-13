@@ -52,6 +52,9 @@ export interface RelayMessageEvent {
 // ---------------------------------------------------------------------------
 
 export const TriggerConfigSchema = z.object({
+  /** Enable or disable real-time triggers. Default: true */
+  enabled: z.boolean().default(true),
+
   /** Minimum entities accumulated before LLM trigger fires. Default: 3 */
   minEntitiesForLlm: z.number().int().positive().default(3),
 

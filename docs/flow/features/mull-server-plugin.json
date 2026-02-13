@@ -148,5 +148,28 @@
         ]
       }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "msp-ac1", "status": "partial", "note": "Missing getStorage() method; returns getMemoryDir() + setAdapters() instead" },
+      { "id": "msp-ac2", "status": "partial", "note": "SessionRef uses plan_id/run_id/channel not planner-trajectory/forge-run/relay-session" },
+      { "id": "msp-ac3", "status": "satisfied", "evidence": "packages/mull/src/domain/types.ts:135-140" },
+      { "id": "msp-ac4", "status": "satisfied", "evidence": "packages/mull/src/api/handlers/run.ts:29-49" },
+      { "id": "msp-ac5", "status": "partial", "note": "Returns minimal status only; missing lastUpdated, recentSessions[], adapterStatus[]" },
+      { "id": "msp-ac6", "status": "satisfied", "evidence": "packages/mull/src/api/handlers/topics.ts:7-23" },
+      { "id": "msp-ac7", "status": "satisfied", "evidence": "packages/mull/src/api/handlers/topics.ts:25-52" },
+      { "id": "msp-ac8", "status": "partial", "note": "Service created but adapters never populated in server.ts" },
+      { "id": "msp-ac9", "status": "partial", "note": "Only notFound() used; run handler uses generic 400 not BadRequestError" },
+      { "id": "msp-ac10", "status": "satisfied", "evidence": "packages/mull/src/api/schemas.ts:8-12" },
+      { "id": "msp-ac11", "status": "missing", "note": "Handler blocks and awaits pipeline; no async job queue" },
+      { "id": "msp-ac12", "status": "satisfied", "evidence": "packages/mull/src/routing/session-ref-router.ts:59-80" }
+    ],
+    "drift": [
+      { "finding": "Dry-run mode with dryRunDetails response", "file": "packages/mull/src/mull.ts:196-216", "action": "document" },
+      { "finding": "LLM failure fallback to deterministic trail decisions", "file": "packages/mull/src/mull.ts:176-185", "action": "document" },
+      { "finding": "Session deduplication in mullAll", "file": "packages/mull/src/mull-all.ts:122-138", "action": "document" }
+    ]
   }
 }

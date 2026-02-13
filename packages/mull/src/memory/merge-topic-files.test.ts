@@ -416,6 +416,89 @@ Use vitest.
       expect(content).toContain('e2e');
     });
 
+    it('deduplicates near-synonym tags (prefix with hyphen)', () => {
+      const nuggets: MergeNugget[] = [
+        {
+          topic: 'test',
+          slug: 's1',
+          category: 'Decisions',
+          description: 'D.',
+          tags: ['storage', 'storage-patterns', 'storage-migration', 'domain-model'],
+        },
+      ];
+
+      mergeIntoTopicFiles(nuggets, '/tmp/memory', 'session-1');
+
+      const content = getWrittenContent('test')!;
+      // Shorter form kept
+      expect(content).toContain('storage');
+      expect(content).toContain('domain-model');
+      // Longer synonyms removed
+      expect(content).not.toContain('storage-patterns');
+      expect(content).not.toContain('storage-migration');
+    });
+
+    it('caps tags at 10 when accumulated across sessions', () => {
+      // Existing topic already has 8 tags from prior sessions
+      const existingContent = `---
+topic: Big Topic
+updated: 2026-02-10T10:00:00Z
+sessions:
+  - session-1
+  - session-2
+tags:
+  - tag-a
+  - tag-b
+  - tag-c
+  - tag-d
+  - tag-e
+  - tag-f
+  - tag-g
+  - tag-h
+---
+
+## Decisions
+
+### old-nugget
+
+Old decision.
+`;
+      mockReaddirSync.mockReturnValue([
+        'big-topic.md' as unknown as import('node:fs').Dirent,
+      ]);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(existingContent);
+
+      // New session adds 5 more tags → 13 total, should be capped to 10
+      mergeIntoTopicFiles(
+        [
+          {
+            topic: 'big-topic',
+            slug: 'new-1',
+            category: 'Decisions',
+            description: 'New.',
+            tags: ['tag-i', 'tag-j', 'tag-k'],
+          },
+          {
+            topic: 'big-topic',
+            slug: 'new-2',
+            category: 'Patterns',
+            description: 'Pattern.',
+            tags: ['tag-l', 'tag-m'],
+          },
+        ],
+        '/tmp/memory',
+        'session-3',
+      );
+
+      const content = getWrittenContent('big-topic')!;
+      // Extract the tags array from YAML frontmatter
+      const tagsMatch = content.match(/tags:\n((?:\s+- .+\n)*)/);
+      expect(tagsMatch).not.toBeNull();
+      const tagLines = tagsMatch![1]!.trim().split('\n').filter(Boolean);
+      expect(tagLines.length).toBeLessThanOrEqual(10);
+    });
+
     it('updates the timestamp', () => {
       mergeIntoTopicFiles(
         [{ topic: 'test', slug: 's1', category: 'Decisions', description: 'D.' }],

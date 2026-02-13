@@ -163,5 +163,34 @@
         ]
       }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "mfda-ac1", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:103-104" },
+      { "id": "mfda-ac2", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:143-177" },
+      { "id": "mfda-ac3", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:68-80" },
+      { "id": "mfda-ac4", "status": "partial", "note": "Uses 'decision' field not 'question'; no 'selected_option' extracted" },
+      { "id": "mfda-ac5", "status": "partial", "note": "Returns JSON string not structured Retrospective object" },
+      { "id": "mfda-ac6", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac7", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac8", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac9", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac10", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac11", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac12", "status": "partial", "note": "loadUserTrajectory missing scope parameter" },
+      { "id": "mfda-ac13", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:193-207" },
+      { "id": "mfda-ac14", "status": "missing", "note": "linked_event_ids left in JSON string, no causal link extraction" },
+      { "id": "mfda-ac15", "status": "missing", "note": "No getCursor/setCursor on adapter; cursor handled by loader" },
+      { "id": "mfda-ac16", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:103" },
+      { "id": "mfda-ac17", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:5-12" },
+      { "id": "mfda-ac18", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:280-287" }
+    ],
+    "drift": [
+      { "finding": "ForgeDbAdapter not registered in factory.ts, schemas.ts, or core-types.ts AdapterType", "file": "packages/mull/src/adapters/factory.ts", "action": "add forge to factory and routing" },
+      { "finding": "Not in ADAPTER_ROUTING in loader.ts", "file": "packages/mull/src/adapters/loader.ts", "action": "add forge to run routing" },
+      { "finding": "No per-event-type parsers module as planned", "file": "packages/mull/src/adapters/implementations/forge-db-adapter.ts", "action": "document inline approach" }
+    ]
   }
 }

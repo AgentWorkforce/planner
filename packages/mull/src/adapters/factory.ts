@@ -15,11 +15,13 @@ import {
   type RelayAdapterConfig,
   type RelayDaemonAdapterConfig,
   type TranscriptAdapterConfig,
+  type ForgeDbAdapterConfig,
 } from './schemas.js';
 import { TrajectoryAdapter } from './implementations/trajectory-adapter.js';
 import { RelayJsonlAdapter } from './implementations/relay-jsonl-adapter.js';
 import { RelayDaemonAdapter } from './implementations/relay-daemon-adapter.js';
 import { TranscriptAdapter } from './implementations/transcript-adapter.js';
+import { ForgeDbAdapter } from './implementations/forge-db-adapter.js';
 
 /**
  * Check if a value looks like a SessionAdapter (duck typing).
@@ -37,7 +39,7 @@ function isSessionAdapter(value: unknown): value is SessionAdapter {
 /**
  * Create a session adapter by type string, or pass through a custom adapter object.
  *
- * @param typeOrAdapter - Adapter type string ('trajectory', 'relay', 'transcript')
+ * @param typeOrAdapter - Adapter type string ('trail', 'relay', 'transcript')
  *                        or a custom object implementing SessionAdapter.
  * @param config - Configuration object validated against the adapter's Zod schema.
  *                 Not required when passing a custom adapter object.
@@ -64,12 +66,12 @@ export function createAdapter(
 
   if (!schema) {
     throw new ValidationError(
-      `Unknown adapter type: '${adapterType}'. Expected one of: trajectory, relay, relay-daemon, transcript`,
+      `Unknown adapter type: '${adapterType}'. Expected one of: trail, relay, relay-daemon, transcript, forge`,
     );
   }
 
   // Validate config against the adapter's Zod schema
-  let validatedConfig: TrajectoryAdapterConfig | RelayAdapterConfig | RelayDaemonAdapterConfig | TranscriptAdapterConfig;
+  let validatedConfig: TrajectoryAdapterConfig | RelayAdapterConfig | RelayDaemonAdapterConfig | TranscriptAdapterConfig | ForgeDbAdapterConfig;
   try {
     validatedConfig = schema.parse(config);
   } catch (err) {
@@ -84,7 +86,7 @@ export function createAdapter(
 
   // Instantiate the appropriate adapter
   switch (adapterType) {
-    case 'trajectory':
+    case 'trail':
       return new TrajectoryAdapter(validatedConfig as TrajectoryAdapterConfig);
     case 'relay':
       return new RelayJsonlAdapter(validatedConfig as RelayAdapterConfig);
@@ -92,5 +94,7 @@ export function createAdapter(
       return new RelayDaemonAdapter(validatedConfig as RelayDaemonAdapterConfig);
     case 'transcript':
       return new TranscriptAdapter(validatedConfig as TranscriptAdapterConfig);
+    case 'forge':
+      return new ForgeDbAdapter(validatedConfig as ForgeDbAdapterConfig);
   }
 }

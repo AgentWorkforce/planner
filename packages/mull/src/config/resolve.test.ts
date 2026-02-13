@@ -21,7 +21,7 @@ describe('resolveConfig()', () => {
 
       expect(config.memoryDir).toBe('./memory');
       expect(config.mullDir).toBe('.mull');
-      expect(config.adapters).toEqual([{ type: 'trajectory', dir: '.trajectories/' }]);
+      expect(config.adapters).toEqual([{ type: 'trail', dir: '.trajectories/' }]);
     });
 
     it('returns defaults when called with empty opts', () => {
@@ -29,7 +29,7 @@ describe('resolveConfig()', () => {
 
       expect(config.memoryDir).toBe('./memory');
       expect(config.mullDir).toBe('.mull');
-      expect(config.adapters).toEqual([{ type: 'trajectory', dir: '.trajectories/' }]);
+      expect(config.adapters).toEqual([{ type: 'trail', dir: '.trajectories/' }]);
     });
   });
 

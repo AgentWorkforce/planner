@@ -6,6 +6,9 @@ import type { TopicFrontmatter, Nugget } from './read-topic-file.js';
 /** Fixed section ordering for topic files. */
 const SECTION_ORDER = ['Decisions', 'Constraints', 'Patterns', 'Gotchas', 'Context'] as const;
 
+/** Maximum tags per topic file. Prevents unbounded accumulation across sessions. */
+const MAX_TOPIC_TAGS = 10;
+
 /** A nugget to be merged into a topic file. */
 export interface MergeNugget {
   topic: string;       // topic slug (filename without .md)
@@ -215,7 +218,7 @@ function buildFrontmatter(
     sessions.push(sessionId);
   }
 
-  // Tags: union of existing + all nugget tags
+  // Tags: union of existing + incoming, then deduplicate and cap
   const tagSet = new Set<string>(existing?.tags ?? []);
   for (const nugget of nuggets) {
     if (nugget.tags) {
@@ -225,12 +228,72 @@ function buildFrontmatter(
     }
   }
 
+  let tags = deduplicateNearSynonymTags([...tagSet]);
+
+  if (tags.length > MAX_TOPIC_TAGS) {
+    tags = capTags(tags, nuggets, existing?.tags ?? []);
+  }
+
   return {
     topic: existing?.topic || slugToTitle(topicSlug),
     updated: new Date().toISOString(),
     sessions,
-    tags: [...tagSet],
+    tags,
   };
+}
+
+/**
+ * Removes near-synonym tags where one is a prefix of another.
+ * E.g., if both 'storage' and 'storage-patterns' exist, keeps 'storage'.
+ * Sorts shortest-first so shorter (more general) forms win.
+ */
+function deduplicateNearSynonymTags(tags: string[]): string[] {
+  const sorted = [...tags].sort((a, b) => a.length - b.length);
+  const kept: string[] = [];
+
+  for (const tag of sorted) {
+    const isRedundant = kept.some((k) => tag.startsWith(k + '-'));
+    if (!isRedundant) {
+      kept.push(tag);
+    }
+  }
+
+  return kept;
+}
+
+/**
+ * Caps tags to MAX_TOPIC_TAGS by ranking:
+ *   +2 per nugget in the current batch that uses the tag
+ *   +1 if the tag existed in previous frontmatter (established across sessions)
+ * Alphabetical tiebreak for stability.
+ */
+function capTags(
+  tags: string[],
+  nuggets: MergeNugget[],
+  existingTags: string[],
+): string[] {
+  const existingSet = new Set(existingTags);
+  const scores = new Map<string, number>();
+
+  for (const tag of tags) {
+    scores.set(tag, existingSet.has(tag) ? 1 : 0);
+  }
+
+  for (const nugget of nuggets) {
+    for (const tag of nugget.tags ?? []) {
+      if (scores.has(tag)) {
+        scores.set(tag, (scores.get(tag) ?? 0) + 2);
+      }
+    }
+  }
+
+  return [...tags]
+    .sort((a, b) => {
+      const scoreDiff = (scores.get(b) ?? 0) - (scores.get(a) ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      return a.localeCompare(b);
+    })
+    .slice(0, MAX_TOPIC_TAGS);
 }
 
 /**

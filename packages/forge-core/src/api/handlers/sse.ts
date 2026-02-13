@@ -104,6 +104,9 @@ const TRAJECTORY_TO_SSE_EVENT: Record<string, string> = {
   [TrajectoryEventType.AgentProgress]: RunSSEEventTypes.AgentProgress,
   // Question events
   [TrajectoryEventType.HumanInputRequested]: RunSSEEventTypes.QuestionAdded,
+  // AC Audit events
+  [TrajectoryEventType.RunAcAuditStarted]: RunSSEEventTypes.AcAuditComplete,
+  [TrajectoryEventType.RunAcAuditCompleted]: RunSSEEventTypes.AcAuditComplete,
 };
 
 /**
@@ -600,6 +603,16 @@ function mapTrajectoryToSSEPayload(event: TrajectoryEvent): Record<string, unkno
         text: payload.text,
         blocking_level: payload.blocking_level,
         options: payload.options,
+      };
+
+    // AC Audit events
+    case TrajectoryEventType.RunAcAuditStarted:
+    case TrajectoryEventType.RunAcAuditCompleted:
+      return {
+        run_id: event.run_id,
+        event_type: event.event_type,
+        ...payload,
+        timestamp: event.timestamp,
       };
 
     default:

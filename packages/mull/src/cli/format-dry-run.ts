@@ -4,7 +4,7 @@ import type { DryRunDetails, DryRunEntity } from '../domain/types.js';
  * Format dry-run details for human-readable console output.
  *
  * Displays:
- *   - Entities found, grouped by type
+ *   - Entities found, grouped by type (from NLP + regex extraction)
  *   - Facts extracted, with pre-structured flag indicated
  *   - Topic matches with confidence scores and isNew flags
  *   - Would-be nuggets with category and topic assignment
@@ -26,9 +26,12 @@ export function formatDryRunOutput(details: DryRunDetails): string {
     const grouped = groupEntitiesByType(details.entities);
     for (const [type, entities] of grouped) {
       lines.push(`  ${type}:`);
-      for (const entity of entities) {
+      for (const entity of entities.slice(0, 15)) {
         const countSuffix = entity.count > 1 ? ` (x${entity.count})` : '';
         lines.push(`    - ${entity.text}${countSuffix}`);
+      }
+      if (entities.length > 15) {
+        lines.push(`    ... and ${entities.length - 15} more`);
       }
     }
   }
@@ -39,9 +42,13 @@ export function formatDryRunOutput(details: DryRunDetails): string {
   if (details.facts.length === 0) {
     lines.push('  (none)');
   } else {
-    for (const fact of details.facts) {
-      const preStructuredTag = fact.isPreStructured ? ' [pre-structured]' : '';
-      lines.push(`  - ${fact.text}${preStructuredTag}`);
+    for (const fact of details.facts.slice(0, 30)) {
+      const preStructuredTag = fact.isPreStructured ? ' [structured]' : '';
+      const sourceTag = fact.source !== 'message' ? ` [${fact.source}]` : '';
+      lines.push(`  - ${fact.text}${preStructuredTag}${sourceTag}`);
+    }
+    if (details.facts.length > 30) {
+      lines.push(`  ... and ${details.facts.length - 30} more`);
     }
   }
   lines.push('');
@@ -54,7 +61,10 @@ export function formatDryRunOutput(details: DryRunDetails): string {
     for (const match of details.topicMatches) {
       const newTag = match.isNew ? ' [NEW]' : '';
       const score = (match.score * 100).toFixed(0);
-      lines.push(`  - ${match.topicSlug} (confidence: ${score}%)${newTag}`);
+      const entities = match.matchedEntities.length > 0
+        ? ` (matched: ${match.matchedEntities.slice(0, 5).join(', ')})`
+        : '';
+      lines.push(`  - ${match.topicSlug} (confidence: ${score}%)${newTag}${entities}`);
     }
   }
   lines.push('');
@@ -62,7 +72,7 @@ export function formatDryRunOutput(details: DryRunDetails): string {
   // --- Would-be Nuggets ---
   lines.push('--- Would-be Nuggets ---');
   if (details.nuggets.length === 0) {
-    lines.push('  (none)');
+    lines.push('  (none — no extractable knowledge found in this session)');
   } else {
     for (const nugget of details.nuggets) {
       const category = nugget.category ?? 'context';

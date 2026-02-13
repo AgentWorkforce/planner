@@ -38,7 +38,7 @@ interface SessionAggregateRow {
  * entriesToSessionData classifies them as SessionDecision[].
  */
 export class TrajectoryAdapter implements SessionAdapter {
-  readonly type = 'trajectory' as const;
+  readonly type = 'trail' as const;
 
   private readonly db: Database.Database;
 
@@ -136,7 +136,7 @@ export class TrajectoryAdapter implements SessionAdapter {
 
     return {
       timestamp: row.timestamp,
-      source: 'trajectory',
+      source: 'trail',
       type: 'decision',
       content: {
         id: row.event_id,

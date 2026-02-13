@@ -4,7 +4,7 @@ import { synthesizeNuggets } from './pipeline/synthesize.js';
 import { extractTrailDecisions } from './pipeline/extract-trail-decisions.js';
 import { extractDryRunDetails } from './pipeline/extract-dry-run-details.js';
 import { FileTopicStore } from './defaults/topic-store.js';
-import { PassthroughSynthesizer } from './defaults/passthrough-synthesizer.js';
+import { LlmSynthesizer } from './synthesizers/llm-synthesizer.js';
 import { routeSessionRef } from './routing/session-ref-router.js';
 import type {
   SessionRef,
@@ -23,7 +23,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export interface MullPipelineOptions extends MullOptions {
-  /** Custom synthesizer. Defaults to PassthroughSynthesizer. */
+  /** Custom synthesizer. Defaults to LlmSynthesizer. */
   synthesizer?: NuggetSynthesizer;
 
   /** Custom topic store. Defaults to FileTopicStore. */
@@ -82,7 +82,7 @@ export async function mull(
   const config: MullConfig = resolveConfig(opts.config);
 
   // Resolve pipeline components (use defaults if not provided)
-  const synthesizer: NuggetSynthesizer = opts.synthesizer ?? new PassthroughSynthesizer();
+  const synthesizer: NuggetSynthesizer = opts.synthesizer ?? new LlmSynthesizer();
   const topicStore: TopicStore = opts.topicStore ?? new FileTopicStore();
 
   // 2. Route to correct adapter
@@ -184,16 +184,8 @@ export async function mull(
     }
   }
 
-  if (nuggets.length === 0) {
-    onProgress?.({
-      stage: 'done',
-      sessionId: sessionRef.id,
-      counts: { nuggets: 0 },
-    });
-    return { ...EMPTY_RESULT, llmFailed, errors };
-  }
-
-  // 6. Dry run: return estimated result with detailed extraction data
+  // 6. Dry run: return extraction details — always, even with 0 nuggets.
+  //    That's how you diagnose and tune the pipeline.
   if (opts.dryRun) {
     const uniqueTopics = new Set(nuggets.map(n => n.topic));
     const dryRunDetails = extractDryRunDetails(preExtract, nuggets);
@@ -215,6 +207,15 @@ export async function mull(
     };
   }
 
+  if (nuggets.length === 0) {
+    onProgress?.({
+      stage: 'done',
+      sessionId: sessionRef.id,
+      counts: { nuggets: 0 },
+    });
+    return { ...EMPTY_RESULT, llmFailed, errors };
+  }
+
   // 7. Merge nuggets into topic files
   onProgress?.({
     stage: 'merging',
@@ -224,7 +225,7 @@ export async function mull(
 
   let mergeResult;
   try {
-    mergeResult = await topicStore.merge(nuggets, config.memoryDir);
+    mergeResult = await topicStore.merge(nuggets, config.memoryDir, sessionRef.id);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

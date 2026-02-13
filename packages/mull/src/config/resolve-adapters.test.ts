@@ -10,13 +10,13 @@ import { TranscriptAdapter } from '../adapters/implementations/transcript-adapte
 import type { MullConfig } from '../domain/types.js';
 
 describe('mapToAdapterSpecificConfig', () => {
-  it('maps trajectory adapter: dir → dbPath', () => {
-    const result = mapToAdapterSpecificConfig({ type: 'trajectory', dir: '/data/traj/' });
+  it('maps trail adapter: dir → dbPath', () => {
+    const result = mapToAdapterSpecificConfig({ type: 'trail', dir: '/data/traj/' });
     expect(result).toEqual({ dbPath: '/data/traj/' });
   });
 
-  it('defaults trajectory dbPath to .trajectories/', () => {
-    const result = mapToAdapterSpecificConfig({ type: 'trajectory' });
+  it('defaults trail dbPath to .trajectories/', () => {
+    const result = mapToAdapterSpecificConfig({ type: 'trail' });
     expect(result).toEqual({ dbPath: '.trajectories/' });
   });
 
@@ -86,10 +86,10 @@ describe('createAdapterFromFlags', () => {
     db.close();
   });
 
-  it('--source trajectory --dir X creates TrajectoryAdapter', () => {
-    const adapter = createAdapterFromFlags('trajectory', dbPath);
+  it('--source trail --dir X creates TrajectoryAdapter', () => {
+    const adapter = createAdapterFromFlags('trail', dbPath);
     expect(adapter).toBeInstanceOf(TrajectoryAdapter);
-    expect(adapter.type).toBe('trajectory');
+    expect(adapter.type).toBe('trail');
     (adapter as TrajectoryAdapter).close();
   });
 
@@ -142,7 +142,7 @@ describe('resolveAdapters', () => {
       memoryDir: './memory',
       mullDir: '.mull',
       adapters: [
-        { type: 'trajectory', dir: dbPath },
+        { type: 'trail', dir: dbPath },
         { type: 'relay', dir: '/relay/' },
       ],
     };

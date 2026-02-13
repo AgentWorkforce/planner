@@ -114,6 +114,12 @@ export function createMullService(config: MullServiceConfig = {}): MullService {
 
     shutdown: () => {
       console.log('[mull] Shutting down');
+      // Close all adapters that have a close method
+      for (const adapter of adapters) {
+        if ('close' in adapter && typeof adapter.close === 'function') {
+          adapter.close();
+        }
+      }
     },
 
     getMemoryDir: () => memoryDir,

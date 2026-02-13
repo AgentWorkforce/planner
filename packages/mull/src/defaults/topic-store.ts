@@ -1,6 +1,8 @@
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import type { TopicStore, Nugget, TopicMergeResult } from '../domain/types.js';
+import { mergeIntoTopicFiles } from '../memory/merge-topic-files.js';
+import type { MergeNugget } from '../memory/merge-topic-files.js';
+import { rebuildTOC } from '../memory/rebuild-toc.js';
 
 /**
  * Slugify a topic name for use as a filename.
@@ -14,17 +16,19 @@ function slugify(topic: string): string {
 }
 
 /**
- * Filesystem-based TopicStore that manages markdown topic files.
+ * Filesystem-based TopicStore that delegates to proper merge layer.
  *
- * Each topic is a markdown file at `<memoryDir>/<slug>.md`.
- * Nuggets are appended as sections. The TOC is an `_index.md` file.
+ * Converts domain Nugget[] → MergeNugget[] and calls mergeIntoTopicFiles()
+ * which handles YAML frontmatter, slug-based dedup, and section ordering.
+ *
+ * The TOC is built from topic frontmatter into index.md.
  */
 export class FileTopicStore implements TopicStore {
   async listTopics(memoryDir: string): Promise<string[]> {
     try {
       const entries = await fs.readdir(memoryDir);
       return entries
-        .filter(e => e.endsWith('.md') && e !== '_index.md')
+        .filter(e => e.endsWith('.md') && e !== 'index.md' && e !== '_index.md')
         .map(e => e.replace(/\.md$/, ''));
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -34,64 +38,52 @@ export class FileTopicStore implements TopicStore {
     }
   }
 
-  async merge(nuggets: Nugget[], memoryDir: string): Promise<TopicMergeResult> {
+  async merge(nuggets: Nugget[], memoryDir: string, sessionId: string): Promise<TopicMergeResult> {
     await fs.mkdir(memoryDir, { recursive: true });
 
-    const existingTopics = new Set(await this.listTopics(memoryDir));
-    let topicsUpdated = 0;
-    let topicsCreated = 0;
-    let nuggetsWritten = 0;
+    // Convert domain Nugget[] → MergeNugget[]
+    const mergeNuggets: MergeNugget[] = [];
 
-    // Group nuggets by topic slug
-    const byTopic = new Map<string, Nugget[]>();
-    for (const nugget of nuggets) {
-      const slug = slugify(nugget.topic);
-      if (!byTopic.has(slug)) {
-        byTopic.set(slug, []);
-      }
-      byTopic.get(slug)!.push(nugget);
+    // Structured nuggets (with slug + category)
+    const structured = nuggets.filter(n => n.slug && n.category);
+    for (const n of structured) {
+      mergeNuggets.push({
+        topic: slugify(n.topic),
+        slug: n.slug!,
+        category: n.category!,
+        description: n.content,
+        why: n.why,
+        caused: n.caused,
+        when: n.when,
+        tags: n.tags,
+      });
     }
 
-    for (const [slug, topicNuggets] of byTopic) {
-      const filePath = path.join(memoryDir, `${slug}.md`);
-      const isNew = !existingTopics.has(slug);
-
-      // Build content to append
-      const lines: string[] = [];
-      for (const nugget of topicNuggets) {
-        lines.push('');
-        lines.push(`<!-- nugget:${nugget.id} confidence:${nugget.confidence} -->`);
-        lines.push(nugget.content);
-        nuggetsWritten++;
-      }
-      const content = lines.join('\n') + '\n';
-
-      if (isNew) {
-        // Create new topic file with header
-        const header = `# ${topicNuggets[0]!.topic}\n`;
-        await fs.writeFile(filePath, header + content, 'utf-8');
-        topicsCreated++;
-      } else {
-        // Append to existing topic file
-        await fs.appendFile(filePath, content, 'utf-8');
-        topicsUpdated++;
-      }
+    // Unstructured nuggets (backward compat — generate slug + default category)
+    const unstructured = nuggets.filter(n => !n.slug || !n.category);
+    for (const n of unstructured) {
+      mergeNuggets.push({
+        topic: slugify(n.topic),
+        slug: n.slug || slugify(n.content.slice(0, 60)),
+        category: n.category || 'Context',
+        description: n.content,
+        tags: n.tags,
+      });
     }
 
-    return { topicsUpdated, topicsCreated, nuggetsWritten };
+    // Delegate to proper merge layer (synchronous)
+    const result = mergeIntoTopicFiles(mergeNuggets, memoryDir, sessionId);
+
+    // Map MergeResult (string[]) → TopicMergeResult (numbers)
+    return {
+      topicsUpdated: result.topicsUpdated.length,
+      topicsCreated: result.topicsCreated.length,
+      nuggetsWritten: result.nuggetsWritten,
+    };
   }
 
   async rebuildToc(memoryDir: string): Promise<void> {
-    const topics = await this.listTopics(memoryDir);
-    if (topics.length === 0) return;
-
-    topics.sort();
-    const lines = ['# Memory Index', ''];
-    for (const slug of topics) {
-      lines.push(`- [${slug}](./${slug}.md)`);
-    }
-    lines.push('');
-
-    await fs.writeFile(path.join(memoryDir, '_index.md'), lines.join('\n'), 'utf-8');
+    // Delegate to proper TOC builder (synchronous)
+    rebuildTOC(memoryDir);
   }
 }

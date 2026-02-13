@@ -9,7 +9,7 @@ import type { SessionRef, MullAdapter } from '../domain/types.js';
  * Used for descriptive error messages when no adapter is found.
  */
 const REF_TYPE_ADAPTER_HINTS: Record<SessionRef['type'], string> = {
-  plan_id: 'trajectory',
+  plan_id: 'trail',
   run_id: 'forge/relay',
   channel: 'relay',
 };

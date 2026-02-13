@@ -83,8 +83,8 @@ describe('mergeSessionData', () => {
     it('interleaves events by timestamp', () => {
       const a = makeSessionData({
         events: [
-          { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'start', payload: {} },
-          { timestamp: '2026-01-01T00:02:00Z', source: 'trajectory', type: 'end', payload: {} },
+          { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'start', payload: {} },
+          { timestamp: '2026-01-01T00:02:00Z', source: 'trail', type: 'end', payload: {} },
         ],
       });
       const b = makeSessionData({
@@ -102,7 +102,7 @@ describe('mergeSessionData', () => {
     it('combines decisions from multiple adapters', () => {
       const a = makeSessionData({
         decisions: [
-          { id: 'd1', timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', description: 'Use SQLite' },
+          { id: 'd1', timestamp: '2026-01-01T00:00:00Z', source: 'trail', description: 'Use SQLite' },
         ],
       });
       const b = makeSessionData({
@@ -119,7 +119,7 @@ describe('mergeSessionData', () => {
     it('deduplicates decisions by id (first occurrence wins)', () => {
       const a = makeSessionData({
         decisions: [
-          { id: 'd1', timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', description: 'from-trajectory' },
+          { id: 'd1', timestamp: '2026-01-01T00:00:00Z', source: 'trail', description: 'from-trajectory' },
         ],
       });
       const b = makeSessionData({
@@ -131,7 +131,7 @@ describe('mergeSessionData', () => {
       const merged = mergeSessionData([a, b]);
       expect(merged.decisions).toHaveLength(1);
       expect(merged.decisions[0]!.description).toBe('from-trajectory');
-      expect(merged.decisions[0]!.source).toBe('trajectory');
+      expect(merged.decisions[0]!.source).toBe('trail');
     });
   });
 
@@ -166,7 +166,7 @@ describe('mergeSessionData', () => {
     it('combines artifacts from multiple adapters', () => {
       const a = makeSessionData({
         artifacts: [
-          { id: 'a1', source: 'trajectory', type: 'file', path: '/src/main.ts' },
+          { id: 'a1', source: 'trail', type: 'file', path: '/src/main.ts' },
         ],
       });
       const b = makeSessionData({
@@ -183,7 +183,7 @@ describe('mergeSessionData', () => {
     it('deduplicates artifacts by id (first occurrence wins)', () => {
       const a = makeSessionData({
         artifacts: [
-          { id: 'a1', source: 'trajectory', type: 'file', path: '/src/v1.ts' },
+          { id: 'a1', source: 'trail', type: 'file', path: '/src/v1.ts' },
         ],
       });
       const b = makeSessionData({
@@ -258,13 +258,13 @@ describe('mergeSessionData', () => {
     it('merges data from trajectory, relay, and transcript adapters', () => {
       const trajectory = makeSessionData({
         messages: [
-          { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', role: 'system', content: 'session started' },
+          { timestamp: '2026-01-01T00:00:00Z', source: 'trail', role: 'system', content: 'session started' },
         ],
         events: [
-          { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'session_start', payload: {} },
+          { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'session_start', payload: {} },
         ],
         decisions: [
-          { id: 'd1', timestamp: '2026-01-01T00:05:00Z', source: 'trajectory', description: 'Chose SQLite' },
+          { id: 'd1', timestamp: '2026-01-01T00:05:00Z', source: 'trail', description: 'Chose SQLite' },
         ],
         retrospective: null,
         artifacts: [],
@@ -306,7 +306,7 @@ describe('mergeSessionData', () => {
 
       // Messages interleaved by timestamp
       expect(merged.messages.map(m => m.source)).toEqual([
-        'trajectory', 'relay', 'transcript', 'relay',
+        'trail', 'relay', 'transcript', 'relay',
       ]);
 
       // Events interleaved by timestamp

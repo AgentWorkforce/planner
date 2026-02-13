@@ -1238,6 +1238,19 @@ export class Orchestrator {
       }
     }
 
+    // AC AUDIT: feature-level acceptance criteria verification (advisory, non-blocking)
+    let acAuditResult: Record<string, unknown> | undefined;
+    if (this.analysisTool && qualityConfig.run_post_ac_audit !== false) {
+      acAuditResult = await this.runRunAcAudit(runId, qualityConfig);
+      if (acAuditResult) {
+        this.accumulateRunDoc(runId, 'ac_audit', acAuditResult);
+        const unmetCount = (acAuditResult.unmet_criteria as string[] | undefined)?.length ?? 0;
+        if (unmetCount > 0) {
+          console.warn(`[Orchestrator] AC audit for ${runId}: ${unmetCount} unmet criteria`);
+        }
+      }
+    }
+
     // Update run status
     this.storage.updateRunStatus(runId, RunStatus.Completed);
 
@@ -1595,6 +1608,51 @@ export class Orchestrator {
       return parsed;
     } catch (err) {
       console.error(`[Orchestrator] RUN_POST failed for run ${runId}:`, err);
+      return undefined;
+    }
+  }
+
+  private async runRunAcAudit(
+    runId: string,
+    qualityConfig: QualityConfig,
+  ): Promise<Record<string, unknown> | undefined> {
+    const run = this.storage.getRun(runId);
+    if (!run) return undefined;
+
+    const workspacePath = run.workspace_path;
+    const allTasks = this.storage.listTasksByRun(runId);
+    const runDoc = this.storage.getRunDocument(runId);
+
+    console.log(`[Orchestrator] Running AC audit for run ${runId}`);
+
+    // Collect file stat for AC audit — stat only, CLI can read files as needed.
+    if (workspacePath) {
+      await execFileAsync('git', ['add', '-N', '.'], { cwd: workspacePath }).catch(() => {});
+    }
+    const gitDiff = await this.collectGitDiff(workspacePath);
+    const fileStat = gitDiff?.stat;
+
+    const prompt = this.buildRunAcAuditPrompt(run, allTasks, runDoc, workspacePath, fileStat);
+
+    try {
+      const result = await this.analysisTool!.run(prompt, {
+        model: qualityConfig.run_post_ac_model ?? 'sonnet',
+        cwd: workspacePath,
+        timeoutMs: qualityConfig.run_post_ac_timeout_ms ?? 300000,
+      });
+
+      const parsed = result.parsed ?? { raw: result.output };
+
+      const usageInfo = result.usage
+        ? ` | ${result.usage.input_tokens}in/${result.usage.output_tokens}out tokens, $${result.usage.total_cost_usd.toFixed(4)}`
+        : '';
+      console.log(
+        `[Orchestrator] AC audit complete for run ${runId} (${result.durationMs}ms${usageInfo})`
+      );
+
+      return parsed;
+    } catch (err) {
+      console.error(`[Orchestrator] AC audit failed for run ${runId}:`, err);
       return undefined;
     }
   }
@@ -2064,9 +2122,87 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
     return prompt;
   }
 
-  /**
-   * Cleans up the worktree for a completed or failed run.
-   */
+  private buildRunAcAuditPrompt(
+    run: Run,
+    allTasks: Task[],
+    runDoc: Record<string, unknown> | null,
+    workspacePath?: string,
+    fileStat?: string,
+  ): string {
+    const completedTasks = allTasks.filter((t) => t.status === TaskStatus.Completed);
+    const summary = runDoc?.summary as { goal: string; context?: string } | undefined;
+    const featureGoal = summary?.goal ?? 'No goal specified';
+    const featureContext = summary?.context;
+
+    let prompt = `Feature-level acceptance criteria audit for a completed run. Verify that the feature goal was actually achieved by checking each acceptance criterion against the real code.
+
+## Feature Goal
+${featureGoal}
+${featureContext ? `\nContext: ${featureContext}` : ''}
+
+## Run: ${run.plan_id} v${run.plan_version}
+- Tasks: ${completedTasks.length} completed
+${workspacePath ? `- Workspace: ${workspacePath}` : ''}
+
+## Tasks and Acceptance Criteria
+`;
+
+    for (const task of completedTasks) {
+      prompt += `\n### Step: ${task.step_title} (${task.step_id})\n`;
+      if (task.step_description) {
+        prompt += `Description: ${task.step_description}\n`;
+      }
+
+      const postKey = `post_${task.step_id}`;
+      const postFindings = runDoc?.[postKey] as Record<string, unknown> | undefined;
+      if (postFindings) {
+        prompt += `TASK_POST result: ${postFindings.passed !== false ? 'PASSED' : 'FAILED'}\n`;
+        if (postFindings.issues && (postFindings.issues as unknown[]).length > 0) {
+          prompt += `TASK_POST issues: ${JSON.stringify(postFindings.issues)}\n`;
+        }
+      }
+
+      if (task.acceptance_criteria && task.acceptance_criteria.length > 0) {
+        prompt += `Acceptance criteria:\n`;
+        for (const ac of task.acceptance_criteria) {
+          prompt += `  - [${ac.id}] ${ac.description}${ac.type ? ` (type: ${ac.type})` : ''}\n`;
+        }
+      } else {
+        prompt += `No acceptance criteria defined for this step.\n`;
+      }
+    }
+
+    if (fileStat) {
+      prompt += `\n## All Files Changed\n\`\`\`\n${fileStat}\n\`\`\`\n`;
+    }
+
+    prompt += `
+## Verification Instructions
+
+Your job is to verify whether EACH acceptance criterion was actually met in the code. Do NOT just trust TASK_POST results — independently verify by reading the actual code.
+
+1. **For each AC**: Use targeted file reads to check if the criterion is satisfied
+2. **Be specific**: Provide file:line evidence or concrete function/variable names
+3. **Check integration**: Does the feature work as a whole across all tasks?
+4. **Identify gaps**: Are there feature-level requirements not covered by any AC?
+5. **Suggest remediation**: For unmet criteria or gaps, what specific changes would close them?
+
+CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
+
+{
+  "feature_goal_met": true|false,
+  "goal_assessment": "2-3 sentence assessment of overall feature completion",
+  "ac_results": [
+    { "step_id": "...", "criterion_id": "...", "met": true|false, "evidence": "file:line or description" }
+  ],
+  "unmet_criteria": ["criterion_ids that were not met"],
+  "gaps": ["feature-level gaps not covered by any AC"],
+  "remediation_suggestions": ["what would close each gap"]
+}`;
+
+    return prompt;
+  }
+
   /**
    * Merges forge commits from a worktree back to the current branch.
    * Worktrees use detached HEAD, so commits would be orphaned without this.

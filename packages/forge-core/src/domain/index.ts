@@ -164,6 +164,11 @@ export {
   type DecisionRecordedPayload,
   CheckpointCreatedPayloadSchema,
   type CheckpointCreatedPayload,
+  // AC Audit event payloads
+  RunAcAuditStartedPayloadSchema,
+  type RunAcAuditStartedPayload,
+  RunAcAuditCompletedPayloadSchema,
+  type RunAcAuditCompletedPayload,
 } from './trajectory-events.js';
 
 // User trajectory types and schemas

@@ -131,6 +131,16 @@ export interface ForgeService {
   getStorage: () => ForgeStorage;
 
   /**
+   * Get the TrajectoryCapture instance for event listening.
+   */
+  getTrajectoryCapture: () => TrajectoryCapture;
+
+  /**
+   * Get the RetrospectiveService instance for event listening (may be undefined in test mode).
+   */
+  getRetrospectiveService: () => import('./services/retrospective-service.js').RetrospectiveService | undefined;
+
+  /**
    * The active execution mode for this service instance.
    */
   mode: ForgeExecutionMode;
@@ -370,5 +380,7 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
       storage.close();
     },
     getStorage: () => storage,
+    getTrajectoryCapture: () => trajectoryCapture,
+    getRetrospectiveService: () => undefined, // TODO: Wire RetrospectiveService when implemented
   };
 }

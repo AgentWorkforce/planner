@@ -64,7 +64,7 @@ describe('normalizeSessionRef()', () => {
 describe('routeSessionRef()', () => {
   describe('plan_id routing', () => {
     it('routes plan_id to trajectory adapter', () => {
-      const trajectoryAdapter = makeAdapter('trajectory', ['plan_id']);
+      const trajectoryAdapter = makeAdapter('trail', ['plan_id']);
       const relayAdapter = makeAdapter('relay', ['channel', 'run_id']);
 
       const result = routeSessionRef(
@@ -72,13 +72,13 @@ describe('routeSessionRef()', () => {
         [trajectoryAdapter, relayAdapter],
       );
 
-      expect(result.name).toBe('trajectory');
+      expect(result.name).toBe('trail');
     });
   });
 
   describe('run_id routing', () => {
     it('routes run_id to forge/relay adapter', () => {
-      const trajectoryAdapter = makeAdapter('trajectory', ['plan_id']);
+      const trajectoryAdapter = makeAdapter('trail', ['plan_id']);
       const forgeAdapter = makeAdapter('forge', ['run_id']);
 
       const result = routeSessionRef(
@@ -92,7 +92,7 @@ describe('routeSessionRef()', () => {
 
   describe('channel routing', () => {
     it('routes channel to relay adapter', () => {
-      const trajectoryAdapter = makeAdapter('trajectory', ['plan_id']);
+      const trajectoryAdapter = makeAdapter('trail', ['plan_id']);
       const relayAdapter = makeAdapter('relay', ['channel']);
 
       const result = routeSessionRef(
@@ -114,11 +114,11 @@ describe('routeSessionRef()', () => {
 
       expect(() =>
         routeSessionRef({ type: 'plan_id', id: 'plan-123' }, [relayAdapter])
-      ).toThrow(/Expected a 'trajectory' adapter/);
+      ).toThrow(/Expected a 'trail' adapter/);
     });
 
     it('throws descriptive error when no adapter matches run_id', () => {
-      const trajectoryAdapter = makeAdapter('trajectory', ['plan_id']);
+      const trajectoryAdapter = makeAdapter('trail', ['plan_id']);
 
       expect(() =>
         routeSessionRef({ type: 'run_id', id: 'run-456' }, [trajectoryAdapter])
@@ -130,7 +130,7 @@ describe('routeSessionRef()', () => {
     });
 
     it('throws descriptive error when no adapter matches channel', () => {
-      const trajectoryAdapter = makeAdapter('trajectory', ['plan_id']);
+      const trajectoryAdapter = makeAdapter('trail', ['plan_id']);
 
       expect(() =>
         routeSessionRef({ type: 'channel', id: '#general' }, [trajectoryAdapter])
@@ -142,12 +142,12 @@ describe('routeSessionRef()', () => {
     });
 
     it('lists configured adapters in error message', () => {
-      const adapter1 = makeAdapter('trajectory', ['plan_id']);
+      const adapter1 = makeAdapter('trail', ['plan_id']);
       const adapter2 = makeAdapter('forge', ['run_id']);
 
       expect(() =>
         routeSessionRef({ type: 'channel', id: '#ch' }, [adapter1, adapter2])
-      ).toThrow(/Configured adapters: \[trajectory, forge\]/);
+      ).toThrow(/Configured adapters: \[trail, forge\]/);
     });
 
     it('throws when adapters array is empty', () => {

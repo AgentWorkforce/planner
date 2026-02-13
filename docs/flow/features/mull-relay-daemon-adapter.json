@@ -163,5 +163,30 @@
         ]
       }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "fail",
+    "criteria": [
+      { "id": "mrda-ac1", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts:127-143" },
+      { "id": "mrda-ac2", "status": "missing", "note": "Only JSONL mode implemented, no SQLite mode" },
+      { "id": "mrda-ac3", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts:341-354" },
+      { "id": "mrda-ac4", "status": "partial", "note": "Channel messages detected but no metadata field added" },
+      { "id": "mrda-ac5", "status": "missing", "note": "Broadcasts detected but not mapped to role=system" },
+      { "id": "mrda-ac6", "status": "missing", "note": "No spawn event payload mapping" },
+      { "id": "mrda-ac7", "status": "missing", "note": "Session boundaries from sessions.jsonl, not release events" },
+      { "id": "mrda-ac8", "status": "partial", "note": "Lifecycle grouping only, no channel or time-gap strategies" },
+      { "id": "mrda-ac9", "status": "missing", "note": "No time-gap fallback or sessionGapMinutes config" },
+      { "id": "mrda-ac10", "status": "missing", "note": "No agentFilter config parameter" },
+      { "id": "mrda-ac11", "status": "missing", "note": "No channelFilter config parameter" },
+      { "id": "mrda-ac12", "status": "missing", "note": "No project context / bridge message handling" },
+      { "id": "mrda-ac13", "status": "missing", "note": "No getCursor/setCursor methods on adapter" },
+      { "id": "mrda-ac14", "status": "partial", "note": "Config only has dataDir and sessionsFile, missing mode/filters" },
+      { "id": "mrda-ac15", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts:17-58" },
+      { "id": "mrda-ac16", "status": "missing", "note": "No channel-based session grouping" }
+    ],
+    "drift": [
+      { "finding": "Architecture uses sessions.jsonl lifecycle instead of three-strategy reconstruction", "file": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts", "action": "document or redesign" }
+    ]
   }
 }

@@ -171,7 +171,7 @@ export type SessionRef = z.infer<typeof SessionRefSchema>;
 // --- Adapter Config (discriminated union) ---
 
 export const TrajectoryAdapterConfigSchema = z.object({
-  type: z.literal('trajectory'),
+  type: z.literal('trail'),
   basePath: z.string().min(1),
 });
 
@@ -187,6 +187,13 @@ export const TranscriptAdapterConfigSchema = z.object({
   format: z.enum(['jsonl', 'markdown', 'plain']).default('jsonl'),
 });
 
+export const ForgeAdapterConfigSchema = z.object({
+  type: z.literal('forge'),
+  dbPath: z.string().min(1),
+  includeUserTrajectory: z.boolean().optional(),
+  includePreferences: z.boolean().optional(),
+});
+
 export const CustomAdapterConfigSchema = z.object({
   type: z.literal('custom'),
   module: z.string().min(1),
@@ -197,6 +204,7 @@ export const AdapterConfigSchema = z.discriminatedUnion('type', [
   TrajectoryAdapterConfigSchema,
   RelayAdapterConfigSchema,
   TranscriptAdapterConfigSchema,
+  ForgeAdapterConfigSchema,
   CustomAdapterConfigSchema,
 ]);
 

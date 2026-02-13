@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@plannr/errors": "^0.1.0",
-    "commander": "^12.1.0",
     "better-sqlite3": "^11.10.0",
     "commander": "^12.1.0",
+    "compromise": "^14.14.5",
     "express": "^5.2.1",
     "gray-matter": "^4.0.3",
     "yaml": "^2.3.4",

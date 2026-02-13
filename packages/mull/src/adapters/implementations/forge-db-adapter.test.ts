@@ -239,7 +239,7 @@ describe('ForgeDbAdapter', () => {
       }
     });
 
-    it('maps retrospective_recorded to type "retrospective" with serialized JSON', async () => {
+    it('maps retrospective_recorded to type "retrospective" with structured causal links', async () => {
       const adapter = new ForgeDbAdapter({ dbPath });
       try {
         const entries = await adapter.read(RUN_ID);
@@ -248,15 +248,22 @@ describe('ForgeDbAdapter', () => {
         expect(retro).toBeDefined();
         expect(retro!.type).toBe('retrospective');
 
-        // Content should be a JSON string of the retrospective object
+        // Content should be a JSON string of the structured retrospective object
         const parsed = JSON.parse(retro!.content as string);
         expect(parsed.summary).toBe('Implemented the adapter successfully');
         expect(parsed.approach).toBe('Read-only SQLite connection with prepared statements');
+
+        // Decisions with causal links
         expect(parsed.decisions).toHaveLength(1);
+        expect(parsed.decisions[0].question).toBe('Which DB driver?');
         expect(parsed.decisions[0].chosen).toBe('better-sqlite3');
-        expect(parsed.challenges).toHaveLength(1);
-        expect(parsed.learnings).toHaveLength(1);
-        expect(parsed.suggestions).toHaveLength(1);
+        expect(parsed.decisions[0].reasoning).toBe('Sync API, fast');
+        // linkedEventIds may be undefined if no matches found
+
+        // Array fields converted to newline-separated strings
+        expect(parsed.challenges).toBe('Schema had undocumented columns');
+        expect(parsed.lessonsLearned).toBe('Prepared statements are faster than inline SQL');
+        expect(parsed.suggestions).toBe('Add index on event_type');
         expect(parsed.confidence).toBe(0.9);
       } finally {
         adapter.close();
@@ -392,6 +399,48 @@ describe('ForgeDbAdapter', () => {
         const events = await adapter.loadUserTrajectory('user-2');
         expect(events.length).toBe(1);
         expect(events[0]!.question_text).toBe('Dark or light theme?');
+      } finally {
+        adapter.close();
+      }
+    });
+
+    it('filters by scope when provided', async () => {
+      const adapter = new ForgeDbAdapter({ dbPath, includeUserTrajectory: true });
+      try {
+        const globalEvents = await adapter.loadUserTrajectory('user-1', 'global');
+        expect(globalEvents.length).toBe(1);
+        expect(globalEvents[0]!.event_id).toBe('ute-001');
+        expect(globalEvents[0]!.scope).toBe('global');
+        expect(globalEvents[0]!.question_text).toBe('Prefer tabs or spaces?');
+
+        const projectEvents = await adapter.loadUserTrajectory('user-1', 'project');
+        expect(projectEvents.length).toBe(1);
+        expect(projectEvents[0]!.event_id).toBe('ute-002');
+        expect(projectEvents[0]!.scope).toBe('project');
+        expect(projectEvents[0]!.question_text).toBe('Use strict mode?');
+      } finally {
+        adapter.close();
+      }
+    });
+
+    it('returns empty array when no events match scope filter', async () => {
+      const adapter = new ForgeDbAdapter({ dbPath, includeUserTrajectory: true });
+      try {
+        const runEvents = await adapter.loadUserTrajectory('user-1', 'run');
+        expect(runEvents).toEqual([]);
+      } finally {
+        adapter.close();
+      }
+    });
+
+    it('returns all events when scope is not provided', async () => {
+      const adapter = new ForgeDbAdapter({ dbPath, includeUserTrajectory: true });
+      try {
+        const allEvents = await adapter.loadUserTrajectory('user-1');
+        expect(allEvents.length).toBe(2);
+        // Should include both global and project scope events
+        expect(allEvents[0]!.scope).toBe('global');
+        expect(allEvents[1]!.scope).toBe('project');
       } finally {
         adapter.close();
       }

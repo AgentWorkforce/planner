@@ -251,6 +251,7 @@ export const RunSSEEventTypes = {
   QuestionAdded: 'question_added',
   Heartbeat: 'heartbeat',
   Connected: 'connected',
+  AcAuditComplete: 'ac_audit_complete',
 } as const;
 
 export type RunSSEEventType = (typeof RunSSEEventTypes)[keyof typeof RunSSEEventTypes];

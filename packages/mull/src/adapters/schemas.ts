@@ -37,10 +37,22 @@ export const RelayDaemonAdapterConfigSchema = z.object({
 });
 export type RelayDaemonAdapterConfig = z.infer<typeof RelayDaemonAdapterConfigSchema>;
 
+/** Config for ForgeDbAdapter - reads from forge SQLite database. */
+export const ForgeDbAdapterConfigSchema = z.object({
+  /** Path to the forge SQLite database file. */
+  dbPath: z.string().min(1, 'dbPath is required'),
+  /** Whether to load user trajectory events (per-user decision history). */
+  includeUserTrajectory: z.boolean().optional(),
+  /** Whether to load derived preferences (inferred user preferences). */
+  includePreferences: z.boolean().optional(),
+});
+export type ForgeDbAdapterConfig = z.infer<typeof ForgeDbAdapterConfigSchema>;
+
 /** Map of adapter type to its config schema. */
 export const adapterConfigSchemas = {
-  trajectory: TrajectoryAdapterConfigSchema,
+  trail: TrajectoryAdapterConfigSchema,
   relay: RelayAdapterConfigSchema,
   'relay-daemon': RelayDaemonAdapterConfigSchema,
   transcript: TranscriptAdapterConfigSchema,
+  forge: ForgeDbAdapterConfigSchema,
 } as const;

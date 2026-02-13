@@ -116,5 +116,28 @@
         ]
       }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "mpda-ac1", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:46" },
+      { "id": "mpda-ac2", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:98-114" },
+      { "id": "mpda-ac3", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:134-155" },
+      { "id": "mpda-ac4", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:135" },
+      { "id": "mpda-ac5", "status": "partial", "note": "Stored as content.asking_agent, not Message.agentName" },
+      { "id": "mpda-ac6", "status": "partial", "note": "Stored as content.step_id, not wrapped in metadata object" },
+      { "id": "mpda-ac7", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:81-96" },
+      { "id": "mpda-ac8", "status": "satisfied", "evidence": "packages/mull/src/adapters/cursor.ts:35-82" },
+      { "id": "mpda-ac9", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:65-67" },
+      { "id": "mpda-ac10", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:46" },
+      { "id": "mpda-ac11", "status": "satisfied", "evidence": "packages/mull/src/adapters/schemas.ts:11-14" },
+      { "id": "mpda-ac12", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/trajectory-adapter.ts:46" },
+      { "id": "mpda-ac13", "status": "partial", "note": "Decision.source set to 'trajectory' instead of 'trail'" }
+    ],
+    "drift": [
+      { "finding": "Class named TrajectoryAdapter not PlannerDbAdapter", "file": "packages/mull/src/adapters/implementations/trajectory-adapter.ts", "action": "document naming convention" },
+      { "finding": "No dedicated test file (tests in factory.test.ts)", "file": "packages/mull/src/adapters/factory.test.ts", "action": "consider adding trajectory-adapter.test.ts" }
+    ]
   }
 }

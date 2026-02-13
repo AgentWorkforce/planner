@@ -2,7 +2,7 @@
   "feature_id": "forge-question-queue",
   "title": "Question Queue Backend",
   "type": "feature",
-  "status": "draft",
+  "status": "verified",
   "priority": "high",
   "parent": "forge-core",
   "dependencies": ["forge-user-trajectory", "forge-mcp-tools", "forge-storage"],
@@ -51,6 +51,24 @@
       },
       "notes": "agents_waiting shown in UI = subscribers.length from question entity"
     }
+  },
+
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "pass",
+    "criteria": [
+      { "id": "fqq-ac1", "status": "satisfied", "evidence": "domain/types.ts:901-916 calculateQuestionPriorityScore() implements exact formula" },
+      { "id": "fqq-ac2", "status": "satisfied", "evidence": "services/question-service.ts:154-192 checks user trajectory with 0.85 threshold" },
+      { "id": "fqq-ac3", "status": "satisfied", "evidence": "services/question-service.ts:194-214 findSimilarPendingQuestion + subscribeToQuestion" },
+      { "id": "fqq-ac4", "status": "satisfied", "evidence": "domain/types.ts:887-892 BLOCKING_LEVEL_VALUES: HardBlock(3), SoftBlock(2), Preference(1), FYI(0)" },
+      { "id": "fqq-ac5", "status": "satisfied", "evidence": "services/question-service.ts:324-400 answerQuestion updates trajectory, notifies subscribers" },
+      { "id": "fqq-ac6", "status": "satisfied", "evidence": "api/routes/questions.ts:39-55 POST /questions, GET /questions/pending, POST /questions/:id/answer" },
+      { "id": "fqq-ac7", "status": "satisfied", "evidence": "api/handlers/sse.ts:106 maps HumanInputRequested to QuestionAdded; mcp/tools/request-human-input.ts:164-177 emits SSE" },
+      { "id": "fqq-ac8", "status": "satisfied", "evidence": "services/question-service.ts:461-532 processTimeouts + autoDefaultQuestion with configurable timeout" }
+    ],
+    "drift": [
+      { "finding": "SSE event naming differs at layers: MCP emits 'question_added', SSE handler maps HumanInputRequested to QuestionAdded", "file": "mcp/tools/request-human-input.ts vs api/handlers/sse.ts", "action": "note" }
+    ]
   },
 
   "plan_implementation": {

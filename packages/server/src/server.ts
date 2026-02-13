@@ -15,7 +15,22 @@ import { createPlannerService, type PlannerService } from '../../planner/src/ind
 import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
 import { createSpecialistSpawner } from '../../ideation/src/relay/spawner.js';
 import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
-import { createMullService, type MullService } from '../../mull/src/index.js';
+import {
+  createMullService,
+  TriggerManager,
+  registerMullTriggers,
+  type MullService,
+  type TriggerCleanupFn,
+} from '../../mull/src/index.js';
+
+// Mull adapter implementations + bridge
+import {
+  ForgeDbAdapter,
+  TrajectoryAdapter,
+  RelayDaemonAdapter,
+} from '../../mull/src/adapters/implementations/index.js';
+import type { SessionAdapter } from '../../mull/src/adapters/core-types.js';
+import { toMullAdapters } from '../../mull/src/adapters/adapter-bridge.js';
 
 // Shared error handling
 import { errorHandler } from '@plannr/errors';
@@ -73,6 +88,7 @@ let plannerService: PlannerService;
 let ideationService: IdeationService;
 let forgeService: ForgeService;
 let mullService: MullService;
+let mullTriggerCleanup: TriggerCleanupFn | null = null;
 
 // =============================================================================
 // Main
@@ -166,8 +182,62 @@ async function start(): Promise<void> {
     memoryDir: MULL_MEMORY_DIR,
   });
   await mullService.initialize();
+
+  // Wire mull adapters after relay connection established
+  const sessionAdapters: SessionAdapter[] = [];
+
+  // Forge DB adapter - reads trajectory events from forge runs
+  sessionAdapters.push(new ForgeDbAdapter({
+    dbPath: FORGE_DB_PATH,
+    includeUserTrajectory: true,
+    includePreferences: true,
+  }));
+
+  // Trajectory adapter - reads decision events from planner
+  sessionAdapters.push(new TrajectoryAdapter({
+    dbPath: DB_PATH,
+  }));
+
+  // Relay daemon adapter - reads agent session data (only if connected)
+  if (isConnected()) {
+    const relayConfig = getRelayConfig();
+    const relayDataDir = path.dirname(relayConfig.socketPath);
+    sessionAdapters.push(new RelayDaemonAdapter({
+      dataDir: relayDataDir,
+    }));
+  }
+
+  // Bridge SessionAdapter[] → MullAdapter[] for the pipeline
+  const mullDir = path.resolve(__dirname, '../../../.mull');
+  mullService.setAdapters(toMullAdapters(sessionAdapters, mullDir));
+
   app.use('/api/mull', mullService.router);
   console.log(`[mull] Initialized (memoryDir: ${MULL_MEMORY_DIR})`);
+
+  // Wire real-time triggers (if enabled via config)
+  const triggerEnabled = process.env.MULL_TRIGGERS_ENABLED !== 'false'; // Default: true
+  if (triggerEnabled) {
+    const mullAdapters = toMullAdapters(sessionAdapters, mullDir);
+    const triggerManager = new TriggerManager({
+      adapters: mullAdapters,
+      config: {
+        enabled: triggerEnabled,
+        mullDir: path.resolve(__dirname, '../../../.mull'),
+        memoryDir: MULL_MEMORY_DIR,
+      },
+    });
+
+    mullTriggerCleanup = registerMullTriggers({
+      triggerManager,
+      enabled: triggerEnabled,
+      trajectoryCapture: forgeService.getTrajectoryCapture(),
+      retrospectiveService: forgeService.getRetrospectiveService(),
+    });
+
+    console.log('[mull:triggers] Real-time triggers enabled and wired to forge events');
+  } else {
+    console.log('[mull:triggers] Real-time triggers disabled via MULL_TRIGGERS_ENABLED=false');
+  }
 
   // Initialize agent lifecycle manager (spawns/releases relay agents)
   const lifecycle = new AgentLifecycleManager({
@@ -259,6 +329,11 @@ async function start(): Promise<void> {
 
     // Stop session timeout service
     sessionTimeoutService.stop();
+
+    // Clean up mull triggers
+    if (mullTriggerCleanup) {
+      mullTriggerCleanup();
+    }
 
     // Close WebSocket server
     wss.close(() => {

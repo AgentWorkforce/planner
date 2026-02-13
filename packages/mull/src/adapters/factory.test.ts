@@ -7,19 +7,23 @@ import { createAdapter } from './factory.js';
 import { TrajectoryAdapter } from './implementations/trajectory-adapter.js';
 import { RelayJsonlAdapter } from './implementations/relay-jsonl-adapter.js';
 import { TranscriptAdapter } from './implementations/transcript-adapter.js';
+import { ForgeDbAdapter } from './implementations/forge-db-adapter.js';
 import { ValidationError } from '@plannr/errors';
 import type { SessionAdapter } from './core-types.js';
 
 describe('createAdapter', () => {
   let tmpDir: string;
   let plannerDbPath: string;
+  let forgeDbPath: string;
 
   beforeAll(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'factory-test-'));
     plannerDbPath = join(tmpDir, 'planner-test.db');
+    forgeDbPath = join(tmpDir, 'forge-test.db');
+
     // Create a minimal planner db so TrajectoryAdapter can open it
-    const db = new Database(plannerDbPath);
-    db.exec(`CREATE TABLE IF NOT EXISTS trajectory_events (
+    const plannerDb = new Database(plannerDbPath);
+    plannerDb.exec(`CREATE TABLE IF NOT EXISTS trajectory_events (
       event_id TEXT PRIMARY KEY NOT NULL,
       type TEXT NOT NULL DEFAULT 'decision',
       question_id TEXT NOT NULL,
@@ -35,7 +39,19 @@ describe('createAdapter', () => {
       agent_trajectory_ref TEXT,
       timestamp TEXT NOT NULL
     )`);
-    db.close();
+    plannerDb.close();
+
+    // Create a minimal forge db so ForgeDbAdapter can open it
+    const forgeDb = new Database(forgeDbPath);
+    forgeDb.exec(`CREATE TABLE IF NOT EXISTS trajectory_events (
+      event_id TEXT PRIMARY KEY NOT NULL,
+      run_id TEXT NOT NULL,
+      task_id TEXT,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      timestamp TEXT NOT NULL
+    )`);
+    forgeDb.close();
   });
 
   afterAll(() => {
@@ -43,9 +59,9 @@ describe('createAdapter', () => {
   });
 
   it('creates TrajectoryAdapter with valid config', () => {
-    const adapter = createAdapter('trajectory', { dbPath: plannerDbPath });
+    const adapter = createAdapter('trail', { dbPath: plannerDbPath });
     expect(adapter).toBeInstanceOf(TrajectoryAdapter);
-    expect(adapter.type).toBe('trajectory');
+    expect(adapter.type).toBe('trail');
     (adapter as TrajectoryAdapter).close();
   });
 
@@ -61,14 +77,32 @@ describe('createAdapter', () => {
     expect(adapter.type).toBe('transcript');
   });
 
+  it('creates ForgeDbAdapter with valid config', () => {
+    const adapter = createAdapter('forge', { dbPath: forgeDbPath });
+    expect(adapter).toBeInstanceOf(ForgeDbAdapter);
+    expect(adapter.type).toBe('forge');
+    (adapter as ForgeDbAdapter).close();
+  });
+
+  it('creates ForgeDbAdapter with optional flags', () => {
+    const adapter = createAdapter('forge', {
+      dbPath: forgeDbPath,
+      includeUserTrajectory: true,
+      includePreferences: true,
+    });
+    expect(adapter).toBeInstanceOf(ForgeDbAdapter);
+    expect(adapter.type).toBe('forge');
+    (adapter as ForgeDbAdapter).close();
+  });
+
   it('throws ValidationError with Zod details for invalid config', () => {
     try {
-      createAdapter('trajectory', { /* missing dbPath */ });
+      createAdapter('trail', { /* missing dbPath */ });
       expect.fail('Should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(ValidationError);
       const ve = err as ValidationError;
-      expect(ve.message).toContain("Invalid config for 'trajectory' adapter");
+      expect(ve.message).toContain("Invalid config for 'trail' adapter");
       expect(ve.details).toBeDefined();
       expect(Array.isArray(ve.details)).toBe(true);
       // Zod error format: array of issues

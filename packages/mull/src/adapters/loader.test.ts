@@ -83,7 +83,7 @@ describe('entriesToSessionData', () => {
     const entries: SessionEntry[] = [
       {
         timestamp: '2026-01-01T00:01:00Z',
-        source: 'trajectory',
+        source: 'trail',
         type: 'decision',
         content: { id: 'd1', description: 'Use SQLite', rationale: 'Simple' },
       },
@@ -94,7 +94,7 @@ describe('entriesToSessionData', () => {
     expect(result.decisions[0]).toEqual({
       id: 'd1',
       timestamp: '2026-01-01T00:01:00Z',
-      source: 'trajectory',
+      source: 'trail',
       description: 'Use SQLite',
       rationale: 'Simple',
     });
@@ -104,20 +104,20 @@ describe('entriesToSessionData', () => {
     const entries: SessionEntry[] = [
       {
         timestamp: '2026-01-01T00:01:00Z',
-        source: 'trajectory',
+        source: 'trail',
         type: 'decision',
         content: { description: 'Use SQLite' },
       },
     ];
 
     const result = entriesToSessionData(entries, 'ses-1');
-    expect(result.decisions[0]!.id).toBe('trajectory-2026-01-01T00:01:00Z');
+    expect(result.decisions[0]!.id).toBe('trail-2026-01-01T00:01:00Z');
   });
 
   it('classifies retrospective entries (first wins)', () => {
     const entries: SessionEntry[] = [
-      { timestamp: '2026-01-01T00:02:00Z', source: 'trajectory', type: 'retrospective', content: 'First retro' },
-      { timestamp: '2026-01-01T00:03:00Z', source: 'trajectory', type: 'retrospective', content: 'Second retro' },
+      { timestamp: '2026-01-01T00:02:00Z', source: 'trail', type: 'retrospective', content: 'First retro' },
+      { timestamp: '2026-01-01T00:03:00Z', source: 'trail', type: 'retrospective', content: 'Second retro' },
     ];
 
     const result = entriesToSessionData(entries, 'ses-1');
@@ -201,8 +201,8 @@ describe('loadSessionFromAdapters', () => {
 
   describe('SessionRef routing', () => {
     it('plan_id routes to trajectory adapter only', async () => {
-      const trajectory = mockAdapter('trajectory', [
-        { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'decision', content: { id: 'd1', description: 'test' } },
+      const trajectory = mockAdapter('trail', [
+        { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'decision', content: { id: 'd1', description: 'test' } },
       ]);
       const relay = mockAdapter('relay', [
         { timestamp: '2026-01-01T00:00:00Z', source: 'relay', type: 'message', content: { role: 'user', content: 'hi' } },
@@ -217,9 +217,9 @@ describe('loadSessionFromAdapters', () => {
       expect(result.messages).toHaveLength(0);
     });
 
-    it('run_id routes to relay and transcript adapters', async () => {
-      const trajectory = mockAdapter('trajectory', [
-        { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'decision', content: { id: 'd1', description: 'test' } },
+    it('run_id routes to relay, transcript, and forge adapters', async () => {
+      const trajectory = mockAdapter('trail', [
+        { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'decision', content: { id: 'd1', description: 'test' } },
       ]);
       const relay = mockAdapter('relay', [
         { timestamp: '2026-01-01T00:00:00Z', source: 'relay', type: 'message', content: { role: 'user', content: 'hi' } },
@@ -227,19 +227,24 @@ describe('loadSessionFromAdapters', () => {
       const transcript = mockAdapter('transcript', [
         { timestamp: '2026-01-01T00:01:00Z', source: 'transcript', type: 'message', content: { role: 'assistant', content: 'hello' } },
       ]);
+      const forge = mockAdapter('forge', [
+        { timestamp: '2026-01-01T00:02:00Z', source: 'forge', type: 'decision', content: { id: 'd2', description: 'Use Express' } },
+      ]);
 
       const ref: SessionRef = { type: 'run', run_id: 'run-abc' };
-      const result = await loadSessionFromAdapters(ref, [trajectory, relay, transcript], { mullDir });
+      const result = await loadSessionFromAdapters(ref, [trajectory, relay, transcript, forge], { mullDir });
 
       expect(trajectory.read).not.toHaveBeenCalled();
       expect(relay.read).toHaveBeenCalledOnce();
       expect(transcript.read).toHaveBeenCalledOnce();
+      expect(forge.read).toHaveBeenCalledOnce();
       expect(result.messages).toHaveLength(2);
+      expect(result.decisions).toHaveLength(1);
     });
 
     it('channel routes to relay adapter only', async () => {
-      const trajectory = mockAdapter('trajectory', [
-        { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'decision', content: { id: 'd1', description: 'test' } },
+      const trajectory = mockAdapter('trail', [
+        { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'decision', content: { id: 'd1', description: 'test' } },
       ]);
       const relay = mockAdapter('relay', [
         { timestamp: '2026-01-01T00:00:00Z', source: 'relay', type: 'message', content: { role: 'agent', content: 'status update' } },
@@ -268,7 +273,7 @@ describe('loadSessionFromAdapters', () => {
 
       await expect(
         loadSessionFromAdapters(ref, [relay], { mullDir }),
-      ).rejects.toThrow('Expected adapter types: trajectory; got: relay');
+      ).rejects.toThrow('Expected adapter types: trail; got: relay');
     });
   });
 
@@ -276,7 +281,7 @@ describe('loadSessionFromAdapters', () => {
 
   describe('session ID derivation', () => {
     it('passes plan_id as sessionId to adapter.read()', async () => {
-      const trajectory = mockAdapter('trajectory', []);
+      const trajectory = mockAdapter('trail', []);
       const ref: SessionRef = { type: 'plan', plan_id: 'my-plan-id' };
 
       await loadSessionFromAdapters(ref, [trajectory], { mullDir });
@@ -307,9 +312,9 @@ describe('loadSessionFromAdapters', () => {
 
   describe('cursor integration', () => {
     it('passes cursor to adapter.read() when cursor exists', async () => {
-      await setCursor('trajectory', 'plan-1', '2026-01-01T00:00:00Z', mullDir);
+      await setCursor('trail', 'plan-1', '2026-01-01T00:00:00Z', mullDir);
 
-      const trajectory = mockAdapter('trajectory', []);
+      const trajectory = mockAdapter('trail', []);
       const ref: SessionRef = { type: 'plan', plan_id: 'plan-1' };
 
       await loadSessionFromAdapters(ref, [trajectory], { mullDir });
@@ -317,13 +322,13 @@ describe('loadSessionFromAdapters', () => {
       // The cursor should be passed as the second argument
       expect(trajectory.read).toHaveBeenCalledWith('plan-1', {
         last_mulled_at: '2026-01-01T00:00:00Z',
-        adapter_type: 'trajectory',
+        adapter_type: 'trail',
         session_id: 'plan-1',
       });
     });
 
     it('passes undefined cursor when no cursor exists', async () => {
-      const trajectory = mockAdapter('trajectory', []);
+      const trajectory = mockAdapter('trail', []);
       const ref: SessionRef = { type: 'plan', plan_id: 'plan-no-cursor' };
 
       await loadSessionFromAdapters(ref, [trajectory], { mullDir });
@@ -332,9 +337,9 @@ describe('loadSessionFromAdapters', () => {
     });
 
     it('ignores cursors when force=true', async () => {
-      await setCursor('trajectory', 'plan-1', '2026-01-01T00:00:00Z', mullDir);
+      await setCursor('trail', 'plan-1', '2026-01-01T00:00:00Z', mullDir);
 
-      const trajectory = mockAdapter('trajectory', []);
+      const trajectory = mockAdapter('trail', []);
       const ref: SessionRef = { type: 'plan', plan_id: 'plan-1' };
 
       await loadSessionFromAdapters(ref, [trajectory], { mullDir, force: true });
@@ -362,7 +367,7 @@ describe('loadSessionFromAdapters', () => {
     });
 
     it('returns empty SessionData when all adapters return empty', async () => {
-      const trajectory = mockAdapter('trajectory', []);
+      const trajectory = mockAdapter('trail', []);
       const ref: SessionRef = { type: 'plan', plan_id: 'plan-empty' };
 
       const result = await loadSessionFromAdapters(ref, [trajectory], { mullDir });
@@ -416,8 +421,8 @@ describe('loadSessionFromAdapters', () => {
     });
 
     it('sets correct session_id in merged metadata', async () => {
-      const trajectory = mockAdapter('trajectory', [
-        { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'decision', content: { id: 'd1', description: 'test' } },
+      const trajectory = mockAdapter('trail', [
+        { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'decision', content: { id: 'd1', description: 'test' } },
       ]);
 
       const ref: SessionRef = { type: 'plan', plan_id: 'plan-meta-test' };
@@ -431,8 +436,8 @@ describe('loadSessionFromAdapters', () => {
 
   describe('default options', () => {
     it('works with no options argument', async () => {
-      const trajectory = mockAdapter('trajectory', [
-        { timestamp: '2026-01-01T00:00:00Z', source: 'trajectory', type: 'decision', content: { id: 'd1', description: 'test' } },
+      const trajectory = mockAdapter('trail', [
+        { timestamp: '2026-01-01T00:00:00Z', source: 'trail', type: 'decision', content: { id: 'd1', description: 'test' } },
       ]);
 
       const ref: SessionRef = { type: 'plan', plan_id: 'plan-defaults' };

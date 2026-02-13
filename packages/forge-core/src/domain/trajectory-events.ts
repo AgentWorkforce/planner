@@ -80,6 +80,10 @@ export const TrajectoryEventType = {
   BudgetInitialized: 'budget_initialized',
   BudgetUpdated: 'budget_updated',
   BudgetWarning: 'budget_warning',
+
+  // AC Audit events
+  RunAcAuditStarted: 'run_ac_audit_started',
+  RunAcAuditCompleted: 'run_ac_audit_completed',
 } as const;
 
 export type TrajectoryEventType =
@@ -130,6 +134,8 @@ export const TrajectoryEventTypeSchema = z.enum([
   'budget_initialized',
   'budget_updated',
   'budget_warning',
+  'run_ac_audit_started',
+  'run_ac_audit_completed',
 ]);
 
 // ============================================
@@ -557,6 +563,27 @@ export const BudgetWarningPayloadSchema = z.object({
 export type BudgetWarningPayload = z.infer<typeof BudgetWarningPayloadSchema>;
 
 // ============================================
+// AC Audit Event Payloads
+// ============================================
+
+export const RunAcAuditStartedPayloadSchema = z.object({
+  run_id: z.string().uuid(),
+  criteria_count: z.number().int(),
+});
+
+export type RunAcAuditStartedPayload = z.infer<typeof RunAcAuditStartedPayloadSchema>;
+
+export const RunAcAuditCompletedPayloadSchema = z.object({
+  run_id: z.string().uuid(),
+  feature_goal_met: z.boolean(),
+  unmet_count: z.number().int(),
+  total_count: z.number().int(),
+  duration_ms: z.number().int(),
+});
+
+export type RunAcAuditCompletedPayload = z.infer<typeof RunAcAuditCompletedPayloadSchema>;
+
+// ============================================
 // Payload Schema Map
 // ============================================
 
@@ -612,6 +639,9 @@ export const TrajectoryPayloadSchemas: Record<TrajectoryEventType, z.ZodType> = 
   [TrajectoryEventType.BudgetInitialized]: BudgetInitializedPayloadSchema,
   [TrajectoryEventType.BudgetUpdated]: BudgetUpdatedPayloadSchema,
   [TrajectoryEventType.BudgetWarning]: BudgetWarningPayloadSchema,
+  // AC Audit events
+  [TrajectoryEventType.RunAcAuditStarted]: RunAcAuditStartedPayloadSchema,
+  [TrajectoryEventType.RunAcAuditCompleted]: RunAcAuditCompletedPayloadSchema,
 };
 
 /**

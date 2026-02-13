@@ -177,17 +177,24 @@ export class ForgeDbAdapter implements SessionAdapter {
   }
 
   /** Load user trajectory events for a given user, ordered by timestamp. */
-  async loadUserTrajectory(userId: string): Promise<UserTrajectoryEventRow[]> {
+  async loadUserTrajectory(userId: string, scope?: 'global' | 'project' | 'run'): Promise<UserTrajectoryEventRow[]> {
     if (!this.includeUserTrajectory) return [];
 
-    const sql = `
+    const params: unknown[] = [userId];
+    let sql = `
       SELECT event_id, user_id, scope, question_text, selected_option,
              reasoning, run_id, task_id, project_id, category, timestamp
       FROM user_trajectory_events
-      WHERE user_id = ?
-      ORDER BY timestamp ASC`;
+      WHERE user_id = ?`;
 
-    return this.db.prepare(sql).all(userId) as UserTrajectoryEventRow[];
+    if (scope) {
+      sql += `\n        AND scope = ?`;
+      params.push(scope);
+    }
+
+    sql += `\n      ORDER BY timestamp ASC`;
+
+    return this.db.prepare(sql).all(...params) as UserTrajectoryEventRow[];
   }
 
   /** Load derived preferences for a given user above a confidence threshold. */
@@ -247,14 +254,54 @@ export class ForgeDbAdapter implements SessionAdapter {
 
       case 'retrospective_recorded': {
         // The payload has { task_id, agent_id, retrospective: { summary, approach, decisions, ... } }
-        const retro = (payload as Record<string, unknown>).retrospective as Record<string, unknown> | undefined;
-        // Serialize the full retrospective for downstream consumption.
-        // entriesToSessionData stores the first non-null retrospective string.
+        const retroPayload = (payload as Record<string, unknown>).retrospective as Record<string, unknown> | undefined;
+
+        if (!retroPayload) {
+          return {
+            timestamp: row.timestamp,
+            source: 'forge',
+            type: 'retrospective',
+            content: '',
+          };
+        }
+
+        // Parse the forge LinkedRetrospective into a structured object
+        // Forge schema: { summary, approach, decisions: [{ question, chosen, reasoning, linked_event_ids? }], challenges: string[], learnings: string[], suggestions: string[], confidence }
+        const decisions = (retroPayload.decisions as Array<Record<string, unknown>> | undefined)?.map(d => ({
+          question: String(d.question ?? ''),
+          chosen: String(d.chosen ?? ''),
+          reasoning: String(d.reasoning ?? ''),
+          // Causal link: linked_event_ids connects decisions to their outcomes
+          linkedEventIds: (d.linked_event_ids as string[] | undefined) ?? undefined,
+        })) ?? [];
+
+        // Convert array fields to strings for mull's retrospective format
+        const challenges = Array.isArray(retroPayload.challenges)
+          ? (retroPayload.challenges as string[]).join('\n')
+          : undefined;
+        const lessonsLearned = Array.isArray(retroPayload.learnings)
+          ? (retroPayload.learnings as string[]).join('\n')
+          : undefined;
+        const suggestions = Array.isArray(retroPayload.suggestions)
+          ? (retroPayload.suggestions as string[]).join('\n')
+          : undefined;
+
+        const structuredRetro = {
+          summary: String(retroPayload.summary ?? ''),
+          approach: retroPayload.approach ? String(retroPayload.approach) : undefined,
+          decisions: decisions.length > 0 ? decisions : undefined,
+          challenges,
+          lessonsLearned,
+          suggestions,
+          confidence: typeof retroPayload.confidence === 'number' ? retroPayload.confidence : undefined,
+        };
+
+        // Serialize the structured retrospective to JSON for storage in SessionData.retrospective (string field)
         return {
           timestamp: row.timestamp,
           source: 'forge',
           type: 'retrospective',
-          content: retro ? JSON.stringify(retro) : '',
+          content: JSON.stringify(structuredRetro),
         };
       }
 

@@ -44,8 +44,8 @@ export interface LoadSessionOptions {
 
 /** Maps SessionRef discriminant to the adapter types that should be queried. */
 const ADAPTER_ROUTING: Record<SessionRef['type'], ReadonlySet<string>> = {
-  plan: new Set(['trajectory']),
-  run: new Set(['relay', 'relay-daemon', 'transcript']),
+  plan: new Set(['trail']),
+  run: new Set(['relay', 'relay-daemon', 'transcript', 'forge']),
   channel: new Set(['relay', 'relay-daemon']),
 };
 
@@ -113,7 +113,11 @@ export function entriesToSessionData(
       }
       case 'retrospective': {
         if (retrospective === null) {
-          retrospective = String(entry.content);
+          // Content can be a structured object or a string
+          // If it's an object, serialize it; otherwise use as-is
+          retrospective = typeof entry.content === 'string'
+            ? entry.content
+            : JSON.stringify(entry.content);
         }
         break;
       }
@@ -158,7 +162,7 @@ export function entriesToSessionData(
  * Load session data from all applicable adapters and merge results.
  *
  * Routing:
- *  - plan_id  → trajectory adapter
+ *  - plan_id  → trail adapter
  *  - run_id   → relay + transcript adapters
  *  - channel  → relay adapter
  *

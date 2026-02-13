@@ -23,9 +23,44 @@ export interface SessionMessage {
   timestamp: string;
 }
 
+export interface SessionDecision {
+  id: string;
+  description: string;
+  rationale?: string;
+  alternatives?: string[];
+  confidence?: number;
+  timestamp: string;
+  source?: string;
+}
+
+export interface SessionEvent {
+  type: string;
+  description: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SessionRetrospective {
+  summary: string;
+  approach?: string;
+  decisions?: Array<{
+    question: string;
+    chosen: string;
+    reasoning?: string;
+    linkedEventIds?: string[];
+  }>;
+  challenges?: string[];
+  lessonsLearned?: string[];
+  suggestions?: string[];
+  confidence?: number;
+}
+
 export interface SessionData {
   ref: SessionRef;
   messages: SessionMessage[];
+  decisions?: SessionDecision[];
+  events?: SessionEvent[];
+  retrospective?: SessionRetrospective | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -43,7 +78,7 @@ export type AdapterConfig = z.infer<typeof AdapterConfigSchema>;
 export const MullConfigSchema = z.object({
   memoryDir: z.string().default('./memory'),
   mullDir: z.string().default('.mull'),
-  adapters: z.array(AdapterConfigSchema).default([{ type: 'trajectory', dir: '.trajectories/' }]),
+  adapters: z.array(AdapterConfigSchema).default([{ type: 'trail', dir: '.trajectories/' }]),
 });
 
 export type MullConfig = z.infer<typeof MullConfigSchema>;
@@ -99,18 +134,63 @@ export interface MullOptions {
 // Pipeline data structures
 // ---------------------------------------------------------------------------
 
-export interface PreExtract {
-  sessionRef: SessionRef;
-  messages: SessionMessage[];
-  existingTopics: string[];
+export interface ExtractedEntity {
+  text: string;
+  type: 'topic' | 'tech' | 'filepath' | 'function' | 'proper_noun' | 'organization';
+  count: number;
+  source: 'nlp' | 'regex';
+}
+
+export interface ExtractedFact {
+  type: 'decision' | 'tool_call' | 'file_modified' | 'error' | 'status_transition' | 'retrospective';
+  description: string;
+  timestamp?: string;
+  isPreStructured: boolean;
   metadata?: Record<string, unknown>;
 }
 
+export interface TopicMatch {
+  topicSlug: string;
+  confidence: number;
+  isNew: boolean;
+  matchedEntities: string[];
+}
+
+export interface FilteredExcerpt {
+  messageId: string;
+  content: string;
+  timestamp: string;
+  reason: 'decision_adjacent' | 'constraint' | 'retrospective' | 'structured' | 'high_signal';
+}
+
+export interface PreExtract {
+  sessionRef: SessionRef;
+  messages: SessionMessage[];
+  decisions?: SessionDecision[];
+  events?: SessionEvent[];
+  retrospective?: SessionRetrospective | null;
+  existingTopics: string[];
+  metadata?: Record<string, unknown>;
+  // Deterministic extraction results (populated by buildPreExtract)
+  entities: ExtractedEntity[];
+  facts: ExtractedFact[];
+  topicMatches: TopicMatch[];
+  filteredTranscript: FilteredExcerpt[];
+}
+
+export type NuggetCategory = 'Decisions' | 'Constraints' | 'Patterns' | 'Gotchas' | 'Context';
+
 export interface Nugget {
   id: string;
+  slug?: string;
+  category?: NuggetCategory;
   content: string;
   topic: string;
   confidence: number;
+  why?: string;
+  caused?: string[];
+  when?: string;
+  tags?: string[];
   source: {
     sessionRef: SessionRef;
     messageIds: string[];
@@ -269,7 +349,7 @@ export interface TopicStore {
   listTopics(memoryDir: string): Promise<string[]>;
 
   /** Merge nuggets into topic files. Returns per-file stats. */
-  merge(nuggets: Nugget[], memoryDir: string): Promise<TopicMergeResult>;
+  merge(nuggets: Nugget[], memoryDir: string, sessionId: string): Promise<TopicMergeResult>;
 
   /** Rebuild the table of contents index file. */
   rebuildToc(memoryDir: string): Promise<void>;

@@ -116,4 +116,4 @@ export interface SessionData {
 }
 
 /** Known adapter type strings. */
-export type AdapterType = 'trajectory' | 'relay' | 'relay-daemon' | 'transcript';
+export type AdapterType = 'trail' | 'relay' | 'relay-daemon' | 'transcript' | 'forge';

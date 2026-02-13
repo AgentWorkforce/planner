@@ -5,7 +5,7 @@ import { MullConfigSchema, type MullConfig } from '../domain/types.js';
 const DEFAULTS: MullConfig = {
   memoryDir: './memory',
   mullDir: '.mull',
-  adapters: [{ type: 'trajectory', dir: '.trajectories/' }],
+  adapters: [{ type: 'trail', dir: '.trajectories/' }],
 };
 
 /**
