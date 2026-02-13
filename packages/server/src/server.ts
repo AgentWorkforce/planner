@@ -35,6 +35,9 @@ import { toMullAdapters } from '../../mull/src/adapters/adapter-bridge.js';
 // Shared error handling
 import { errorHandler } from '@plannr/errors';
 
+// Configuration
+import { getServerConfig, type ServerConfig } from './config.js';
+
 // Middleware
 import { timeoutMiddleware } from './middleware/timeout.js';
 
@@ -74,11 +77,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Configuration
 // =============================================================================
 
-const PORT = process.env.PORT || 3001;
-const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../../planner.db');
-const IDEATION_DB_PATH = process.env.IDEATION_DB_PATH || path.resolve(__dirname, '../../../ideation.db');
-const FORGE_DB_PATH = process.env.FORGE_DB_PATH || path.resolve(__dirname, '../../../forge.db');
-const MULL_MEMORY_DIR = process.env.MULL_MEMORY_DIR || path.resolve(__dirname, '../../../memory');
+let serverConfig: ServerConfig;
+try {
+  serverConfig = getServerConfig();
+} catch (error) {
+  console.error('[server:config] Configuration error:', error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
+const PORT = serverConfig.port;
+const DB_PATH = serverConfig.dbPath;
+const IDEATION_DB_PATH = serverConfig.ideationDbPath;
+const FORGE_DB_PATH = serverConfig.forgeDbPath;
+const MULL_MEMORY_DIR = serverConfig.mullMemoryDir;
 
 // =============================================================================
 // Services
