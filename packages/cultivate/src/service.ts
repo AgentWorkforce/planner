@@ -106,53 +106,151 @@ export function createCultivateService(config: CultivateServiceConfig = {}): Cul
         return;
       }
 
-      // Cleanup resources in reverse order of initialization
+      // Capture context locally to avoid TypeScript null checks in closures
+      const shutdownContext = context;
 
-      // Stop workers
-      if (context.workers) {
-        console.log('[cultivate-service] Stopping workers...');
-        // Close each worker
-        await Promise.all(
-          Object.values(context.workers).map((worker) => {
-            if (worker && typeof worker.close === 'function') {
-              return worker.close();
-            }
-            return Promise.resolve();
-          })
-        );
-      }
+      // Maximum shutdown timeout: 30 seconds
+      const SHUTDOWN_TIMEOUT_MS = 30000;
+      const shutdownStartTime = Date.now();
 
-      // Close queues
-      if (context.queues) {
-        console.log('[cultivate-service] Closing queues...');
-        await Promise.all(
-          Object.values(context.queues).map((queue) => {
-            if (queue && typeof queue.close === 'function') {
-              return queue.close();
-            }
-            return Promise.resolve();
-          })
-        );
-      }
+      /**
+       * Helper to check if we've exceeded the shutdown timeout
+       */
+      const isTimedOut = () => {
+        const elapsed = Date.now() - shutdownStartTime;
+        return elapsed >= SHUTDOWN_TIMEOUT_MS;
+      };
 
-      // Close Redis connection
-      if (context.redis) {
-        console.log('[cultivate-service] Closing Redis connection...');
-        await context.redis.quit();
-      }
-
-      // Close storage (database connection)
-      if (context.storage) {
-        console.log('[cultivate-service] Closing storage...');
-        if (typeof context.storage.close === 'function') {
-          await context.storage.close();
+      /**
+       * Helper to safely execute a shutdown step with error handling
+       */
+      const safeShutdownStep = async (
+        stepName: string,
+        fn: () => Promise<void>
+      ): Promise<void> => {
+        if (isTimedOut()) {
+          console.warn(`[cultivate-service] ⚠ Skipping ${stepName} - shutdown timeout exceeded`);
+          return;
         }
-      }
 
+        try {
+          console.log(`[cultivate-service] ${stepName}...`);
+          await fn();
+          console.log(`[cultivate-service] ✓ ${stepName} complete`);
+        } catch (error) {
+          console.error(`[cultivate-service] ✗ Error during ${stepName}:`, error);
+          // Continue with remaining cleanup steps
+        }
+      };
+
+      // Cleanup resources in reverse order of initialization:
+      // 8. Workers → 7. Queues → 6. SSE → 5. (skip Tuner) → 4. (skip Anthropic) → 3. (skip ML) → 2. Redis → 1. Storage
+
+      // Step 1: Stop BullMQ workers (wait for active jobs with timeout)
+      await safeShutdownStep('Stopping BullMQ workers', async () => {
+        if (!shutdownContext.workers) return;
+
+        const workerClosePromises = Object.entries(shutdownContext.workers).map(
+          async ([name, worker]) => {
+            if (worker && typeof worker.close === 'function') {
+              try {
+                // BullMQ Worker.close() waits for active jobs to complete
+                // We don't pass force=true, so it waits gracefully
+                await worker.close();
+                console.log(`[cultivate-service]   - Worker ${name} closed`);
+              } catch (error) {
+                console.error(`[cultivate-service]   - Error closing worker ${name}:`, error);
+              }
+            }
+          }
+        );
+
+        await Promise.all(workerClosePromises);
+      });
+
+      // Step 2: Close BullMQ queues
+      await safeShutdownStep('Closing BullMQ queues', async () => {
+        if (!shutdownContext.queues) return;
+
+        const queueClosePromises = Object.entries(shutdownContext.queues).map(
+          async ([name, queue]) => {
+            if (queue && typeof queue.close === 'function') {
+              try {
+                await queue.close();
+                console.log(`[cultivate-service]   - Queue ${name} closed`);
+              } catch (error) {
+                console.error(`[cultivate-service]   - Error closing queue ${name}:`, error);
+              }
+            }
+          }
+        );
+
+        await Promise.all(queueClosePromises);
+      });
+
+      // Step 3: Close SSE connections
+      await safeShutdownStep('Closing SSE connections', async () => {
+        if (!shutdownContext.sseBroadcaster) return;
+
+        // The SSE broadcaster maintains a Set of Response objects
+        // We need to end all active SSE connections
+        // Access the clients Set directly if possible, or use a cleanup method
+        // Since we don't have a direct cleanup method, we'll broadcast a shutdown event
+        // and rely on clients to handle disconnect
+        try {
+          shutdownContext.sseBroadcaster.broadcast('shutdown', {
+            message: 'Cultivate service shutting down',
+            timestamp: new Date().toISOString(),
+          });
+          console.log('[cultivate-service]   - SSE shutdown event broadcast');
+        } catch (error) {
+          console.error('[cultivate-service]   - Error broadcasting SSE shutdown:', error);
+        }
+      });
+
+      // Step 4: Close Redis connection
+      await safeShutdownStep('Closing Redis connection', async () => {
+        if (!shutdownContext.redis) return;
+
+        try {
+          // Use quit() for graceful shutdown (waits for pending commands)
+          // If we're out of time, we could use disconnect() instead
+          if (isTimedOut()) {
+            await shutdownContext.redis.disconnect();
+            console.log('[cultivate-service]   - Redis disconnected (forced)');
+          } else {
+            await shutdownContext.redis.quit();
+            console.log('[cultivate-service]   - Redis quit (graceful)');
+          }
+        } catch (error) {
+          // If quit fails, try disconnect as fallback
+          console.error('[cultivate-service]   - Error during Redis quit, attempting disconnect:', error);
+          try {
+            await shutdownContext.redis.disconnect();
+          } catch (disconnectError) {
+            console.error('[cultivate-service]   - Error during Redis disconnect:', disconnectError);
+          }
+        }
+      });
+
+      // Step 5: Close SQLite database
+      await safeShutdownStep('Closing SQLite database', async () => {
+        if (!shutdownContext.storage) return;
+
+        if (typeof shutdownContext.storage.close === 'function') {
+          await shutdownContext.storage.close();
+          console.log('[cultivate-service]   - Database closed');
+        } else {
+          console.log('[cultivate-service]   - Storage has no close method, skipping');
+        }
+      });
+
+      // Clear context references
       context = undefined;
       routerInstance = undefined;
 
-      console.log('[cultivate-service] ✅ Shutdown complete');
+      const shutdownDuration = Date.now() - shutdownStartTime;
+      console.log(`[cultivate-service] ✅ Shutdown complete (${shutdownDuration}ms)`);
     },
 
     getContext: () => context,
