@@ -3,6 +3,13 @@
   "compilerOptions": {
     "noEmit": true
   },
+  "references": [
+    { "path": "../cultivate" },
+    { "path": "../planner" },
+    { "path": "../ideation" },
+    { "path": "../forge-core" },
+    { "path": "../mull" }
+  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
