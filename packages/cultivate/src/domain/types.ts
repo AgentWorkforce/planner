@@ -119,3 +119,58 @@ export const ScoringFactorsSchema = z.object({
   content_quality: z.number().min(0).max(1),
 });
 export type ScoringFactors = z.infer<typeof ScoringFactorsSchema>;
+
+/**
+ * Cultivate weights - same keys as ScoringFactors but as weight multipliers (unbounded)
+ */
+export const CultivateWeightsSchema = z.object({
+  recency: z.number(),
+  specificity: z.number(),
+  source_authority: z.number(),
+  repetition: z.number(),
+  emotional_intensity: z.number(),
+  strategic_fit: z.number(),
+  actionability: z.number(),
+  content_quality: z.number(),
+});
+export type CultivateWeights = z.infer<typeof CultivateWeightsSchema>;
+
+/**
+ * Cultivate configuration with per-greenhouse weights and tuning parameters
+ */
+export const CultivateConfigSchema = z.object({
+  weights: z.record(z.string(), CultivateWeightsSchema), // keyed by greenhouse_id
+  filter_rules: z.record(z.string(), z.object({ enabled: z.boolean() })), // keyed by rule_id
+  tier1_strictness: z.number(),
+  tier2_threshold: z.number(),
+  extract_model: z.string().optional(),
+  cluster_model: z.string().optional(),
+});
+export type CultivateConfig = z.infer<typeof CultivateConfigSchema>;
+
+/**
+ * User action outcome for a signal (link to plan or dismiss)
+ */
+export const CultivateOutcomeSchema = z.object({
+  signal_id: z.string(),
+  action: z.enum(['link', 'dismiss']),
+  greenhouse_id: z.string(),
+  metadata: z.record(z.unknown()).optional(),
+  timestamp: z.string(),
+});
+export type CultivateOutcome = z.infer<typeof CultivateOutcomeSchema>;
+
+/**
+ * AI-generated recommendation for signal exploration
+ */
+export const RecommendationSchema = z.object({
+  id: z.string(),
+  greenhouse_id: z.string(),
+  title: z.string(),
+  reasoning: z.string(),
+  confidence: z.number(),
+  supporting_signal_ids: z.array(z.string()),
+  supporting_cluster_ids: z.array(z.string()),
+  created_at: z.string(),
+});
+export type Recommendation = z.infer<typeof RecommendationSchema>;
