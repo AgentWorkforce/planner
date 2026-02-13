@@ -70,6 +70,53 @@ stop_process() {
     fi
 }
 
+# Check Redis availability
+check_redis() {
+    redis-cli ping >/dev/null 2>&1 && return 0 || return 1
+}
+
+# Start Redis if not running
+start_redis() {
+    if check_redis; then
+        success "Redis already running"
+        return 0
+    fi
+
+    log "Redis not running, attempting to start..."
+
+    # Try brew services first (macOS)
+    if command -v brew >/dev/null 2>&1; then
+        if brew services start redis 2>/dev/null; then
+            sleep 1
+            if check_redis; then
+                success "Redis started via brew services"
+                return 0
+            fi
+        fi
+    fi
+
+    # Try docker if brew didn't work
+    if command -v docker >/dev/null 2>&1; then
+        if docker ps -a --format '{{.Names}}' | grep -q '^plannr-redis$'; then
+            log "Resuming Redis container..."
+            docker start plannr-redis >/dev/null 2>&1
+        else
+            log "Starting Redis in Docker..."
+            docker run -d --name plannr-redis -p 6379:6379 redis:latest >/dev/null 2>&1
+        fi
+        sleep 2
+        if check_redis; then
+            success "Redis started via Docker"
+            return 0
+        fi
+    fi
+
+    error "Failed to start Redis. Please ensure Redis is installed or Docker is available."
+    error "  macOS: brew install redis && brew services start redis"
+    error "  Docker: docker run -d -p 6379:6379 redis:latest"
+    return 1
+}
+
 # Check agent-relay daemon status
 check_relay() {
     agent-relay status 2>/dev/null | grep -qi "running" && return 0 || return 1
@@ -104,6 +151,16 @@ stop_relay() {
 # Start backend
 start_backend() {
     stop_process "$BACKEND_PID_FILE" "backend"
+
+    # Check Redis availability before starting backend
+    log "Checking Redis availability..."
+    if ! check_redis; then
+        log "Redis is not available, attempting to start..."
+        if ! start_redis; then
+            error "Cannot start backend without Redis. Please start Redis manually."
+            return 1
+        fi
+    fi
 
     # Check if port 3001 is in use
     if lsof -i :3001 >/dev/null 2>&1; then
@@ -288,6 +345,13 @@ show_status() {
     echo ""
     log "=== Development Environment Status ==="
     echo ""
+
+    # Redis status
+    if check_redis; then
+        success "Redis: running at localhost:6379"
+    else
+        warn "Redis: not running"
+    fi
 
     # Relay status
     if check_relay; then
@@ -477,8 +541,17 @@ case "${1:-start}" in
             *) log "Usage: $0 tend [start|stop|restart|logs]" ;;
         esac
         ;;
+    redis)
+        case "${2:-start}" in
+            start) start_redis ;;
+            stop) log "Stopping Redis is not recommended in dev mode. Use 'brew services stop redis' or 'docker stop plannr-redis' manually." ;;
+            restart) log "Restarting Redis..."; start_redis ;;
+            *) log "Usage: $0 redis [start|stop|restart]" ;;
+        esac
+        ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}"
+        echo "       $0 redis {start|stop|restart}"
         echo "       $0 relay {start|stop|restart}"
         echo "       $0 backend {start|stop|restart|logs}"
         echo "       $0 tuner {start|stop|restart|logs}"
