@@ -1,8 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, unlinkSync } from 'node:fs';
-import type { GateResultRegistry } from './gate-registry.js';
-import type { SpawnGateAgentFn } from './agent-spawner.js';
+import { MODEL_ID_MAP } from '../config/forge-config.js';
 
 export interface AnalysisUsage {
   input_tokens: number;
@@ -23,19 +20,10 @@ export interface AnalysisToolConfig {
   cli?: string;
   defaultTimeoutMs?: number;
   concurrencyLimit?: number;
-  /** Gate registry for agent-based quality gate coordination */
-  gateRegistry?: GateResultRegistry;
-  /** Spawn function for gate agents (injected from server) */
-  spawnGateAgent?: SpawnGateAgentFn;
-  /** Function to terminate a spawned agent (called on timeout) */
-  terminateAgent?: (agentId: string) => Promise<void>;
 }
 
-const MODEL_MAP: Record<string, string> = {
-  haiku: 'claude-haiku-4-5-20251001',
-  sonnet: 'claude-sonnet-4-5-20250929',
-  opus: 'claude-opus-4-6',
-};
+// Re-alias for local readability; canonical map lives in forge-config
+const MODEL_MAP = MODEL_ID_MAP;
 
 export class AnalysisTool {
   private cli: string;
@@ -43,17 +31,11 @@ export class AnalysisTool {
   private concurrencyLimit: number;
   private activeCount = 0;
   private waitQueue: Array<() => void> = [];
-  private gateRegistry?: GateResultRegistry;
-  private spawnGateAgent?: SpawnGateAgentFn;
-  private terminateAgent?: (agentId: string) => Promise<void>;
 
   constructor(config: AnalysisToolConfig = {}) {
     this.cli = config.cli ?? 'claude';
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120000;
     this.concurrencyLimit = config.concurrencyLimit ?? 2;
-    this.gateRegistry = config.gateRegistry;
-    this.spawnGateAgent = config.spawnGateAgent;
-    this.terminateAgent = config.terminateAgent;
   }
 
   private async acquireSlot(): Promise<void> {
@@ -118,117 +100,11 @@ export class AnalysisTool {
       timeoutMs?: number;
     }
   ): Promise<AnalysisResult> {
-    // Dispatch: use spawned agent when gate infrastructure is available, else subprocess fallback
-    if (this.gateRegistry && this.spawnGateAgent) {
-      return this.runViaAgent(prompt, options);
-    }
     return this.runViaSubprocess(prompt, options);
   }
 
   /**
-   * Spawns a gate agent via relay to perform the analysis.
-   * Uses file-based result passing: agent writes findings to /tmp/gate-{id}.json,
-   * and the onExited callback reads the file to resolve the gate Promise.
-   * This avoids the fragile curl-based MCP reporting that caused 100% timeouts.
-   */
-  private async runViaAgent(
-    prompt: string,
-    options?: {
-      model?: string;
-      cwd?: string;
-      timeoutMs?: number;
-    }
-  ): Promise<AnalysisResult> {
-    const modelKey = options?.model ?? 'sonnet';
-    const modelName = MODEL_MAP[modelKey] ?? MODEL_MAP['sonnet'] ?? 'claude-sonnet-4-5-20250929';
-    const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
-    const gateId = randomUUID();
-    const resultFilePath = `/tmp/gate-${gateId}.json`;
-
-    // Track spawned agent so we can terminate it on timeout
-    let spawnedAgentId: string | undefined;
-
-    // Create the gate Promise BEFORE spawning the agent.
-    // onTimeout: terminate the gate agent to stop wasting Conductor credits.
-    const gatePromise = this.gateRegistry!.createGate(gateId, timeoutMs, () => {
-      if (spawnedAgentId) {
-        console.warn(`[AnalysisTool] Gate ${gateId} timed out — terminating agent ${spawnedAgentId}`);
-        this.terminateAgent?.(spawnedAgentId).catch((err) => {
-          console.error(`[AnalysisTool] Failed to terminate agent ${spawnedAgentId}:`, err);
-        });
-      }
-    });
-
-    // Prevent unhandled rejection if gate is rejected via rejectGate() in catch/finally
-    // while gatePromise is not yet being awaited (e.g., spawn fails before we reach await).
-    gatePromise.catch(() => {});
-
-    try {
-      const spawnResult = await this.spawnGateAgent!({
-        gateId,
-        prompt,
-        cwd: options?.cwd,
-        cli: this.cli,
-        model: modelKey,
-      }, (exitCode) => {
-        // Agent exited — check for result file before rejecting
-        if (!this.gateRegistry!.hasPendingGate(gateId)) return;
-
-        try {
-          if (existsSync(resultFilePath)) {
-            const raw = readFileSync(resultFilePath, 'utf-8');
-            const findings = JSON.parse(raw);
-            console.log(`[AnalysisTool] Gate ${gateId} — read findings from ${resultFilePath}`);
-            this.gateRegistry!.resolveGate(gateId, findings);
-            // Clean up temp file
-            try { unlinkSync(resultFilePath); } catch { /* best effort */ }
-          } else {
-            this.gateRegistry!.rejectGate(
-              gateId,
-              `Gate agent exited (code: ${exitCode}) without writing result file`
-            );
-          }
-        } catch (err) {
-          this.gateRegistry!.rejectGate(
-            gateId,
-            `Gate agent exited but result file was invalid: ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
-      });
-
-      spawnedAgentId = spawnResult.agentId;
-      console.log(`[AnalysisTool] Spawned gate agent ${spawnResult.agentId} for gate ${gateId}`);
-
-      // Await the gate result (resolved when agent exits and result file is read)
-      const gateResult = await gatePromise;
-
-      return {
-        output: JSON.stringify(gateResult.findings),
-        parsed: gateResult.findings,
-        durationMs: gateResult.durationMs,
-        model: modelName,
-      };
-    } catch (err) {
-      // Ensure gate is cleaned up on any error
-      if (this.gateRegistry!.hasPendingGate(gateId)) {
-        this.gateRegistry!.rejectGate(gateId, 'Analysis cancelled');
-      }
-      throw err;
-    } finally {
-      // Always terminate the gate agent after result (or error/timeout)
-      if (spawnedAgentId) {
-        this.terminateAgent?.(spawnedAgentId).catch((err) => {
-          console.warn(`[AnalysisTool] Failed to terminate gate agent ${spawnedAgentId}:`, err);
-        });
-      }
-      // Clean up result file (in case timeout killed agent before onExited ran)
-      try { if (existsSync(resultFilePath)) unlinkSync(resultFilePath); } catch { /* best effort */ }
-    }
-  }
-
-  /**
-   * Fallback: runs analysis via `claude -p` subprocess.
-   * Used when gate infrastructure is not available (disconnected/test mode).
+   * Runs analysis via `claude -p` subprocess.
    */
   private async runViaSubprocess(
     prompt: string,

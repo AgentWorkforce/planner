@@ -296,6 +296,8 @@ export interface SpawnAgentOptions {
   mcpServerUrl?: string;
   /** Channels to pre-join the agent to after spawning */
   channels?: string[];
+  /** Skip MCP context injection — forge agents use curl-based reporting, not relay */
+  skipMcpContext?: boolean;
 }
 
 /**
@@ -403,9 +405,10 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
   }
 
   try {
-    // Build task with MCP context
-    const mcpContext = buildMcpContext(options);
-    const taskWithContext = `${options.task}\n${mcpContext}`;
+    // Build task — skip MCP context for forge agents (they use curl, not relay)
+    const taskWithContext = options.skipMcpContext
+      ? options.task
+      : `${options.task}\n${buildMcpContext(options)}`;
 
     const result = await client.spawn({
       name: options.name,

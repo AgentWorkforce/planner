@@ -812,7 +812,9 @@ export class Orchestrator {
     // Spawn agent with exit callback
     try {
       const onAgentExited = (info: AgentExitInfo) => {
-        this.handleAgentExited(info, runId);
+        this.handleAgentExited(info, runId).catch(err => {
+          console.error(`[Orchestrator] handleAgentExited failed for task ${info.taskId}:`, err);
+        });
       };
       const result = await this.spawnTask(spawnOptions, onAgentExited);
 
@@ -980,11 +982,11 @@ export class Orchestrator {
    *
    * If the task already reported (completed/failed/blocked via MCP), this is a no-op.
    * If the task is still 'running' (agent exited without calling report_complete),
-   * we mark it as failed — the agent crashed or forgot to report, so the work is unverified.
+   * check git log for a commit marker. If found, mark as completed. Otherwise mark as failed.
    *
    * This is the fallback path. The primary path is MCP self-reporting.
    */
-  private handleAgentExited(info: AgentExitInfo, runId: string): void {
+  private async handleAgentExited(info: AgentExitInfo, runId: string): Promise<void> {
     const task = this.storage.getTask(info.taskId);
     if (!task) return;
 
@@ -996,11 +998,40 @@ export class Orchestrator {
       return;
     }
 
-    // Agent exited while task is still 'running' — it didn't call report_complete.
-    // Mark as failed because the agent crashed or exited without reporting — the work is unverified.
-    // The orchestrator's retry logic will handle this on the next poll cycle.
+    // Agent exited while task is still 'running' — check git log for commit marker
+    const workspacePath = task.workspace_path || this.runWorktrees.get(runId);
+    if (workspacePath) {
+      try {
+        const taskIdPrefix = info.taskId.slice(0, 8);
+        const { stdout } = await execFileAsync(
+          'git',
+          ['log', '--oneline', '--all', '--grep', `[forge:${taskIdPrefix}]`],
+          { cwd: workspacePath }
+        );
+
+        if (stdout.trim()) {
+          console.log(
+            `[Orchestrator] Agent ${info.agentId} exited but found commit [forge:${taskIdPrefix}] — marking task ${task.step_id} as completed`
+          );
+          this.storage.updateTaskStatus(info.taskId, TaskStatus.Completed);
+          const attempts = this.storage.listAttemptsByTask(info.taskId);
+          if (attempts.length > 0) {
+            const lastAttempt = attempts[attempts.length - 1]!;
+            this.storage.updateAttempt(lastAttempt.attempt_id, {
+              outcome: AttemptOutcome.Success,
+            });
+          }
+          return;
+        }
+      } catch (err) {
+        // Git check failed, fall through to mark as failed
+        console.log(`[Orchestrator] Git commit check failed for task ${task.step_id}:`, err);
+      }
+    }
+
+    // No commit found or git check failed — mark as failed
     console.log(
-      `[Orchestrator] Agent ${info.agentId} exited without MCP report — marking task ${task.step_id} as failed (crash or timeout)`
+      `[Orchestrator] Agent ${info.agentId} exited without MCP report or commit marker — marking task ${task.step_id} as failed (crash or timeout)`
     );
     this.storage.updateTaskStatus(info.taskId, TaskStatus.Failed);
 

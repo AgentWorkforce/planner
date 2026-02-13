@@ -17,6 +17,24 @@ export type ModelType = (typeof ModelType)[keyof typeof ModelType];
 export const ModelTypeSchema = z.enum(['haiku', 'sonnet', 'opus']);
 
 /**
+ * Maps short model names to full API model IDs.
+ * Single source of truth — used by forge-spawner and analysis-tool.
+ */
+export const MODEL_ID_MAP: Record<string, string> = {
+  haiku: 'claude-haiku-4-5-20251001',
+  sonnet: 'claude-sonnet-4-5-20250929',
+  opus: 'claude-opus-4-6',
+};
+
+/**
+ * Resolves a model name to its full API model ID.
+ * Returns the input unchanged if it's not a known short name (assumes it's already a full ID).
+ */
+export function resolveModelId(name: string): string {
+  return MODEL_ID_MAP[name] || name;
+}
+
+/**
  * CLI configuration for a role.
  * Maps an owner_role to the CLI command, optional timeout, and audit flag.
  */
@@ -70,6 +88,8 @@ export const RepoConfigSchema = z.object({
   repo_url: z.string().min(1),
   /** The base branch to use (defaults to main/master) */
   base_branch: z.string().optional(),
+  /** Target directory within the workspace for this scope's code (e.g., "packages/cultivate/src") */
+  target_path: z.string().optional(),
 });
 
 export type RepoConfig = z.infer<typeof RepoConfigSchema>;

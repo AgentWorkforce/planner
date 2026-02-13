@@ -121,12 +121,19 @@ function transformStep(
     }
   }
 
-  // Extract target_path from specification if present
+  // Resolve target_path: specification > repo config > monorepo convention
   if (step.specification && typeof step.specification === 'object') {
     const spec = step.specification as Record<string, unknown>;
     if (typeof spec.target_path === 'string') {
       forgeStep.target_path = spec.target_path;
     }
+  }
+  if (!forgeStep.target_path && repoConfig?.target_path) {
+    forgeStep.target_path = repoConfig.target_path;
+  }
+  if (!forgeStep.target_path && step.scope) {
+    // Monorepo convention fallback: packages/{scope}/src
+    forgeStep.target_path = `packages/${step.scope}/src`;
   }
 
   return forgeStep;

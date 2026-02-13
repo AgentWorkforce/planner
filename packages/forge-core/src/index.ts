@@ -43,6 +43,9 @@ export * from './config/index.js';
 // Planner adapter exports
 export * from './adapters/index.js';
 
+// Prompt exports
+export * from './prompts/index.js';
+
 // =============================================================================
 // Service Factory (for server integration)
 // =============================================================================
@@ -287,12 +290,7 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     gateRegistry = config.spawnGateAgent ? new GateResultRegistry() : undefined;
 
     // Create AnalysisTool for PREP/POST quality gates
-    const analysisTool = new AnalysisTool({
-      cli: 'claude',
-      gateRegistry,
-      spawnGateAgent: config.spawnGateAgent,
-      terminateAgent: config.terminateAgent,
-    });
+    const analysisTool = new AnalysisTool({ cli: 'claude' });
 
     // Create Orchestrator
     const orchestrator = createOrchestrator({
