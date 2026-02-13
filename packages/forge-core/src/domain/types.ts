@@ -286,8 +286,8 @@ export type BudgetsConfig = z.infer<typeof BudgetsConfigSchema>;
  * Research basis: Reflexion 2023 - Self-correction with failure analysis +20-30% improvement
  */
 export const RetryConfigSchema = z.object({
-  /** Maximum retry attempts per task (default: 1 - conservative) */
-  max_retries_per_task: z.number().int().min(0).default(1),
+  /** Maximum retry attempts per task (default: 2 — allows 1 retry with failure context) */
+  max_retries_per_task: z.number().int().min(0).default(2),
   /** Backoff strategy (default: exponential) */
   backoff: z.enum(['none', 'linear', 'exponential']).default('exponential'),
   /** Base seconds for backoff calculation (default: 30) */
@@ -496,6 +496,7 @@ export const TaskSchema = z.object({
   specification: z.record(z.string(), z.unknown()).optional(),
   /** Target directory within workspace where agent should create files */
   target_path: z.string().optional(),
+  error: z.string().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -1116,6 +1117,178 @@ export function createActiveGuardian(
   };
   return ActiveGuardianSchema.parse(guardian);
 }
+
+// ============================================
+// Cultivate Domain Types
+// ============================================
+
+/**
+ * Greenhouse operation mode
+ */
+export const GreenhouseMode = {
+  Active: 'active',
+  Paused: 'paused',
+  Archived: 'archived',
+} as const;
+
+export type GreenhouseMode = (typeof GreenhouseMode)[keyof typeof GreenhouseMode];
+
+export const GreenhouseModeSchema = z.enum(['active', 'paused', 'archived']);
+
+/**
+ * Cluster trend direction
+ */
+export const ClusterTrend = {
+  Rising: 'rising',
+  Stable: 'stable',
+  Declining: 'declining',
+} as const;
+
+export type ClusterTrend = (typeof ClusterTrend)[keyof typeof ClusterTrend];
+
+export const ClusterTrendSchema = z.enum(['rising', 'stable', 'declining']);
+
+/**
+ * Signal status lifecycle
+ */
+export const SignalStatus = {
+  New: 'new',
+  Processed: 'processed',
+  Clustered: 'clustered',
+  Linked: 'linked',
+  Archived: 'archived',
+} as const;
+
+export type SignalStatus = (typeof SignalStatus)[keyof typeof SignalStatus];
+
+export const SignalStatusSchema = z.enum([
+  'new',
+  'processed',
+  'clustered',
+  'linked',
+  'archived',
+]);
+
+/**
+ * Signal source type
+ */
+export const SourceType = {
+  Slack: 'slack',
+  GitHub: 'github',
+  Email: 'email',
+  Linear: 'linear',
+  Manual: 'manual',
+} as const;
+
+export type SourceType = (typeof SourceType)[keyof typeof SourceType];
+
+export const SourceTypeSchema = z.enum(['slack', 'github', 'email', 'linear', 'manual']);
+
+/**
+ * Author type for signals
+ */
+export const AuthorType = {
+  Human: 'human',
+  Bot: 'bot',
+  System: 'system',
+} as const;
+
+export type AuthorType = (typeof AuthorType)[keyof typeof AuthorType];
+
+export const AuthorTypeSchema = z.enum(['human', 'bot', 'system']);
+
+/**
+ * Tracks progression through the cultivate pipeline
+ */
+export const StepProvenanceSchema = z.object({
+  /** Pipeline step name (e.g., 'ingestion', 'scoring', 'clustering') */
+  step: z.string().min(1),
+  /** When the signal entered this step */
+  timestamp: z.string().datetime(),
+  /** Additional context about this step (e.g., model used, confidence score) */
+  details: z.record(z.unknown()).optional(),
+});
+
+export type StepProvenance = z.infer<typeof StepProvenanceSchema>;
+
+/**
+ * Signal represents a single request/feedback item from any source
+ */
+export const SignalSchema = z.object({
+  id: z.string().uuid(),
+  greenhouse_id: z.string().uuid(),
+  source_type: SourceTypeSchema,
+  /** External identifier from the source system */
+  external_id: z.string().min(1),
+  title: z.string().min(1),
+  body: z.string(),
+  author: z.string().min(1),
+  author_type: AuthorTypeSchema,
+  /** Optional URL to the original source */
+  url: z.string().url().optional(),
+  /** Composite score from scoring service */
+  score: z.number(),
+  /** Individual scoring factors (urgency, impact, clarity, etc.) */
+  scoring_factors: z.record(z.number()),
+  /** Cluster this signal belongs to (if clustered) */
+  cluster_id: z.string().uuid().optional(),
+  status: SignalStatusSchema,
+  /** Pipeline progression history */
+  provenance: z.array(StepProvenanceSchema),
+  /** User-defined or auto-generated tags */
+  tags: z.array(z.string()),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  /** Plan ID if this signal has been linked to a plan */
+  linked_plan_id: z.string().uuid().optional(),
+});
+
+export type Signal = z.infer<typeof SignalSchema>;
+
+/**
+ * Greenhouse defines a filtered collection of signals from specific sources
+ */
+export const GreenhouseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  /** Current operation mode */
+  mode: GreenhouseModeSchema,
+  /** Keywords that must be present (OR condition) */
+  keyword_require: z.array(z.string()),
+  /** Keywords that must NOT be present */
+  keyword_exclude: z.array(z.string()),
+  /** Source identifiers to monitor (e.g., channel IDs, repo names) */
+  source_ids: z.array(z.string()),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type Greenhouse = z.infer<typeof GreenhouseSchema>;
+
+/**
+ * Cluster represents a group of related signals
+ */
+export const ClusterSchema = z.object({
+  id: z.string().uuid(),
+  greenhouse_id: z.string().uuid(),
+  /** Human-readable cluster label */
+  label: z.string().min(1),
+  /** AI-generated summary of the cluster theme */
+  summary: z.string(),
+  /** Number of signals in this cluster */
+  signal_count: z.number().int().min(0),
+  /** Trend direction based on recent signal velocity */
+  trend: ClusterTrendSchema,
+  /** New signals per week */
+  velocity_weekly: z.number(),
+  /** New signals per month */
+  velocity_monthly: z.number(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type Cluster = z.infer<typeof ClusterSchema>;
 
 // ============================================
 // Task Execution Metric (DOT Framework)
