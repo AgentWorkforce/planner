@@ -174,3 +174,41 @@ export const RecommendationSchema = z.object({
   created_at: z.string(),
 });
 export type Recommendation = z.infer<typeof RecommendationSchema>;
+
+/**
+ * Raw event from source adapter (before normalization)
+ */
+export const RawEventSchema = z.object({
+  source_config_id: z.string(),
+  external_id: z.string(),
+  raw_payload: z.unknown(), // Accepts any JSON from source
+  received_at: z.string(),
+});
+export type RawEvent = z.infer<typeof RawEventSchema>;
+
+/**
+ * Normalized event after adapter transformation (validated contract for pipeline entry)
+ */
+export const NormalizedEventSchema = z.object({
+  title: z.string(),
+  body: z.string(),
+  author: z.string(),
+  author_type: AuthorTypeSchema,
+  url: z.string().optional(),
+  source_type: AdapterTypeSchema,
+  external_id: z.string(),
+  occurred_at: z.string(),
+});
+export type NormalizedEvent = z.infer<typeof NormalizedEventSchema>;
+
+/**
+ * LLM extraction results (themes, entities, and scoring hints)
+ */
+export const ExtractionResultSchema = z.object({
+  themes: z.array(z.string()),
+  entities: z.array(z.string()),
+  actionability_hint: z.number(), // LLM-provided score
+  quality_hint: z.number(), // LLM-provided score
+  strategic_fit_hint: z.number(), // LLM-provided score
+});
+export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
