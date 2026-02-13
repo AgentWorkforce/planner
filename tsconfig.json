@@ -6,6 +6,7 @@
     { "path": "./packages/forge-core" },
     { "path": "./packages/testbench" },
     { "path": "./packages/tuner" },
+    { "path": "./packages/cultivate" },
     { "path": "./packages/planner-ui" },
     { "path": "./packages/ideation-ui" },
     { "path": "./packages/forge-ui" },
