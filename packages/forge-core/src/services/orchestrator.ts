@@ -470,37 +470,39 @@ export class Orchestrator {
         }
 
         // No ready, no running, but have pending → analyze why
-        // Check if ALL pending tasks are blocked by failed dependencies (cascading failure)
-        const completedStepIds = new Set(completedTasks.map((t) => t.step_id));
+        // Compute transitive blocked set: tasks blocked by failures through any dep chain
         const failedStepIds = new Set(failedTasks.map((t) => t.step_id));
+        const transitivelyBlocked = new Set(failedStepIds);
 
-        let blockedByFailureCount = 0;
-        const blockedTasks: Task[] = [];
-
-        for (const task of pendingTasks) {
-          // Check if this task has at least one failed dependency
-          const hasFailedDep = task.dependencies.some((depStepId) => failedStepIds.has(depStepId));
-
-          if (hasFailedDep) {
-            blockedByFailureCount++;
-            blockedTasks.push(task);
+        // Iteratively expand: if any dep is in the blocked set, the task is also blocked
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const task of pendingTasks) {
+            if (transitivelyBlocked.has(task.step_id)) continue;
+            if (task.dependencies.some((depId) => transitivelyBlocked.has(depId))) {
+              transitivelyBlocked.add(task.step_id);
+              changed = true;
+            }
           }
         }
 
-        if (blockedByFailureCount === pendingTasks.length) {
-          // ALL pending tasks are blocked by failed dependencies → cascading failure
+        const blockedTasks = pendingTasks.filter((t) => transitivelyBlocked.has(t.step_id));
+        const stuckTasks = pendingTasks.filter((t) => !transitivelyBlocked.has(t.step_id));
+
+        if (blockedTasks.length > 0 && stuckTasks.length === 0) {
+          // ALL pending tasks are transitively blocked by failures → cascading failure
           console.log(
-            `[Orchestrator] Cascading failure detected: ${blockedByFailureCount} tasks blocked by upstream failures`
+            `[Orchestrator] Cascading failure detected: ${blockedTasks.length} tasks blocked by upstream failures`
           );
 
           // Mark blocked tasks as failed with clear message
           for (const task of blockedTasks) {
-            const failedDeps = task.dependencies.filter((depStepId) => failedStepIds.has(depStepId));
+            const failedDeps = task.dependencies.filter((depId) => transitivelyBlocked.has(depId));
             const blockMsg = `Blocked: upstream task${failedDeps.length > 1 ? 's' : ''} ${failedDeps.join(', ')} failed`;
 
             this.storage.updateTask(task.task_id, { status: TaskStatus.Failed });
 
-            // Record error on latest attempt if it exists
             const attempts = this.storage.listAttemptsByTask(task.task_id);
             if (attempts.length > 0) {
               const lastAttempt = attempts[attempts.length - 1]!;
@@ -511,8 +513,6 @@ export class Orchestrator {
             }
           }
 
-          // Finalize run immediately with cascading failure description
-          const totalFailed = failedTasks.length + blockedTasks.length;
           const blockedStepIds = blockedTasks.map((t) => t.step_id).join(', ');
           this.failRun(
             runId,
@@ -522,15 +522,9 @@ export class Orchestrator {
           return;
         }
 
-        // Some pending tasks have only completed/pending deps → possible circular dependency
-        // Increment stall counter and wait
+        // Some pending tasks are not blocked by failures → possible circular dependency
         stallCount++;
         if (stallCount > this.maxStallIterations) {
-          const stuckTasks = pendingTasks.filter((t) => {
-            // Tasks that aren't blocked by failures but can't proceed
-            return !t.dependencies.some((depStepId) => failedStepIds.has(depStepId));
-          });
-
           console.error(
             `[Orchestrator] Run ${runId} stalled with ${stuckTasks.length} stuck tasks (possible circular dependencies)`,
             stuckTasks.map((t) => ({ step_id: t.step_id, deps: t.dependencies }))
@@ -1592,7 +1586,7 @@ export class Orchestrator {
       const result = await this.analysisTool!.run(prompt, {
         model: qualityConfig.run_post_model ?? 'haiku',
         cwd: workspacePath,
-        timeoutMs: 180000, // 3 min — focused integration review
+        timeoutMs: 300000, // 5 min — accounts for relay spawn overhead
       });
 
       const parsed = result.parsed ?? { raw: result.output };

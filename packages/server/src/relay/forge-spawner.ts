@@ -545,7 +545,6 @@ export const spawnForgeTask: SpawnTaskFn = async (
 
   // Pre-spawn cleanup: release any stale agent with the same name.
   // Zombie agents from previous server sessions block name reuse in the relay daemon.
-  // Race with 2s timeout — release hangs for 10s on non-existent agents.
   try {
     const preRelease = await Promise.race([
       releaseAgent(agentName),
@@ -554,6 +553,19 @@ export const spawnForgeTask: SpawnTaskFn = async (
     if (preRelease.success) {
       console.warn(`[forge-spawner] Cleared stale agent ${agentName} before respawn`);
       await new Promise(r => setTimeout(r, 500));
+    } else {
+      // Graceful release failed — try force-kill via CLI as fallback
+      // This handles agents spawned by a previous server session
+      const client = getClient();
+      if (client) {
+        try {
+          await client.removeAgent(agentName, { removeMessages: true });
+          console.warn(`[forge-spawner] Force-removed stale agent ${agentName} before respawn`);
+          await new Promise(r => setTimeout(r, 500));
+        } catch {
+          // Agent likely doesn't exist — safe to proceed
+        }
+      }
     }
   } catch {
     // Best-effort — don't block spawn on cleanup failure
@@ -614,8 +626,18 @@ export const terminateForgeAgent: TerminateAgentFn = async (agentId: string): Pr
   const result = await releaseAgent(agentId);
 
   if (!result.success) {
-    // Log but don't throw — agent might already be terminated
+    // Release failed — agent may have crashed. Still deregister from daemon registry
+    // to prevent agents.json accumulation that causes daemon CPU spiral.
     console.error(`[forge-spawner] Failed to release agent ${agentId}: ${result.error || 'Unknown error'}`);
+    const client = getClient();
+    if (client) {
+      try {
+        await client.removeAgent(agentId, { removeMessages: true });
+        console.log(`[forge-spawner] Deregistered dead agent ${agentId} from registry`);
+      } catch {
+        // Best-effort — agent may not exist in registry
+      }
+    }
   }
 };
 
