@@ -212,3 +212,78 @@ export const ExtractionResultSchema = z.object({
   strategic_fit_hint: z.number(), // LLM-provided score
 });
 export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
+
+/**
+ * Authentication configuration (opaque encrypted credentials)
+ */
+export const AuthConfigSchema = z.object({
+  type: AuthTypeSchema,
+  encrypted_credentials: z.string(), // Opaque string - actual encryption handled by auth-encryption feature
+});
+export type AuthConfig = z.infer<typeof AuthConfigSchema>;
+
+/**
+ * Source configuration with health monitoring and adapter settings
+ */
+export const SourceConfigSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  adapter_type: AdapterTypeSchema,
+  preset: z.string().optional(),
+  endpoint_template: z.string().optional(),
+  auth: AuthConfigSchema.optional(),
+  poll_interval_ms: z.number(),
+  greenhouse_ids: z.array(z.string()),
+  health: SourceHealthSchema,
+  consecutive_failures: z.number(),
+  last_error: z.string().optional(),
+  enabled: z.boolean(),
+  created_at: z.string(),
+});
+export type SourceConfig = z.infer<typeof SourceConfigSchema>;
+
+/**
+ * Source preset template for common integrations
+ */
+export const SourcePresetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  adapter_type: AdapterTypeSchema,
+  endpoint_template: z.string(),
+  auth_type: AuthTypeSchema,
+  default_poll_interval_ms: z.number(),
+  tier: z.number(), // Source tier (1-5)
+});
+export type SourcePreset = z.infer<typeof SourcePresetSchema>;
+
+/**
+ * Filter rule with effectiveness tracking
+ */
+export const FilterRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  type: FilterRuleTypeSchema,
+  condition: z.string(),
+  enabled: z.boolean(),
+  effectiveness: z.object({
+    signals_matched: z.number(),
+    false_positive_rate: z.number(),
+  }),
+});
+export type FilterRule = z.infer<typeof FilterRuleSchema>;
+
+/**
+ * Document ingestion job tracking
+ */
+export const IngestionJobSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  status: IngestionJobStatusSchema,
+  total_chunks: z.number(),
+  processed_chunks: z.number(),
+  greenhouse_id: z.string(),
+  created_at: z.string(),
+});
+export type IngestionJob = z.infer<typeof IngestionJobSchema>;
