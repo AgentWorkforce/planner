@@ -4,8 +4,12 @@
  * Core clustering pipeline that calls Anthropic SDK to analyze extracted signal
  * data and assign signals to existing clusters or recommend creating new clusters.
  *
- * Uses the ClusterAssignmentDecision schema to determine cluster assignment,
- * enforcing Greenhouse isolation by only querying clusters for the target greenhouse.
+ * Uses tool-based structured output (CLUSTER_ASSIGNMENT_TOOL) to guarantee response
+ * shape, enforcing per-Greenhouse cluster isolation via:
+ * - Storage-level NOT NULL constraint on greenhouse_id
+ * - Querying only clusters for the target greenhouse
+ * - Multi-layer validation in assignCluster() (list check + verification fetch + assertion)
+ * - Database foreign key constraint and unique (greenhouse_id, label) composite key
  *
  * Error handling: All clustering failures (LLM API errors, validation failures, etc.)
  * are wrapped in SignalProcessingError for BullMQ dead-letter routing.
@@ -18,6 +22,7 @@ import { SignalProcessingError } from '../errors.js';
 import type { CultivateStorage } from '../storage/interface.js';
 import {
   CLUSTER_ASSIGNMENT_SYSTEM_PROMPT,
+  CLUSTER_ASSIGNMENT_TOOL,
   createClusterAssignmentUserPrompt,
   ClusterAssignmentDecisionSchema,
   type ClusterAssignmentDecision,
@@ -70,8 +75,8 @@ export interface ClusteringContext {
  *
  * This function analyzes extracted signal data and determines the best cluster assignment:
  * 1. Fetches existing clusters for the target Greenhouse (enforces isolation)
- * 2. Calls Haiku with the cluster assignment prompt including signal data and clusters
- * 3. Parses the response as ClusterAssignmentDecision using JSON schema validation
+ * 2. Calls Haiku with the cluster assignment tool for guaranteed structured output
+ * 3. Validates the tool_use response against ClusterAssignmentDecisionSchema
  * 4. Returns ClusterAssignment with cluster_id and isNew flag
  *
  * The function guarantees Greenhouse isolation by:
@@ -152,14 +157,15 @@ export async function assignCluster(context: ClusteringContext): Promise<Cluster
     greenhouseName: greenhouse_name,
   });
 
-  // Step 3: Call Anthropic API for cluster assignment decision
-  // The API response must be valid JSON matching ClusterAssignmentDecisionSchema
+  // Step 3: Call Anthropic API for cluster assignment decision using structured output
+  // Use tool_use to guarantee the response matches ClusterAssignmentDecisionSchema
   let response;
   try {
     response = await anthropic.messages.create({
       model,
       max_tokens: 1024,
       system: CLUSTER_ASSIGNMENT_SYSTEM_PROMPT,
+      tools: [CLUSTER_ASSIGNMENT_TOOL as any],
       messages: [
         {
           role: 'user',
@@ -173,27 +179,27 @@ export async function assignCluster(context: ClusteringContext): Promise<Cluster
     throw new SignalProcessingError('tier3-clustering', signal_id, cause);
   }
 
-  // Step 4: Extract text content from response
-  const textContent = response.content.find((block: any) => block.type === 'text');
-  if (!textContent || (textContent as any).type !== 'text') {
+  // Step 4: Extract tool_use content from structured output
+  const toolUseContent = response.content.find((block: any) => block.type === 'tool_use');
+  if (!toolUseContent || (toolUseContent as any).type !== 'tool_use') {
     const responseTypes = response.content.map((c: any) => c.type).join(', ') || 'no content';
     const cause = new Error(
-      `Expected text response from model, got ${responseTypes}`
+      `Expected tool_use response from model, got ${responseTypes}`
     );
     throw new SignalProcessingError('tier3-clustering', signal_id, cause);
   }
 
-  // Step 5: Parse JSON response and validate against schema
+  // Step 5: Validate the structured tool input against schema
+  // The tool_use mechanism guarantees structure, but we still validate for type safety
   let decision: ClusterAssignmentDecision;
   try {
-    const textBlock = textContent as any;
-    const parsedJson = JSON.parse(textBlock.text);
-    decision = ClusterAssignmentDecisionSchema.parse(parsedJson);
+    const toolUseBlock = toolUseContent as any;
+    decision = ClusterAssignmentDecisionSchema.parse(toolUseBlock.input);
   } catch (parseError) {
     const cause =
       parseError instanceof Error
         ? parseError
-        : new Error(`Failed to parse cluster assignment response: ${String(parseError)}`);
+        : new Error(`Failed to validate cluster assignment decision: ${String(parseError)}`);
     throw new SignalProcessingError('tier3-clustering', signal_id, cause);
   }
 
@@ -202,11 +208,34 @@ export async function assignCluster(context: ClusteringContext): Promise<Cluster
 
   if (decision.action === 'assign') {
     // Assigning to existing cluster
-    // Validate that the cluster belongs to this greenhouse (isolation check)
+    // Enforce Greenhouse isolation with multiple validation layers:
+
+    // 1. Check in existingClusters list (already filtered by greenhouse_id in Step 1)
     const targetCluster = existingClusters.find((c) => c.id === decision.cluster_id);
     if (!targetCluster) {
       const cause = new Error(
         `Cluster ${decision.cluster_id} not found in greenhouse ${greenhouse_id} (isolation violation)`
+      );
+      throw new SignalProcessingError('tier3-clustering', signal_id, cause);
+    }
+
+    // 2. Double-check by fetching cluster directly with greenhouse_id validation
+    // This ensures cluster_id cannot span Greenhouses
+    const verifiedCluster = await storage.getClusterByIdAndGreenhouse(
+      decision.cluster_id,
+      greenhouse_id
+    );
+    if (!verifiedCluster) {
+      const cause = new Error(
+        `Cluster ${decision.cluster_id} isolation violation: belongs to different greenhouse`
+      );
+      throw new SignalProcessingError('tier3-clustering', signal_id, cause);
+    }
+
+    // 3. Assert greenhouse_id matches expected value (defensive programming)
+    if (verifiedCluster.greenhouse_id !== greenhouse_id) {
+      const cause = new Error(
+        `Cluster ${decision.cluster_id} greenhouse mismatch: expected ${greenhouse_id}, got ${verifiedCluster.greenhouse_id}`
       );
       throw new SignalProcessingError('tier3-clustering', signal_id, cause);
     }

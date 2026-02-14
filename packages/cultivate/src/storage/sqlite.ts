@@ -105,6 +105,10 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     `);
 
     // Clusters table
+    // Per-Greenhouse isolation enforced at schema level:
+    // - greenhouse_id NOT NULL ensures every cluster belongs to a greenhouse
+    // - FOREIGN KEY ensures greenhouse must exist
+    // - (greenhouse_id, label) UNIQUE prevents duplicate labels within a greenhouse
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS clusters (
         id TEXT PRIMARY KEY,
@@ -116,7 +120,9 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
         velocity_weekly REAL NOT NULL DEFAULT 0,
         velocity_monthly REAL NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(greenhouse_id) REFERENCES greenhouses(id) ON DELETE CASCADE,
+        UNIQUE(greenhouse_id, label)
       )
     `);
 
@@ -526,6 +532,14 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
 
   async getClusterById(id: string): Promise<Cluster | null> {
     const row = this.db.prepare('SELECT * FROM clusters WHERE id = ?').get(id) as any;
+    if (!row) return null;
+    return this.mapRowToCluster(row);
+  }
+
+  async getClusterByIdAndGreenhouse(id: string, greenhouse_id: string): Promise<Cluster | null> {
+    const row = this.db
+      .prepare('SELECT * FROM clusters WHERE id = ? AND greenhouse_id = ?')
+      .get(id, greenhouse_id) as any;
     if (!row) return null;
     return this.mapRowToCluster(row);
   }

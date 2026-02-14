@@ -291,8 +291,19 @@ export interface CultivateStorage {
 
   /**
    * Get a cluster by ID
+   * @deprecated Use getClusterByIdAndGreenhouse() for greenhouse-safe access
    */
   getClusterById(id: string): Promise<Cluster | null>;
+
+  /**
+   * Get a cluster by ID and greenhouse (Greenhouse isolation enforced)
+   * Ensures the cluster belongs to the specified greenhouse
+   * @param id - Cluster ID
+   * @param greenhouse_id - Expected greenhouse ID for validation
+   * @throws Error if cluster exists but belongs to a different greenhouse
+   * @returns Cluster if found and belongs to the greenhouse, null otherwise
+   */
+  getClusterByIdAndGreenhouse(id: string, greenhouse_id: string): Promise<Cluster | null>;
 
   /**
    * Get a cluster by label within a greenhouse
