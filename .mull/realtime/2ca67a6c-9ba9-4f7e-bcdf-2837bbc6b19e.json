@@ -1,0 +1,16 @@
+{
+  "sessionId": "2ca67a6c-9ba9-4f7e-bcdf-2837bbc6b19e",
+  "entitiesSinceLastLlm": [],
+  "factsSinceLastLlm": [
+    {
+      "slug": "recovery-e204441b-b2fd-4b66-8ace-0059dfc64b1e",
+      "text": "Recovery: escalate",
+      "source": "forge:2ca67a6c-9ba9-4f7e-bcdf-2837bbc6b19e",
+      "timestamp": "2026-02-14T18:52:54.746Z",
+      "entities": [],
+      "isPreStructured": true
+    }
+  ],
+  "lastLlmRunAt": null,
+  "lastDeterministicAt": "2026-02-14T18:52:54.749Z"
+}

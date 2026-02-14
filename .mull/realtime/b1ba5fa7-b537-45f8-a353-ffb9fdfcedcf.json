@@ -1,0 +1,40 @@
+{
+  "sessionId": "b1ba5fa7-b537-45f8-a353-ffb9fdfcedcf",
+  "entitiesSinceLastLlm": [],
+  "factsSinceLastLlm": [
+    {
+      "slug": "recovery-86ec7bce-3e3c-468a-ad81-d08661a8d4a1",
+      "text": "Recovery: revise",
+      "source": "forge:b1ba5fa7-b537-45f8-a353-ffb9fdfcedcf",
+      "timestamp": "2026-02-14T15:23:17.376Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-2bd9710a-9d72-46c1-aa9a-b24c22c57309",
+      "text": "Recovery: escalate",
+      "source": "forge:b1ba5fa7-b537-45f8-a353-ffb9fdfcedcf",
+      "timestamp": "2026-02-14T15:23:49.387Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-428a5f4f-7b81-48c4-9d28-cff6677bd303",
+      "text": "Recovery: revise",
+      "source": "forge:b1ba5fa7-b537-45f8-a353-ffb9fdfcedcf",
+      "timestamp": "2026-02-14T15:23:51.393Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-9c9539dd-b523-4d17-9e13-45ad3b44e525",
+      "text": "Recovery: escalate",
+      "source": "forge:b1ba5fa7-b537-45f8-a353-ffb9fdfcedcf",
+      "timestamp": "2026-02-14T15:24:23.404Z",
+      "entities": [],
+      "isPreStructured": true
+    }
+  ],
+  "lastLlmRunAt": null,
+  "lastDeterministicAt": "2026-02-14T15:24:23.404Z"
+}
