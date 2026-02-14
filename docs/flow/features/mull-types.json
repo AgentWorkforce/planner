@@ -1,0 +1,156 @@
+{
+  "feature_id": "mull-domain-types",
+  "title": "Core Type System & Schemas",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Define all core TypeScript types and Zod schemas for the mull pipeline. This is the contract surface — every pipeline stage, adapter, and consumer depends on these types. Three files: src/adapters/types.ts (adapter contract: SessionAdapter interface, SessionData, Message, SessionEvent, Decision, Retrospective, Artifact), src/types.ts (pipeline types: Entity, Fact, TopicMatch, FilteredExcerpt, Nugget, PreExtract, MergeResult, TopicFile, MullConfig), and src/realtime-types.ts (trigger types: EntityAccumulatorState). All types are Zod schemas with inferred TypeScript types.",
+    "acceptance_criteria": [
+      { "id": "mdt-ac1", "description": "SessionAdapter interface exported with loadSession(sessionId), listSessions(opts?: {after?, before?}), getCursor(sessionId), setCursor(sessionId, timestamp) methods" },
+      { "id": "mdt-ac2", "description": "SessionData schema: sessionId, source, startedAt, endedAt?, messages[], events[], decisions?, retrospective?, artifacts?" },
+      { "id": "mdt-ac3", "description": "Message schema: role (user|agent|system), agentName?, content, timestamp" },
+      { "id": "mdt-ac4", "description": "SessionEvent schema: type (tool_call|file_modified|error|status_transition|decision|message_sent|agent_spawned|chapter_start), description, timestamp, metadata?" },
+      { "id": "mdt-ac5", "description": "Decision schema: title, chosen, rejected?:string[], reasoning?, confidence?:number(0-1), timestamp, source?:string (marks pre-structured trail decisions with source='trail')" },
+      { "id": "mdt-ac6", "description": "Retrospective schema: summary, approach?, decisions?:RetrospectiveDecision[], challenges?, lessonsLearned?, suggestions?, confidence?:number(0-1)" },
+      { "id": "mdt-ac6b", "description": "RetrospectiveDecision schema: question, chosen, reasoning, linkedEventIds?:string[] — maps to forge's linked_event_ids for causal chain tracking" },
+      { "id": "mdt-ac7", "description": "Artifact schema: type (commit|file|pr|external), path?, reference?" },
+      { "id": "mdt-ac8", "description": "Entity schema: text, kind (topic|tech|filepath|function|proper_noun)" },
+      { "id": "mdt-ac9", "description": "Fact schema: type (tool_call|file_modified|error|status_transition|decision|retrospective), description, timestamp, metadata?, isPreStructured?:boolean (true for trail decisions with reasoning — bypass LLM)" },
+      { "id": "mdt-ac10", "description": "TopicMatch schema: topicSlug, confidence:number(0-1), isNew:boolean, matchedEntities:string[] (which entities matched)" },
+      { "id": "mdt-ac11", "description": "Nugget schema: slug, category (decision|constraint|pattern|gotcha|context), title, body (2-4 lines), topicSlug, sessionId, timestamp, caused?:string (slug of related nugget), tags:string[]" },
+      { "id": "mdt-ac12", "description": "PreExtract schema: sessionId, source, entities:Entity[], facts:Fact[], topicMatches:TopicMatch[], filteredTranscript:FilteredExcerpt[], existingTopics:{slug:string, sessionCount:number, tags:string[]}[]" },
+      { "id": "mdt-ac13", "description": "MergeResult schema: topicsUpdated:string[], topicsCreated:string[], nuggetsWritten:number" },
+      { "id": "mdt-ac14", "description": "FilteredExcerpt schema: messages:Message[] (the relevant exchange), anchorEvent?:string (what decision/event this excerpt surrounds), startTimestamp, endTimestamp, relevanceScore?:number(0-1)" },
+      { "id": "mdt-ac15", "description": "TopicFile schema: slug:string, frontmatter:{topic, updated, sessions:string[], tags:string[]}, sections:Record<NuggetCategory, Nugget[]> — parsed representation of a topic .md file" },
+      { "id": "mdt-ac16", "description": "MullConfig schema: memoryDir:string, adapters:AdapterConfig[], llm:{model, maxTokensIn, maxTokensOut, apiKey?}, extraction:{minEntitiesForLlm:number, categories:NuggetCategory[], topicMatchThreshold:number}" },
+      { "id": "mdt-ac17", "description": "AdapterConfig discriminated union: {type:'trajectory', trajectoriesDir, completedOnly} | {type:'relay', mode, logDir?} | {type:'transcript', path, format} | {type:'custom', adapter:SessionAdapter}" },
+      { "id": "mdt-ac18", "description": "EntityAccumulatorState schema: sessionId, entitiesSinceLastLlm:Entity[], factsSinceLastLlm:Fact[], lastLlmRunAt?:string, lastDeterministicAt?:string — for real-time trigger batching" },
+      { "id": "mdt-ac19", "description": "SessionRef discriminated union: {type:'sessionId', id:string} | {type:'planId', id:string} | {type:'runId', id:string} | {type:'channel', id:string} — unifies session identity across adapters" },
+      { "id": "mdt-ac20", "description": "LlmNuggetOutput schema: Zod schema for validating LLM response — array of {slug, category, title, body, topicSlug, caused?, tags[]}. Used for resilient parsing with .safeParse()" },
+      { "id": "mdt-ac21", "description": "All types exported from package root: import { SessionData, Nugget, ... } from '@plannr/mull'" },
+      { "id": "mdt-ac22", "description": "Zod schemas enable runtime validation of adapter output, LLM response parsing via .safeParse(), and config file validation" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Three type files: adapters/types.ts (external contract), types.ts (pipeline internals), realtime-types.ts (trigger state)",
+        "Zod over plain interfaces: enables runtime validation of adapter output (external data), LLM response parsing (.safeParse for resilience), and config file validation",
+        "SessionAdapter interface is the adapter contract — any custom adapter implements this",
+        "PreExtract is the stage boundary: everything before it is deterministic, everything after may use LLM",
+        "Nugget.caused is a slug string, not an ID — human-readable today, graph edge later (Tier 3)",
+        "FilteredExcerpt captures a window of messages around a decision point, with anchor event reference",
+        "Decision.source='trail' marks pre-structured decisions that bypass LLM — this is how the trail shortcut flows through the type system",
+        "Fact.isPreStructured=true marks facts that can become nuggets directly — consumed by llm-synthesis to skip LLM for those",
+        "SessionRef solves the plan_id vs run_id vs channel mapping problem — server plugin routes by discriminant",
+        "EntityAccumulatorState tracks real-time trigger batching state — persisted to .mull/ for server restart survival",
+        "LlmNuggetOutput is the validation schema for LLM responses — .safeParse() enables resilient parsing without crashing on format deviations",
+        "MullConfig matches spec section 7 exactly — includes minEntitiesForLlm and topicMatchThreshold",
+        "Retrospective expanded to match forge's rich format: approach, decisions[] with linkedEventIds, suggestions[]"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["mull"],
+    "steps": [
+      {
+        "step_id": "mdt-i001",
+        "title": "Create package scaffold",
+        "scope": "mull",
+        "description": "Create packages/mull/ directory, package.json (@plannr/mull), tsconfig.json. Add to root workspace references. Install dependencies: zod.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/mull/package.json exists with name @plannr/mull, main: dist/index.js, types: dist/index.d.ts" },
+          { "id": "ac2", "description": "packages/mull/tsconfig.json extends root config" },
+          { "id": "ac3", "description": "Root tsconfig.json references includes packages/mull" },
+          { "id": "ac4", "description": "npm install succeeds from root" }
+        ],
+        "specification": {
+          "architecture": {
+            "package_scope": "@plannr/mull",
+            "portability_constraint": "No imports from @plannr/planner, @plannr/forge-core, @plannr/storage-base, or any other monorepo package in core types"
+          }
+        }
+      },
+      {
+        "step_id": "mdt-i002",
+        "title": "Implement adapter type schemas",
+        "scope": "mull",
+        "description": "Create src/adapters/types.ts with Zod schemas: SessionDataSchema, MessageSchema, SessionEventSchema, DecisionSchema, RetrospectiveSchema, RetrospectiveDecisionSchema, ArtifactSchema. Define SessionAdapter interface (not Zod — it's a method contract, not data). Export inferred types.",
+        "dependencies": ["mdt-i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionAdapter interface has loadSession, listSessions, getCursor, setCursor methods with correct signatures" },
+          { "id": "ac2", "description": "SessionData parsed via SessionDataSchema.parse() validates all required and optional fields" },
+          { "id": "ac3", "description": "Decision.source field distinguishes trail decisions (source='trail') from LLM-inferred decisions" },
+          { "id": "ac4", "description": "Retrospective includes approach?, decisions?:RetrospectiveDecision[], suggestions? matching forge's rich format" },
+          { "id": "ac5", "description": "RetrospectiveDecision has linkedEventIds?:string[] for causal chain tracking" }
+        ]
+      },
+      {
+        "step_id": "mdt-i003",
+        "title": "Implement pipeline type schemas",
+        "scope": "mull",
+        "description": "Create src/types.ts with Zod schemas: EntitySchema, FactSchema (with isPreStructured flag), TopicMatchSchema (with matchedEntities), FilteredExcerptSchema (with messages, anchorEvent, timestamps), NuggetSchema, PreExtractSchema, MergeResultSchema, TopicFileSchema, LlmNuggetOutputSchema, MullConfigSchema, AdapterConfigSchema (discriminated union), SessionRefSchema (discriminated union).",
+        "dependencies": ["mdt-i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "FilteredExcerpt has: messages:Message[], anchorEvent?:string, startTimestamp:string, endTimestamp:string, relevanceScore?:number" },
+          { "id": "ac2", "description": "Fact.isPreStructured boolean flags trail decisions for LLM bypass" },
+          { "id": "ac3", "description": "TopicMatch.matchedEntities tracks which entities triggered the match" },
+          { "id": "ac4", "description": "LlmNuggetOutputSchema validates LLM response array — .safeParse() returns {success, data?, error?}" },
+          { "id": "ac5", "description": "MullConfig matches spec section 7: memoryDir, adapters[], llm{}, extraction{minEntitiesForLlm, categories, topicMatchThreshold}" },
+          { "id": "ac6", "description": "SessionRef discriminated union: sessionId | planId | runId | channel" },
+          { "id": "ac7", "description": "AdapterConfig discriminated union: trajectory | relay | transcript | custom" }
+        ]
+      },
+      {
+        "step_id": "mdt-i004",
+        "title": "Implement real-time trigger types",
+        "scope": "mull",
+        "description": "Create src/realtime-types.ts with EntityAccumulatorStateSchema. This is used by mull-realtime-triggers but defined here because it's a core data structure that needs Zod validation for persistence.",
+        "dependencies": ["mdt-i003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "EntityAccumulatorState has: sessionId, entitiesSinceLastLlm:Entity[], factsSinceLastLlm:Fact[], lastLlmRunAt?, lastDeterministicAt?" },
+          { "id": "ac2", "description": "Schema validates correctly when loaded from .mull/ persistence file" }
+        ]
+      },
+      {
+        "step_id": "mdt-i005",
+        "title": "Create package index with re-exports",
+        "scope": "mull",
+        "description": "Create src/index.ts that re-exports all public types from adapters/types.ts, types.ts, and realtime-types.ts. This is the package entry point — consumers import from '@plannr/mull'.",
+        "dependencies": ["mdt-i004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "import { SessionData, Nugget, PreExtract, MullConfig, SessionRef } from '@plannr/mull' works" },
+          { "id": "ac2", "description": "All Zod schemas and inferred types are exported" },
+          { "id": "ac3", "description": "SessionAdapter interface is exported" }
+        ]
+      },
+      {
+        "step_id": "mdt-i006",
+        "title": "Write type tests",
+        "scope": "mull",
+        "description": "Create src/__tests__/types.test.ts with Vitest. Validate all Zod schemas: valid data passes, invalid data fails with expected errors. Test discriminated unions (AdapterConfig, SessionRef). Test LlmNuggetOutput.safeParse with various LLM output formats including edge cases.",
+        "dependencies": ["mdt-i005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SessionData with all required fields passes validation" },
+          { "id": "ac2", "description": "SessionData with missing sessionId fails validation" },
+          { "id": "ac3", "description": "LlmNuggetOutput.safeParse handles: valid JSON array, missing fields (partial success), extra fields (stripped), malformed JSON (graceful error)" },
+          { "id": "ac4", "description": "AdapterConfig discriminated union routes correctly by type field" },
+          { "id": "ac5", "description": "SessionRef discriminated union routes correctly by type field" },
+          { "id": "ac6", "description": "FilteredExcerpt validates messages array with Message sub-schema" }
+        ]
+      }
+    ]
+  }
+}

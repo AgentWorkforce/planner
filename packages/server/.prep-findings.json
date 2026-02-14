@@ -1,0 +1,152 @@
+{
+  "task_id": "cultivate-server-mount",
+  "scope": "server",
+  "tier": "0/0",
+  "findings": {
+    "existing_patterns": {
+      "service_mounting_pattern": {
+        "location": "packages/server/src/server.ts:97-363",
+        "steps": [
+          "1. Import createService from @plannr/package-name",
+          "2. Call createService({ config }) - returns service object with router",
+          "3. Call service.initialize() - sets up storage/migrations",
+          "4. Mount router: app.use('/api/{domain}', service.router)",
+          "5. Add to graceful shutdown in shutdown() function"
+        ],
+        "examples": {
+          "planner": {
+            "import": "import { createPlannerService, type PlannerService } from '../../planner/src/index.js'",
+            "env_vars": ["DB_PATH"],
+            "create": "plannerService = createPlannerService({ dbPath: DB_PATH })",
+            "initialize": "plannerService.initialize()",
+            "mount": "app.use('/api', plannerService.router)",
+            "shutdown": "plannerService.shutdown()"
+          },
+          "ideation": {
+            "import": "import { createIdeationService, type IdeationService } from '../../ideation/src/index.js'",
+            "env_vars": ["IDEATION_DB_PATH"],
+            "create": "ideationService = createIdeationService({ dbPath: IDEATION_DB_PATH, plannerUrl, spawnAgent, reportStatus })",
+            "initialize": "await ideationService.initialize()",
+            "mount": "app.use('/api/ideation', ideationService.router)",
+            "shutdown": "await ideationService.shutdown()"
+          },
+          "forge": {
+            "import": "import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js'",
+            "env_vars": ["FORGE_DB_PATH", "FORGE_MODE"],
+            "create": "forgeService = createForgeService({ dbPath, mode, spawnTask, terminateAgent, spawnGateAgent, plannerUrl, repoRoot, worktreeBase })",
+            "initialize": "await forgeService.initialize()",
+            "mount": "app.use('/api/forge', forgeService.router)",
+            "shutdown": "forgeService.shutdown()"
+          },
+          "mull": {
+            "import": "import { createMullService, type MullService } from '../../mull/src/index.js'",
+            "env_vars": ["MULL_MEMORY_DIR"],
+            "create": "mullService = createMullService({ memoryDir: MULL_MEMORY_DIR })",
+            "initialize": "await mullService.initialize()",
+            "mount": "app.use('/api/mull', mullService.router)",
+            "shutdown": "mullService.shutdown()"
+          }
+        }
+      },
+      "env_var_declaration": {
+        "location": "packages/server/src/server.ts:77-81",
+        "pattern": "const VAR_NAME = process.env.VAR_NAME || path.resolve(__dirname, '../../../default-value')",
+        "examples": [
+          "const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../../planner.db')",
+          "const IDEATION_DB_PATH = process.env.IDEATION_DB_PATH || path.resolve(__dirname, '../../../ideation.db')",
+          "const FORGE_DB_PATH = process.env.FORGE_DB_PATH || path.resolve(__dirname, '../../../forge.db')",
+          "const MULL_MEMORY_DIR = process.env.MULL_MEMORY_DIR || path.resolve(__dirname, '../../../memory')"
+        ]
+      },
+      "service_variable_declaration": {
+        "location": "packages/server/src/server.ts:87-90",
+        "pattern": "let serviceName: ServiceType",
+        "note": "Declared at module level, assigned in start() function"
+      },
+      "graceful_shutdown": {
+        "location": "packages/server/src/server.ts:340-363",
+        "pattern": "Call service.shutdown() in the shutdown() function",
+        "existing_shutdowns": [
+          "plannerService.shutdown()",
+          "await ideationService.shutdown()",
+          "forgeService.shutdown()",
+          "mullService.shutdown()"
+        ]
+      },
+      "package_json_dependencies": {
+        "location": "packages/server/package.json:17-22",
+        "pattern": "Add internal package dependency without version (uses workspace)",
+        "note": "Currently no @plannr/ package dependencies listed - planner/ideation/forge imported via relative paths"
+      }
+    },
+    "cultivate_specific_requirements": {
+      "env_vars_needed": [
+        "CULTIVATE_DB_PATH - Database path (default: ../../../cultivate.db)",
+        "CULTIVATE_SECRET - Secret key for JWT signing",
+        "CULTIVATE_REDIS_URL - Redis connection URL (default: redis://localhost:6379)",
+        "CULTIVATE_EXTRACT_MODEL - Anthropic model for extraction (default: from tuner or config)",
+        "CULTIVATE_CLUSTER_MODEL - Anthropic model for clustering (default: from tuner or config)"
+      ],
+      "redis_requirement": {
+        "needed_for": "BullMQ job queues (6 queues for pipeline processing)",
+        "dev_sh_location": "scripts/dev.sh",
+        "action": "Verify Redis is installed and running before starting server",
+        "note": "BullMQ requires Redis - service will fail without it"
+      },
+      "integration_points": {
+        "sse_broadcaster": "SSEBroadcaster should be instantiated in startup and injected into cultivate service",
+        "tuner_integration": "Cultivate uses tuner for model selection (via CULTIVATE_EXTRACT_MODEL/CULTIVATE_CLUSTER_MODEL env vars)",
+        "storage": "SQLite via @plannr/storage-base, separate cultivate.db"
+      }
+    },
+    "architecture_notes": {
+      "relay_timing": "Most services initialized AFTER relay connection attempt (lines 138-215)",
+      "relay_dependency": "Ideation and forge depend on relay for spawning agents, cultivate does not",
+      "middleware_order": [
+        "1. cors()",
+        "2. express.json()",
+        "3. timeoutMiddleware",
+        "4. planChannelMiddleware (/api)",
+        "5. qaChannelMiddleware (/api)",
+        "6. serverRouter (/api) - MUST come BEFORE planner router",
+        "7. Service routers (planner, ideation, forge, mull, cultivate)",
+        "8. errorHandler (MUST be last)"
+      ],
+      "initialization_phases": {
+        "phase_1_sync": "planner (synchronous initialize())",
+        "phase_2_relay": "Relay connection attempt (non-blocking)",
+        "phase_3_async": "ideation, forge, mull (async initialize())",
+        "phase_4_wiring": "Adapters, triggers, lifecycle managers, channel management"
+      }
+    },
+    "implementation_checklist": {
+      "1_env_vars": "Add CULTIVATE_* env var declarations (lines 77-81 area)",
+      "2_service_var": "Add 'let cultivateService: CultivateService' declaration (line 87-90 area)",
+      "3_import": "Add import statement for createCultivateService from @plannr/cultivate",
+      "4_create_init": "Create and initialize service in start() function (after mull, before lifecycle manager)",
+      "5_mount": "Mount router at app.use('/api/cultivate', cultivateService.router)",
+      "6_shutdown": "Add cultivateService.shutdown() to shutdown() function",
+      "7_package_json": "Add '@plannr/cultivate': '*' to dependencies (if using workspace pattern)",
+      "8_dev_sh": "Verify Redis startup in scripts/dev.sh",
+      "9_console_log": "Add console.log for endpoints after server starts (follow existing pattern)",
+      "10_readme": "Update server README.md if exists (document new endpoints)"
+    },
+    "potential_issues": {
+      "redis_missing": "Service will fail if Redis is not running - ensure dev.sh handles this",
+      "sse_broadcaster_sharing": "SSEBroadcaster should be instantiated once and shared across services if needed",
+      "async_initialize": "Cultivate initialize() is likely async - use await like ideation/forge/mull",
+      "shutdown_order": "Order matters for graceful shutdown - cultivate should shutdown before relay destroyed",
+      "relative_imports": "Other services use relative imports (../../package/src), not workspace names - follow existing pattern"
+    }
+  },
+  "confidence": "high",
+  "blockers": [],
+  "recommendations": [
+    "Follow the existing service mounting pattern exactly - it's well-established",
+    "Initialize cultivate after mull but before lifecycle manager (no relay dependency)",
+    "Use relative imports like other services: '../../cultivate/src/index.js'",
+    "Ensure Redis is started in dev.sh before server starts",
+    "Add proper error handling if Redis connection fails during initialize()",
+    "Consider whether SSEBroadcaster needs to be shared with cultivate service"
+  ]
+}

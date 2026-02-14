@@ -1,0 +1,61 @@
+{
+  "sessionId": "b49b86ce-a305-4442-8fc6-09af13cd05e0",
+  "entitiesSinceLastLlm": [
+    {
+      "text": "Define CultivateStartupError with error codes",
+      "type": "concept",
+      "count": 1
+    },
+    {
+      "text": "Define SignalFilteredError and SignalProcessingError",
+      "type": "concept",
+      "count": 1
+    }
+  ],
+  "factsSinceLastLlm": [
+    {
+      "slug": "task-task_completed-a6b6c93f-c040-4b47-8e02-3d2a6b1294f5",
+      "text": "Define CultivateStartupError with error codes: Verified CultivateStartupError implementation. All acceptance criteria met: error codes defined (REDIS_UNAVAILABLE, SQLITE_INIT_FAILED, ML_MODEL_LOAD_FAILED, ANTHROPIC_UNAVAILABLE, plus additional codes), diagnostics object includes dependency/connectionInfo(sanitized)/retryAttempts, instanceof check works correctly. Static factory methods provided for all error codes. Implementation includes toJSON() for structured logging. Code follows TypeScript conventions with proper readonly properties and JSDoc comments.",
+      "source": "forge:b49b86ce-a305-4442-8fc6-09af13cd05e0",
+      "timestamp": "2026-02-13T23:25:42.197Z",
+      "entities": [
+        "Define CultivateStartupError with error codes"
+      ]
+    },
+    {
+      "slug": "recovery-c8e2c74c-c17d-49d7-9406-09efed8e6fa3",
+      "text": "Recovery: revise",
+      "source": "forge:b49b86ce-a305-4442-8fc6-09af13cd05e0",
+      "timestamp": "2026-02-13T23:50:13.275Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-2453a1da-d4ef-4ff2-bce4-00c2470430cb",
+      "text": "Recovery: escalate",
+      "source": "forge:b49b86ce-a305-4442-8fc6-09af13cd05e0",
+      "timestamp": "2026-02-14T09:02:06.962Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-7eba88f9-d340-46d4-9526-38325ac16e35",
+      "text": "Recovery: revise",
+      "source": "forge:b49b86ce-a305-4442-8fc6-09af13cd05e0",
+      "timestamp": "2026-02-14T09:02:07.164Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "task-task_completed-c653ed2f-52df-4444-8a0c-950e67a7521c",
+      "text": "Define SignalFilteredError and SignalProcessingError: Verified SignalFilteredError and SignalProcessingError implementations in packages/cultivate/src/errors.ts. All acceptance criteria met: filter_tier is 0|1|2 union type, rule_name defaults to empty string (populated for tier 1), pipeline_step and signal_id present for dead-letter tracking. No changes required.",
+      "source": "forge:b49b86ce-a305-4442-8fc6-09af13cd05e0",
+      "timestamp": "2026-02-14T09:03:56.932Z",
+      "entities": [
+        "Define SignalFilteredError and SignalProcessingError"
+      ]
+    }
+  ],
+  "lastLlmRunAt": null,
+  "lastDeterministicAt": "2026-02-14T09:03:56.934Z"
+}

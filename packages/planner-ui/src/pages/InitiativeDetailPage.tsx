@@ -179,6 +179,12 @@ export function InitiativeDetailPage() {
 
   const iconBgColor = initiative.color || '#00d9ff';
 
+  // Filter out child plans already shown inside a coordination plan
+  const childPlanIds = new Set(
+    plans.flatMap((p) => p.sub_plan_ids ?? [])
+  );
+  const visiblePlans = plans.filter((p) => !childPlanIds.has(p.plan_id));
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -258,7 +264,7 @@ export function InitiativeDetailPage() {
           {/* Header with title and action buttons */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-semibold text-text-primary">
-              Plans ({plans.length})
+              Plans ({visiblePlans.length})
             </h2>
             <div className="flex items-center gap-2">
               <Button
@@ -279,7 +285,7 @@ export function InitiativeDetailPage() {
             </div>
           </div>
 
-          {plans.length === 0 ? (
+          {visiblePlans.length === 0 ? (
             // Empty state - no plans
             <div className="flex flex-col items-center justify-center py-16 text-center border border-border-subtle rounded-xl bg-bg-card/50">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-bg-tertiary flex items-center justify-center">
@@ -295,7 +301,7 @@ export function InitiativeDetailPage() {
           ) : (
             // Plans grid
             <div className="space-y-2.5">
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <PlanCard key={plan.plan_id} plan={plan} />
               ))}
             </div>

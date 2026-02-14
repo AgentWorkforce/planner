@@ -16,8 +16,9 @@ export {
   submitVersion,
   approveVersion,
   publishVersion,
+  getResolvedPlan,
 } from './plans';
-export type { ListPlansParams } from './plans';
+export type { ListPlansParams, ResolvedStep, ResolvedStepEntry, ResolvedSubPlanEntry, ResolvedPlanResponse } from './plans';
 export { getExecutionStatus, createMockExecutionStatus } from './execution';
 export {
   sendChatMessage,

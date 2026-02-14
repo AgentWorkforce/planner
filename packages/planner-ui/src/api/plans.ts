@@ -101,3 +101,34 @@ export async function publishVersion(
     `/plans/${planId}/versions/${version}/publish`
   );
 }
+
+// Resolved plan (sub-plan steps expanded inline)
+
+export interface ResolvedStepEntry {
+  type: 'step';
+  step: Step;
+}
+
+export interface ResolvedSubPlanEntry {
+  type: 'sub_plan';
+  parent_step: Step;
+  sub_plan: {
+    plan_id: string;
+    goal: string;
+    status: string | null;
+    version: number | null;
+    steps: Step[];
+  };
+}
+
+export type ResolvedStep = ResolvedStepEntry | ResolvedSubPlanEntry;
+
+export interface ResolvedPlanResponse {
+  plan: Plan;
+  version: PlanVersion | null;
+  resolved_steps: ResolvedStep[];
+}
+
+export async function getResolvedPlan(planId: string): Promise<ResolvedPlanResponse> {
+  return get<ResolvedPlanResponse>(`/plans/${planId}/resolved`);
+}

@@ -11,7 +11,6 @@ import type { Router } from 'express';
 import { SQLiteIdeationStorage, type IdeationStorage } from './storage/index.js';
 import { createIdeationRouter } from './api/index.js';
 import { createHttpPlannerClient } from './api/planner-client.js';
-import { initInterviewer, stopInterviewer } from './interviewer/index.js';
 
 // =============================================================================
 // Plugin Interface (for mounting in planner backend)
@@ -22,6 +21,10 @@ export interface IdeationServiceConfig {
   dbPath?: string;
   /** Base URL of the planner API (enables send-to-planner) */
   plannerUrl?: string;
+  /** Specialist spawner callback (enables spawn_specialist MCP tool) */
+  spawnAgent?: (sessionId: string, name: string, focus: string, context?: string) => Promise<string>;
+  /** Report agent status callback (enables report_agent_status MCP tool) */
+  reportStatus?: (agentId: string, state: string, options?: { activity?: string; thought?: string }) => void;
 }
 
 export interface IdeationService {
@@ -56,19 +59,19 @@ export function createIdeationService(config: IdeationServiceConfig = {}): Ideat
     ? createHttpPlannerClient({ baseUrl: config.plannerUrl })
     : undefined;
 
-  const router = createIdeationRouter(
-    plannerClient ? { storage, plannerClient } : storage
-  );
+  const router = createIdeationRouter({
+    storage,
+    plannerClient,
+    spawnAgent: config.spawnAgent,
+    reportStatus: config.reportStatus,
+  });
 
   return {
     router,
     initialize: async () => {
       await storage.initialize();
-      // Start the Interviewer service with storage access
-      initInterviewer({ storage });
     },
     shutdown: async () => {
-      stopInterviewer();
       await storage.close();
     },
     getStorage: () => storage,
@@ -87,9 +90,6 @@ export * from './storage/index.js';
 
 // API Layer
 export * from './api/index.js';
-
-// Interviewer (Lead Agent)
-export * from './interviewer/index.js';
 
 // Specialists (Dynamic Agents)
 export * from './specialists/index.js';

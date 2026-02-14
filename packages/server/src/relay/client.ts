@@ -20,6 +20,27 @@ let client: RelayClient | null = null;
 let connectionState: ClientState = 'DISCONNECTED';
 let config: RelayConfig | null = null;
 
+/** Connection metrics for health monitoring and debugging */
+interface ConnectionMetrics {
+  connectCount: number;
+  disconnectCount: number;
+  lastConnectedAt: number | null;
+  lastDisconnectedAt: number | null;
+  lastError: string | null;
+  lastStateChangeAt: number;
+  currentStateDurationMs: number;
+}
+
+const metrics: ConnectionMetrics = {
+  connectCount: 0,
+  disconnectCount: 0,
+  lastConnectedAt: null,
+  lastDisconnectedAt: null,
+  lastError: null,
+  lastStateChangeAt: Date.now(),
+  currentStateDurationMs: 0,
+};
+
 const stateChangeListeners: Set<(state: ClientState) => void> = new Set();
 
 /** Message handler type */
@@ -85,12 +106,29 @@ export async function connect(): Promise<void> {
       connectionState = newState;
 
       if (oldState !== newState) {
-        console.log(`[relay] Connection state: ${oldState} -> ${newState}`);
+        const now = Date.now();
+        const prevDuration = now - metrics.lastStateChangeAt;
+        metrics.lastStateChangeAt = now;
+        metrics.currentStateDurationMs = 0;
+
+        if (newState === 'READY') {
+          metrics.connectCount++;
+          metrics.lastConnectedAt = now;
+          console.log(`[relay] Connection state: ${oldState} -> READY (was ${oldState} for ${(prevDuration / 1000).toFixed(1)}s, connects: ${metrics.connectCount})`);
+        } else if (newState === 'DISCONNECTED') {
+          metrics.disconnectCount++;
+          metrics.lastDisconnectedAt = now;
+          console.log(`[relay] Connection state: ${oldState} -> DISCONNECTED (was ${oldState} for ${(prevDuration / 1000).toFixed(1)}s, disconnects: ${metrics.disconnectCount})`);
+        } else {
+          console.log(`[relay] Connection state: ${oldState} -> ${newState}`);
+        }
+
         notifyStateChange(newState);
       }
     };
 
     client.onError = (error: Error) => {
+      metrics.lastError = error.message;
       console.error('[relay] Client error:', error.message);
     };
 
@@ -256,6 +294,10 @@ export interface SpawnAgentOptions {
   planId?: string;
   /** MCP server URL for agent tools (defaults to http://localhost:3001) */
   mcpServerUrl?: string;
+  /** Channels to pre-join the agent to after spawning */
+  channels?: string[];
+  /** Skip MCP context injection — forge agents use curl-based reporting, not relay */
+  skipMcpContext?: boolean;
 }
 
 /**
@@ -264,7 +306,7 @@ export interface SpawnAgentOptions {
  * use relay's listConnectedAgents(). This map tracks spawn metadata for
  * agents we spawned from this process.
  */
-const spawnedAgents: Map<string, { pid?: number; spawnedAt: Date }> = new Map();
+const spawnedAgents: Map<string, { pid?: number; spawnedAt: Date; channelId?: string }> = new Map();
 
 /**
  * Build MCP context instructions for spawned agents.
@@ -363,24 +405,30 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
   }
 
   try {
-    // Build task with MCP context
-    const mcpContext = buildMcpContext(options);
-    const taskWithContext = `${options.task}\n${mcpContext}`;
+    // Build task — skip MCP context for forge agents (they use curl, not relay)
+    const taskWithContext = options.skipMcpContext
+      ? options.task
+      : `${options.task}\n${buildMcpContext(options)}`;
 
-    const result = await client.spawn({
+    // SDK spawn(options, timeoutMs?) — timeout MUST be 2nd arg, not inside options
+    const SPAWN_TIMEOUT = 90_000;
+    const spawnOpts = {
       name: options.name,
       cli: options.cli || 'claude',
       task: taskWithContext,
       cwd: options.cwd,
       team: options.team,
-    });
+    };
+    const result = await client.spawn(spawnOpts, SPAWN_TIMEOUT);
 
     if (result.success) {
+      const channelId = options.planId ? `#plan-${options.planId}` : undefined;
       spawnedAgents.set(options.name, {
         pid: result.pid,
         spawnedAt: new Date(),
+        channelId,
       });
-      console.log(`[relay] Spawned agent ${options.name} with PID ${result.pid}`);
+      console.log(`[relay] Spawned agent ${options.name} with PID ${result.pid}${channelId ? ` (channel: ${channelId})` : ''}`);
 
       // Pre-join agent to plan channel for immediate communication
       if (options.planId) {
@@ -390,6 +438,18 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
           console.log(`[relay] Pre-joined ${options.name} to ${channel}`);
         } else {
           console.warn(`[relay] Failed to pre-join ${options.name} to ${channel}`);
+        }
+      }
+
+      // Pre-join agent to additional channels
+      if (options.channels) {
+        for (const channel of options.channels) {
+          const joined = client.adminJoinChannel(channel, options.name);
+          if (joined) {
+            console.log(`[relay] Pre-joined ${options.name} to ${channel}`);
+          } else {
+            console.warn(`[relay] Failed to pre-join ${options.name} to ${channel}`);
+          }
         }
       }
     } else {
@@ -430,6 +490,17 @@ export async function releaseAgent(name: string): Promise<ReleaseResultPayload> 
       // Emit agent_left so UI knows agent is gone
       emitAgentLeft(name, 'released');
       console.log(`[relay] Released agent ${name}`);
+
+      // Deregister from relay registry to prevent agents.json bloat.
+      // Without this, every spawned agent stays in agents.json forever,
+      // causing CPU spiral as the daemon iterates over hundreds of stale entries.
+      try {
+        await client.removeAgent(name, { removeMessages: true });
+        console.log(`[relay] Deregistered agent ${name} from registry`);
+      } catch (removeErr) {
+        // Non-fatal — agent is already terminated, registry cleanup is best-effort
+        console.warn(`[relay] Failed to deregister agent ${name}: ${removeErr instanceof Error ? removeErr.message : removeErr}`);
+      }
     } else {
       console.error(`[relay] Failed to release agent ${name}: ${result.error}`);
     }
@@ -462,6 +533,24 @@ export function getSpawnedAgents(): Array<{ name: string; pid?: number; spawnedA
  */
 export function isAgentSpawned(name: string): boolean {
   return spawnedAgents.has(name);
+}
+
+/**
+ * Get the plan channel associated with a spawned agent.
+ * Returns undefined if the agent wasn't spawned with a plan context.
+ */
+export function getSpawnedAgentChannel(name: string): string | undefined {
+  return spawnedAgents.get(name)?.channelId;
+}
+
+/**
+ * Get relay connection metrics for health monitoring.
+ */
+export function getConnectionMetrics(): ConnectionMetrics {
+  return {
+    ...metrics,
+    currentStateDurationMs: Date.now() - metrics.lastStateChangeAt,
+  };
 }
 
 // Re-export types

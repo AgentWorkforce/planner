@@ -1,0 +1,186 @@
+{
+  "feature_id": "forge-build-coordinator",
+  "title": "Build Coordinator Service",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "component": "forge-core",
+  "parent": "forge-builds",
+  "dependencies": ["forge-build-domain", "forge-build-storage"],
+
+  "summary": {
+    "goal": "Implement the tier-based execution coordinator that advances a build through its tiers, creating and monitoring Forge runs, handling failures, and supporting pause/resume/cancel at the build level.",
+    "acceptance_criteria": [
+      { "id": "fbc-ac1", "description": "startBuild() begins execution: fetches tier 0 plans from Planner, creates runs, transitions build to 'running'" },
+      { "id": "fbc-ac2", "description": "Each plan is fetched via PlannerClient.fetchPlanVersion() and transformed via transformToForgePlan() before run creation" },
+      { "id": "fbc-ac3", "description": "Within a tier, up to concurrency_limit runs execute in parallel" },
+      { "id": "fbc-ac4", "description": "When all runs in a tier complete successfully, the coordinator advances to the next tier" },
+      { "id": "fbc-ac5", "description": "When a run fails in tier N: dependent tiers are blocked, sibling runs in tier N continue, build status becomes 'failed' once tier settles" },
+      { "id": "fbc-ac6", "description": "When skip_completed=true, plans with a recent successful run are marked as 'skipped' in build_runs and not re-executed" },
+      { "id": "fbc-ac7", "description": "pauseBuild() pauses all in-progress runs and stops scheduling new ones" },
+      { "id": "fbc-ac8", "description": "resumeBuild() resumes paused runs and continues tier progression" },
+      { "id": "fbc-ac9", "description": "cancelBuild() cancels all in-progress and pending runs" },
+      { "id": "fbc-ac10", "description": "Build completes when all tiers are done (or when blocked by failure with no more actionable tiers)" },
+      { "id": "fbc-ac11", "description": "Coordinator survives server restart: on startup, resumes any builds in 'running' state" },
+      { "id": "fbc-ac12", "description": "Works with both test mode and real mode — mode is passed to each run" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The coordinator monitors runs by polling (like the existing orchestrator monitors tasks)",
+        "Run completion detection: poll build_runs statuses, compare against expected counts per tier",
+        "The coordinator does NOT use sub_plan_id — it creates independent top-level runs",
+        "Each run goes through the normal Forge execution pipeline (orchestrator or test executor)",
+        "The coordinator is a service instantiated in createForgeService(), similar to how the orchestrator is created",
+        "Server restart recovery: query for builds with status='running', resume monitoring"
+      ],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "execution_loop": "1. Start tier 0 → create runs (up to concurrency limit) → 2. Monitor runs (poll interval) → 3. Run completes: update build_run status → 4. All tier N runs done? → advance to tier N+1 → repeat → 5. All tiers done? → finalize build",
+      "failure_model": "Run failure in tier N → mark build_run as failed → continue sibling runs → when tier settles: if any failed, block higher tiers, set build status to 'failed'. User can retry failed tier or cancel.",
+      "concurrency": "Per-build concurrency_limit (default 5). Within a tier, schedule up to limit runs. As runs complete, schedule more from the same tier if available."
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fbc-i001",
+        "title": "Implement BuildCoordinator class with config and state tracking",
+        "scope": "forge-core",
+        "description": "Create the BuildCoordinator class with constructor accepting config (storage, plannerClient, scheduleReadyTasks, forgeConfig), internal state maps for tracking active builds, and the public API surface.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BuildCoordinatorConfig interface: { storage: ForgeStorage, plannerClient: PlannerClient, scheduleReadyTasks: (runId: string) => void, forgeConfig: ForgeConfig, pollIntervalMs?: number (default 3000) }" },
+          { "id": "ac2", "description": "BuildCoordinator extends EventEmitter. Private state: activeBuildLoops Map<buildId, boolean>, storage, plannerClient, scheduleReadyTasks, forgeConfig, pollIntervalMs" },
+          { "id": "ac3", "description": "Public methods declared: startBuild(buildId), pauseBuild(buildId), resumeBuild(buildId), cancelBuild(buildId), recoverActiveBuilds(), shutdown()" },
+          { "id": "ac4", "description": "Typed event emission: this.emit(eventType, { buildId, data }) for build lifecycle events. Event types: build_started, tier_started, run_started, run_completed, run_failed, tier_completed, build_completed, build_failed, build_paused, build_cancelled" },
+          { "id": "ac5", "description": "subscribeToBuild(buildId, listener) and unsubscribeFromBuild(buildId, listener) convenience methods that filter events by buildId" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/forge-core/src/services/build-coordinator.ts",
+            "pattern": "Class-based service extending EventEmitter (from 'events'). Config injection via constructor. State tracking with Maps. Async execution loops. Emits typed events for SSE consumption."
+          }
+        }
+      },
+      {
+        "step_id": "fbc-i002",
+        "title": "Implement startBuild() with tier 0 execution",
+        "scope": "forge-core",
+        "description": "Implement startBuild that transitions build to 'running', resolves tier 0 plans, creates runs and build_runs, schedules execution, and starts the monitoring loop.",
+        "dependencies": ["fbc-i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Transitions build status from 'pending' to 'running'" },
+          { "id": "ac2", "description": "Reads tier 0 plan_ids from build.tiers" },
+          { "id": "ac3", "description": "For each plan_id: fetches plan via plannerClient.fetchPlanVersion(planId), transforms via transformToForgePlan(planVersion, forgeConfig)" },
+          { "id": "ac4", "description": "If skip_completed=true and getRecentSuccessfulRun(planId) returns a run, marks build_run as 'skipped' instead of creating a new run" },
+          { "id": "ac5", "description": "Creates Run via createRun(forgePlan), saves to storage, creates BuildRun linking build_id→run_id" },
+          { "id": "ac6", "description": "Calls scheduleReadyTasks(runId) for each created run (respecting concurrency_limit)" },
+          { "id": "ac7", "description": "Kicks off the async monitorBuildLoop(buildId)" }
+        ],
+        "specification": {
+          "architecture": {
+            "concurrency_model": "Track in-flight run count. Schedule up to concurrency_limit runs. When a run completes in the monitor loop, schedule next available run from same tier.",
+            "error_handling": "If plannerClient.fetchPlanVersion fails for a plan, mark that build_run as 'failed' with error, continue with remaining plans in tier."
+          }
+        }
+      },
+      {
+        "step_id": "fbc-i003",
+        "title": "Implement monitorBuildLoop() for tier progression",
+        "scope": "forge-core",
+        "description": "Implement the async polling loop that monitors run completions, advances tiers, and finalizes the build.",
+        "dependencies": ["fbc-i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Polls every pollIntervalMs while activeBuildLoops.get(buildId) is true" },
+          { "id": "ac2", "description": "For current tier: reads all build_runs, checks each run's status from storage.getRun(runId), syncs build_run status" },
+          { "id": "ac3", "description": "When a run completes: updates build_run to 'completed', if under concurrency_limit schedules next unstarted run in same tier" },
+          { "id": "ac4", "description": "When a run fails: updates build_run to 'failed'" },
+          { "id": "ac5", "description": "When all build_runs in tier are terminal (completed/failed/skipped): if all succeeded/skipped, emit 'tier_completed' event, start next tier via startTier(buildId, tierNum+1). If any failed, emit 'build_failed' event, set build status to 'failed' and stop." },
+          { "id": "ac6", "description": "When all tiers done: set build status to 'completed', set completed_at, emit 'build_completed' event" },
+          { "id": "ac7", "description": "Stall detection: if no progress for 100 iterations, log warning" },
+          { "id": "ac8", "description": "Emit events at each state change: 'run_started' when scheduling, 'run_completed'/'run_failed' on status sync, 'tier_started' when advancing tiers" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Same while(true) + delay pattern as orchestrator.executeRun(). Check activeBuildLoops map for early exit on pause/cancel.",
+            "tier_advancement": "startTier() is reusable — same logic as the tier 0 path in startBuild but for tier N. Extract shared helper: executeTier(buildId, tierNum)."
+          }
+        }
+      },
+      {
+        "step_id": "fbc-i004",
+        "title": "Implement pause, resume, cancel build operations",
+        "scope": "forge-core",
+        "description": "Implement the three control operations that modify build state and propagate to child runs.",
+        "dependencies": ["fbc-i003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "pauseBuild(): sets activeBuildLoops.set(buildId, false) to stop monitoring, pauses all running runs via storage.updateRunStatus(runId, 'paused'), updates build status to 'paused', emits 'build_paused' event" },
+          { "id": "ac2", "description": "resumeBuild(): transitions build back to 'running', resumes paused runs, restarts monitorBuildLoop(), emits 'build_started' event (resume)" },
+          { "id": "ac3", "description": "cancelBuild(): stops monitoring loop, cancels all non-terminal runs via storage.updateRunStatus(runId, 'cancelled'), sets all pending build_runs to 'failed', updates build status to 'cancelled', emits 'build_cancelled' event" },
+          { "id": "ac4", "description": "All three validate state transitions before acting (e.g., can't pause a completed build)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Each operation: validate transition → update build status → propagate to child runs → manage monitoring loop"
+          }
+        }
+      },
+      {
+        "step_id": "fbc-i005",
+        "title": "Implement server restart recovery",
+        "scope": "forge-core",
+        "description": "Add recoverActiveBuilds() that finds builds in 'running' state on startup and resumes their monitoring loops.",
+        "dependencies": ["fbc-i003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "recoverActiveBuilds(): queries listBuilds({ status: 'running' }), for each starts monitorBuildLoop(buildId)" },
+          { "id": "ac2", "description": "Monitor loop picks up where it left off — reads current tier state from build_runs, continues from first incomplete tier" },
+          { "id": "ac3", "description": "Logs recovery actions: '[BuildCoordinator] Recovering N active builds'" }
+        ],
+        "specification": {
+          "architecture": {
+            "invocation": "Called from createForgeService() after storage initialization, before router creation"
+          }
+        }
+      },
+      {
+        "step_id": "fbc-i006",
+        "title": "Wire BuildCoordinator into createForgeService()",
+        "scope": "forge-core",
+        "description": "Instantiate BuildCoordinator in createForgeService() and expose it for the build API handlers. Add shutdown hook.",
+        "dependencies": ["fbc-i005"],
+        "owner_role": "backend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BuildCoordinator instantiated with { storage, plannerClient, scheduleReadyTasks, forgeConfig } in createForgeService()" },
+          { "id": "ac2", "description": "recoverActiveBuilds() called during initialization" },
+          { "id": "ac3", "description": "coordinator.shutdown() called in service shutdown hook" },
+          { "id": "ac4", "description": "BuildCoordinator passed to createForgeRouter() via ForgeRouterDeps" },
+          { "id": "ac5", "description": "Created in both real and test mode — plannerClient is always created (it fetches plans to create runs regardless of execution mode). In test mode, scheduleReadyTasks comes from testExecutor; in real mode from orchestrator." }
+        ],
+        "specification": {
+          "architecture": {
+            "files": [
+              "packages/forge-core/src/index.ts",
+              "packages/forge-core/src/api/routes.ts"
+            ],
+            "pattern": "Same wiring pattern as existing orchestrator — created in factory, passed to router via deps"
+          }
+        }
+      }
+    ]
+  }
+}

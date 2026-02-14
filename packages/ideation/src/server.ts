@@ -8,7 +8,6 @@ import express from 'express';
 import cors from 'cors';
 import { createIdeationRouter } from './api/index.js';
 import { SQLiteIdeationStorage } from './storage/index.js';
-import { initNavigator } from './navigator/index.js';
 import { initTunerIntegration, stopTunerIntegration } from './tuner/index.js';
 
 const PORT = process.env.IDEATION_PORT || 3001;
@@ -25,14 +24,6 @@ async function main() {
     console.log('[Ideation Server] Tuner integration initialized');
   } catch (error) {
     console.warn('[Ideation Server] Tuner not available:', error instanceof Error ? error.message : error);
-  }
-
-  // Initialize Navigator service
-  try {
-    initNavigator({ storage });
-    console.log('[Ideation Server] Navigator service initialized');
-  } catch (error) {
-    console.warn('[Ideation Server] Navigator not available:', error instanceof Error ? error.message : error);
   }
 
   // Create Express app

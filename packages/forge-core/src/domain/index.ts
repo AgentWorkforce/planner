@@ -164,6 +164,11 @@ export {
   type DecisionRecordedPayload,
   CheckpointCreatedPayloadSchema,
   type CheckpointCreatedPayload,
+  // AC Audit event payloads
+  RunAcAuditStartedPayloadSchema,
+  type RunAcAuditStartedPayload,
+  RunAcAuditCompletedPayloadSchema,
+  type RunAcAuditCompletedPayload,
 } from './trajectory-events.js';
 
 // User trajectory types and schemas
@@ -230,3 +235,26 @@ export {
   isRetrospectiveParseError,
   isRetrospectiveValidationError,
 } from './retrospective.js';
+
+// Build domain types and schemas
+export {
+  BuildStatus,
+  BuildStatusSchema,
+  BuildRunStatus,
+  BuildRunStatusSchema,
+  VALID_BUILD_TRANSITIONS,
+  validateBuildTransition,
+  ForgeExecutionModeSchema,
+  BuildTierSchema,
+  type BuildTier,
+  BuildRequestSchema,
+  type BuildRequest,
+  BuildSchema,
+  type Build,
+  BuildRunSchema,
+  type BuildRun,
+  // Build factory functions
+  createBuild,
+  createBuildRun,
+  type CreateBuildRunOptions,
+} from './build-types.js';

@@ -20,6 +20,8 @@ export const CreatePlanRequestSchema = z.object({
   understanding: UnderstandingSchema.optional(),
   /** DOT Framework: Decomposition limits and thresholds */
   decomposition_config: DecompositionConfigSchema.optional(),
+  /** Steps to include in the initial version (e.g. from graduated blocks) */
+  steps: z.array(StepSchema).optional(),
 });
 
 export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;
@@ -94,6 +96,84 @@ export const CreateVersionRequestSchema = z.object({
   steps: z.array(StepSchema).optional(),
   /** DOT Framework: Decomposition limits and thresholds */
   decomposition_config: DecompositionConfigSchema.optional(),
+  /** Understanding from ideation session */
+  understanding: UnderstandingSchema.optional(),
 });
 
 export type CreateVersionRequest = z.infer<typeof CreateVersionRequestSchema>;
+
+/**
+ * Project config schema for scopes and execution policies.
+ */
+export const ProjectConfigSchema = z.object({
+  scopes: z.object({
+    workspace_path: z.string().optional(),
+    remote_url: z.string().optional(),
+    default_branch: z.string().optional(),
+  }).optional(),
+  execution_policy: z.object({
+    max_concurrent: z.number().int().positive().optional(),
+    timeout: z.number().positive().optional(),
+    retries: z.number().int().min(0).optional(),
+    budget: z.number().positive().optional(),
+  }).optional(),
+}).optional();
+
+export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
+
+/**
+ * Request schema for creating a new project.
+ */
+export const CreateProjectRequestSchema = z.object({
+  name: z.string().min(1).max(200),
+  owner_id: z.string().optional(),
+  initiative_id: z.string().optional(),
+  config: ProjectConfigSchema,
+});
+
+export type CreateProjectRequest = z.infer<typeof CreateProjectRequestSchema>;
+
+/**
+ * Request schema for updating a project.
+ */
+export const UpdateProjectRequestSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  owner_id: z.string().nullable().optional(),
+  initiative_id: z.string().nullable().optional(),
+  session_id: z.string().nullable().optional(),
+  plan_id: z.string().nullable().optional(),
+  run_id: z.string().nullable().optional(),
+  config: ProjectConfigSchema,
+});
+
+export type UpdateProjectRequest = z.infer<typeof UpdateProjectRequestSchema>;
+
+/**
+ * Request schema for updating project focus.
+ */
+export const UpdateProjectFocusSchema = z.object({
+  current_focus: z.any(),
+});
+
+export type UpdateProjectFocus = z.infer<typeof UpdateProjectFocusSchema>;
+
+/**
+ * Query schema for listing projects.
+ */
+export const ListProjectsQuerySchema = z.object({
+  owner_id: z.string().optional(),
+  initiative_id: z.string().optional(),
+  session_id: z.string().optional(),
+});
+
+export type ListProjectsQuery = z.infer<typeof ListProjectsQuerySchema>;
+
+/**
+ * Request schema for project graduation.
+ */
+export const GraduateProjectRequestSchema = z.object({
+  target: z.enum(['ideation', 'planning', 'forging']),
+  options: z.record(z.unknown()).optional(),
+});
+
+export type GraduateProjectRequest = z.infer<typeof GraduateProjectRequestSchema>;

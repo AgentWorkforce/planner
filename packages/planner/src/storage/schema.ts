@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS versions (
   status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'published')),
   summary_json TEXT NOT NULL,
   understanding_json TEXT NOT NULL DEFAULT '{}',
+  context_json TEXT NOT NULL DEFAULT '{}',
   submitted_at TEXT,
   approval_info_json TEXT,
   change_request_id TEXT,
@@ -410,6 +411,49 @@ CREATE TABLE IF NOT EXISTS org_members (
 `;
 
 /**
+ * SQL to create the projects table.
+ * Projects link ideation sessions, plans, and forge runs into a unified entity.
+ */
+export const CREATE_PROJECTS_TABLE = `
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  owner_id TEXT,
+  initiative_id TEXT,
+  session_id TEXT,
+  plan_id TEXT,
+  run_id TEXT,
+  config TEXT,
+  current_focus TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (initiative_id) REFERENCES initiatives(initiative_id) ON DELETE SET NULL,
+  FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE SET NULL
+)
+`;
+
+/**
+ * Index for faster lookups by initiative_id on projects table.
+ */
+export const CREATE_PROJECTS_INITIATIVE_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_projects_initiative ON projects(initiative_id)
+`;
+
+/**
+ * Index for faster lookups by session_id on projects table.
+ */
+export const CREATE_PROJECTS_SESSION_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_projects_session ON projects(session_id)
+`;
+
+/**
+ * Index for faster lookups by plan_id on projects table.
+ */
+export const CREATE_PROJECTS_PLAN_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_projects_plan ON projects(plan_id)
+`;
+
+/**
  * All schema creation statements in order.
  */
 export const ALL_SCHEMA_STATEMENTS = [
@@ -451,4 +495,9 @@ export const ALL_SCHEMA_STATEMENTS = [
   CREATE_TRAJECTORY_EVENTS_PLAN_INDEX,
   CREATE_TRAJECTORY_EVENTS_AGENT_INDEX,
   CREATE_TRAJECTORY_EVENTS_TIMESTAMP_INDEX,
+  // Projects table
+  CREATE_PROJECTS_TABLE,
+  CREATE_PROJECTS_INITIATIVE_INDEX,
+  CREATE_PROJECTS_SESSION_INDEX,
+  CREATE_PROJECTS_PLAN_INDEX,
 ];

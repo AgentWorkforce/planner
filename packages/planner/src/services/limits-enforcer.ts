@@ -1,5 +1,6 @@
 import type { PlanVersion } from '../domain/plan.js';
 import type { Step } from '../domain/step.js';
+import type { PlanStorage as FullPlanStorage } from '../storage/interface.js';
 import {
   DecompositionConfig,
   DEFAULT_DECOMPOSITION_CONFIG,
@@ -31,17 +32,11 @@ export interface DepthValidationResult {
   error?: string;
 }
 
-// ============================================
-// Storage Interface (for depth validation)
-// ============================================
-
 /**
- * Minimal storage interface for depth validation.
- * Only requires the ability to fetch a plan version.
+ * Minimal storage interface for sub-plan validation.
+ * Uses getLatestVersion to resolve sub_plan_id references.
  */
-export interface PlanStorage {
-  getPlanVersion(planId: string, version?: number): Promise<PlanVersion | null>;
-}
+export type PlanStorage = Pick<FullPlanStorage, 'getLatestVersion' | 'getPlan'>;
 
 // ============================================
 // Step Count Validation
@@ -126,6 +121,92 @@ export function validatePlanLimits(
 // ============================================
 
 /**
+ * Validates that all sub_plan_id references in a plan's steps point to
+ * existing plans in the database.
+ *
+ * Returns errors for missing references, warnings for sub-plans
+ * that aren't yet approved/published.
+ */
+export function validateSubPlanReferences(
+  planVersion: PlanVersion,
+  storage: PlanStorage
+): LimitsValidationResult {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  const stepsWithSubPlans = planVersion.steps.filter((s) => s.sub_plan_id);
+  if (stepsWithSubPlans.length === 0) {
+    return { valid: true, warnings, errors };
+  }
+
+  for (const step of stepsWithSubPlans) {
+    const subPlanId = step.sub_plan_id!;
+    const subPlan = storage.getPlan(subPlanId);
+
+    if (!subPlan) {
+      errors.push(
+        `Step '${step.step_id}' references sub-plan '${subPlanId}' which does not exist`
+      );
+      continue;
+    }
+
+    const subVersion = storage.getLatestVersion(subPlanId);
+    if (!subVersion) {
+      warnings.push(
+        `Step '${step.step_id}' references sub-plan '${subPlanId}' which has no versions`
+      );
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    warnings,
+    errors,
+  };
+}
+
+/**
+ * Checks whether all sub-plans referenced by a plan are published.
+ * Used as a hard gate before publishing a parent plan.
+ */
+export function validateSubPlansPublished(
+  planVersion: PlanVersion,
+  storage: PlanStorage
+): LimitsValidationResult {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  const stepsWithSubPlans = planVersion.steps.filter((s) => s.sub_plan_id);
+  if (stepsWithSubPlans.length === 0) {
+    return { valid: true, warnings, errors };
+  }
+
+  for (const step of stepsWithSubPlans) {
+    const subPlanId = step.sub_plan_id!;
+    const subVersion = storage.getLatestVersion(subPlanId);
+
+    if (!subVersion) {
+      errors.push(
+        `Step '${step.step_id}': sub-plan '${subPlanId}' has no versions — cannot publish`
+      );
+      continue;
+    }
+
+    if (subVersion.status !== 'published') {
+      errors.push(
+        `Step '${step.step_id}': sub-plan '${subPlanId}' is '${subVersion.status}' — must be published first`
+      );
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    warnings,
+    errors,
+  };
+}
+
+/**
  * Validates sub-plan depth by traversing sub_plan_id references.
  *
  * Returns error if:
@@ -134,11 +215,11 @@ export function validatePlanLimits(
  *
  * Requires storage access to fetch sub-plans.
  */
-export async function validateSubPlanDepth(
+export function validateSubPlanDepth(
   planId: string,
   storage: PlanStorage,
   maxDepth?: number
-): Promise<DepthValidationResult> {
+): DepthValidationResult {
   const effectiveMaxDepth = maxDepth ?? DEFAULT_DECOMPOSITION_CONFIG.max_depth;
   const visited = new Set<string>();
   const path: string[] = [planId];
@@ -160,8 +241,8 @@ export async function validateSubPlanDepth(
 
     visited.add(currentPlanId);
 
-    // Fetch the plan version
-    const planVersion = await storage.getPlanVersion(currentPlanId);
+    // Fetch the latest version of this plan
+    const planVersion = storage.getLatestVersion(currentPlanId);
     if (!planVersion) {
       // Plan doesn't exist yet or was deleted - not an error
       break;
@@ -179,7 +260,7 @@ export async function validateSubPlanDepth(
 
     // For simplicity, we follow the first sub-plan reference
     // A more comprehensive check would validate all paths
-    currentPlanId = subPlanIds[0];
+    currentPlanId = subPlanIds[0]!;
     path.push(currentPlanId);
     depth++;
   }
@@ -207,11 +288,11 @@ export async function validateSubPlanDepth(
  * Validates all sub-plan depths in a plan.
  * Checks each step with sub_plan_id.
  */
-export async function validateAllSubPlanDepths(
+export function validateAllSubPlanDepths(
   planVersion: PlanVersion,
   storage: PlanStorage,
   config?: DecompositionConfig | PlannerConfig
-): Promise<LimitsValidationResult> {
+): LimitsValidationResult {
   const decomp = getDecompositionConfig(planVersion, config);
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -231,7 +312,7 @@ export async function validateAllSubPlanDepths(
 
   // Validate depth for each sub-plan reference
   for (const step of stepsWithSubPlans) {
-    const result = await validateSubPlanDepth(
+    const result = validateSubPlanDepth(
       step.sub_plan_id!,
       storage,
       decomp.max_depth
@@ -256,13 +337,13 @@ export async function validateAllSubPlanDepths(
 // ============================================
 
 /**
- * Performs full limits validation including step counts and depth.
+ * Performs full limits validation including step counts, depth, and references.
  */
-export async function validateAllLimits(
+export function validateAllLimits(
   planVersion: PlanVersion,
   storage: PlanStorage,
   config?: DecompositionConfig | PlannerConfig
-): Promise<LimitsValidationResult> {
+): LimitsValidationResult {
   const warnings: string[] = [];
   const errors: string[] = [];
 
@@ -271,10 +352,17 @@ export async function validateAllLimits(
   warnings.push(...stepLimitsResult.warnings);
   errors.push(...stepLimitsResult.errors);
 
-  // Validate sub-plan depths
-  const depthResult = await validateAllSubPlanDepths(planVersion, storage, config);
-  warnings.push(...depthResult.warnings);
-  errors.push(...depthResult.errors);
+  // Validate sub-plan references exist
+  const refResult = validateSubPlanReferences(planVersion, storage);
+  warnings.push(...refResult.warnings);
+  errors.push(...refResult.errors);
+
+  // Validate sub-plan depths (only if references are valid)
+  if (refResult.valid) {
+    const depthResult = validateAllSubPlanDepths(planVersion, storage, config);
+    warnings.push(...depthResult.warnings);
+    errors.push(...depthResult.errors);
+  }
 
   return {
     valid: errors.length === 0,

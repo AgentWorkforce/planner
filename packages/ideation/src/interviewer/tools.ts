@@ -1,17 +1,22 @@
 /**
  * Interviewer Tools
  *
- * Anthropic tool definitions for Interviewer capabilities.
+ * Tool definitions for Interviewer capabilities.
  * Tools enable lazy specialist spawning and session management.
  */
 
-import type Anthropic from '@anthropic-ai/sdk';
+/** Tool definition compatible with Anthropic Messages API format. */
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
 
 // =============================================================================
 // Tool Definitions
 // =============================================================================
 
-export const INTERVIEWER_TOOLS: Anthropic.Tool[] = [
+export const INTERVIEWER_TOOLS: ToolDefinition[] = [
   {
     name: 'start_session',
     description: 'Create a new brainstorming session. Returns session_id. Does NOT auto-spawn specialists - spawn them lazily as needed.',
@@ -45,29 +50,6 @@ export const INTERVIEWER_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: 'add_message',
-    description: 'Add a message to the session transcript. Use this to record the conversation.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        session_id: {
-          type: 'string',
-          description: 'The session ID',
-        },
-        role: {
-          type: 'string',
-          enum: ['user', 'assistant'],
-          description: 'Who sent the message',
-        },
-        content: {
-          type: 'string',
-          description: 'The message content',
-        },
-      },
-      required: ['session_id', 'role', 'content'],
-    },
-  },
-  {
     name: 'update_understanding',
     description: 'Update specialist observations. Called when specialists report insights. Structure is freeform.',
     input_schema: {
@@ -91,7 +73,7 @@ export const INTERVIEWER_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'send_to_planner',
-    description: 'Send the current understanding to the planner to create a structured plan. Use when the user is ready to move forward.',
+    description: 'Send raw session understanding to the planner. ONLY use this when there are NO curated blocks. If curated blocks exist, use graduate_blocks instead — it produces much better structured plans.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -168,6 +150,97 @@ export const INTERVIEWER_TOOLS: Anthropic.Tool[] = [
       required: ['session_id', 'idea_summary', 'specialist_perspectives'],
     },
   },
+  {
+    name: 'list_blocks',
+    description: 'List all blocks in the session with their status and confidence. Use when the user asks about blocks, or when you need block IDs for graduation.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID',
+        },
+      },
+      required: ['session_id'],
+    },
+  },
+  {
+    name: 'graduate_blocks',
+    description: 'Graduate curated blocks into structured plan steps. This is the PREFERRED way to send work to the planner — always use this instead of send_to_planner when curated blocks exist. Converts validated specialist-reviewed blocks into concrete plan steps. NOTE: Each block can only be graduated once. Already-graduated blocks will be rejected — to update them after graduation, send changes as a message to the PlannerLead instead.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID',
+        },
+        block_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional. IDs of specific blocks to graduate. If omitted, all curated blocks are graduated.',
+        },
+        scope: {
+          type: 'string',
+          description: 'Optional target scope for the steps (e.g., repo, team, domain)',
+        },
+      },
+      required: ['session_id'],
+    },
+  },
+  {
+    name: 'report_agent_status',
+    description: 'Report your current state and activity. Call at key transitions to keep status bar current.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID (needed for channel routing)',
+        },
+        state: {
+          type: 'string',
+          enum: ['working', 'idle', 'needs_input'],
+          description: 'Current agent state',
+        },
+        activity: {
+          type: 'string',
+          description: 'Brief activity label (2-3 words, e.g. "Thinking", "Consulting")',
+        },
+        thought: {
+          type: 'string',
+          description: 'Current thinking (under 80 chars)',
+        },
+      },
+      required: ['state'],
+    },
+  },
+  {
+    name: 'report_tool_use',
+    description: 'Report that you are about to use a built-in tool (Read, Edit, Write, Bash). Call this BEFORE using the tool so the UI shows what you are doing.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The session ID (needed for channel routing)',
+        },
+        tool: {
+          type: 'string',
+          enum: ['read_file', 'edit_file', 'write_file', 'run_command', 'search_files'],
+          description: 'Which built-in tool is being used',
+        },
+        file_path: {
+          type: 'string',
+          description: 'File path being operated on (if applicable)',
+        },
+        summary: {
+          type: 'string',
+          description: 'Brief summary of what the tool call does (under 60 chars)',
+        },
+      },
+      required: ['tool', 'summary'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -181,12 +254,6 @@ export interface StartSessionInput {
 
 export interface ReadSessionInput {
   session_id: string;
-}
-
-export interface AddMessageInput {
-  session_id: string;
-  role: 'user' | 'assistant';
-  content: string;
 }
 
 export interface UpdateUnderstandingInput {
@@ -218,14 +285,41 @@ export interface UpdateSynthesisInput {
   }>;
 }
 
+export interface ListBlocksInput {
+  session_id: string;
+}
+
+export interface GraduateBlocksInput {
+  session_id: string;
+  block_ids?: string[];
+  scope?: string;
+}
+
+export interface ReportAgentStatusInput {
+  session_id?: string;
+  state: 'working' | 'idle' | 'needs_input';
+  activity?: string;
+  thought?: string;
+}
+
+export interface ReportToolUseInput {
+  session_id?: string;
+  tool: 'read_file' | 'edit_file' | 'write_file' | 'run_command' | 'search_files';
+  file_path?: string;
+  summary: string;
+}
+
 export type ToolInput =
   | { name: 'start_session'; input: StartSessionInput }
   | { name: 'read_session'; input: ReadSessionInput }
-  | { name: 'add_message'; input: AddMessageInput }
   | { name: 'update_understanding'; input: UpdateUnderstandingInput }
   | { name: 'send_to_planner'; input: SendToPlannerInput }
   | { name: 'spawn_specialist'; input: SpawnSpecialistInput }
-  | { name: 'update_synthesis'; input: UpdateSynthesisInput };
+  | { name: 'update_synthesis'; input: UpdateSynthesisInput }
+  | { name: 'list_blocks'; input: ListBlocksInput }
+  | { name: 'graduate_blocks'; input: GraduateBlocksInput }
+  | { name: 'report_agent_status'; input: ReportAgentStatusInput }
+  | { name: 'report_tool_use'; input: ReportToolUseInput };
 
 // =============================================================================
 // Tool Result

@@ -26,11 +26,17 @@ export function runMigrations(db: Database.Database): void {
   // 4. Add metadata_json column to versions if missing
   migrateVersionsMetadata(db);
 
-  // 5. Add source_json column to plans if missing
+  // 5. Ensure projects table exists (for tend project entity)
+  ensureProjectsTable(db);
+
+  // 6. Add source_json column to plans if missing
   migratePlansSource(db);
 
-  // 6. Add understanding_json column to versions if missing
+  // 7. Add understanding_json column to versions if missing
   migrateVersionsUnderstanding(db);
+
+  // 8. Add context_json column to versions if missing
+  migrateVersionsContext(db);
 }
 
 /**
@@ -116,6 +122,30 @@ function migrateVersionsMetadata(db: Database.Database): void {
 }
 
 /**
+ * Ensures the projects table exists.
+ * Projects link ideation sessions, plans, and forge runs into a unified entity.
+ */
+function ensureProjectsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      owner_id TEXT,
+      initiative_id TEXT,
+      session_id TEXT,
+      plan_id TEXT,
+      run_id TEXT,
+      config TEXT,
+      current_focus TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (initiative_id) REFERENCES initiatives(initiative_id) ON DELETE SET NULL,
+      FOREIGN KEY (plan_id) REFERENCES plans(plan_id) ON DELETE SET NULL
+    )
+  `);
+}
+
+/**
  * Adds source_json column to plans table if missing.
  * Tracks plan origin: manual, ideation, or intake.
  */
@@ -146,5 +176,20 @@ function migrateVersionsUnderstanding(db: Database.Database): void {
   if (!hasUnderstanding) {
     // Add column with default value for existing versions
     db.exec(`ALTER TABLE versions ADD COLUMN understanding_json TEXT NOT NULL DEFAULT '{}'`);
+  }
+}
+
+/**
+ * Adds context_json column to versions table if missing.
+ * Stores structured role-keyed decisions (architect, designer, etc.) from planning.
+ */
+function migrateVersionsContext(db: Database.Database): void {
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(versions)`)
+    .all();
+  const hasContext = columns.some((c) => c.name === 'context_json');
+
+  if (!hasContext) {
+    db.exec(`ALTER TABLE versions ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`);
   }
 }

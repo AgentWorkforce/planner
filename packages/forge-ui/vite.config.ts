@@ -14,6 +14,9 @@ export default defineConfig({
   },
   server: {
     port: 3003,
+    headers: {
+      'Content-Security-Policy': "script-src 'self' 'unsafe-inline' 'unsafe-eval';",
+    },
     proxy: {
       // Forge API routes (mounted at /api/forge in backend)
       '/api/forge': {

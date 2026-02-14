@@ -7,6 +7,29 @@
 import { Router } from 'express';
 import type { IdeationStorage } from '../storage/index.js';
 import { createHandlers, type HandlerConfig } from './handlers.js';
+import { createIdeationMcpHandlers } from './handlers/mcp.js';
+import type { ToolExecutorDeps } from '../interviewer/tool-executor.js';
+
+/**
+ * Extract ToolExecutorDeps from router config.
+ * HandlerConfig has { storage, plannerClient?, spawnAgent? }.
+ * If config is just IdeationStorage, wrap it: { storage: config }.
+ */
+function getMcpDeps(config: IdeationStorage | HandlerConfig): ToolExecutorDeps {
+  // Check if it's HandlerConfig by checking for storage property
+  if ('storage' in config && typeof (config as HandlerConfig).storage === 'object') {
+    // It's HandlerConfig - extract fields
+    const handlerConfig = config as HandlerConfig;
+    return {
+      storage: handlerConfig.storage,
+      plannerClient: handlerConfig.plannerClient,
+      spawnAgent: handlerConfig.spawnAgent,
+      reportStatus: handlerConfig.reportStatus,
+    };
+  }
+  // It's just IdeationStorage
+  return { storage: config as IdeationStorage };
+}
 
 export function createIdeationRouter(config: IdeationStorage | HandlerConfig): Router {
   const router = Router();
@@ -132,15 +155,16 @@ export function createIdeationRouter(config: IdeationStorage | HandlerConfig): R
   router.get('/events', handlers.subscribeToEvents);
 
   // ===========================================================================
-  // Navigator Routes
+  // MCP Tool Routes (for spawned agents)
   // ===========================================================================
 
   /**
-   * POST /navigator/chat - Send message to Navigator agent
-   * Body: { message: string }
-   * Response: { response: string }
+   * POST /mcp/tools/list - List available interviewer tools
+   * POST /mcp/tools/call - Execute an interviewer tool
    */
-  router.post('/navigator/chat', handlers.navigatorChat);
+  const mcpHandlers = createIdeationMcpHandlers(getMcpDeps(config));
+  router.post('/mcp/tools/list', mcpHandlers.listTools);
+  router.post('/mcp/tools/call', mcpHandlers.callTool);
 
   return router;
 }

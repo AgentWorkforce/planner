@@ -1,0 +1,138 @@
+{
+  "feature_id": "forge-build-storage",
+  "title": "Build Storage Layer",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "component": "forge-core",
+  "parent": "forge-builds",
+  "dependencies": ["forge-build-domain"],
+
+  "summary": {
+    "goal": "Add builds and build_runs tables to forge.db with migration, and implement storage queries for build lifecycle operations.",
+    "acceptance_criteria": [
+      { "id": "fbs-ac1", "description": "builds table created with migration: build_id PK, status, tiers_json, concurrency_limit, skip_completed, mode, workspace_path, error, timestamps" },
+      { "id": "fbs-ac2", "description": "build_runs table created: build_id + run_id composite, plan_id, plan_version, tier, status, timestamps, FK to builds and runs" },
+      { "id": "fbs-ac3", "description": "createBuild() inserts build record and returns it" },
+      { "id": "fbs-ac4", "description": "createBuildRun() inserts build_run record linking a run to a build" },
+      { "id": "fbs-ac5", "description": "getBuild() returns build with aggregated progress (runs per tier, completion counts)" },
+      { "id": "fbs-ac6", "description": "updateBuildStatus() transitions build status" },
+      { "id": "fbs-ac7", "description": "getBuildRunsByTier() returns all build_runs for a specific tier" },
+      { "id": "fbs-ac8", "description": "getRecentSuccessfulRun(planId) returns the most recent completed run for a plan (for skip_completed)" },
+      { "id": "fbs-ac9", "description": "listBuilds() with optional status filter and pagination" },
+      { "id": "fbs-ac10", "description": "Migration is idempotent and safe to re-run" }
+    ]
+  },
+
+  "context": {
+    "architect": {
+      "tables": {
+        "builds": "build_id TEXT PK, status TEXT NOT NULL, tiers_json TEXT NOT NULL, concurrency_limit INTEGER DEFAULT 5, skip_completed INTEGER DEFAULT 0, mode TEXT NOT NULL, workspace_path TEXT, error TEXT, created_at TEXT, started_at TEXT, completed_at TEXT, updated_at TEXT",
+        "build_runs": "build_id TEXT NOT NULL, run_id TEXT NOT NULL, plan_id TEXT NOT NULL, plan_version INTEGER, tier INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT, updated_at TEXT, PK(build_id, run_id), FK(build_id) → builds, FK(run_id) → runs"
+      },
+      "pattern": "Follows existing forge storage pattern — same BaseSqliteStorage, same migration approach, same converter pattern"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fbs-i001",
+        "title": "Add builds and build_runs table DDL to schema.ts",
+        "scope": "forge-core",
+        "description": "Add CREATE_BUILDS_TABLE, CREATE_BUILD_RUNS_TABLE, and index definitions to storage/schema.ts. Add to MIGRATION_STATEMENTS array for idempotent application.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_BUILDS_TABLE with: build_id TEXT PK, status TEXT NOT NULL CHECK(status IN ('pending','running','completed','failed','paused','cancelled')), tiers_json TEXT NOT NULL, concurrency_limit INTEGER NOT NULL DEFAULT 5, skip_completed INTEGER NOT NULL DEFAULT 0, mode TEXT NOT NULL, workspace_path TEXT, error TEXT, created_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, updated_at TEXT NOT NULL" },
+          { "id": "ac2", "description": "CREATE_BUILD_RUNS_TABLE with: build_id TEXT NOT NULL, run_id TEXT NOT NULL, plan_id TEXT NOT NULL, plan_version INTEGER, tier INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','completed','failed','skipped')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (build_id, run_id), FOREIGN KEY (build_id) REFERENCES builds(build_id) ON DELETE CASCADE, FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE" },
+          { "id": "ac3", "description": "Index: idx_builds_status ON builds(status)" },
+          { "id": "ac4", "description": "Index: idx_build_runs_build_id ON build_runs(build_id)" },
+          { "id": "ac5", "description": "Index: idx_build_runs_plan_id ON build_runs(plan_id)" },
+          { "id": "ac6", "description": "Added to MIGRATION_STATEMENTS with IF NOT EXISTS for idempotency" }
+        ],
+        "specification": {
+          "model": {
+            "file": "packages/forge-core/src/storage/schema.ts",
+            "pattern": "Same as existing CREATE_RUNS_TABLE — string constants, CHECK constraints for enums, CASCADE on FK deletes"
+          }
+        }
+      },
+      {
+        "step_id": "fbs-i002",
+        "title": "Add row types and converter functions for builds",
+        "scope": "forge-core",
+        "description": "Define BuildRow and BuildRunRow interfaces in storage/sqlite/converters.ts. Implement rowToBuild() and rowToBuildRun() converter functions.",
+        "dependencies": ["fbs-i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BuildRow interface: { build_id: string, status: string, tiers_json: string, concurrency_limit: number, skip_completed: number, mode: string, workspace_path: string|null, error: string|null, created_at: string, started_at: string|null, completed_at: string|null, updated_at: string }" },
+          { "id": "ac2", "description": "BuildRunRow interface: { build_id: string, run_id: string, plan_id: string, plan_version: number|null, tier: number, status: string, created_at: string, updated_at: string }" },
+          { "id": "ac3", "description": "rowToBuild() parses tiers_json, converts skip_completed int→boolean, returns Build" },
+          { "id": "ac4", "description": "rowToBuildRun() returns BuildRun directly (no JSON parsing needed)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/forge-core/src/storage/sqlite/converters.ts",
+            "pattern": "Same as existing rowToRun() — parse JSON columns, convert int booleans, return typed entity"
+          }
+        }
+      },
+      {
+        "step_id": "fbs-i003",
+        "title": "Implement build CRUD storage functions",
+        "scope": "forge-core",
+        "description": "Create storage/sqlite/builds.ts with all build storage operations: createBuild, getBuild, updateBuildStatus, listBuilds, createBuildRun, getBuildRunsByTier, updateBuildRunStatus, getRecentSuccessfulRun.",
+        "dependencies": ["fbs-i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createBuild(db, build: Build): Build — INSERT into builds with JSON.stringify(tiers), boolean→int conversion" },
+          { "id": "ac2", "description": "getBuild(db, buildId): Build|null — SELECT with rowToBuild conversion" },
+          { "id": "ac3", "description": "updateBuildStatus(db, buildId, status, error?): Build|null — UPDATE status + timestamps (started_at on running, completed_at on completed/failed/cancelled)" },
+          { "id": "ac4", "description": "listBuilds(db, filter?: { status?, limit?, offset? }): { builds: Build[], total: number }" },
+          { "id": "ac5", "description": "createBuildRun(db, buildRun: BuildRun): BuildRun — INSERT into build_runs" },
+          { "id": "ac6", "description": "getBuildRunsByTier(db, buildId, tier): BuildRun[] — SELECT WHERE build_id AND tier" },
+          { "id": "ac7", "description": "getBuildRunsForBuild(db, buildId): BuildRun[] — SELECT all build_runs for a build ordered by tier" },
+          { "id": "ac8", "description": "updateBuildRunStatus(db, buildId, runId, status): BuildRun|null — UPDATE build_run status + updated_at" },
+          { "id": "ac9", "description": "getRecentSuccessfulRun(db, planId): Run|null — SELECT from runs WHERE plan_id AND status='completed' ORDER BY completed_at DESC LIMIT 1" },
+          { "id": "ac10", "description": "Extend existing listRuns() to support plan_id filter: listRuns(filter?: { status?, plan_id?, limit?, offset? }). This enables Planner's ForgeClient to query GET /api/forge/runs?plan_id=X&status=completed." }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/forge-core/src/storage/sqlite/builds.ts",
+            "file_edit": [
+              "packages/forge-core/src/storage/interface.ts — extend listRuns signature to accept optional { plan_id, limit, offset } filter",
+              "packages/forge-core/src/storage/sqlite/runs.ts — update listRuns() to add WHERE plan_id = ? clause when filter.plan_id provided"
+            ],
+            "pattern": "Same as storage/sqlite/runs.ts — functions accept db: Database.Database, use prepared statements, parametrized queries"
+          }
+        }
+      },
+      {
+        "step_id": "fbs-i004",
+        "title": "Extend ForgeStorage interface with build methods",
+        "scope": "forge-core",
+        "description": "Add build storage methods to the ForgeStorage interface and implement them in the SqliteForgeStorage class.",
+        "dependencies": ["fbs-i003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeStorage interface extended with: createBuild, getBuild, updateBuildStatus, listBuilds, createBuildRun, getBuildRunsByTier, getBuildRunsForBuild, updateBuildRunStatus, getRecentSuccessfulRun" },
+          { "id": "ac2", "description": "Existing listRuns() signature updated: listRuns(filter?: { status?: RunStatus, plan_id?: string, limit?: number, offset?: number }): { runs: Run[], total: number }. Backwards compatible — no args returns all runs." },
+          { "id": "ac3", "description": "SqliteForgeStorage (storage/sqlite/index.ts) implements all new methods by delegating to builds.ts functions, and updates existing listRuns delegation" },
+          { "id": "ac4", "description": "Build-related types imported and re-exported from storage/index.ts" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": [
+              "packages/forge-core/src/storage/interface.ts",
+              "packages/forge-core/src/storage/sqlite/index.ts",
+              "packages/forge-core/src/storage/index.ts"
+            ],
+            "pattern": "Same delegation pattern as existing run methods"
+          }
+        }
+      }
+    ]
+  }
+}

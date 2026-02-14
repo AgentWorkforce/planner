@@ -160,6 +160,8 @@ export interface PlanSummary {
   org_id?: string;
   /** Owner user ID for "My Plans" filtering */
   owner_user_id?: string;
+  /** Sub-plan IDs referenced by steps (non-empty = coordination plan) */
+  sub_plan_ids?: string[];
   // Navigation fields for PlanCard enhancements
   /** Total number of steps in the plan */
   step_count?: number;

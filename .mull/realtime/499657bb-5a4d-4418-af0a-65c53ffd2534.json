@@ -1,0 +1,424 @@
+{
+  "sessionId": "499657bb-5a4d-4418-af0a-65c53ffd2534",
+  "entitiesSinceLastLlm": [],
+  "factsSinceLastLlm": [
+    {
+      "slug": "recovery-2de5da75-9a74-4bf5-a1fd-9a225188c25b",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T10:53:45.842Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-efbe3000-440a-41d4-8ecc-13c36d9d5392",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T11:39:08.804Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-30d395d0-4abd-47d4-9f82-44b0ec05afd5",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T13:07:48.396Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-9a0fdc8d-7481-4cd2-a334-d7b3601da393",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T13:25:31.801Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-5ce42dba-5558-48c9-a052-6112119f370e",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T14:53:30.903Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-e09d7863-d577-4466-aede-d6b5d8b842b3",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T14:54:39.014Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-612a3d78-69e1-4e12-a6ec-ee1576675086",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T14:55:47.088Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-68af320f-42b7-4c16-b534-716dfd96291d",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T14:56:51.181Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-a4e7fe7e-d4b8-4185-a3fa-a84e8146c5dd",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T14:57:57.264Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-136afa6d-05b4-4218-8151-0187e36bcd56",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T14:59:07.265Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-9cf00b24-d9b3-4d88-8fd9-ffa6fcf61a7a",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T15:22:45.345Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-71567f03-7fde-4984-8aeb-92cbba71ce3e",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T15:24:25.465Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-ffec4869-9ae5-45ac-b14a-8023e386138a",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T16:19:03.995Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-8970d4ed-19e6-406f-be8e-3d3ee0c912a2",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T16:42:41.707Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-ab8d2c8b-49d6-42d8-b73a-6959326831e7",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T16:43:57.927Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-1b1ba1b7-3025-48c1-b5f4-16eaf1eaf3cf",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T16:44:28.221Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-82c20a80-2af4-4d54-8037-d40f81120de4",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T16:44:58.499Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-e9d862b1-844a-44b3-afbe-2f6fe3d5ed92",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T17:24:06.727Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-300caa6b-d452-44b0-b90a-eabc81149a70",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:07:16.263Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-8f6980ca-043b-4d83-bd1a-b22da38d5d64",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:08:20.382Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-37001230-a766-40bf-a269-63d3383e41c3",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:09:24.500Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-9f6730de-ae80-4c9b-8e93-7e8c7bb26dba",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:10:28.550Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-029030c1-7bfe-4626-a05a-dc49bba27930",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:11:32.636Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-fd91d468-5a7a-4722-a617-38bccefc7b14",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:12:36.685Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-c7cc02ae-acf7-454d-8e3d-b6ac42e28af5",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:13:40.740Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-6c3143a3-13b6-4ab6-b353-770e98f5fc90",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:14:44.780Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-626b5bba-4304-4e57-a591-e4b11e5dd0d9",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:15:48.819Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-6d3e6037-d8cf-4e1f-9e73-e841facef3da",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:16:52.875Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-f5d4b9ff-26b0-4b68-9483-56dd21bd14ef",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:17:56.924Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-6f543c52-fce3-4402-a170-799dd5b83e76",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:19:00.981Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-222771fc-7ca8-40e2-bc3a-18ff39846b89",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:20:05.044Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-91f9cfe8-b78b-4e60-9d25-6cc1ab3c708e",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:21:09.104Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-285cc6f1-d4fd-4cd9-ab70-88b3ccbd0d7d",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:22:13.151Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-0ce5dcb0-42a7-4b7f-ad1e-df2fa7e6104a",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:23:17.206Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-a1b5c4d8-e6f4-42b6-a9d5-9a08e3e95277",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:24:21.257Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-3d4a07c1-1df0-4fd4-aa34-b2e99fcd15c0",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:25:25.315Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-7d58d74f-beae-43a4-b89f-dda749190f5c",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:26:29.377Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-4eded4b0-7284-4779-8656-2f2db0980e17",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:27:33.485Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-eb0bc8ed-4036-44cc-b434-c4d597d336a1",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:28:37.549Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-008ed67a-cc6a-4a82-9648-05ca5a67ff61",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:29:41.612Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-2264ab2c-1043-4c0f-949f-860e07ef02dd",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:30:45.672Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-ff4877fd-8a30-44a0-a18f-dd1bfc8f0609",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:31:49.728Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-c5246f1a-6f00-4322-8a8f-826055aa03e2",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:32:53.783Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-970580d0-a091-4427-b483-820bfefd93e7",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:33:57.840Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-4cbf779f-22e9-4652-a1cd-53f1feebec3b",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:35:01.891Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-9e47f74d-1705-4fd0-86ad-e6579be1f312",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:36:05.937Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-14e4120e-081a-45cb-9a1b-e1bda1713f15",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:37:09.994Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-0b44f106-8be7-4aa9-912d-91fb63755fda",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:38:14.052Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-4061bc26-3174-4259-99b2-5cc68080f678",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:39:18.096Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-32f015b5-5e9d-4bcb-bfd0-bb464e2e3e21",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:40:22.144Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-54b6610b-272a-435f-8601-880fb55eec89",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:41:26.202Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-dbf5e983-cddc-498a-92d1-5fa92d9e8d99",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T18:42:30.262Z",
+      "entities": [],
+      "isPreStructured": true
+    }
+  ],
+  "lastLlmRunAt": null,
+  "lastDeterministicAt": "2026-02-14T18:42:30.263Z"
+}

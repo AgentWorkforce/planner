@@ -1,0 +1,69 @@
+{
+  "feature_id": "cultivate-pipeline",
+  "title": "Processing Pipeline Orchestration",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-filter-rules", "cultivate-filter-tier2", "cultivate-extractor", "cultivate-scorer", "cultivate-clusterer", "cultivate-dedup", "cultivate-sse"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Process-signal pipeline orchestrating all stages: Greenhouse gate (Tier 0) then Tier 1 rules then Tier 2 ML then Tier 3 LLM extraction then Score then Near dedup then Cluster then Store then SSE broadcast. Atomic semantics: no partial signals. Does NOT handle chunking (that is pre-pipeline in ingest-document worker).",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Pipeline executes stages in order: Tier 0 -> Tier 1 -> Tier 2 -> Tier 3 extract -> Score -> Near dedup -> Cluster -> Store -> SSE" },
+      { "id": "ac2", "description": "A signal that passes all stages is fully stored with extraction, scores, and cluster assignment" },
+      { "id": "ac3", "description": "A signal that fails any stage does not produce a partial record in storage" },
+      { "id": "ac4", "description": "On unrecoverable failure, the job enters dead letter queue after BullMQ retry exhaustion" },
+      { "id": "ac5", "description": "Each pipeline stage records a StepProvenance entry tracking stage name, duration, and outcome" },
+      { "id": "ac6", "description": "SSE signal:new event is broadcast on successful pipeline completion" },
+      { "id": "ac7", "description": "Pipeline integrates with BullMQ process-signal worker as the job processor" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "cp-s1",
+        "title": "Define ProcessSignalContext type",
+        "scope": "cultivate",
+        "description": "Create the ProcessSignalContext type that flows through the pipeline carrying accumulated state: raw signal data, greenhouse_id, filter results, extraction result, scoring result, cluster assignment, dedup result, and provenance trail (StepProvenance[]). Each stage reads what it needs and appends its output. Define StepProvenance type with stage_name, started_at, completed_at, outcome (passed/filtered/failed), and optional reason.",
+        "dependencies": []
+      },
+      {
+        "id": "cp-s2",
+        "title": "Implement pipeline orchestrator",
+        "scope": "cultivate",
+        "description": "Build processSignal(rawSignal, greenhouseId, dependencies) as the main pipeline function. Wire all stages in sequence: (1) Greenhouse gate - verify signal matches Greenhouse keyword filters, (2) Tier 1 - run rule registry filter, (3) Tier 2 - run ML classification, (4) Tier 3 - run Sonnet extraction, (5) Score - compute multi-factor score, (6) Near dedup - check for near duplicates post-extraction, (7) Cluster - assign to cluster via Haiku, (8) Store - persist complete signal, (9) SSE - broadcast signal:new. Each stage receives and returns ProcessSignalContext.",
+        "dependencies": ["cp-s1"]
+      },
+      {
+        "id": "cp-s3",
+        "title": "Add atomic success-or-dead-letter semantics",
+        "scope": "cultivate",
+        "description": "Ensure pipeline atomicity: if any stage after Tier 0/1/2 filtering throws, no partial signal is stored. Use a transactional approach — only call storage.insertSignal() after all processing stages complete successfully. Filter rejections (Tiers 0/1/2) are clean exits (not errors) that record provenance but do not store the signal. Unhandled errors propagate to BullMQ for retry/dead-letter handling.",
+        "dependencies": ["cp-s2"]
+      },
+      {
+        "id": "cp-s4",
+        "title": "Implement provenance tracking per stage",
+        "scope": "cultivate",
+        "description": "Wrap each pipeline stage with provenance recording. Before each stage, record started_at. After each stage, record completed_at and outcome. On filter rejection, record outcome 'filtered' with reason. On error, record outcome 'failed' with error message. Store the complete StepProvenance[] array with the signal for full pipeline audit trail. Provenance is stored even for filtered signals (in a separate filtered_signals table or log).",
+        "dependencies": ["cp-s2"]
+      },
+      {
+        "id": "cp-s5",
+        "title": "Add SSE broadcast on completion",
+        "scope": "cultivate",
+        "description": "After successful signal storage, call sseBroadcaster.emit('signal:new', { signal_id, greenhouse_id, cluster_id, score }) to notify connected clients. On cluster assignment to a new cluster, also emit 'cluster:new'. On assignment to existing cluster, emit 'cluster:updated' with updated signal count. SSE emission is the final pipeline step and its failure should not roll back the stored signal.",
+        "dependencies": ["cp-s2"]
+      },
+      {
+        "id": "cp-s6",
+        "title": "Integrate with BullMQ process-signal worker",
+        "scope": "cultivate",
+        "description": "Create the BullMQ worker for the 'process-signal' queue that invokes processSignal() for each job. Job data contains raw signal content, source metadata, and greenhouse_id. Configure worker concurrency, retry policy (exponential backoff, max 3 retries), and dead letter queue. On job failure after max retries, move to dead letter with full error context and provenance trail.",
+        "dependencies": ["cp-s2", "cp-s3"]
+      }
+    ]
+  }
+}

@@ -1,14 +1,12 @@
 /**
- * Chat API Handlers
+ * Chat Suggestion Handlers
  *
- * Provides endpoints for AI chat functionality.
- * In standalone mode, uses mock responses.
+ * Provides endpoints for applying AI suggestions to plans.
  */
 
 import type { Request, Response, NextFunction } from 'express';
 import type { PlanStorage } from '../../storage/interface.js';
 import { notFound, badRequest } from '../middleware.js';
-import { createMockChatResponse } from './chat-mock.js';
 import {
   addStepToPlan,
   editStepInPlan,
@@ -16,46 +14,6 @@ import {
   addCriteriaToStep,
   editCriteriaInStep,
 } from '../../domain/plan-operations.js';
-
-interface PlanIdParams {
-  id: string;
-}
-
-/**
- * Chat context from the UI
- */
-interface ChatContext {
-  plan_id: string;
-  version: number;
-  goal: string;
-  context?: string;
-  steps: {
-    step_id: string;
-    title: string;
-    description?: string;
-    scope?: string;
-    dependencies: string[];
-    acceptance_criteria_count: number;
-    has_gate: boolean;
-  }[];
-}
-
-/**
- * Chat message from history
- */
-interface ChatHistoryMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-/**
- * Chat request body
- */
-interface ChatRequestBody {
-  message: string;
-  context: ChatContext;
-  history?: ChatHistoryMessage[];
-}
 
 /**
  * Suggestion in chat response
@@ -68,60 +26,10 @@ export interface ChatSuggestion {
 }
 
 /**
- * Chat response
+ * Creates suggestion route handlers with injected storage dependency.
  */
-interface ChatResponse {
-  message: string;
-  suggestion?: ChatSuggestion;
-  session_status: 'active' | 'none';
-}
-
-/**
- * Creates chat route handlers with injected storage dependency.
- * Standalone version - uses mock responses (no agent integration).
- */
-export function createChatHandlers(storage: PlanStorage) {
+export function createSuggestionHandlers(storage: PlanStorage) {
   return {
-    /**
-     * POST /ai/chat
-     * Send a chat message to the planning agent.
-     * In standalone mode, returns mock response.
-     */
-    chat: async (req: Request<PlanIdParams, unknown, ChatRequestBody>, res: Response, next: NextFunction) => {
-      try {
-        const { message, context } = req.body;
-
-        if (!message || typeof message !== 'string') {
-          throw badRequest('message is required');
-        }
-        if (!context || !context.plan_id) {
-          throw badRequest('context with plan_id is required');
-        }
-
-        const planId = context.plan_id;
-
-        // Check if plan exists
-        const plan = storage.getPlan(planId);
-        if (!plan) {
-          throw notFound('Plan');
-        }
-
-        // Standalone mode - always use mock response
-        console.log(`[chat] Standalone mode for plan ${planId}, using mock response`);
-        const version = storage.getLatestVersion(planId);
-        if (!version) {
-          throw notFound('Plan version');
-        }
-        const mockResponse = createMockChatResponse(message, context, version);
-        res.json({
-          ...mockResponse,
-          session_status: 'none',
-        });
-      } catch (err) {
-        next(err);
-      }
-    },
-
     /**
      * POST /ai/suggestions/apply
      * Apply a suggestion from the chat.

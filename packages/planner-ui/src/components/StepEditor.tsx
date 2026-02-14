@@ -282,7 +282,7 @@ export function StepEditor({
 
         {/* Specification domain indicators - fixed width so scope doesn't shift */}
         <div className="flex-shrink-0 flex items-center gap-0.5 min-w-[60px] justify-end">
-          {Object.entries(step.specification || {}).map(([domain, spec]) => {
+          {Object.entries(step.specification && typeof step.specification === 'object' ? step.specification : {}).map(([domain, spec]) => {
             const hasContent = spec && typeof spec === 'object' && Object.keys(spec).length > 0;
             // Map domain names to icons
             const normalizedDomain = domain.toLowerCase();

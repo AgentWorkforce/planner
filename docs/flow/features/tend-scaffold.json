@@ -1,0 +1,110 @@
+{
+  "feature_id": "tend-scaffold",
+  "title": "Fork ideation-ui into packages/tend",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Fork ideation-ui into packages/tend — the new unified workspace package.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "packages/tend/ directory exists with package.json named @plannr/tend"
+      },
+      {
+        "id": "ac2",
+        "description": "Vite dev server runs on port 3004 with proxy to localhost:3001"
+      },
+      {
+        "id": "ac3",
+        "description": "Three routes exist: / (DashboardPage), /projects/:id (ProjectPage), /settings (SettingsPage)"
+      },
+      {
+        "id": "ac4",
+        "description": "IdeationGridLayout renamed to TendLayout, still renders three-column CSS Grid"
+      },
+      {
+        "id": "ac5",
+        "description": "tailwind.config.cjs extends @plannr/shared-ui/theme/tailwind-preset.cjs"
+      },
+      {
+        "id": "ac6",
+        "description": "All ideation-ui component imports updated to local paths (no cross-package imports)"
+      },
+      {
+        "id": "ac7",
+        "description": "dev.sh updated to include tend on port 3004"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Fork of packages/ideation-ui/. Copy entire directory, update package.json (name, port), update Vite config (port 3004, proxy), rename core layout component.",
+        "Keep all existing components initially — they'll be replaced/adapted in later stages.",
+        "Routing changes from /ideation/session/:id to /, /projects/:id, /settings."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "scf01",
+        "title": "Copy ideation-ui directory to packages/tend",
+        "scope": "tend",
+        "description": "cp -r packages/ideation-ui packages/tend. Update package.json: name to @plannr/tend, adjust scripts.",
+        "acceptance_criteria": ["ac1"]
+      },
+      {
+        "id": "scf02",
+        "title": "Configure Vite for port 3004",
+        "scope": "tend",
+        "description": "Update vite.config.ts: server.port=3004, proxy /api to localhost:3001, proxy /ws to localhost:3001 (WebSocket). Update @alias to packages/tend/src.",
+        "dependencies": ["scf01"],
+        "acceptance_criteria": ["ac2"]
+      },
+      {
+        "id": "scf03",
+        "title": "Rename layout and set up routing",
+        "scope": "tend",
+        "description": "Rename IdeationGridLayout → TendLayout (file + component + all imports). Replace ideation routing with: / → DashboardPage, /projects/:id → ProjectPage, /settings → SettingsPage. Create stub page components if needed.",
+        "dependencies": ["scf01"],
+        "acceptance_criteria": ["ac3", "ac4"]
+      },
+      {
+        "id": "scf04",
+        "title": "Update Tailwind config and fix imports",
+        "scope": "tend",
+        "description": "Create tailwind.config.cjs extending @plannr/shared-ui/theme/tailwind-preset.cjs. Scan all imports for cross-package references to ideation-ui and update to local paths within packages/tend/.",
+        "dependencies": ["scf01"],
+        "acceptance_criteria": ["ac5", "ac6"]
+      },
+      {
+        "id": "scf05",
+        "title": "Update dev.sh and verify",
+        "scope": "tend",
+        "description": "Add tend to dev.sh (npm run dev -w tend on port 3004). Add tend to root tsconfig.json references. Run npm install to link workspace. Verify: dev server starts, three-column layout renders, no build errors.",
+        "dependencies": ["scf02", "scf03", "scf04"],
+        "acceptance_criteria": ["ac7"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_package": "packages/ideation-ui/",
+      "target_package": "packages/tend/",
+      "port": 3004,
+      "layout_rename": "IdeationGridLayout → TendLayout",
+      "routes": {
+        "root": "DashboardPage",
+        "project_detail": "/projects/:id → ProjectPage",
+        "settings": "/settings → SettingsPage"
+      }
+    }
+  }
+}

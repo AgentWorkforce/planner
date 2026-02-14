@@ -22,17 +22,27 @@ export interface ChannelInfo {
 /** Global planner channel */
 export const PLANNER_CHANNEL = '#planner';
 
-/** Track created channels */
+/** Track registered channels (known to exist, not necessarily joined) */
 const createdChannels = new Set<string>();
 
-/** Track plan channels */
-const planChannels = new Map<string, string>(); // planId -> channelId
+/** Track plan channels: planId -> channelId (registered, not necessarily joined) */
+const planChannels = new Map<string, string>();
+
+/** Track channels we've actually joined in the relay daemon */
+const joinedChannels = new Set<string>();
 
 /**
  * Get channel ID for a plan.
  */
 export function getPlanChannelId(planId: string): string {
   return `#plan-${planId.slice(0, 8)}`;
+}
+
+/**
+ * Get channel ID for an ideation session.
+ */
+export function getSessionChannelId(sessionId: string): string {
+  return `#ideation-${sessionId.slice(0, 8)}`;
 }
 
 /**
@@ -71,9 +81,10 @@ export function createPlanChannel(planId: string, planTitle?: string): string | 
 
   const channelId = getPlanChannelId(planId);
 
-  // Check if already created
-  if (planChannels.has(planId)) {
-    console.log(`[channels] Plan channel ${channelId} already exists`);
+  const channelAlreadyJoined = joinedChannels.has(channelId);
+
+  // If already registered AND joined, nothing to do
+  if (planChannels.has(planId) && channelAlreadyJoined) {
     return channelId;
   }
 
@@ -84,7 +95,8 @@ export function createPlanChannel(planId: string, planTitle?: string): string | 
   if (joined) {
     createdChannels.add(channelId);
     planChannels.set(planId, channelId);
-    console.log(`[channels] Created channel ${channelId} for plan ${planId}`);
+    joinedChannels.add(channelId);
+    console.log(`[channels] Joined channel ${channelId} for plan ${planId}`);
     return channelId;
   }
 
@@ -111,6 +123,7 @@ export function removePlanChannel(planId: string): boolean {
   if (left) {
     createdChannels.delete(channelId);
     planChannels.delete(planId);
+    joinedChannels.delete(channelId);
     console.log(`[channels] Removed channel ${channelId} for plan ${planId}`);
     return true;
   }
@@ -186,16 +199,15 @@ export function initChannelManagement(): void {
   // Also create when connection becomes ready
   onStateChange((state: ClientState) => {
     if (state === 'READY') {
-      // Recreate channels after reconnection
+      // Recreate global channel after reconnection
       createPlannerChannel();
 
-      // Rejoin existing plan channels
-      for (const [planId] of planChannels) {
-        const channelId = getPlanChannelId(planId);
-        const client = getClient();
-        if (client) {
+      // Only rejoin channels that were actively joined this session
+      const client = getClient();
+      if (client && joinedChannels.size > 0) {
+        console.log(`[channels] Rejoining ${joinedChannels.size} active channels`);
+        for (const channelId of joinedChannels) {
           client.joinChannel(channelId, 'Planner Core');
-          console.log(`[channels] Rejoined channel ${channelId}`);
         }
       }
     }
@@ -205,22 +217,29 @@ export function initChannelManagement(): void {
 }
 
 /**
- * Sync plan channels with storage.
- * Call this on startup to create channels for existing plans.
+ * Register plan channels in the local Map without joining them in the relay daemon.
+ * Called on startup to populate channel lookups (getChannelsForUser, etc.)
+ * without flooding the daemon with join requests.
  */
-export function syncPlanChannels(planIds: string[]): void {
-  if (!isConnected()) {
-    console.log('[channels] Skipping plan channel sync: relay not connected');
-    return;
-  }
-
+export function registerPlanChannels(planIds: string[]): void {
   for (const planId of planIds) {
     if (!planChannels.has(planId)) {
-      createPlanChannel(planId);
+      const channelId = getPlanChannelId(planId);
+      planChannels.set(planId, channelId);
+      createdChannels.add(channelId);
     }
   }
+  console.log(`[channels] Registered ${planIds.length} plan channels (lazy join)`);
+}
 
-  console.log(`[channels] Synced ${planIds.length} plan channels`);
+/**
+ * Ensure a plan channel is joined in the relay daemon.
+ * Joins on-demand if not already joined. Use this before sending messages.
+ */
+export function ensurePlanChannelJoined(planId: string): string | null {
+  const channelId = planChannels.get(planId) || getPlanChannelId(planId);
+  if (joinedChannels.has(channelId)) return channelId;
+  return createPlanChannel(planId);
 }
 
 /**

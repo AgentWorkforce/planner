@@ -67,6 +67,17 @@ export const ForgeExecutionConfigSchema = z.object({
     tier_d: z.number().positive(),
   }),
 
+  quality: z.object({
+    prep_enabled: z.boolean(),
+    task_post_enabled: z.boolean(),
+    run_post_enabled: z.boolean(),
+    prep_model: z.string(),
+    task_post_model: z.string(),
+    run_post_model: z.string(),
+    prep_min_tasks: z.number().int().min(1),
+    prep_min_tier_tasks: z.number().int().min(1).optional(),
+  }).optional(),
+
   version: z.number().int().positive(),
   updated_at: z.string().datetime(),
 });
@@ -149,6 +160,16 @@ export const DEFAULT_FORGE_CONFIG: ForgeExecutionConfig = {
     tier_b: 5.0,
     tier_c: 8.0,
     tier_d: 15.0,
+  },
+  quality: {
+    prep_enabled: true,
+    task_post_enabled: true,
+    run_post_enabled: true,
+    prep_model: 'claude-haiku',
+    task_post_model: 'claude-haiku',
+    run_post_model: 'claude-haiku',
+    prep_min_tasks: 3,
+    prep_min_tier_tasks: 2,
   },
   version: 1,
   updated_at: new Date().toISOString(),

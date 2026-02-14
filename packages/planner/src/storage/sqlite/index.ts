@@ -1,5 +1,6 @@
 import { BaseSqliteStorage } from '@plannr/storage-base';
-import type { Plan, PlanVersion } from '../../domain/plan.js';
+import type { Plan, PlanVersion, Understanding } from '../../domain/plan.js';
+import type { Context } from '../../domain/context.js';
 import type { PlanStatus } from '../../domain/status.js';
 import type { ApprovalInfo } from '../../domain/workflow.js';
 import type {
@@ -33,6 +34,7 @@ import * as Sessions from './sessions.js';
 import * as Improvements from './improvements.js';
 import * as Questions from './questions.js';
 import * as Trajectory from './trajectory.js';
+import * as Projects from './projects.js';
 
 /**
  * SQLite implementation of PlanStorage.
@@ -171,6 +173,30 @@ export class SqliteStorage extends BaseSqliteStorage implements PlanStorage {
     status: PlanStatus
   ): PlanVersion | null {
     return Versions.updateVersionStatus(this.db, planId, version, status);
+  }
+
+  updateVersionContext(
+    planId: string,
+    version: number,
+    context: Context
+  ): PlanVersion | null {
+    return Versions.updateVersionContext(this.db, planId, version, context);
+  }
+
+  updateVersionUnderstanding(
+    planId: string,
+    version: number,
+    understanding: Understanding
+  ): PlanVersion | null {
+    return Versions.updateVersionUnderstanding(this.db, planId, version, understanding);
+  }
+
+  getSubPlanIds(planId: string): string[] {
+    return Versions.getSubPlanIds(this.db, planId);
+  }
+
+  getDependentPlanIds(planId: string): string[] {
+    return Versions.getDependentPlanIds(this.db, planId);
   }
 
   // ============================================
@@ -423,6 +449,34 @@ export class SqliteStorage extends BaseSqliteStorage implements PlanStorage {
 
   deleteTrajectoryEvent(eventId: string): boolean {
     return Trajectory.deleteTrajectoryEvent(this.db, eventId);
+  }
+
+  // ============================================
+  // Project operations
+  // ============================================
+
+  createProject(project: import('../interface.js').Project): import('../interface.js').Project {
+    return Projects.createProject(this.db, project);
+  }
+
+  getProject(id: string): import('../interface.js').Project | null {
+    return Projects.getProject(this.db, id);
+  }
+
+  updateProject(id: string, updates: Partial<Omit<import('../interface.js').Project, 'id' | 'created_at' | 'updated_at'>>): import('../interface.js').Project | null {
+    return Projects.updateProject(this.db, id, updates);
+  }
+
+  updateProjectFocus(id: string, focus: Record<string, unknown>): import('../interface.js').Project | null {
+    return Projects.updateProjectFocus(this.db, id, focus);
+  }
+
+  listProjects(filter?: import('../interface.js').ProjectFilter): import('../interface.js').Project[] {
+    return Projects.listProjects(this.db, filter);
+  }
+
+  deleteProject(id: string): boolean {
+    return Projects.deleteProject(this.db, id);
   }
 
   public transaction<T>(fn: () => T): T {

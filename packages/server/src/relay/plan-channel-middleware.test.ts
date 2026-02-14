@@ -15,13 +15,8 @@ vi.mock('./client.js', () => ({
   isConnected: vi.fn(),
 }));
 
-vi.mock('./planner-lead.js', () => ({
-  notifyNewPlan: vi.fn(),
-}));
-
 import { createPlanChannel } from './channels.js';
 import { isConnected } from './client.js';
-import { notifyNewPlan } from './planner-lead.js';
 
 describe('planChannelMiddleware', () => {
   let mockReq: Partial<Request>;
@@ -49,7 +44,6 @@ describe('planChannelMiddleware', () => {
     // Default to connected
     vi.mocked(isConnected).mockReturnValue(true);
     vi.mocked(createPlanChannel).mockReturnValue('#plan-abc12345');
-    vi.mocked(notifyNewPlan).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -96,12 +90,7 @@ describe('planChannelMiddleware', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(createPlanChannel).toHaveBeenCalledWith('abc12345-full-uuid', 'Test goal');
-    expect(notifyNewPlan).toHaveBeenCalledWith(
-      '#plan-abc12345',
-      'abc12345-full-uuid',
-      'Test goal',
-      'Test context'
-    );
+    // Note: Spawned PlannerLead agent will be notified via lifecycle manager
   });
 
   it('should not create channel when relay is not connected', async () => {
@@ -119,7 +108,6 @@ describe('planChannelMiddleware', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(createPlanChannel).not.toHaveBeenCalled();
-    expect(notifyNewPlan).not.toHaveBeenCalled();
   });
 
   it('should not create channel for non-201 responses', async () => {
@@ -204,12 +192,7 @@ describe('planChannelMiddleware', () => {
 
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(notifyNewPlan).toHaveBeenCalledWith(
-      '#plan-abc12345',
-      'abc12345-full-uuid',
-      'New plan',
-      undefined
-    );
+    expect(createPlanChannel).toHaveBeenCalledWith('abc12345-full-uuid', undefined);
   });
 
   it('should match /plans and /plans/ paths', () => {

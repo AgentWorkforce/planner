@@ -24,6 +24,7 @@ import type {
   UserTrajectoryScope,
   DerivedPreference,
 } from '../../domain/user-trajectory.js';
+import type { Build, BuildStatus, BuildRun, BuildRunStatus } from '../../domain/build-types.js';
 import type { ForgeStorage, TrajectoryEventFilter, GuardianEventFilter } from '../interface.js';
 import { ALL_SCHEMA_STATEMENTS, MIGRATION_STATEMENTS } from '../schema.js';
 
@@ -41,6 +42,7 @@ import * as UserTrajectories from './user-trajectories.js';
 import * as Preferences from './preferences.js';
 import * as Guardians from './guardians.js';
 import * as Metrics from './metrics.js';
+import * as Builds from './builds.js';
 
 /**
  * SQLite implementation of ForgeStorage.
@@ -108,6 +110,18 @@ export class SqliteForgeStorage extends BaseSqliteStorage implements ForgeStorag
     return Runs.getActiveRuns(this.db);
   }
 
+  getRunDocument(runId: string): Record<string, unknown> | null {
+    return Runs.getRunDocument(this.db, runId);
+  }
+
+  setRunDocument(runId: string, document: Record<string, unknown>): void {
+    return Runs.setRunDocument(this.db, runId, document);
+  }
+
+  findCompletedRunsForPlan(planId: string): { run_id: string; completed_at: string | null }[] {
+    return Runs.findCompletedRunsForPlan(this.db, planId);
+  }
+
   // ============================================
   // Task operations
   // ============================================
@@ -138,6 +152,17 @@ export class SqliteForgeStorage extends BaseSqliteStorage implements ForgeStorag
 
   getTaskByStepId(runId: string, stepId: string): Task | null {
     return Tasks.getTaskByStepId(this.db, runId, stepId);
+  }
+
+  findCompletedTasksByStepId(
+    stepId: string,
+    scope?: string
+  ): { task_id: string; run_id: string; step_title: string }[] {
+    return Tasks.findCompletedTasksByStepId(this.db, stepId, scope);
+  }
+
+  findCompletedTasksByTitle(scope: string, stepTitle: string): { task_id: string; run_id: string }[] {
+    return Tasks.findCompletedTasksByTitle(this.db, scope, stepTitle);
   }
 
   // ============================================
@@ -485,6 +510,58 @@ export class SqliteForgeStorage extends BaseSqliteStorage implements ForgeStorag
     cost_allowed_usd: number | null;
   } | null {
     return Metrics.getRunBudget(this.db, runId);
+  }
+
+  // ============================================
+  // Build operations
+  // ============================================
+
+  createBuild(build: Build): Build {
+    return Builds.createBuild(this.db, build);
+  }
+
+  getBuild(buildId: string): Build | null {
+    return Builds.getBuild(this.db, buildId);
+  }
+
+  updateBuild(buildId: string, updates: Partial<Build>): Build | null {
+    return Builds.updateBuild(this.db, buildId, updates);
+  }
+
+  updateBuildStatus(buildId: string, status: BuildStatus): Build | null {
+    return Builds.updateBuildStatus(this.db, buildId, status);
+  }
+
+  listBuilds(status?: BuildStatus): Build[] {
+    return Builds.listBuilds(this.db, status);
+  }
+
+  getActiveBuilds(): Build[] {
+    return Builds.getActiveBuilds(this.db);
+  }
+
+  // ============================================
+  // BuildRun operations
+  // ============================================
+
+  createBuildRun(buildRun: BuildRun): BuildRun {
+    return Builds.createBuildRun(this.db, buildRun);
+  }
+
+  getBuildRun(buildId: string, runId: string): BuildRun | null {
+    return Builds.getBuildRun(this.db, buildId, runId);
+  }
+
+  updateBuildRunStatus(buildId: string, runId: string, status: BuildRunStatus): BuildRun | null {
+    return Builds.updateBuildRunStatus(this.db, buildId, runId, status);
+  }
+
+  listBuildRunsByBuild(buildId: string): BuildRun[] {
+    return Builds.listBuildRunsByBuild(this.db, buildId);
+  }
+
+  listBuildRunsByTier(buildId: string, tier: number): BuildRun[] {
+    return Builds.listBuildRunsByTier(this.db, buildId, tier);
   }
 
   // ============================================

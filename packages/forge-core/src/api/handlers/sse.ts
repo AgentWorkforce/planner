@@ -104,6 +104,9 @@ const TRAJECTORY_TO_SSE_EVENT: Record<string, string> = {
   [TrajectoryEventType.AgentProgress]: RunSSEEventTypes.AgentProgress,
   // Question events
   [TrajectoryEventType.HumanInputRequested]: RunSSEEventTypes.QuestionAdded,
+  // AC Audit events
+  [TrajectoryEventType.RunAcAuditStarted]: RunSSEEventTypes.AcAuditComplete,
+  [TrajectoryEventType.RunAcAuditCompleted]: RunSSEEventTypes.AcAuditComplete,
 };
 
 /**
@@ -602,6 +605,16 @@ function mapTrajectoryToSSEPayload(event: TrajectoryEvent): Record<string, unkno
         options: payload.options,
       };
 
+    // AC Audit events
+    case TrajectoryEventType.RunAcAuditStarted:
+    case TrajectoryEventType.RunAcAuditCompleted:
+      return {
+        run_id: event.run_id,
+        event_type: event.event_type,
+        ...payload,
+        timestamp: event.timestamp,
+      };
+
     default:
       return {
         ...basePayload,
@@ -638,6 +651,71 @@ function extractGateSpecificFields(
   }
 }
 
+/**
+ * Creates a global SSE handler that streams events for ALL runs.
+ *
+ * Used by the dashboard to detect when any run changes status
+ * so it can refetch run lists. Sends data-only messages (no `event:` field)
+ * so the browser's `onmessage` handler fires.
+ *
+ * Route: GET /runs/events
+ *
+ * @param deps - Dependencies including trajectoryCapture
+ */
+export function globalRunEventsSSEHandler(deps: RunEventsSSEDeps) {
+  return (req: Request, res: Response): void => {
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    // Flush headers to establish connection
+    res.flushHeaders();
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+    // Set up heartbeat
+    const heartbeatInterval = setInterval(() => {
+      res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
+    }, 30000);
+
+    // Handler for trajectory events — no run_id filter
+    const handleTrajectoryEvent = (event: TrajectoryEvent) => {
+      if (!SUPPORTED_RUN_EVENT_TYPES.includes(event.event_type)) {
+        return;
+      }
+
+      const sseEventType = TRAJECTORY_TO_SSE_EVENT[event.event_type];
+      if (!sseEventType) {
+        return;
+      }
+
+      const ssePayload = mapTrajectoryToSSEPayload(event);
+
+      // Send as data-only (no event: field) so browser onmessage fires
+      res.write(`data: ${JSON.stringify({ type: sseEventType, run_id: event.run_id, ...ssePayload })}\n\n`);
+    };
+
+    // Subscribe to trajectory events
+    deps.trajectoryCapture.on('trajectory', handleTrajectoryEvent);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      clearInterval(heartbeatInterval);
+      deps.trajectoryCapture.off('trajectory', handleTrajectoryEvent);
+    });
+
+    // Handle errors
+    req.on('error', (err) => {
+      console.error('[SSE] Global connection error:', err);
+      clearInterval(heartbeatInterval);
+      deps.trajectoryCapture.off('trajectory', handleTrajectoryEvent);
+    });
+  };
+}
+
 // ============================================
 // Export handler types
 // ============================================
@@ -645,3 +723,4 @@ function extractGateSpecificFields(
 export type RunEventsSSEHandlerFn = ReturnType<typeof runEventsSSEHandler>;
 export type FullRunEventsSSEHandlerFn = ReturnType<typeof fullRunEventsSSEHandler>;
 export type GateEventsSSEHandlerFn = ReturnType<typeof gateEventsSSEHandler>;
+export type GlobalRunEventsSSEHandlerFn = ReturnType<typeof globalRunEventsSSEHandler>;

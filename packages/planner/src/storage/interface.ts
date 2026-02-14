@@ -1,4 +1,5 @@
-import type { Plan, PlanVersion } from '../domain/plan.js';
+import type { Plan, PlanVersion, Understanding } from '../domain/plan.js';
+import type { Context } from '../domain/context.js';
 import type { PlanStatus } from '../domain/status.js';
 import type { ApprovalInfo } from '../domain/workflow.js';
 import type { ChangeRequest, ChangeRequestStatus, RevisionStatus } from '../domain/change-request.js';
@@ -7,6 +8,32 @@ import type { Improvement, ImprovementStatus } from '../domain/improvement.js';
 import type { Organization, Initiative } from '../domain/organization.js';
 import type { Question, QuestionStatus, QuestionFilter } from '../domain/question.js';
 import type { DecisionEvent, TrajectoryEventFilter } from '../domain/trajectory.js';
+
+/**
+ * Project represents a unified entity linking ideation sessions, plans, and forge runs.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  owner_id: string | null;
+  initiative_id: string | null;
+  session_id: string | null;
+  plan_id: string | null;
+  run_id: string | null;
+  config: Record<string, unknown> | null;
+  current_focus: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Filter options for project list queries.
+ */
+export interface ProjectFilter {
+  owner_id?: string;
+  initiative_id?: string;
+  session_id?: string;
+}
 
 /**
  * Plan data with pre-joined attention signal inputs.
@@ -84,6 +111,20 @@ export interface PlanStorage {
     version: number,
     status: PlanStatus
   ): PlanVersion | null;
+  updateVersionContext(
+    planId: string,
+    version: number,
+    context: Context
+  ): PlanVersion | null;
+  updateVersionUnderstanding(
+    planId: string,
+    version: number,
+    understanding: Understanding
+  ): PlanVersion | null;
+
+  // Sub-plan hierarchy queries
+  getSubPlanIds(planId: string): string[];
+  getDependentPlanIds(planId: string): string[];
 
   // Workflow operations
   submitVersion(planId: string, version: number): PlanVersion | null;
@@ -170,6 +211,14 @@ export interface PlanStorage {
   listTrajectoryEvents(planId: string, filter?: TrajectoryEventFilter): DecisionEvent[];
   findSimilarQuestions(planId: string, text: string, threshold?: number): DecisionEvent[];
   deleteTrajectoryEvent(eventId: string): boolean;
+
+  // Project operations
+  createProject(project: Project): Project;
+  getProject(id: string): Project | null;
+  updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>): Project | null;
+  updateProjectFocus(id: string, focus: Record<string, unknown>): Project | null;
+  listProjects(filter?: ProjectFilter): Project[];
+  deleteProject(id: string): boolean;
 
   // Transaction support
   transaction<T>(fn: () => T): T;

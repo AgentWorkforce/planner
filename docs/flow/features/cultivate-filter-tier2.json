@@ -1,0 +1,106 @@
+{
+  "feature_id": "cultivate-filter-tier2",
+  "title": "Tier 2 Local ML Classification",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain", "cultivate-errors"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement Tier 2 filtering using Transformers.js zero-shot classification with the Xenova/mobilebert-uncased-mnli model. The model is loaded at startup via loadClassificationModel() — failure throws CultivateStartupError('ML_MODEL_LOAD_FAILED'). First run downloads the model (~100MB). Classification determines if a signal is actionable product feedback vs noise. Returns pass/fail decision with feedback_score (confidence) and category_hint (product_feedback, bug_report, feature_request, question, noise). Per-signal failures route to dead-letter, not crash the pipeline.",
+    "acceptance_criteria": [
+      { "id": "cft2-ac1", "description": "loadClassificationModel() loads Xenova/mobilebert-uncased-mnli via @huggingface/transformers pipeline('zero-shot-classification')" },
+      { "id": "cft2-ac2", "description": "loadClassificationModel() throws CultivateStartupError('ML_MODEL_LOAD_FAILED') if model fails to load" },
+      { "id": "cft2-ac3", "description": "tier2Filter(text) returns { passed: boolean, feedback_score: number, category_hint: string }" },
+      { "id": "cft2-ac4", "description": "Classification uses candidate labels: product_feedback, bug_report, feature_request, question, noise" },
+      { "id": "cft2-ac5", "description": "Signal passes if top label is NOT 'noise' and score exceeds tier2_threshold from config (default 0.3)" },
+      { "id": "cft2-ac6", "description": "Per-signal classification failure does NOT crash — signal routes to dead-letter with error context" },
+      { "id": "cft2-ac7", "description": "Model loaded once at startup, reused for all classifications (singleton)" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cft2-s1",
+        "title": "Add @huggingface/transformers dependency",
+        "scope": "cultivate",
+        "description": "Add @huggingface/transformers as a dependency to packages/cultivate/package.json. This is the Transformers.js library that runs ML models locally in Node.js. The package provides the pipeline() function for zero-shot classification. Note: first run will download the Xenova/mobilebert-uncased-mnli model (~100MB) to a local cache directory. Ensure the package is compatible with the project's ESM setup (type: module).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "@huggingface/transformers added to package.json dependencies" },
+          { "id": "ac2", "description": "npm install succeeds from root" }
+        ]
+      },
+      {
+        "step_id": "cft2-s2",
+        "title": "Implement loadClassificationModel() with startup check",
+        "scope": "cultivate",
+        "description": "Create src/filters/ml-classifier.ts. Implement loadClassificationModel(): Promise<void> that calls pipeline('zero-shot-classification', 'Xenova/mobilebert-uncased-mnli') from @huggingface/transformers and stores the classifier in module-scoped variable. Wrap in try/catch: on failure, throw new CultivateStartupError('ML_MODEL_LOAD_FAILED', { model: 'Xenova/mobilebert-uncased-mnli', error: err.message }). Add isModelLoaded(): boolean check. The startup sequence calls loadClassificationModel() and blocks until complete — the model must be ready before processing signals.",
+        "dependencies": ["cft2-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Classifier stored as module singleton after successful load" },
+          { "id": "ac2", "description": "CultivateStartupError('ML_MODEL_LOAD_FAILED') thrown with model name and error details on failure" },
+          { "id": "ac3", "description": "isModelLoaded() returns true after successful load, false before" }
+        ]
+      },
+      {
+        "step_id": "cft2-s3",
+        "title": "Implement tier2Filter() zero-shot classification",
+        "scope": "cultivate",
+        "description": "Implement tier2Filter(text: string, threshold?: number): Promise<Tier2Result>. Uses the loaded classifier with candidate labels: ['product_feedback', 'bug_report', 'feature_request', 'question', 'noise']. The classifier returns scores for each label. Logic: find the top-scoring label. If top label is 'noise' OR top score < threshold (default 0.3), return { passed: false, feedback_score: topScore, category_hint: topLabel }. Otherwise return { passed: true, feedback_score: topScore, category_hint: topLabel }. The threshold is read from CultivateConfig.tier2_threshold.",
+        "dependencies": ["cft2-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Uses 5 candidate labels for zero-shot classification" },
+          { "id": "ac2", "description": "Signals classified as 'noise' are rejected regardless of score" },
+          { "id": "ac3", "description": "Signals with top score below threshold are rejected" },
+          { "id": "ac4", "description": "feedback_score and category_hint returned for both pass and fail" }
+        ]
+      },
+      {
+        "step_id": "cft2-s4",
+        "title": "Define Tier2Result type",
+        "scope": "cultivate",
+        "description": "Define Tier2Result type in src/filters/ml-classifier.ts (or in domain types): { passed: boolean, feedback_score: number, category_hint: 'product_feedback' | 'bug_report' | 'feature_request' | 'question' | 'noise' }. Also define Tier2CategoryLabel as the union type for the 5 categories. Export both types. The category_hint is used downstream by the scorer (strategic_fit factor) and by the UI for display.",
+        "dependencies": ["cft2-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tier2Result has passed, feedback_score, and category_hint fields" },
+          { "id": "ac2", "description": "Tier2CategoryLabel is a string union of the 5 categories" },
+          { "id": "ac3", "description": "Types exported for use by scorer and UI" }
+        ]
+      },
+      {
+        "step_id": "cft2-s5",
+        "title": "Add CultivateStartupError('ML_MODEL_LOAD_FAILED') integration",
+        "scope": "cultivate",
+        "description": "Ensure loadClassificationModel() properly integrates with the cultivate-errors feature. The CultivateStartupError should include diagnostics: { dependency: 'transformers.js', model: 'Xenova/mobilebert-uncased-mnli', cacheDir: the model cache path, error: original error message, hint: 'First run downloads ~100MB model. Check network connectivity and disk space.' }. Also verify the error is properly caught by the startup sequence (cultivate-startup feature) to produce clear console output via formatStartupDiagnostics().",
+        "dependencies": ["cft2-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Startup error includes model name, cache directory, and hint about first-run download" },
+          { "id": "ac2", "description": "formatStartupDiagnostics produces actionable output for ML_MODEL_LOAD_FAILED" },
+          { "id": "ac3", "description": "Error integrates with CultivateStartupError from cultivate-errors feature" }
+        ]
+      },
+      {
+        "step_id": "cft2-s6",
+        "title": "Handle per-signal failure for dead-letter",
+        "scope": "cultivate",
+        "description": "Wrap the classification call in tier2Filter with per-signal error handling. If the classifier throws for a specific signal (e.g., text too long, encoding issue, model runtime error), catch the error and throw SignalProcessingError with pipeline_step='tier2-classification' and the original error as cause. This allows the BullMQ worker to route the signal to dead-letter rather than crashing. The model itself remains loaded and functional for subsequent signals. Add a try/catch pattern that distinguishes model-level failures (re-throw as CultivateInternalError) from signal-level failures (throw as SignalProcessingError).",
+        "dependencies": ["cft2-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Per-signal classification error throws SignalProcessingError, not CultivateInternalError" },
+          { "id": "ac2", "description": "Model remains loaded after a per-signal failure" },
+          { "id": "ac3", "description": "SignalProcessingError includes pipeline_step='tier2-classification'" },
+          { "id": "ac4", "description": "Model-level catastrophic failure throws CultivateInternalError" }
+        ]
+      }
+    ]
+  }
+}

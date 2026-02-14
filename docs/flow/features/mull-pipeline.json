@@ -1,0 +1,164 @@
+{
+  "feature_id": "mull-pipeline",
+  "title": "Pipeline Orchestrator",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-adapter-system", "mull-deterministic-extraction", "mull-llm-synthesis", "mull-topic-file-system"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement the pipeline orchestrator that wires all stages together into the complete mull flow: load → extract → synthesize → merge → toc. This is src/index.ts — the public API surface. It handles: stage composition, incremental processing (cursor-based), idempotency guarantees, dry-run mode (extract without writing), result aggregation across multiple sessions (--all mode), error handling and partial failure recovery. The mull(sessionId, opts) function and createAdapter(type, config) factory are exported here.",
+    "acceptance_criteria": [
+      { "id": "mp-ac1", "description": "mull(sessionId, opts) executes the full pipeline: load session → build PreExtract → synthesize nuggets → merge into topic files → rebuild TOC" },
+      { "id": "mp-ac2", "description": "mull(sessionId, opts) returns MergeResult with topicsUpdated, topicsCreated, nuggetsWritten" },
+      { "id": "mp-ac3", "description": "opts includes: adapter (or adapters[]), memoryDir, llm config, dryRun flag, force flag" },
+      { "id": "mp-ac4", "description": "When dryRun is true, runs extraction and synthesis but skips merge and TOC rebuild, returns would-be MergeResult" },
+      { "id": "mp-ac5", "description": "When force is true, ignores cursor and re-processes entire session" },
+      { "id": "mp-ac6", "description": "After successful processing, updates cursor via adapter.setCursor()" },
+      { "id": "mp-ac7", "description": "mullAll(opts) lists sessions from all adapters, filters to unprocessed (no cursor or cursor < latest event), processes each" },
+      { "id": "mp-ac8", "description": "mullAll returns aggregate MergeResult summing all individual results" },
+      { "id": "mp-ac9", "description": "Idempotency: processing same session twice with same data produces identical topic file content" },
+      { "id": "mp-ac10", "description": "Partial failure: if LLM call fails, deterministic nuggets (trail decisions) are still written" },
+      { "id": "mp-ac11", "description": "createAdapter(type, config) exported for programmatic use" },
+      { "id": "mp-ac12", "description": "Config loading: resolveConfig(opts?) merges mull.config.json + package.json mull key + opts, with opts taking precedence" },
+      { "id": "mp-ac13", "description": "SessionRef routing: mull() accepts a SessionRef (plan_id, run_id, or channel discriminant) and routes to the correct adapter(s) based on the discriminant type" },
+      { "id": "mp-ac14", "description": "Partial failure handling: if LLM synthesis fails, pre-structured nuggets from trail decisions are still written to topic files (deterministic fallback path completes)" },
+      { "id": "mp-ac15", "description": "Idempotency guarantee for multi-adapter: same adapter set + same cursor state + same source data = identical output. Source data changes between runs produce different (but correct) output — this is expected and documented." }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is the composition layer — it doesn't implement any extraction or synthesis logic itself",
+        "The pipeline steps have clear data flow: SessionData → PreExtract → Nugget[] → MergeResult",
+        "Config resolution order: CLI flags > opts parameter > mull.config.json > package.json mull key > defaults",
+        "Zero-config: no config file and no opts → look for .trajectories/, use Haiku, write to ./memory/",
+        "mullAll is a batch orchestrator: list sessions, filter by cursor, process each, aggregate results",
+        "Partial failure recovery: if synthesis fails, extraction results are not lost — trail decisions can still be written",
+        "The idempotency guarantee comes from slug-based merge in the topic file system — this layer just ensures cursors track correctly"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-pipeline",
+    "version": 1,
+    "status": "draft",
+    "scopes": [
+      {
+        "scope_id": "mull-pipeline-core",
+        "name": "Pipeline Core",
+        "description": "The mull() and mullAll() functions, config resolution, SessionRef routing"
+      },
+      {
+        "scope_id": "mull-pipeline-resilience",
+        "name": "Pipeline Resilience",
+        "description": "Partial failure handling, idempotency guarantees, error recovery"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mp-s1",
+        "title": "Implement mull() pipeline function",
+        "scope": "mull-pipeline-core",
+        "description": "Build the main mull(sessionRef, opts) function that executes the full pipeline for a single session: 1) resolve config, 2) load session data from adapters (via SessionRef routing), 3) build PreExtract, 4) synthesize nuggets (with partial failure fallback), 5) merge into topic files (unless dryRun), 6) rebuild TOC (unless dryRun), 7) update cursor. Accepts SessionRef (plan_id, run_id, or channel discriminant) and routes to correct adapter(s). Returns MergeResult.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mp-s1-ac1", "description": "Executes full pipeline: load → extract → synthesize → merge → TOC" },
+          { "id": "mp-s1-ac2", "description": "Accepts SessionRef and routes to correct adapter(s) based on discriminant type" },
+          { "id": "mp-s1-ac3", "description": "Returns MergeResult with topicsUpdated, topicsCreated, nuggetsWritten" },
+          { "id": "mp-s1-ac4", "description": "dryRun mode: runs extraction + synthesis but skips merge and TOC, returns would-be result" },
+          { "id": "mp-s1-ac5", "description": "force mode: ignores cursor, re-processes entire session" },
+          { "id": "mp-s1-ac6", "description": "Updates cursor via adapter.setCursor() after successful processing" }
+        ],
+        "specification": "Location: src/index.ts. Export mull(sessionRef: string | SessionRef, opts?: MullOpts): Promise<MullResult>. MullOpts: { adapters?: SessionAdapter[], memoryDir?: string, llm?: LlmConfig, dryRun?: boolean, force?: boolean, mullDir?: string }. String sessionRef is shorthand for { type: 'plan_id', id: sessionRef }. Pipeline stages called sequentially with results threaded through. MullResult extends MergeResult with { sessionId, dryRun, llmUsed, llmFailed }."
+      },
+      {
+        "step_id": "mp-s2",
+        "title": "Implement mullAll() batch function",
+        "scope": "mull-pipeline-core",
+        "description": "Build mullAll(opts) that lists sessions from all configured adapters, filters to unprocessed sessions (no cursor or cursor timestamp < latest event in source), and processes each through mull(). Returns aggregate MergeResult summing all individual session results. Processes sessions sequentially by default (parallel option future). Tracks per-session success/failure for reporting.",
+        "dependencies": ["mp-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mp-s2-ac1", "description": "Lists sessions from all adapters, filters to unprocessed" },
+          { "id": "mp-s2-ac2", "description": "Processes each unprocessed session through mull()" },
+          { "id": "mp-s2-ac3", "description": "Returns aggregate MergeResult summing all individual results" },
+          { "id": "mp-s2-ac4", "description": "Tracks per-session success/failure in result" },
+          { "id": "mp-s2-ac5", "description": "Continues processing remaining sessions if one session fails" }
+        ],
+        "specification": "Location: src/index.ts. Export mullAll(opts?: MullAllOpts): Promise<MullAllResult>. MullAllOpts extends MullOpts. MullAllResult: { aggregate: MergeResult, sessions: { sessionId: string, result: MullResult | null, error?: string }[], processed: number, failed: number, skipped: number }. Sequential processing with try/catch per session."
+      },
+      {
+        "step_id": "mp-s3",
+        "title": "Implement resolveConfig",
+        "scope": "mull-pipeline-core",
+        "description": "Build resolveConfig(opts?) that merges configuration from multiple sources in precedence order: opts parameter > mull.config.json (in cwd) > package.json 'mull' key > defaults. Defaults: memoryDir='./memory', mullDir='.mull', adapters=[trajectory adapter with dir='.trajectories/']. Config schema validated with Zod. Returns fully resolved MullConfig.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mp-s3-ac1", "description": "Reads mull.config.json from cwd if it exists" },
+          { "id": "mp-s3-ac2", "description": "Reads package.json 'mull' key if it exists" },
+          { "id": "mp-s3-ac3", "description": "Precedence: opts > mull.config.json > package.json > defaults" },
+          { "id": "mp-s3-ac4", "description": "Defaults: memoryDir='./memory', mullDir='.mull', trajectory adapter with dir='.trajectories/'" },
+          { "id": "mp-s3-ac5", "description": "Config validated with Zod schema" }
+        ],
+        "specification": "Location: src/config.ts. Export resolveConfig(opts?: Partial<MullConfig>): MullConfig. MullConfig: { memoryDir: string, mullDir: string, adapters: AdapterConfig[], llm?: LlmConfig }. Use fs.existsSync for file detection. deepMerge for combining configs (arrays are replaced, not merged). Zod schema: MullConfigSchema."
+      },
+      {
+        "step_id": "mp-s4",
+        "title": "Implement SessionRef routing logic",
+        "scope": "mull-pipeline-core",
+        "description": "Build the SessionRef routing that maps discriminated session references to the correct adapter(s). SessionRef is a discriminated union: { type: 'plan_id', id } routes to trajectory adapter, { type: 'run_id', id } routes to forge/relay adapter, { type: 'channel', id } routes to relay adapter. String session IDs default to plan_id type. Routing selects the appropriate adapter(s) from the configured set.",
+        "dependencies": ["mp-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mp-s4-ac1", "description": "plan_id SessionRef routes to trajectory adapter" },
+          { "id": "mp-s4-ac2", "description": "run_id SessionRef routes to forge/relay adapter" },
+          { "id": "mp-s4-ac3", "description": "channel SessionRef routes to relay adapter" },
+          { "id": "mp-s4-ac4", "description": "String session IDs default to plan_id type" },
+          { "id": "mp-s4-ac5", "description": "Throws descriptive error if no matching adapter found in configured set" }
+        ],
+        "specification": "Location: src/routing.ts. Export resolveAdapters(sessionRef: string | SessionRef, adapters: SessionAdapter[]): SessionAdapter[]. SessionRef: { type: 'plan_id' | 'run_id' | 'channel', id: string }. Each adapter has a 'type' property used for matching. Return filtered adapter array. Throw if empty result."
+      },
+      {
+        "step_id": "mp-s5",
+        "title": "Implement partial failure handling",
+        "scope": "mull-pipeline-resilience",
+        "description": "Build the partial failure handling that ensures trail decision nuggets are always written even when LLM synthesis fails. In the mull() pipeline: if synthesizeNuggets throws (LLM error), catch the error, log it, and fall back to only the pre-structured nuggets (trail decision shortcut). These nuggets are still merged into topic files and the TOC is still rebuilt. The MullResult includes llmFailed flag. Document idempotency guarantee: same adapters + same cursors + same source data = identical output.",
+        "dependencies": ["mp-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mp-s5-ac1", "description": "LLM synthesis failure caught, logged, and does not abort pipeline" },
+          { "id": "mp-s5-ac2", "description": "Pre-structured trail decision nuggets still written to topic files on LLM failure" },
+          { "id": "mp-s5-ac3", "description": "TOC still rebuilt even when LLM fails" },
+          { "id": "mp-s5-ac4", "description": "MullResult includes llmFailed boolean flag" },
+          { "id": "mp-s5-ac5", "description": "Idempotency: same adapter set + same cursor state + same source data = identical output" },
+          { "id": "mp-s5-ac6", "description": "Cursor still updated after partial success (trail nuggets written)" }
+        ],
+        "specification": "In src/index.ts mull() function: wrap synthesizeNuggets call in try/catch. On catch: log error, set llmFailed=true, use only convertPreStructuredFacts(preExtract.facts) for nuggets. Continue with merge and TOC. Idempotency documented in JSDoc: deterministic extraction + slug-based merge = identical output for identical inputs."
+      },
+      {
+        "step_id": "mp-s6",
+        "title": "Write pipeline orchestrator tests",
+        "scope": "mull-pipeline-core",
+        "description": "Comprehensive test suite for the pipeline orchestrator. Tests: mull() full pipeline execution end-to-end, dry-run mode (no files written), force mode (cursor ignored), SessionRef routing to correct adapters, resolveConfig precedence (opts > config file > defaults), mullAll() batch processing with aggregation, partial failure (LLM fails but trail nuggets written), idempotency (re-run produces identical output), cursor updated after success, multi-adapter idempotency guarantee.",
+        "dependencies": ["mp-s1", "mp-s2", "mp-s3", "mp-s4", "mp-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mp-s6-ac1", "description": "End-to-end test: mull() processes session through all stages, produces correct MergeResult" },
+          { "id": "mp-s6-ac2", "description": "Dry-run test: no files written, MergeResult still returned" },
+          { "id": "mp-s6-ac3", "description": "Force test: cursor ignored, full session reprocessed" },
+          { "id": "mp-s6-ac4", "description": "SessionRef routing test: plan_id/run_id/channel route to correct adapters" },
+          { "id": "mp-s6-ac5", "description": "Config resolution test: opts override config file, config file overrides defaults" },
+          { "id": "mp-s6-ac6", "description": "mullAll test: batch processes multiple sessions, aggregates results, handles per-session failures" },
+          { "id": "mp-s6-ac7", "description": "Partial failure test: LLM error still produces trail decision nuggets in topic files" },
+          { "id": "mp-s6-ac8", "description": "Idempotency test: two runs with same data produce identical topic file content" }
+        ],
+        "specification": "Location: src/__tests__/pipeline.test.ts. Use Vitest. Create mock adapters, mock LLM (via vi.mock). Use tmp directories for memory/ and .mull/. Create fixture SessionData with mix of trail decisions and other events. For idempotency test: run mull() twice, compare topic file contents byte-for-byte."
+      }
+    ]
+  }
+}

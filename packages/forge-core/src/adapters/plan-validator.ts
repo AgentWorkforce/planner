@@ -1,4 +1,4 @@
-import type { ForgePlan } from '../domain/types.js';
+import type { ForgePlan, ForgeStep, Task } from '../domain/types.js';
 
 /**
  * Validation error types.
@@ -324,4 +324,88 @@ export function getTopologicalOrder(plan: ForgePlan): string[] | null {
   }
 
   return result;
+}
+
+/**
+ * Computes dependency tiers from a DAG of steps.
+ * Tier 0 = no dependencies, Tier N = max(dependency tiers) + 1.
+ * Returns null if the graph has cycles.
+ */
+export function computeDependencyTiers(steps: ForgeStep[]): Map<string, number> | null {
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+  const tiers = new Map<string, number>();
+
+  for (const step of steps) {
+    inDegree.set(step.step_id, step.dependencies.length);
+    adjacency.set(step.step_id, []);
+  }
+
+  for (const step of steps) {
+    for (const dep of step.dependencies) {
+      adjacency.get(dep)?.push(step.step_id);
+    }
+  }
+
+  // Seed tier 0: nodes with no dependencies
+  const queue: string[] = [];
+  for (const step of steps) {
+    if (step.dependencies.length === 0) {
+      queue.push(step.step_id);
+      tiers.set(step.step_id, 0);
+    }
+  }
+
+  let processed = 0;
+
+  while (queue.length > 0) {
+    const stepId = queue.shift()!;
+    processed++;
+    const currentTier = tiers.get(stepId)!;
+
+    for (const dependent of adjacency.get(stepId) || []) {
+      // Dependent's tier = max of all its resolved dependency tiers + 1
+      const existingTier = tiers.get(dependent) ?? 0;
+      tiers.set(dependent, Math.max(existingTier, currentTier + 1));
+
+      const newDegree = (inDegree.get(dependent) || 0) - 1;
+      inDegree.set(dependent, newDegree);
+      if (newDegree === 0) {
+        queue.push(dependent);
+      }
+    }
+  }
+
+  if (processed !== steps.length) {
+    return null; // Cycle detected
+  }
+
+  return tiers;
+}
+
+/**
+ * Groups tasks by (scope, tier) key.
+ * Key format: "scope:tierN" (e.g., "api:tier0", "frontend:tier1").
+ * Tasks without scope use "default" as the scope.
+ */
+export function groupByScopeTier(
+  tasks: Task[],
+  tierMap: Map<string, number>
+): Map<string, Task[]> {
+  const groups = new Map<string, Task[]>();
+
+  for (const task of tasks) {
+    const scope = task.scope ?? 'default';
+    const tier = tierMap.get(task.step_id) ?? 0;
+    const key = `${scope}:tier${tier}`;
+
+    const group = groups.get(key);
+    if (group) {
+      group.push(task);
+    } else {
+      groups.set(key, [task]);
+    }
+  }
+
+  return groups;
 }

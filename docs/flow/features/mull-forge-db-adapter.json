@@ -1,0 +1,196 @@
+{
+  "feature_id": "mull-forge-db-adapter",
+  "title": "Forge DB Trajectory & Retrospective Adapter",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types", "mull-adapter-system"],
+  "parent": "mull-integration",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement a SessionAdapter that reads from forge.db — the richest data source. Three tables, 40+ event types, structured retrospectives, and user trajectory data. Sessions are identified by run_id. Key mappings: TrajectoryEvent (40+ types with JSON payloads) -> SessionEvent[], retrospective_recorded payload -> Retrospective with full richness (approach, decisions[], challenges[], learnings[], suggestions[], confidence), UserTrajectoryEvent -> high-signal Decision candidates, DerivedPreference -> Context nugget candidates with confidence metadata. This adapter filters to high-signal event types — not all 40+ types are useful for knowledge extraction.",
+    "acceptance_criteria": [
+      { "id": "mfda-ac1", "description": "Adapter reads from forge.db using better-sqlite3 with { readonly: true }" },
+      { "id": "mfda-ac2", "description": "Sessions identified by run_id — listSessions returns distinct run_ids from trajectory_events table" },
+      { "id": "mfda-ac3", "description": "TrajectoryEvent.event_type filtered to 11 high-signal types: decision_recorded, checkpoint_created, retrospective_recorded, agent_spawned, task_completed, task_failed, gate_reached, gate_approved, gate_rejected, budget_warning, recovery_strategy_selected" },
+      { "id": "mfda-ac4", "description": "decision_recorded events -> Decision with question, chosen, reasoning from payload fields: payload.question, payload.selected_option, payload.reasoning" },
+      { "id": "mfda-ac5", "description": "retrospective_recorded events -> Retrospective with all fields: summary, approach, decisions[] (with linked_event_ids), challenges[], learnings[], suggestions[], confidence" },
+      { "id": "mfda-ac6", "description": "agent_spawned events -> SessionEvent with type agent_spawned, payload.agent_name, payload.task_description" },
+      { "id": "mfda-ac7", "description": "task_completed/task_failed events -> SessionEvent with payload.task_id, payload.outcome, payload.duration_ms, payload.error (for failed)" },
+      { "id": "mfda-ac8", "description": "gate_reached/gate_approved/gate_rejected events -> SessionEvent with payload.gate_id, payload.gate_type, payload.approver (for approved/rejected), payload.reason" },
+      { "id": "mfda-ac9", "description": "recovery_strategy_selected events -> SessionEvent with payload.strategy_name, payload.alternatives_considered[], payload.reasoning" },
+      { "id": "mfda-ac10", "description": "budget_warning events -> SessionEvent with payload.budget_type, payload.current_usage, payload.threshold, payload.recommendation" },
+      { "id": "mfda-ac11", "description": "checkpoint_created events -> SessionEvent with payload.checkpoint_id, payload.description, payload.state_snapshot" },
+      { "id": "mfda-ac12", "description": "UserTrajectoryEvent loaded separately from user_trajectory_events table — NOT keyed by run_id but by user_id with scope (global/project/run). Loaded via loadUserTrajectory(userId, scope?) method" },
+      { "id": "mfda-ac13", "description": "DerivedPreference loaded separately from user_preferences table (NOT derived_preferences) — keyed by user_id with scope, loaded via loadDerivedPreferences(userId, scope?). Tagged with confidence score and evidence_count for nugget metadata" },
+      { "id": "mfda-ac14", "description": "Retrospective.decisions[].linked_event_ids creates causal links between nuggets" },
+      { "id": "mfda-ac15", "description": "getCursor/setCursor track last processed timestamp per run_id for trajectory_events, separate cursor for user_trajectory_events" },
+      { "id": "mfda-ac16", "description": "Read-only: never modify forge.db" },
+      { "id": "mfda-ac17", "description": "Config: { dbPath: string, includeUserTrajectory?: boolean, includePreferences?: boolean }" },
+      { "id": "mfda-ac18", "description": "Payload parsing is defensive — each event type has its own parser with try/catch, malformed payloads logged and skipped rather than crashing" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is the most complex adapter: 3 tables, 40+ event types, JSON payloads that need type-specific parsing",
+        "High-signal filtering is critical: agent_progress and agent_tool_call events are noise for mull — skip them",
+        "Retrospective is the highest-value input: already structured as summary + decisions with reasoning + learnings",
+        "Retrospective.decisions[].linked_event_ids enables causal graph: decision A led to decision B",
+        "UserTrajectoryEvent captures repeated user decisions — if user always chooses X for question pattern Y, that's a Pattern nugget",
+        "DerivedPreference with confidence > 0.7 represents strong user preferences — these are Context nuggets",
+        "TrajectoryEvent.payload is a JSON string — each event_type has a different payload schema (validated by Zod in forge-core)",
+        "Event type -> SessionEvent type mapping needs a lookup table, not a giant if/else",
+        "UserTrajectoryEvent and DerivedPreference are per-user with scope, NOT per-run — they need separate loading methods outside the run-based session model"
+      ],
+      "concerns": [
+        "Payload schema changes in forge-core would break this adapter — need version awareness or defensive parsing",
+        "40+ event types but only ~11 are high-signal — the filter list needs to be configurable or at least documented",
+        "UserTrajectoryEvent and DerivedPreference are orthogonal to run_id — they have their own lifecycle. Solved with separate loadUserTrajectory/loadDerivedPreferences methods outside the SessionAdapter.getSession contract."
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "version": 1,
+    "scopes": ["mull"],
+    "steps": [
+      {
+        "step_id": "mfda-s1",
+        "title": "Create ForgeDbAdapter class with read-only connection",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/forge-db-adapter.ts. Implement class ForgeDbAdapter that implements SessionAdapter plus additional methods for user trajectory and derived preferences. Constructor accepts { dbPath: string, includeUserTrajectory?: boolean, includePreferences?: boolean }. Opens forge.db with better-sqlite3({ readonly: true }). Do NOT extend BaseSqliteStorage. Store config flags for optional data sources.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s1-ac1", "description": "ForgeDbAdapter class created implementing SessionAdapter" },
+          { "id": "mfda-s1-ac2", "description": "Constructor opens forge.db with { readonly: true }" },
+          { "id": "mfda-s1-ac3", "description": "Stores includeUserTrajectory and includePreferences config flags" },
+          { "id": "mfda-s1-ac4", "description": "Does NOT extend BaseSqliteStorage" }
+        ],
+        "specification": "Location: packages/mull/src/adapters/forge-db-adapter.ts. Uses better-sqlite3 directly (NOT @plannr/storage-base BaseSqliteStorage). Config type: ForgeDbAdapterConfig = { dbPath: string, includeUserTrajectory?: boolean, includePreferences?: boolean }. Implements SessionAdapter (listSessions, getSession, getCursor, setCursor, close). Additional methods: loadUserTrajectory(), loadDerivedPreferences(). DB opened with new Database(dbPath, { readonly: true })."
+      },
+      {
+        "step_id": "mfda-s2",
+        "title": "Define high-signal event type registry with payload field maps",
+        "scope": "mull",
+        "description": "Create a HIGH_SIGNAL_EVENTS constant map that defines the 11 high-signal event types and their payload field names for extraction. This serves as both the filter set and the documentation of what fields each event type provides:\n\n- decision_recorded: { question, selected_option, reasoning, alternatives }\n- checkpoint_created: { checkpoint_id, description, state_snapshot }\n- retrospective_recorded: { summary, approach, decisions[], challenges[], learnings[], suggestions[], confidence }\n- agent_spawned: { agent_name, task_description, agent_role }\n- task_completed: { task_id, outcome, duration_ms, result_summary }\n- task_failed: { task_id, error, duration_ms, failure_reason, recovery_attempted }\n- gate_reached: { gate_id, gate_type, description }\n- gate_approved: { gate_id, gate_type, approver, reason }\n- gate_rejected: { gate_id, gate_type, approver, reason, required_changes }\n- budget_warning: { budget_type, current_usage, threshold, recommendation }\n- recovery_strategy_selected: { strategy_name, alternatives_considered[], reasoning, context }\n\nExport this map so tests and documentation can reference it.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s2-ac1", "description": "HIGH_SIGNAL_EVENTS map defines all 11 event types with their payload field names" },
+          { "id": "mfda-s2-ac2", "description": "Map is exported for use by tests and other modules" },
+          { "id": "mfda-s2-ac3", "description": "Each entry documents the expected payload fields for that event type" }
+        ],
+        "specification": "The registry pattern avoids a giant if/else chain in the parser. Each entry in the map provides: eventType string, payloadFields string[] (expected field names), and a mapToSessionEvent function or at minimum the target SessionEvent type."
+      },
+      {
+        "step_id": "mfda-s3",
+        "title": "Implement per-event-type payload parsers",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/forge-payload-parsers.ts. Implement a parser function for each of the 11 high-signal event types. Each parser: 1) Takes a raw JSON payload string, 2) Calls JSON.parse wrapped in try/catch, 3) Extracts the documented fields from the parsed object, 4) Returns a typed SessionEvent or Decision or Retrospective. Parsers are defensive — missing fields get defaults, malformed JSON returns null with a logged warning. The retrospective_recorded parser is the most complex: it must extract decisions[] with their linked_event_ids[], challenges[], learnings[], suggestions[], and confidence score.",
+        "dependencies": ["mfda-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s3-ac1", "description": "One parser function per high-signal event type (11 total)" },
+          { "id": "mfda-s3-ac2", "description": "Each parser handles malformed JSON gracefully — returns null, logs warning" },
+          { "id": "mfda-s3-ac3", "description": "retrospective_recorded parser extracts full Retrospective structure including decisions[].linked_event_ids" },
+          { "id": "mfda-s3-ac4", "description": "decision_recorded parser maps to Decision with source='trail'" },
+          { "id": "mfda-s3-ac5", "description": "All parsers provide sensible defaults for missing optional fields" }
+        ],
+        "specification": "Location: packages/mull/src/adapters/forge-payload-parsers.ts. Export one function per event type: parseDecisionRecorded(payload: string): Decision | null, parseRetrospectiveRecorded(payload: string): Retrospective | null, etc. Each wraps JSON.parse in try/catch. The retrospective parser must handle nested decisions[].linked_event_ids as string[] and map to causal slug references. decision_recorded sets Decision.source = 'trail' because forge decisions are well-structured. Default missing string fields to '', missing arrays to [], missing numbers to 0."
+      },
+      {
+        "step_id": "mfda-s4",
+        "title": "Implement listSessions and getSession for run-based trajectory events",
+        "scope": "mull",
+        "description": "Implement listSessions: SELECT DISTINCT run_id, MIN(timestamp), MAX(timestamp), COUNT(*) FROM trajectory_events WHERE event_type IN (high-signal list) GROUP BY run_id. Supports after/before filtering. Implement getSession(runId): SELECT * FROM trajectory_events WHERE run_id = ? AND event_type IN (high-signal list) ORDER BY timestamp ASC. For each row, look up the event_type in HIGH_SIGNAL_EVENTS and dispatch to the appropriate payload parser. Collect results into SessionData with decisions[], events[], retrospectives[].",
+        "dependencies": ["mfda-s1", "mfda-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s4-ac1", "description": "listSessions returns distinct run_ids with event counts, filtered to high-signal types only" },
+          { "id": "mfda-s4-ac2", "description": "getSession dispatches each event row to the correct payload parser" },
+          { "id": "mfda-s4-ac3", "description": "SessionData separates decisions, events, and retrospectives into typed arrays" },
+          { "id": "mfda-s4-ac4", "description": "SQL IN clause uses the HIGH_SIGNAL_EVENTS keys, not hardcoded strings" }
+        ],
+        "specification": "Location: packages/mull/src/adapters/forge-db-adapter.ts (methods on ForgeDbAdapter class). listSessions SQL: SELECT DISTINCT run_id, MIN(timestamp) as first_event, MAX(timestamp) as last_event, COUNT(*) as event_count FROM trajectory_events WHERE event_type IN (...) GROUP BY run_id. Build IN clause dynamically from Object.keys(HIGH_SIGNAL_EVENTS). getSession SQL: SELECT * FROM trajectory_events WHERE run_id = ? AND event_type IN (...) ORDER BY timestamp ASC. Dispatch each row via: HIGH_SIGNAL_EVENTS[row.event_type].parser(row.payload)."
+      },
+      {
+        "step_id": "mfda-s5",
+        "title": "Implement separate user trajectory and derived preference loading",
+        "scope": "mull",
+        "description": "Add two methods outside the SessionAdapter contract (these are ForgeDbAdapter-specific):\n\n1) loadUserTrajectory(userId: string, scope?: 'global' | 'project' | 'run'): UserTrajectoryDecision[]\n   Query user_trajectory_events WHERE user_id = ? AND (scope = ? if provided) ORDER BY timestamp ASC.\n   Map each row to a Decision candidate with scope metadata. These represent repeated user choices across runs.\n\n2) loadDerivedPreferences(userId: string, scope?: 'global' | 'project' | 'run'): DerivedPreferenceCandidate[]\n   Query user_preferences WHERE user_id = ? AND (scope = ? if provided).\n   Map each row to a Context nugget candidate tagged with confidence and evidence_count.\n   Only return preferences with confidence > configurable threshold (default 0.5).\n\nThese are NOT per-run — they aggregate across runs and have their own cursor tracking separate from run-based cursors.",
+        "dependencies": ["mfda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s5-ac1", "description": "loadUserTrajectory queries user_trajectory_events by user_id and optional scope" },
+          { "id": "mfda-s5-ac2", "description": "loadDerivedPreferences queries user_preferences table by user_id and optional scope" },
+          { "id": "mfda-s5-ac3", "description": "DerivedPreference results include confidence and evidence_count metadata" },
+          { "id": "mfda-s5-ac4", "description": "Both methods have separate cursor files from run-based trajectory cursors" },
+          { "id": "mfda-s5-ac5", "description": "Preferences filtered by configurable confidence threshold (default 0.5)" }
+        ],
+        "specification": "UserTrajectoryEvent and DerivedPreference are per-user with scope — they are NOT tied to a specific run. They represent accumulated knowledge about user preferences across the entire system. The loadUserTrajectory method returns Decision candidates that can be fed into mull's deterministic layer. The loadDerivedPreferences method returns Context nugget candidates that can be directly promoted to topics."
+      },
+      {
+        "step_id": "mfda-s6",
+        "title": "Implement cursor tracking for run-based and user-based data",
+        "scope": "mull",
+        "description": "Implement two cursor tracks:\n\n1) Run-based cursors: .mull/cursors/forge/runs/{run_id}.json with { lastTimestamp, lastProcessedAt }. Used by getSession to incrementally fetch only new trajectory_events.\n\n2) User-based cursors: .mull/cursors/forge/users/{user_id}.json with { lastTrajectoryTimestamp, lastPreferenceTimestamp, lastProcessedAt }. Used by loadUserTrajectory and loadDerivedPreferences for incremental processing.\n\ngetCursor/setCursor methods accept a type parameter to distinguish: getCursor(id, 'run') vs getCursor(id, 'user').",
+        "dependencies": ["mfda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s6-ac1", "description": "Run-based cursors stored in .mull/cursors/forge/runs/{run_id}.json" },
+          { "id": "mfda-s6-ac2", "description": "User-based cursors stored in .mull/cursors/forge/users/{user_id}.json" },
+          { "id": "mfda-s6-ac3", "description": "getCursor accepts type parameter ('run' | 'user') to select cursor track" },
+          { "id": "mfda-s6-ac4", "description": "getSession respects run cursor for incremental trajectory_events fetching" },
+          { "id": "mfda-s6-ac5", "description": "loadUserTrajectory and loadDerivedPreferences respect user cursor" }
+        ],
+        "specification": "Location: cursor methods on ForgeDbAdapter. Run cursors at .mull/cursors/forge/runs/{run_id}.json. User cursors at .mull/cursors/forge/users/{user_id}.json. getCursor overloaded: getCursor(id: string, type: 'run' | 'user'). Use fs.readFileSync with try/catch for missing files. setCursor writes JSON with fs.writeFileSync after mkdirSync({ recursive: true }). getSession adds WHERE timestamp > ? when run cursor exists."
+      },
+      {
+        "step_id": "mfda-s7",
+        "title": "Write tests with in-memory SQLite",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/__tests__/forge-db-adapter.test.ts. Use better-sqlite3 ':memory:' to create test database with trajectory_events, user_trajectory_events, and user_preferences tables. Test each of the 11 event type parsers with known payloads. Test: listSessions filtering, getSession with mixed event types, retrospective extraction with linked_event_ids, user trajectory loading by scope, derived preference confidence filtering, cursor tracking for both run-based and user-based data, malformed payload handling, empty result sets. Use Vitest.",
+        "dependencies": ["mfda-s4", "mfda-s5", "mfda-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mfda-s7-ac1", "description": "Tests create in-memory SQLite with all 3 forge table schemas (trajectory_events, user_trajectory_events, user_preferences)" },
+          { "id": "mfda-s7-ac2", "description": "Each of 11 event type parsers tested with valid and malformed payloads" },
+          { "id": "mfda-s7-ac3", "description": "Tests cover user trajectory and derived preference loading with scope filtering" },
+          { "id": "mfda-s7-ac4", "description": "Tests cover both cursor tracks (run-based and user-based)" },
+          { "id": "mfda-s7-ac5", "description": "All tests pass with Vitest" }
+        ]
+      }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "mfda-ac1", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:103-104" },
+      { "id": "mfda-ac2", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:143-177" },
+      { "id": "mfda-ac3", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:68-80" },
+      { "id": "mfda-ac4", "status": "partial", "note": "Uses 'decision' field not 'question'; no 'selected_option' extracted" },
+      { "id": "mfda-ac5", "status": "partial", "note": "Returns JSON string not structured Retrospective object" },
+      { "id": "mfda-ac6", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac7", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac8", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac9", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac10", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac11", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:261-272" },
+      { "id": "mfda-ac12", "status": "partial", "note": "loadUserTrajectory missing scope parameter" },
+      { "id": "mfda-ac13", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:193-207" },
+      { "id": "mfda-ac14", "status": "missing", "note": "linked_event_ids left in JSON string, no causal link extraction" },
+      { "id": "mfda-ac15", "status": "missing", "note": "No getCursor/setCursor on adapter; cursor handled by loader" },
+      { "id": "mfda-ac16", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:103" },
+      { "id": "mfda-ac17", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:5-12" },
+      { "id": "mfda-ac18", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/forge-db-adapter.ts:280-287" }
+    ],
+    "drift": [
+      { "finding": "ForgeDbAdapter not registered in factory.ts, schemas.ts, or core-types.ts AdapterType", "file": "packages/mull/src/adapters/factory.ts", "action": "add forge to factory and routing" },
+      { "finding": "Not in ADAPTER_ROUTING in loader.ts", "file": "packages/mull/src/adapters/loader.ts", "action": "add forge to run routing" },
+      { "finding": "No per-event-type parsers module as planned", "file": "packages/mull/src/adapters/implementations/forge-db-adapter.ts", "action": "document inline approach" }
+    ]
+  }
+}

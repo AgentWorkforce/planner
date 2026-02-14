@@ -30,6 +30,7 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
           source: params.source,
           understanding: params.understanding,
           initiative_id: params.initiative_id,
+          ...(params.steps && { steps: params.steps }),
         }),
       });
 
@@ -58,6 +59,7 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
           goal: params.goal,
           context: params.context,
           understanding: params.understanding,
+          ...(params.steps && { steps: params.steps }),
         }),
       });
 
@@ -67,11 +69,11 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
       }
 
       const data = await response.json() as {
-        version: number;
+        version: { version: number };
       };
       return {
         plan_id: params.plan_id,
-        version: data.version,
+        version: data.version.version,
       };
     },
 
@@ -89,6 +91,44 @@ export function createHttpPlannerClient(config: HttpPlannerClientConfig): Planne
       if (!response.ok) {
         const error = await response.text();
         throw new Error(`Planner API error: ${response.status} ${error}`);
+      }
+    },
+
+    async linkProjectPlan(params) {
+      try {
+        // Find project by session_id
+        const listResponse = await fetch(
+          `${baseUrl}/api/projects?session_id=${encodeURIComponent(params.session_id)}`,
+        );
+
+        if (!listResponse.ok) {
+          console.warn(`[PlannerClient] Failed to list projects for session ${params.session_id}: ${listResponse.status}`);
+          return;
+        }
+
+        const listData = await listResponse.json() as { projects: Array<{ id: string }> };
+        const project = listData.projects[0];
+
+        if (!project) {
+          console.warn(`[PlannerClient] No project found for session ${params.session_id}`);
+          return;
+        }
+
+        // Update project with plan_id
+        const updateResponse = await fetch(`${baseUrl}/api/projects/${project.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan_id: params.plan_id }),
+        });
+
+        if (!updateResponse.ok) {
+          console.warn(`[PlannerClient] Failed to link project ${project.id} to plan ${params.plan_id}: ${updateResponse.status}`);
+          return;
+        }
+
+        console.log(`[PlannerClient] Linked project ${project.id} to plan ${params.plan_id}`);
+      } catch (error) {
+        console.warn('[PlannerClient] Error linking project to plan:', error);
       }
     },
   };
@@ -127,6 +167,10 @@ export function createMockPlannerClient(): PlannerClient {
     },
 
     async updatePlan(_params) {
+      // Mock - no-op
+    },
+
+    async linkProjectPlan(_params) {
       // Mock - no-op
     },
   };

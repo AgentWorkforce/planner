@@ -28,6 +28,8 @@ export interface QueuedTask {
   step_id: string;
   /** Scope for per-scope limits (optional) */
   scope?: string;
+  /** Creation timestamp for stable ordering (plan step order) */
+  created_at?: string;
 }
 
 /**
@@ -77,6 +79,12 @@ export class TaskQueue {
   /**
    * Gets the next batch of ready tasks to execute, respecting parallelism limits.
    *
+   * Strategy:
+   * 1. Group ready tasks by scope
+   * 2. Apply per-scope limit to each group (default 2 per scope)
+   * 3. Apply global limit across all selected tasks
+   * 4. This prevents any single scope from monopolizing all agent slots
+   *
    * @param allReadyTasks - All tasks that are ready to execute (dependencies met)
    * @param currentlyRunning - Tasks currently being executed
    * @returns Subset of ready tasks that can be started
@@ -87,7 +95,7 @@ export class TaskQueue {
   ): QueuedTask[] {
     const runningCount = currentlyRunning.length;
     const globalLimit = this.config.max_concurrent_tasks;
-    const perScopeLimit = this.config.max_concurrent_per_scope;
+    const perScopeLimit = this.config.max_concurrent_per_scope ?? 2; // Default: 2 per scope
 
     // Calculate available global slots
     const availableGlobalSlots = Math.max(0, globalLimit - runningCount);
@@ -104,43 +112,58 @@ export class TaskQueue {
     // Build running counts by scope
     const runningByScope = this.countByScope(currentlyRunning);
 
-    // Select tasks respecting both global and per-scope limits
-    const selected: QueuedTask[] = [];
-    const selectedByScope: Record<string, number> = {};
-
+    // Group ready tasks by scope
+    const tasksByScope = new Map<string, QueuedTask[]>();
     for (const task of sortedReady) {
-      // Check global limit
+      const scopeKey = task.scope ?? 'default';
+      if (!tasksByScope.has(scopeKey)) {
+        tasksByScope.set(scopeKey, []);
+      }
+      tasksByScope.get(scopeKey)!.push(task);
+    }
+
+    // Select tasks respecting both per-scope and global limits
+    const selected: QueuedTask[] = [];
+
+    // Iterate through scopes and select up to per-scope limit from each
+    for (const [scopeKey, scopeTasks] of tasksByScope.entries()) {
+      const scope = scopeKey === 'default' ? undefined : scopeKey;
+      const scopeRunning = runningByScope[scopeKey] ?? 0;
+
+      // Calculate how many more tasks this scope can run
+      const scopeAvailable = perScopeLimit - scopeRunning;
+      if (scopeAvailable <= 0) {
+        continue; // Scope is at capacity
+      }
+
+      // Select up to scopeAvailable tasks from this scope
+      let selectedFromScope = 0;
+      for (const task of scopeTasks) {
+        // Check sequential preference - if enabled, only allow first task per scope
+        if (this.config.prefer_sequential_in_scope && scope) {
+          if (scopeRunning > 0 || selectedFromScope > 0) {
+            // Already have a task for this scope, skip remaining
+            break;
+          }
+        }
+
+        // Check if we've hit the per-scope limit for this iteration
+        if (selectedFromScope >= scopeAvailable) {
+          break;
+        }
+
+        // Check global limit
+        if (selected.length >= availableGlobalSlots) {
+          break;
+        }
+
+        selected.push(task);
+        selectedFromScope++;
+      }
+
+      // If we've filled all global slots, stop processing scopes
       if (selected.length >= availableGlobalSlots) {
         break;
-      }
-
-      // Check per-scope limit if configured
-      if (perScopeLimit !== undefined && task.scope) {
-        const scopeRunning = runningByScope[task.scope] ?? 0;
-        const scopeSelected = selectedByScope[task.scope] ?? 0;
-        const scopeTotal = scopeRunning + scopeSelected;
-
-        if (scopeTotal >= perScopeLimit) {
-          // This scope is at capacity, skip this task
-          continue;
-        }
-      }
-
-      // Check sequential preference - if enabled, only allow first task per scope
-      if (this.config.prefer_sequential_in_scope && task.scope) {
-        const scopeRunning = runningByScope[task.scope] ?? 0;
-        const scopeSelected = selectedByScope[task.scope] ?? 0;
-
-        if (scopeRunning > 0 || scopeSelected > 0) {
-          // Already have a task for this scope, skip
-          continue;
-        }
-      }
-
-      // Task can be selected
-      selected.push(task);
-      if (task.scope) {
-        selectedByScope[task.scope] = (selectedByScope[task.scope] ?? 0) + 1;
       }
     }
 
@@ -225,7 +248,9 @@ export class TaskQueue {
   // ============================================
 
   /**
-   * Sorts tasks by scope, then by step_id within scope.
+   * Sorts tasks by scope, then by creation order within scope.
+   * created_at reflects plan step order (tasks are inserted in step_order).
+   * Falls back to step_id alphabetical if created_at is missing.
    */
   private sortByScope(tasks: QueuedTask[]): QueuedTask[] {
     return [...tasks].sort((a, b) => {
@@ -235,7 +260,11 @@ export class TaskQueue {
       if (scopeA !== scopeB) {
         return scopeA.localeCompare(scopeB);
       }
-      // Then sort by step_id within scope
+      // Then sort by creation order within scope (plan step order)
+      if (a.created_at && b.created_at) {
+        return a.created_at.localeCompare(b.created_at);
+      }
+      // Fallback to step_id if created_at not available
       return a.step_id.localeCompare(b.step_id);
     });
   }
@@ -260,6 +289,7 @@ export class TaskQueue {
       task_id: task.task_id,
       step_id: task.step_id,
       scope: task.scope,
+      created_at: task.created_at,
     };
   }
 }

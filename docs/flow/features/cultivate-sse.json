@@ -1,0 +1,94 @@
+{
+  "feature_id": "cultivate-sse",
+  "title": "SSE Broadcaster (Shared Infrastructure)",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement SSEBroadcaster class as shared infrastructure for the cultivate system. Instantiated once at startup and injected into pipeline stages, BullMQ workers, trend detection, and API routes. Events: signal:new, signal:updated, cluster:new, cluster:updated, cluster:trending, ingestion:progress, ingestion:complete, source:error, source:auth_expired. Heartbeat every 30 seconds to keep connections alive. The broadcaster must NOT live inside the API layer — it is a standalone service consumed by multiple subsystems to avoid circular dependencies.",
+    "acceptance_criteria": [
+      { "id": "csse-ac1", "description": "SSEBroadcaster manages a set of connected Response objects for SSE streaming" },
+      { "id": "csse-ac2", "description": "emit(event, data) sends to all connected clients in SSE format (event: type\\ndata: json\\n\\n)" },
+      { "id": "csse-ac3", "description": "Heartbeat comment sent every 30 seconds to prevent proxy/load balancer timeouts" },
+      { "id": "csse-ac4", "description": "Dead client connections cleaned up on error/close events" },
+      { "id": "csse-ac5", "description": "Typed emit methods for each event type ensure correct payload shapes" },
+      { "id": "csse-ac6", "description": "GET /events endpoint helper sets correct SSE headers (Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive)" },
+      { "id": "csse-ac7", "description": "Broadcaster is injectable — pipeline, workers, and API all receive the same instance" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "csse-s1",
+        "title": "Define SSE event type enum and payload types",
+        "scope": "cultivate",
+        "description": "Create src/sse/types.ts. Define CultivateSSEEventType enum: 'signal:new', 'signal:updated', 'cluster:new', 'cluster:updated', 'cluster:trending', 'ingestion:progress', 'ingestion:complete', 'source:error', 'source:auth_expired'. Define typed payload interfaces for each event: SignalNewPayload (signal_id, greenhouse_id, title, source_type), SignalUpdatedPayload (signal_id, fields_changed[]), ClusterNewPayload (cluster_id, greenhouse_id, label), ClusterUpdatedPayload (cluster_id, signal_count, trend?), ClusterTrendingPayload (cluster_id, greenhouse_id, label, trend, velocity_weekly), IngestionProgressPayload (job_id, processed_chunks, total_chunks), IngestionCompletePayload (job_id, signals_created), SourceErrorPayload (source_config_id, error, health), SourceAuthExpiredPayload (source_config_id, name).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All 9 event types defined as string literal union" },
+          { "id": "ac2", "description": "Each event type has a corresponding typed payload interface" }
+        ]
+      },
+      {
+        "step_id": "csse-s2",
+        "title": "Implement SSEBroadcaster class",
+        "scope": "cultivate",
+        "description": "Create src/sse/broadcaster.ts. Implement SSEBroadcaster class with: private clients Set<Response>, addClient(res: Response) that adds to set and registers close/error cleanup, removeClient(res: Response) that removes from set, emit(event: CultivateSSEEventType, data: unknown) that iterates clients and writes SSE-formatted data (event: {type}\\ndata: {json}\\n\\n). Handle write errors by removing dead clients. Track client count for health monitoring.",
+        "dependencies": ["csse-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "addClient registers close handler for automatic cleanup" },
+          { "id": "ac2", "description": "emit writes correct SSE format to all connected clients" },
+          { "id": "ac3", "description": "Write errors on dead connections trigger removeClient, not crash" },
+          { "id": "ac4", "description": "clientCount getter available for health monitoring" }
+        ]
+      },
+      {
+        "step_id": "csse-s3",
+        "title": "Implement client connection management and heartbeat",
+        "scope": "cultivate",
+        "description": "Add connection lifecycle management to SSEBroadcaster: start() method that begins a 30-second heartbeat interval sending SSE comment lines (: heartbeat\\n\\n) to all clients, stop() method that clears the interval and closes all client connections, addClient should set SSE response headers (Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive) and send an initial connection event. The heartbeat prevents proxy/load balancer idle timeouts.",
+        "dependencies": ["csse-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Heartbeat sends SSE comment every 30 seconds" },
+          { "id": "ac2", "description": "stop() clears interval and properly ends all client responses" },
+          { "id": "ac3", "description": "addClient sets Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive" },
+          { "id": "ac4", "description": "Initial connection event sent on addClient so client knows connection succeeded" }
+        ]
+      },
+      {
+        "step_id": "csse-s4",
+        "title": "Add typed emit methods for each event",
+        "scope": "cultivate",
+        "description": "Add typed convenience methods to SSEBroadcaster that enforce correct payload shapes: emitSignalNew(payload: SignalNewPayload), emitSignalUpdated(payload: SignalUpdatedPayload), emitClusterNew(payload: ClusterNewPayload), emitClusterUpdated(payload: ClusterUpdatedPayload), emitClusterTrending(payload: ClusterTrendingPayload), emitIngestionProgress(payload: IngestionProgressPayload), emitIngestionComplete(payload: IngestionCompletePayload), emitSourceError(payload: SourceErrorPayload), emitSourceAuthExpired(payload: SourceAuthExpiredPayload). Each method delegates to this.emit() with the correct event type.",
+        "dependencies": ["csse-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Each typed method enforces its specific payload interface at compile time" },
+          { "id": "ac2", "description": "Calling emitSignalNew with wrong payload shape is a TypeScript error" },
+          { "id": "ac3", "description": "All 9 event types have corresponding typed emit methods" }
+        ]
+      },
+      {
+        "step_id": "csse-s5",
+        "title": "Wire GET /events endpoint helper",
+        "scope": "cultivate",
+        "description": "Create src/sse/handler.ts with a createSSEHandler(broadcaster: SSEBroadcaster) factory function that returns an Express request handler. The handler: sets SSE headers via broadcaster.addClient(res), sends an initial 'connected' event with { clientId, timestamp }, and ensures cleanup on request close. This helper is mounted by the API routes feature at GET /api/cultivate/events. Also export the SSEBroadcaster class and all types from src/sse/index.ts.",
+        "dependencies": ["csse-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createSSEHandler returns a standard Express (req, res) handler" },
+          { "id": "ac2", "description": "Handler sends initial 'connected' event with clientId and timestamp" },
+          { "id": "ac3", "description": "SSEBroadcaster and all types exported from src/sse/index.ts" },
+          { "id": "ac4", "description": "Request close triggers client cleanup" }
+        ]
+      }
+    ]
+  }
+}

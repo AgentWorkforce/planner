@@ -1,7 +1,8 @@
 import { createContext, useContext, ReactNode, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
-import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion } from '@/api';
+import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion, getVersion, getResolvedPlan } from '@/api';
+import type { ResolvedStep } from '@/api';
 import { usePlanEvents } from '@/hooks';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { STORAGE_KEYS } from '@/config/storage-keys';
@@ -63,6 +64,13 @@ interface PlanEditorContextValue {
   handleWorkflowApprove: (approver: string) => Promise<void>;
   handleWorkflowPublish: () => Promise<void>;
 
+  // Version switching
+  switchVersion: (versionNumber: number) => Promise<void>;
+
+  // Coordination plan (sub-plan flattened view)
+  isCoordinationPlan: boolean;
+  resolvedSteps: ResolvedStep[];
+
   // Real-time sync
   isEventStreamConnected: boolean;
   eventStreamError: string | null;
@@ -82,6 +90,9 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState<PlanVersion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Track when user manually selects a version to prevent SSE overriding it
+  const pinnedVersionRef = useRef<number | null>(null);
 
   // Messaging sidebar collapsed state (persisted)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -118,6 +129,32 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
   const [hoveredDirection, setHoveredDirection] = useState<'incoming' | 'outgoing' | null>(null);
   const stepsContainerRef = useRef<HTMLDivElement>(null);
 
+  // Coordination plan: resolved steps for flattened view
+  const [resolvedSteps, setResolvedSteps] = useState<ResolvedStep[]>([]);
+  const isCoordinationPlan = version?.steps.some((s) => s.sub_plan_id) ?? false;
+
+  // Fetch resolved data when this is a coordination plan
+  useEffect(() => {
+    if (!planId || !isCoordinationPlan) {
+      setResolvedSteps([]);
+      return;
+    }
+
+    let cancelled = false;
+    getResolvedPlan(planId).then((result) => {
+      if (!cancelled) {
+        setResolvedSteps(result.resolved_steps);
+      }
+    }).catch((err) => {
+      console.error('[PlanEditorContext] Failed to fetch resolved plan:', err);
+      if (!cancelled) {
+        setResolvedSteps([]);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [planId, isCoordinationPlan, version?.version]);
+
   // Scroll to and highlight a step (used by dependency indicator click)
   const handleScrollToStep = useCallback((stepId: string) => {
     const container = stepsContainerRef.current;
@@ -136,6 +173,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
   const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refetchPlan = useCallback(async () => {
     if (!planId) return;
+    if (pinnedVersionRef.current !== null) return;
     try {
       const result = await getPlan(planId);
       // Update if fetched version is newer OR same version but updated more recently
@@ -196,6 +234,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     async function fetchPlan() {
       if (!planId) return;
 
+      pinnedVersionRef.current = null;
       setLoading(true);
       setError(null);
 
@@ -233,6 +272,19 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
 
     fetchComments();
   }, [planId, version?.version]);
+
+  // Switch to a specific version
+  const switchVersion = useCallback(async (versionNumber: number) => {
+    if (!planId) return;
+    try {
+      const result = await getVersion(planId, versionNumber);
+      pinnedVersionRef.current = versionNumber;
+      setVersion(result.version);
+      setPlan(result.plan);
+    } catch (err) {
+      console.error('[PlanEditorContext] Failed to switch version:', err);
+    }
+  }, [planId]);
 
   // Handler for updating a step
   const handleStepUpdate = useCallback(
@@ -423,6 +475,8 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     setHoveredDirection,
     stepsContainerRef,
     handleScrollToStep,
+    isCoordinationPlan,
+    resolvedSteps,
     handleStepUpdate,
     handleStepDelete,
     handleGoalUpdate,
@@ -430,6 +484,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     handleWorkflowSubmit,
     handleWorkflowApprove,
     handleWorkflowPublish,
+    switchVersion,
     isEventStreamConnected,
     eventStreamError,
     currentUser,

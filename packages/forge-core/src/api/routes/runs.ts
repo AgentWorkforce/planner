@@ -1,6 +1,7 @@
-import type { Router } from 'express';
+import type { Router, Request, Response } from 'express';
 import type { ForgeStorage } from '../../storage/interface.js';
 import type { TrajectoryCapture } from '../../services/trajectory-capture.js';
+import type { PlannerClient } from '../../adapters/planner-client.js';
 import {
   createRunHandler,
   listRunsHandler,
@@ -15,7 +16,7 @@ import {
   type TerminateActiveAgentsFn,
 } from '../handlers/run-control.js';
 import { getTaskDetailHandler, getTaskRetrospectiveHandler } from '../handlers/tasks.js';
-import { fullRunEventsSSEHandler, type RunEventsSSEDeps } from '../handlers/sse.js';
+import { fullRunEventsSSEHandler, globalRunEventsSSEHandler, type RunEventsSSEDeps } from '../handlers/sse.js';
 
 // ============================================
 // Types
@@ -37,6 +38,10 @@ export interface RegisterRunRoutesOptions {
    * TrajectoryCapture for event streaming and tracking.
    */
   trajectoryCapture?: TrajectoryCapture;
+  /**
+   * PlannerClient for fetching plans by reference (plan_id + version).
+   */
+  plannerClient?: PlannerClient;
 }
 
 // ============================================
@@ -70,6 +75,7 @@ export function registerRunRoutes(
     storage,
     trajectoryCapture: options?.trajectoryCapture,
     scheduleReadyTasks: options?.scheduleReadyTasks,
+    plannerClient: options?.plannerClient,
   };
 
   const controlHandlerDeps = {
@@ -86,8 +92,18 @@ export function registerRunRoutes(
   // Run CRUD operations
   router.post('/runs', createRunHandler(runHandlerDeps));
   router.get('/runs', listRunsHandler(runHandlerDeps));
-  // Note: /runs/counts must come BEFORE /runs/:id to avoid matching "counts" as an ID
+  // Note: /runs/counts and /runs/events must come BEFORE /runs/:id to avoid matching as an ID
   router.get('/runs/counts', getRunsCountsHandler(runHandlerDeps));
+
+  // Global SSE stream for all run events (used by dashboard to detect run status changes)
+  if (options?.trajectoryCapture) {
+    const globalSSEDeps: RunEventsSSEDeps = {
+      trajectoryCapture: options.trajectoryCapture,
+      storage,
+    };
+    router.get('/runs/events', globalRunEventsSSEHandler(globalSSEDeps));
+  }
+
   router.get('/runs/:id', getRunHandler(runHandlerDeps));
 
   // Run control operations
@@ -100,6 +116,18 @@ export function registerRunRoutes(
 
   // Task retrospective
   router.get('/runs/:id/tasks/:taskId/retrospective', getTaskRetrospectiveHandler(taskHandlerDeps));
+
+  // Run artifacts
+  router.get('/runs/:id/artifacts', (req: Request, res: Response) => {
+    try {
+      const runId = req.params.id as string;
+      const artifacts = storage.listArtifactsByRun(runId);
+      res.json({ artifacts });
+    } catch (err) {
+      console.error('[RunRoutes] Error listing artifacts:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 
   // SSE events (if trajectory capture provided)
   if (options?.trajectoryCapture) {

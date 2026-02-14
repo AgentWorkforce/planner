@@ -7,18 +7,12 @@
 
 import type { Request, Response } from 'express';
 import { getRelayMode, getRelayConfig, isConnected } from '../../relay/index.js';
-import { hasApiKey } from '../../relay/anthropic-config.js';
-import { isPlannerLeadActive } from '../../relay/planner-lead.js';
 
 export interface CapabilitiesResponse {
   relay: {
     available: boolean;
     url: string;
-    status: 'connected' | 'disconnected' | 'mock';
-  };
-  ai: {
-    available: boolean;
-    planner_lead_active: boolean;
+    status: 'connected' | 'disconnected';
   };
   forge: {
     available: boolean;
@@ -43,28 +37,12 @@ export function createCapabilitiesHandlers() {
       const relayMode = getRelayMode();
       const relayConfig = getRelayConfig();
       const relayConnected = isConnected();
-      const aiAvailable = hasApiKey();
-      const plannerLeadActive = isPlannerLeadActive();
-
-      // Determine relay status
-      let relayStatus: 'connected' | 'disconnected' | 'mock';
-      if (relayMode === 'connected') {
-        relayStatus = 'connected';
-      } else if (relayMode === 'mock') {
-        relayStatus = 'mock';
-      } else {
-        relayStatus = 'disconnected';
-      }
 
       const response: CapabilitiesResponse = {
         relay: {
           available: relayConnected,
           url: relayConfig.socketPath,
-          status: relayStatus,
-        },
-        ai: {
-          available: aiAvailable,
-          planner_lead_active: plannerLeadActive,
+          status: relayMode,
         },
         forge: {
           available: relayConnected, // Forge requires relay for real agent spawning

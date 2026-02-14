@@ -1,0 +1,61 @@
+{
+  "feature_id": "cultivate-scorer",
+  "title": "Multi-Factor Scoring Engine",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain", "cultivate-storage"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "8-factor scoring engine: recency, specificity, source_authority, repetition, emotional_intensity, strategic_fit, actionability, content_quality. Weight resolution chain: Greenhouse overrides, then Tuner config, then mode defaults, then DEFAULT_WEIGHTS.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "ScoringFactors type defines all 8 factors as number values (0-1 scale)" },
+      { "id": "ac2", "description": "DEFAULT_WEIGHTS provides sensible baseline weights for all 8 factors" },
+      { "id": "ac3", "description": "Each scoring factor has an independent calculator function" },
+      { "id": "ac4", "description": "Weight resolution follows strict chain: Greenhouse overrides > Tuner config > mode defaults > DEFAULT_WEIGHTS" },
+      { "id": "ac5", "description": "scoreSignal() returns composite score (0-1) along with individual factor scores and resolved weights" },
+      { "id": "ac6", "description": "Per-Greenhouse weight overrides allow different scoring priorities for different Greenhouses" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "cs-s1",
+        "title": "Define ScoringFactors type and DEFAULT_WEIGHTS",
+        "scope": "cultivate",
+        "description": "Create Zod schema and TypeScript type for ScoringFactors with all 8 factor fields (recency, specificity, source_authority, repetition, emotional_intensity, strategic_fit, actionability, content_quality) as numbers 0-1. Define CultivateWeights type mapping each factor to a weight. Export DEFAULT_WEIGHTS constant with balanced baseline weights summing to 1.0.",
+        "dependencies": []
+      },
+      {
+        "id": "cs-s2",
+        "title": "Implement each scoring factor calculator",
+        "scope": "cultivate",
+        "description": "Build individual pure functions for each factor: calcRecency (time decay), calcSpecificity (from extraction), calcSourceAuthority (from source tier), calcRepetition (signal count in cluster), calcEmotionalIntensity (from extraction), calcStrategicFit (keyword alignment with Greenhouse focus), calcActionability (from extraction), calcContentQuality (length, structure, detail heuristics). Each returns a number 0-1.",
+        "dependencies": ["cs-s1"]
+      },
+      {
+        "id": "cs-s3",
+        "title": "Implement weight resolution chain",
+        "scope": "cultivate",
+        "description": "Build resolveWeights(greenhouseId, tunerConfig, mode) that resolves weights through the priority chain: (1) Greenhouse-specific weight overrides if set, (2) Tuner config weights if available, (3) mode-specific defaults (e.g., refinement vs discovery), (4) DEFAULT_WEIGHTS as final fallback. Returns fully resolved CultivateWeights. Each level in the chain can partially override — missing factors fall through to the next level.",
+        "dependencies": ["cs-s1"]
+      },
+      {
+        "id": "cs-s4",
+        "title": "Implement scoreSignal() combining all factors",
+        "scope": "cultivate",
+        "description": "Build scoreSignal(signal, extraction, context) that: (1) computes all 8 factor scores by calling individual calculators, (2) resolves weights via the chain, (3) computes weighted composite score as sum of (factor * weight), (4) returns ScoringResult with composite score, individual factor scores, and the resolved weights used. Composite score normalized to 0-1.",
+        "dependencies": ["cs-s2", "cs-s3"]
+      },
+      {
+        "id": "cs-s5",
+        "title": "Add per-Greenhouse weight override support",
+        "scope": "cultivate",
+        "description": "Integrate with Greenhouse storage to read and write per-Greenhouse weight overrides. Greenhouses store optional weight_overrides as partial CultivateWeights (only overridden factors). The weight resolution chain picks these up at highest priority. Include storage migration for weight_overrides column on greenhouses table.",
+        "dependencies": ["cs-s4"]
+      }
+    ]
+  }
+}

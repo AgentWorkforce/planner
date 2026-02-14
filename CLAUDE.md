@@ -1,5 +1,27 @@
 # Planner Core
 
+## General Rules
+
+Before asking questions about the codebase, ALWAYS investigate by reading relevant files first. Do not ask the user questions you could answer by grepping or reading code. The user expects you to be self-sufficient in exploration.
+
+## Code Standards
+
+This project uses TypeScript as the primary language. All new code should be TypeScript. When editing existing files, check for shared components (e.g., shared-ui) before creating new ones. Always check imports resolve correctly.
+
+## UI Development
+
+When making changes, NEVER use Playwright/browser automation for small UI tweaks. Make the code change directly and let the user verify visually. Only use browser automation when explicitly asked to test end-to-end flows.
+
+## Git Workflow
+
+When working with git: always confirm the correct branch and remote (origin vs upstream) before pushing. Never assume which branch to push to — verify with the user or check the current branch context.
+
+Do NOT take shortcuts during merges or file operations. Never skip files, stub out content, or use lazy approaches that could cause data loss. When restoring or merging files, verify completeness before reporting done.
+
+## Debugging
+
+When debugging issues, identify and fix the ROOT CAUSE — do not apply band-aid fixes, XML stripping hacks, or workarounds. If you don't understand the architecture, read the code until you do before proposing a fix.
+
 ## What This Is
 
 This repository implements the **Planner** layer of a three-tier agentic architecture:

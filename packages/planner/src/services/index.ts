@@ -64,6 +64,8 @@ export {
   validateSubPlanDepth,
   validateAllSubPlanDepths,
   validateAllLimits,
+  validateSubPlanReferences,
+  validateSubPlansPublished,
 
   // Helper functions
   groupStepsByScope,
@@ -75,8 +77,7 @@ export type {
   LimitsValidationResult,
   ScopeStepCount,
   DepthValidationResult,
-  // Note: PlanStorage is a minimal interface for depth validation
-  // Use storage/interface.ts PlanStorage for full storage interface
+  // Note: PlanStorage is a Pick<> of storage/interface.ts PlanStorage
   PlanStorage as LimitsEnforcerPlanStorage,
 } from './limits-enforcer.js';
 

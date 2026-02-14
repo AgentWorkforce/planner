@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { PlanStorage } from '../../storage/interface.js';
-import { createPlan, createPlanVersion } from '../../domain/plan.js';
+import { createPlan, createPlanVersion, PlanVersionSchema } from '../../domain/plan.js';
 import { createVersionFrom } from '../../domain/diff.js';
 import { PlanStatus } from '../../domain/status.js';
 import type { AttentionType } from '../../domain/attention.js';
@@ -78,6 +78,11 @@ export function createPlanHandlers(storage: PlanStorage) {
           decomposition_config: body.decomposition_config,
         });
 
+        // Apply steps if provided (e.g. from graduated ideation blocks)
+        if (body.steps) {
+          version.steps = body.steps;
+        }
+
         // DOT Framework: Enrich steps with language tier and complexity estimate
         version = enrichPlanVersionForCreate(version);
 
@@ -152,6 +157,10 @@ export function createPlanHandlers(storage: PlanStorage) {
               status: latestVersion?.status || PlanStatus.Draft,
               latest_version: latestVersion?.version || 1,
               scopes,
+              step_count: latestVersion?.steps?.length ?? 0,
+              sub_plan_ids: latestVersion?.steps
+                ?.filter((s) => s.sub_plan_id)
+                .map((s) => s.sub_plan_id as string) ?? [],
               initiative_id: plan.initiative_id,
               initiative,
               created_at: plan.created_at,
@@ -209,6 +218,10 @@ export function createPlanHandlers(storage: PlanStorage) {
             status: latestVersion?.status || PlanStatus.Draft,
             latest_version: latestVersion?.version || 1,
             scopes,
+            step_count: latestVersion?.steps?.length ?? 0,
+            sub_plan_ids: latestVersion?.steps
+              ?.filter((s) => s.sub_plan_id)
+              .map((s) => s.sub_plan_id as string) ?? [],
             initiative_id: plan.initiative_id,
             initiative,
             created_at: plan.created_at,
@@ -356,17 +369,23 @@ export function createPlanHandlers(storage: PlanStorage) {
     getVersion: (req: Request<VersionParams>, res: Response, next: NextFunction) => {
       try {
         const { id, version: versionStr } = req.params;
-        const versionNum = parseInt(versionStr, 10);
-        if (isNaN(versionNum)) {
-          throw badRequest('Invalid version number');
-        }
 
         const plan = storage.getPlan(id);
         if (!plan) {
           throw notFound('Plan');
         }
 
-        const version = storage.getVersion(id, versionNum);
+        let version;
+        if (versionStr === 'latest') {
+          version = storage.getLatestVersion(id);
+        } else {
+          const versionNum = parseInt(versionStr, 10);
+          if (isNaN(versionNum)) {
+            throw badRequest('Invalid version number');
+          }
+          version = storage.getVersion(id, versionNum);
+        }
+
         if (!version) {
           throw notFound('Version');
         }
@@ -410,6 +429,9 @@ export function createPlanHandlers(storage: PlanStorage) {
         if (body.decomposition_config !== undefined) {
           newVersion.decomposition_config = body.decomposition_config;
         }
+        if (body.understanding !== undefined) {
+          newVersion.understanding = body.understanding;
+        }
 
         // DOT Framework: Enrich new/modified steps
         newVersion = enrichPlanVersionForUpdate(newVersion, latestVersion.steps);
@@ -423,6 +445,71 @@ export function createPlanHandlers(storage: PlanStorage) {
         storage.createVersion(newVersion);
 
         res.status(201).json(mergeValidationIntoResponse({ version: newVersion }, validation));
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    /**
+     * POST /plans/:id/versions/:version/restore
+     * Create a new version with the content from an older version.
+     * The new version gets the next version number (MAX+1), not the source's number.
+     */
+    restoreVersion: (req: Request<VersionParams>, res: Response, next: NextFunction) => {
+      try {
+        const { id, version: versionStr } = req.params;
+        const versionNum = parseInt(versionStr, 10);
+        if (isNaN(versionNum)) {
+          throw badRequest('Invalid version number');
+        }
+
+        const plan = storage.getPlan(id);
+        if (!plan) {
+          throw notFound('Plan');
+        }
+
+        // Fetch the version to restore from
+        const sourceVersion = storage.getVersion(id, versionNum);
+        if (!sourceVersion) {
+          throw notFound('Version');
+        }
+
+        // Get the latest version to determine the next version number
+        const latestVersion = storage.getLatestVersion(id);
+        if (!latestVersion) {
+          throw notFound('Version');
+        }
+
+        // If the source IS the latest, nothing to restore
+        if (sourceVersion.version === latestVersion.version) {
+          throw badRequest('Cannot restore: this is already the latest version');
+        }
+
+        // Build the new version: content from source, version number from latest+1
+        const now = new Date().toISOString();
+        const restoredVersion = PlanVersionSchema.parse({
+          plan_id: id,
+          version: latestVersion.version + 1,
+          status: PlanStatus.Draft,
+          summary: { ...sourceVersion.summary },
+          steps: sourceVersion.steps.map((s) => ({ ...s, dependencies: [...s.dependencies] })),
+          decomposition_config: sourceVersion.decomposition_config,
+          understanding: sourceVersion.understanding,
+          context: sourceVersion.context,
+          metadata: {
+            ...sourceVersion.metadata,
+            restored_from_version: sourceVersion.version,
+          },
+          created_at: now,
+          updated_at: now,
+        });
+
+        storage.createVersion(restoredVersion);
+
+        res.status(201).json({
+          version: restoredVersion,
+          restored_from: sourceVersion.version,
+        });
       } catch (err) {
         next(err);
       }

@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@agent-relay/sdk": "^2.0.37",
-    "@anthropic-ai/sdk": "^0.39.0",
     "@plannr/errors": "*",
     "@plannr/storage-base": "*",
     "better-sqlite3": "^11.7.0",

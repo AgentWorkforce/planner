@@ -57,6 +57,11 @@ export class TrajectoryCapture extends EventEmitter {
     super();
     this.storage = storage;
     this.strictValidation = options.strictValidation ?? false;
+
+    // Prevent unhandled 'error' events from crashing the process
+    this.on('error', (err, context) => {
+      console.error(`[TrajectoryCapture] ${err.message}`, context);
+    });
   }
 
   /**

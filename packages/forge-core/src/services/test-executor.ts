@@ -152,8 +152,10 @@ export class TestExecutor {
         this.storage.updateTaskStatus(task.task_id, TaskStatus.Completed);
 
         const durationMs = Date.now() - taskStartTime;
-        const tokensUsed = Math.floor(Math.random() * 5000) + 1000;
-        const costUsd = tokensUsed * 0.000003;
+        // TODO: Parse real token usage from test agent output
+        // Test executor doesn't spawn real agents, so metrics are unavailable
+        const tokensUsed = 0; // Real token data not available in test mode
+        const costUsd = 0; // Real cost data not available in test mode
 
         // Record execution metric
         const metric = createTaskExecutionMetric({

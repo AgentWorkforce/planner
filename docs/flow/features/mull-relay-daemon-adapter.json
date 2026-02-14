@@ -1,0 +1,192 @@
+{
+  "feature_id": "mull-relay-daemon-adapter",
+  "title": "Relay Daemon Storage Adapter",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["mull-domain-types", "mull-adapter-system"],
+  "parent": "mull-integration",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement a SessionAdapter that reads from the agent-relay daemon's actual storage. Unlike the generic relay-JSONL adapter (which reads plain JSONL files), this adapter understands the daemon's SQLite message store and its JSONL archive format with Envelope<T> wrappers, SendPayload/ChannelMessagePayload types, and agent lifecycle events. It can also read from the daemon's SQLite database directly for more structured access. Sessions are reconstructed from continuous message streams by agent lifecycle boundaries (spawn -> release) or time windows.",
+    "acceptance_criteria": [
+      { "id": "mrda-ac1", "description": "Reads from .agent-relay/messages/ directory (JSONL archives) with proper Envelope<T> parsing" },
+      { "id": "mrda-ac2", "description": "Optionally reads from .agent-relay/ daemon SQLite for structured message access" },
+      { "id": "mrda-ac3", "description": "SendPayload (DM) messages -> Message with agentName = from field, role = agent" },
+      { "id": "mrda-ac4", "description": "ChannelMessagePayload messages -> Message with channel context in metadata" },
+      { "id": "mrda-ac5", "description": "Broadcast messages (TO: *) -> Message with role = system" },
+      { "id": "mrda-ac6", "description": "Agent spawn events -> SessionEvent with type agent_spawned" },
+      { "id": "mrda-ac7", "description": "Agent release events -> SessionEvent marking session boundary" },
+      { "id": "mrda-ac8", "description": "Session reconstruction uses three strategies in priority order: 1) channel-based (messages in #plan-{uuid} = one session), 2) agent lifecycle (spawn -> release = one session), 3) time-gap fallback (30 min configurable gap = session boundary)" },
+      { "id": "mrda-ac9", "description": "Fallback session grouping: when no clear lifecycle events, group by time window (configurable, default 30 min gap)" },
+      { "id": "mrda-ac10", "description": "agentFilter config: limit to messages from/to specific agents" },
+      { "id": "mrda-ac11", "description": "channelFilter config: limit to specific channels (e.g., #plan-{uuid})" },
+      { "id": "mrda-ac12", "description": "Cross-project bridge messages tagged with project context in metadata" },
+      { "id": "mrda-ac13", "description": "getCursor/setCursor track by agent name or channel" },
+      { "id": "mrda-ac14", "description": "Config: { dataDir: string, mode: 'jsonl' | 'sqlite', agentFilter?: string[], channelFilter?: string[], sessionGapMinutes?: number }" },
+      { "id": "mrda-ac15", "description": "Defines minimal local types for JSONL parsing (RelayEnvelope, RelaySendPayload, RelayChannelPayload) — does NOT import from relay SDK to keep mull portable" },
+      { "id": "mrda-ac16", "description": "Channel-based session reconstruction: all messages in #plan-{uuid} grouped as one session with id = plan-{uuid}" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This differs from the generic relay-JSONL adapter: it understands the daemon's specific message types (SendPayload, ChannelMessagePayload, Envelope<T>)",
+        "Session boundary detection is the key challenge: relay messages are a continuous stream, not session-delimited",
+        "Agent spawn -> release lifecycle provides natural session boundaries for agent-to-agent work",
+        "Channel-based grouping: #plan-{uuid} channels naturally scope to a planning session",
+        "JSONL files are date-partitioned (YYYY-MM-DD.jsonl) — need to read across date boundaries for multi-day sessions",
+        "SQLite mode provides structured queries (WHERE from_name = ? AND timestamp > ?) vs. scanning JSONL",
+        "This adapter is plannr-specific because it depends on relay daemon storage format — the generic JSONL adapter handles simple formats",
+        "Local type definitions for relay wire format keep mull portable — no runtime dependency on the relay SDK package"
+      ],
+      "concerns": [
+        "Relay daemon SQLite schema is not documented in this monorepo — need to inspect .agent-relay/ files or read relay source",
+        "Session reconstruction heuristics: time-gap-based grouping may split sessions that had a long pause",
+        "Large JSONL archives: scanning all messages for agent filtering could be slow without indexing"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "version": 1,
+    "scopes": ["mull"],
+    "steps": [
+      {
+        "step_id": "mrda-s1",
+        "title": "Define minimal local types for relay wire format",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/relay-types.ts. Define minimal TypeScript interfaces that mirror the relay daemon's wire format for JSONL parsing. Do NOT import from the relay SDK — this keeps mull portable and avoids a runtime dependency.\n\nTypes to define:\n- RelayEnvelope<T>: { id: string, type: string, timestamp: string, payload: T }\n- RelaySendPayload: { from: string, to: string, body: string, thread?: string }\n- RelayChannelPayload: { from: string, channel: string, body: string, thread?: string }\n- RelaySpawnPayload: { name: string, cli: string, task?: string }\n- RelayReleasePayload: { name: string }\n- RelayMessageType: union type of 'message' | 'channel_message' | 'spawn' | 'release' | 'broadcast'\n\nThese are minimal parse targets — only the fields mull needs for extraction. Additional fields in the actual relay format are ignored by the parser.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s1-ac1", "description": "Local types defined in relay-types.ts, no imports from relay SDK" },
+          { "id": "mrda-s1-ac2", "description": "RelayEnvelope<T> covers id, type, timestamp, payload" },
+          { "id": "mrda-s1-ac3", "description": "Payload types cover SendPayload, ChannelPayload, SpawnPayload, ReleasePayload" },
+          { "id": "mrda-s1-ac4", "description": "Types are minimal — only fields needed for mull extraction" }
+        ],
+        "specification": "The relay SDK (agent-relay package) defines Envelope, SendPayload, ChannelMessagePayload etc. We intentionally do NOT import these because: 1) mull should be portable across relay versions, 2) we only need a subset of fields, 3) if relay types change, mull's defensive parsing handles it gracefully rather than a compile-time break."
+      },
+      {
+        "step_id": "mrda-s2",
+        "title": "Create RelayDaemonAdapter class with dual-mode connection",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/relay-daemon-adapter.ts. Implement class RelayDaemonAdapter that implements SessionAdapter. Constructor accepts config: { dataDir: string, mode: 'jsonl' | 'sqlite', agentFilter?: string[], channelFilter?: string[], sessionGapMinutes?: number }. In 'sqlite' mode, open the daemon's SQLite DB with better-sqlite3({ readonly: true }). In 'jsonl' mode, store the messages directory path for lazy file reading. Default sessionGapMinutes to 30.",
+        "dependencies": ["mrda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s2-ac1", "description": "RelayDaemonAdapter implements SessionAdapter" },
+          { "id": "mrda-s2-ac2", "description": "Supports 'jsonl' and 'sqlite' modes via config" },
+          { "id": "mrda-s2-ac3", "description": "SQLite mode opens DB with { readonly: true }" },
+          { "id": "mrda-s2-ac4", "description": "sessionGapMinutes defaults to 30" }
+        ],
+        "specification": "Location: packages/mull/src/adapters/relay-daemon-adapter.ts. Config type: RelayDaemonAdapterConfig = { dataDir: string, mode: 'jsonl' | 'sqlite', agentFilter?: string[], channelFilter?: string[], sessionGapMinutes?: number }. Constructor: if mode==='sqlite', open DB at {dataDir}/relay.db with better-sqlite3({ readonly: true }). If mode==='jsonl', store messagesDir = path.join(dataDir, 'messages'). Note: JSONL is the primary mode based on actual relay daemon behavior — SQLite is secondary."
+      },
+      {
+        "step_id": "mrda-s3",
+        "title": "Implement JSONL reader with date-partitioned file handling",
+        "scope": "mull",
+        "description": "Implement a JSONL reader module at packages/mull/src/adapters/relay-jsonl-reader.ts. Reads .agent-relay/messages/ directory which contains date-partitioned JSONL files (YYYY-MM-DD.jsonl). The reader: 1) Lists all JSONL files in the directory sorted by date, 2) For a given time range (after/before), only opens relevant date-partitioned files, 3) Reads each file line-by-line, 4) Parses each line as RelayEnvelope<unknown>, 5) Detects envelope type and parses payload as the appropriate RelaySendPayload/RelayChannelPayload/etc, 6) Applies agentFilter (from/to fields) and channelFilter, 7) Returns filtered RelayEnvelope[] array. Defensive parsing — malformed lines are skipped with a warning, not a crash.",
+        "dependencies": ["mrda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s3-ac1", "description": "Reads date-partitioned JSONL files from .agent-relay/messages/" },
+          { "id": "mrda-s3-ac2", "description": "Only opens JSONL files within the requested time range" },
+          { "id": "mrda-s3-ac3", "description": "Parses each line as RelayEnvelope, detects type, parses payload" },
+          { "id": "mrda-s3-ac4", "description": "Applies agentFilter and channelFilter during read" },
+          { "id": "mrda-s3-ac5", "description": "Malformed lines skipped with warning, not crash" }
+        ],
+        "specification": "Location: packages/mull/src/adapters/relay-jsonl-reader.ts. Export readRelayJsonl(messagesDir: string, opts?: { after?: string, before?: string, agentFilter?: string[], channelFilter?: string[] }): RelayEnvelope[]. Date filtering: parse YYYY-MM-DD from filenames, compare with opts.after/before dates to skip irrelevant files. Line parsing: for each line, JSON.parse wrapped in try/catch. Type detection: envelope.type determines payload parser. Agent filter: check payload.from and payload.to fields. Channel filter: check payload.channel field."
+      },
+      {
+        "step_id": "mrda-s4",
+        "title": "Implement session reconstruction algorithm",
+        "scope": "mull",
+        "description": "Implement session reconstruction in packages/mull/src/adapters/relay-session-reconstructor.ts. Takes a stream of RelayEnvelope[] (already filtered) and groups them into sessions. Uses three strategies in priority order:\n\n1) Channel-based: Messages in #plan-{uuid} channels are grouped by channel. Session ID = the channel name (e.g., 'plan-abc123'). All messages in the same channel belong to one session regardless of timing.\n\n2) Agent lifecycle: For non-channel messages, look for spawn/release envelope pairs. Messages between a spawn and its corresponding release (matched by agent name) form one session. Session ID = '{agent_name}-{spawn_timestamp}'.\n\n3) Time-gap fallback: For remaining ungrouped messages, sort by timestamp and split into sessions wherever the gap between consecutive messages exceeds sessionGapMinutes (default 30). Session ID = 'gap-{first_message_timestamp}'.\n\nReturn Map<sessionId, RelayEnvelope[]> where each value is the chronologically ordered messages for that session.",
+        "dependencies": ["mrda-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s4-ac1", "description": "Channel-based grouping: #plan-{uuid} messages grouped by channel name" },
+          { "id": "mrda-s4-ac2", "description": "Agent lifecycle grouping: spawn->release pairs define session boundaries" },
+          { "id": "mrda-s4-ac3", "description": "Time-gap fallback: messages split by configurable gap (default 30 min)" },
+          { "id": "mrda-s4-ac4", "description": "Strategies applied in priority order: channel > lifecycle > time-gap" },
+          { "id": "mrda-s4-ac5", "description": "Returns Map<sessionId, RelayEnvelope[]> with chronological ordering" },
+          { "id": "mrda-s4-ac6", "description": "Messages that match channel strategy are NOT re-processed by lifecycle or time-gap strategies" }
+        ],
+        "specification": "The three strategies are applied as a waterfall: channel-based claims messages first, then lifecycle claims from the remainder, then time-gap handles whatever is left. A message belongs to exactly one session. Channel-based is highest priority because #plan-{uuid} channels provide the strongest semantic grouping."
+      },
+      {
+        "step_id": "mrda-s5",
+        "title": "Implement listSessions and getSession using reconstruction",
+        "scope": "mull",
+        "description": "Wire up the adapter's SessionAdapter methods. listSessions: 1) In JSONL mode, use the JSONL reader to load all envelopes within the time range, then run session reconstruction, return SessionRef[] with id, firstEvent, lastEvent, messageCount. 2) In SQLite mode, query the daemon's message table with filters, reconstruct sessions from results. getSession(sessionId): Load the specific session's envelopes and map to SessionData. Mapping rules: SendPayload -> Message(agentName=from, role='agent', content=body), ChannelMessagePayload -> Message(agentName=from, role='agent', content=body, metadata.channel), Broadcast (to='*') -> Message(role='system'), SpawnPayload -> SessionEvent(type='agent_spawned', agentName=name), ReleasePayload -> SessionEvent(type='session_boundary').",
+        "dependencies": ["mrda-s2", "mrda-s3", "mrda-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s5-ac1", "description": "listSessions works in both JSONL and SQLite modes" },
+          { "id": "mrda-s5-ac2", "description": "getSession maps SendPayload to Message with agentName and role='agent'" },
+          { "id": "mrda-s5-ac3", "description": "getSession maps ChannelMessagePayload to Message with channel in metadata" },
+          { "id": "mrda-s5-ac4", "description": "getSession maps broadcast messages to Message with role='system'" },
+          { "id": "mrda-s5-ac5", "description": "Spawn/release envelopes mapped to SessionEvent types" },
+          { "id": "mrda-s5-ac6", "description": "Cross-project bridge messages include project context in metadata" }
+        ],
+        "specification": "Location: methods on RelayDaemonAdapter class. listSessions: load all envelopes via JSONL reader (or SQLite query), run session reconstruction, return SessionRef[] per reconstructed session. getSession: load specific session's envelopes from reconstruction cache or re-reconstruct. Message mapping: switch on envelope.type — 'message' with to='*' -> role='system', 'message' with named to -> role='agent', 'channel_message' -> role='agent' with metadata.channel. Bridge messages detected by 'project:' prefix in from/to fields."
+      },
+      {
+        "step_id": "mrda-s6",
+        "title": "Implement cursor tracking by agent name or channel",
+        "scope": "mull",
+        "description": "Implement getCursor/setCursor that track progress per agent name or channel. Cursor files stored at .mull/cursors/relay/{identifier}.json where identifier is the agent name or channel name. For channel-based sessions, the cursor tracks by channel. For agent lifecycle sessions, by agent name. For time-gap sessions, by a synthetic key. Cursor contains { lastTimestamp, lastProcessedAt, messageCount }.",
+        "dependencies": ["mrda-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s6-ac1", "description": "Cursors stored in .mull/cursors/relay/{identifier}.json" },
+          { "id": "mrda-s6-ac2", "description": "Channel sessions tracked by channel name" },
+          { "id": "mrda-s6-ac3", "description": "Agent lifecycle sessions tracked by agent name" },
+          { "id": "mrda-s6-ac4", "description": "Cursor includes lastTimestamp, lastProcessedAt, messageCount" }
+        ]
+      },
+      {
+        "step_id": "mrda-s7",
+        "title": "Write tests for JSONL parsing, session reconstruction, and mapping",
+        "scope": "mull",
+        "description": "Create packages/mull/src/adapters/__tests__/relay-daemon-adapter.test.ts. Tests:\n- JSONL reader: parse valid envelopes, skip malformed lines, date-partitioned file selection\n- Session reconstruction: channel-based grouping, spawn->release lifecycle grouping, time-gap fallback, priority ordering (channel > lifecycle > time-gap)\n- Message mapping: SendPayload -> Message, ChannelPayload -> Message with channel metadata, Broadcast -> system role, Spawn/Release -> SessionEvents\n- Agent and channel filters applied correctly\n- Cursor tracking: save/load cursor, incremental processing\n- Edge cases: empty JSONL files, single-message sessions, multi-day sessions spanning date boundaries\n\nCreate temp directories with test JSONL files for JSONL mode tests. Use Vitest.",
+        "dependencies": ["mrda-s5", "mrda-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mrda-s7-ac1", "description": "Tests cover JSONL parsing with valid and malformed input" },
+          { "id": "mrda-s7-ac2", "description": "Tests cover all three session reconstruction strategies and their priority order" },
+          { "id": "mrda-s7-ac3", "description": "Tests cover message type mapping (DM, channel, broadcast, spawn, release)" },
+          { "id": "mrda-s7-ac4", "description": "Tests cover agent and channel filtering" },
+          { "id": "mrda-s7-ac5", "description": "Tests cover cursor tracking and incremental processing" },
+          { "id": "mrda-s7-ac6", "description": "All tests pass with Vitest" }
+        ]
+      }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "fail",
+    "criteria": [
+      { "id": "mrda-ac1", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts:127-143" },
+      { "id": "mrda-ac2", "status": "missing", "note": "Only JSONL mode implemented, no SQLite mode" },
+      { "id": "mrda-ac3", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts:341-354" },
+      { "id": "mrda-ac4", "status": "partial", "note": "Channel messages detected but no metadata field added" },
+      { "id": "mrda-ac5", "status": "missing", "note": "Broadcasts detected but not mapped to role=system" },
+      { "id": "mrda-ac6", "status": "missing", "note": "No spawn event payload mapping" },
+      { "id": "mrda-ac7", "status": "missing", "note": "Session boundaries from sessions.jsonl, not release events" },
+      { "id": "mrda-ac8", "status": "partial", "note": "Lifecycle grouping only, no channel or time-gap strategies" },
+      { "id": "mrda-ac9", "status": "missing", "note": "No time-gap fallback or sessionGapMinutes config" },
+      { "id": "mrda-ac10", "status": "missing", "note": "No agentFilter config parameter" },
+      { "id": "mrda-ac11", "status": "missing", "note": "No channelFilter config parameter" },
+      { "id": "mrda-ac12", "status": "missing", "note": "No project context / bridge message handling" },
+      { "id": "mrda-ac13", "status": "missing", "note": "No getCursor/setCursor methods on adapter" },
+      { "id": "mrda-ac14", "status": "partial", "note": "Config only has dataDir and sessionsFile, missing mode/filters" },
+      { "id": "mrda-ac15", "status": "satisfied", "evidence": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts:17-58" },
+      { "id": "mrda-ac16", "status": "missing", "note": "No channel-based session grouping" }
+    ],
+    "drift": [
+      { "finding": "Architecture uses sessions.jsonl lifecycle instead of three-strategy reconstruction", "file": "packages/mull/src/adapters/implementations/relay-daemon-adapter.ts", "action": "document or redesign" }
+    ]
+  }
+}

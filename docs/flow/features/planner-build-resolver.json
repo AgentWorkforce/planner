@@ -1,0 +1,216 @@
+{
+  "feature_id": "planner-build-resolver",
+  "title": "Build Resolver: Plan Dependency Resolution & Proposal",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "component": "planner-core",
+  "dependencies": ["forge-builds"],
+
+  "summary": {
+    "goal": "Add a build resolver service to Planner that takes an initiative_id or set of plan_ids, resolves inter-plan dependencies into a topologically-sorted tier structure, checks Forge for previous completions, and returns a BuildProposal for user review before execution.",
+    "in_scope": [
+      "Inter-plan dependency resolution from plan metadata",
+      "Topological sort into execution tiers",
+      "Previous completion checking (queries Forge API for run history)",
+      "Auto-inclusion of missing dependencies with warnings",
+      "BuildProposal response with tiers, warnings, skipped plans, estimates",
+      "API endpoint: POST /api/builds/propose"
+    ],
+    "out_of_scope": [
+      "Build execution (that's Forge)",
+      "Build state tracking (that's Forge)",
+      "UI for proposals (separate feature)"
+    ],
+    "acceptance_criteria": [
+      { "id": "pbr-ac1", "description": "POST /api/builds/propose accepts { initiative_id } or { plan_ids: [...] } and returns a BuildProposal" },
+      { "id": "pbr-ac2", "description": "Resolver reads inter-plan dependencies and computes topological tiers" },
+      { "id": "pbr-ac3", "description": "If plan B depends on plan A and only B is selected, A is auto-included with a warning" },
+      { "id": "pbr-ac4", "description": "Circular dependencies are detected and returned as errors in the proposal" },
+      { "id": "pbr-ac5", "description": "Plans with recent successful Forge runs are marked as 'already_completed' in the proposal" },
+      { "id": "pbr-ac6", "description": "Plans that are still draft (not approved) are flagged with a warning" },
+      { "id": "pbr-ac7", "description": "Proposal includes per-tier plan counts and total step counts for estimation" },
+      { "id": "pbr-ac8", "description": "When initiative_id is provided, all plans under that initiative are included" },
+      { "id": "pbr-ac9", "description": "Plans can have explicit depends_on_plans field linking to other plan_ids" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Inter-plan dependencies need to be stored somewhere queryable at runtime",
+        "Feature files have depends_on but those reference feature_ids not plan_ids",
+        "Plans already have a plan_id and belong to initiatives — need a depends_on_plans field on the plan entity",
+        "The resolver is stateless — it computes the proposal fresh each time from current data",
+        "Forge run history is queried via HTTP (GET /api/forge/runs?plan_id=X&status=completed)",
+        "The proposal is ephemeral — it's not stored. User reviews it, then submits to Forge."
+      ],
+      "questions": [
+        "Should depends_on_plans be on the Plan entity or the PlanVersion?",
+        "How do we initially populate depends_on_plans for existing mull plans?"
+      ],
+      "confidence": "forming"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "proposal_shape": {
+        "BuildProposal": "{ tiers: ProposalTier[], warnings: ProposalWarning[], auto_included: string[], total_plans: number, total_steps: number }",
+        "ProposalTier": "{ tier: number, plans: ProposalPlan[] }",
+        "ProposalPlan": "{ plan_id: string, goal: string, steps_count: number, status: 'ready' | 'already_completed' | 'draft_warning', previous_run?: { run_id, status, completed_at } }",
+        "ProposalWarning": "{ type: 'auto_included' | 'draft_plan' | 'circular_dependency' | 'modified_since_last_run', plan_id: string, message: string }"
+      },
+      "dependency_source": "Plan entity gets a depends_on_plans: string[] field. Populated during plan creation (from feature metadata) or manually. Stored in plans table as JSON."
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "pbr-i001",
+        "title": "Add depends_on_plans column to plans table and update Plan entity",
+        "scope": "planner-core",
+        "description": "Add a depends_on_plans TEXT column (JSON array of plan_ids) to the plans table via migration. Update the Plan Zod schema and factory functions to include the new field.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Migration in storage/migration.ts: ALTER TABLE plans ADD COLUMN depends_on_plans TEXT DEFAULT '[]' — with PRAGMA table_info check for idempotency" },
+          { "id": "ac2", "description": "PlanSchema in domain/plan.ts extended with: depends_on_plans: z.array(z.string().uuid()).default([])" },
+          { "id": "ac3", "description": "createPlan() factory sets depends_on_plans: [] by default" },
+          { "id": "ac4", "description": "rowToPlan() converter in storage/sqlite/converters.ts parses depends_on_plans from JSON string" },
+          { "id": "ac5", "description": "planToRow() or INSERT statement serializes depends_on_plans via JSON.stringify()" },
+          { "id": "ac6", "description": "updatePlan() supports updating depends_on_plans field" },
+          { "id": "ac7", "description": "GET /api/plans/:id returns depends_on_plans in response" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": [
+              "packages/planner/src/storage/migration.ts",
+              "packages/planner/src/domain/plan.ts",
+              "packages/planner/src/storage/sqlite/converters.ts",
+              "packages/planner/src/storage/sqlite/plans.ts"
+            ],
+            "pattern": "Same as existing migrations — PRAGMA table_info check, ALTER TABLE ADD COLUMN. JSON column stored as TEXT, parsed in converter."
+          }
+        }
+      },
+      {
+        "step_id": "pbr-i002",
+        "title": "Define BuildProposal domain types",
+        "scope": "planner-core",
+        "description": "Create Zod schemas and TypeScript types for BuildProposal, ProposalTier, ProposalPlan, ProposalWarning, and the propose request schema.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ProposalPlanSchema: z.object({ plan_id: z.string().uuid(), goal: z.string(), steps_count: z.number(), status: z.enum(['ready', 'already_completed', 'draft_warning']), previous_run: z.object({ run_id: z.string(), status: z.string(), completed_at: z.string() }).optional() })" },
+          { "id": "ac2", "description": "ProposalTierSchema: z.object({ tier: z.number().int().nonnegative(), plans: z.array(ProposalPlanSchema) })" },
+          { "id": "ac3", "description": "ProposalWarningSchema: z.object({ type: z.enum(['auto_included', 'draft_plan', 'circular_dependency', 'modified_since_last_run']), plan_id: z.string().uuid().optional(), message: z.string() })" },
+          { "id": "ac4", "description": "BuildProposalSchema: z.object({ tiers: z.array(ProposalTierSchema), warnings: z.array(ProposalWarningSchema), auto_included: z.array(z.string().uuid()), total_plans: z.number(), total_steps: z.number() })" },
+          { "id": "ac5", "description": "ProposeRequestSchema: z.object({ initiative_id: z.string().uuid().optional(), plan_ids: z.array(z.string().uuid()).optional() }).refine(data => data.initiative_id || (data.plan_ids && data.plan_ids.length > 0), { message: 'Either initiative_id or plan_ids required' })" },
+          { "id": "ac6", "description": "All types exported: BuildProposal, ProposalTier, ProposalPlan, ProposalWarning, ProposeRequest" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/planner/src/domain/build-proposal.ts",
+            "pattern": "Zod-first with inferred types, same as plan.ts"
+          }
+        }
+      },
+      {
+        "step_id": "pbr-i003",
+        "title": "Implement topological sort and dependency resolution service",
+        "scope": "planner-core",
+        "description": "Create a build-resolver service that resolves plan dependencies into topologically-sorted tiers. Handles auto-inclusion of missing dependencies, circular dependency detection, and draft plan warnings.",
+        "dependencies": ["pbr-i001", "pbr-i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "resolveToTiers(plans: Plan[]): { tiers: Map<number, string[]>, warnings: ProposalWarning[], missingDeps: string[] } — Kahn's algorithm for topological sort" },
+          { "id": "ac2", "description": "If plan B depends on plan A and A is not in the input Plan[] set, A's plan_id is added to missingDeps return array (propose() is responsible for fetching missing plans and re-calling resolveToTiers with the expanded set)" },
+          { "id": "ac3", "description": "Circular dependency detection: if cycle found, returns warning { type: 'circular_dependency', message: 'Circular dependency detected involving plans: [ids]' } and places cycled plans in highest tier" },
+          { "id": "ac4", "description": "Plans with no dependencies go in tier 0. Plans depending only on tier 0 plans go in tier 1. Etc." },
+          { "id": "ac5", "description": "Draft plans (latest version status='draft') flagged with warning { type: 'draft_plan', plan_id, message: 'Plan has no approved version' }" },
+          { "id": "ac6", "description": "Pure function — takes Plan[] and returns tiers + warnings + missingDeps. No storage or HTTP calls. Auto-inclusion is driven by propose() which loops: resolve → fetch missing → resolve again until missingDeps is empty." }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/planner/src/services/build-resolver.ts",
+            "algorithm": "Kahn's algorithm: 1. Build adjacency list from depends_on_plans. 2. Compute in-degree for each plan. 3. Initialize queue with in-degree=0 nodes (tier 0). 4. Process queue: remove node, decrement neighbors, add to next tier when in-degree=0. 5. If remaining nodes after algorithm, they're in cycles."
+          }
+        }
+      },
+      {
+        "step_id": "pbr-i004",
+        "title": "Implement Forge run history client for completion checking",
+        "scope": "planner-core",
+        "description": "Create a lightweight HTTP client that queries Forge for recent successful runs by plan_id. Used to mark plans as 'already_completed' in the proposal.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgeClient class or function: { getRecentRuns(planId: string, status?: string): Promise<{ run_id, status, completed_at }[]> }" },
+          { "id": "ac2", "description": "Calls GET /api/forge/runs?plan_id={planId}&status=completed&limit=1 on the configured Forge URL" },
+          { "id": "ac3", "description": "ForgeClientConfig: { base_url: string, timeout_ms?: number }" },
+          { "id": "ac4", "description": "Returns empty array on connection error or 404 (graceful degradation — missing Forge doesn't break proposals)" },
+          { "id": "ac5", "description": "createForgeClient(config) factory function" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/planner/src/services/forge-client.ts",
+            "pattern": "Same pattern as forge-core's PlannerClient — lightweight fetch wrapper with Zod response validation. Since Planner and Forge are co-located in the same server, base_url is http://localhost:3001."
+          }
+        }
+      },
+      {
+        "step_id": "pbr-i005",
+        "title": "Implement propose() orchestration function",
+        "scope": "planner-core",
+        "description": "Create the main propose() function that orchestrates the full proposal workflow: resolve input to plans, compute tiers, check completions, assemble BuildProposal response.",
+        "dependencies": ["pbr-i003", "pbr-i004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "propose(input: ProposeRequest, deps: { storage: PlanStorage, forgeClient: ForgeClient }): Promise<BuildProposal>" },
+          { "id": "ac2", "description": "If initiative_id: fetches all plans via storage.listPlans({ initiative_id })" },
+          { "id": "ac3", "description": "If plan_ids: fetches each plan via storage.getPlan(id), throws 404 for missing" },
+          { "id": "ac4", "description": "Calls resolveToTiers() in a loop: if missingDeps returned, fetches each from storage.getPlan(), adds auto_included warning, appends to plan set, re-resolves. Loop exits when missingDeps is empty (max 10 iterations to prevent runaway)." },
+          { "id": "ac5", "description": "For each plan, queries forgeClient.getRecentRuns() — if recent completed run exists, marks plan as 'already_completed'" },
+          { "id": "ac6", "description": "Assembles BuildProposal with tiers, warnings, auto_included ids, total_plans count, total_steps count (sum of steps across all plan versions)" },
+          { "id": "ac7", "description": "Each ProposalPlan includes goal from latest version summary, steps_count from latest version" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/services/build-resolver.ts",
+            "pattern": "Orchestration function composing resolver + forge client. Forge completion checks run in parallel via Promise.all() for all plans."
+          }
+        }
+      },
+      {
+        "step_id": "pbr-i006",
+        "title": "Add POST /api/builds/propose endpoint",
+        "scope": "planner-core",
+        "description": "Create handler and route for the propose endpoint. Validates request, calls propose(), returns BuildProposal. Wire into planner router.",
+        "dependencies": ["pbr-i005"],
+        "owner_role": "backend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Handler: validates body with ProposeRequestSchema.safeParse(), calls propose(), returns { proposal } with 200" },
+          { "id": "ac2", "description": "400 if neither initiative_id nor plan_ids provided" },
+          { "id": "ac3", "description": "404 if initiative_id doesn't exist or plan_ids reference missing plans" },
+          { "id": "ac4", "description": "Route registered in planner router: POST /builds/propose" },
+          { "id": "ac5", "description": "createRouter() signature extended: createRouter(storage: PlanStorage, opts?: { forgeClient?: ForgeClient }). ForgeClient created in server.ts with forgeUrl config. Build routes only registered when forgeClient is provided." },
+          { "id": "ac6", "description": "Works without Forge running — forgeClient returns empty results, proposal still computes tiers correctly without completion status" }
+        ],
+        "specification": {
+          "architecture": {
+            "files": [
+              "packages/planner/src/api/handlers/builds.ts",
+              "packages/planner/src/api/routes.ts",
+              "packages/server/src/server.ts"
+            ],
+            "pattern": "Same handler factory pattern as plans.ts handlers. ForgeClient optional dep — if not provided, all plans show as 'ready'. createRouter signature becomes createRouter(storage, opts?) to avoid breaking existing callers."
+          }
+        }
+      }
+    ]
+  }
+}

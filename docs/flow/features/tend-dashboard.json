@@ -1,0 +1,141 @@
+{
+  "feature_id": "tend-dashboard",
+  "title": "Dashboard Page",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["tend-project-entity", "tend-project-tree", "tend-conversation-core"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Build the dashboard page showing project list, AI overview, and first-time experience.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "DashboardPage renders three-column layout (same TendLayout)"
+      },
+      {
+        "id": "ac2",
+        "description": "Right column shows project list as text-based tree with attention indicators"
+      },
+      {
+        "id": "ac3",
+        "description": "Center column has AI conversation for discussing priorities and next actions"
+      },
+      {
+        "id": "ac4",
+        "description": "Left column collapses when empty (no forming blocks at dashboard level)"
+      },
+      {
+        "id": "ac5",
+        "description": "Each project entry shows: name, step progress (e.g., '7/10 · 3 running'), attention signals (e.g., '⟳ Session middleware · needs input')"
+      },
+      {
+        "id": "ac6",
+        "description": "[+ new] button or conversational creation starts new project"
+      },
+      {
+        "id": "ac7",
+        "description": "First-time experience: empty state with warm AI greeting ('What would you like to work on?')"
+      },
+      {
+        "id": "ac8",
+        "description": "Sections hidden when empty (WORK, ARTIFACTS in right column appear only when content exists)"
+      },
+      {
+        "id": "ac9",
+        "description": "Clicking a project navigates to /projects/:id"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The dashboard uses the same three-column layout as the project page — this is a tend principle",
+        "The content changes: left has project drafts (future: cultivate signals), center has AI overview, right has project list",
+        "ideation-ui already has a DashboardPage with session list — adapt the structure, replace session list with project list",
+        "The empty state aesthetic should feel like a zen garden: peaceful, ready, full of potential",
+        "Project list is text-based, not cards — matches the tend aesthetic",
+        "Attention indicators use symbols (⟳ for needs attention, • for running, ✓ for done)"
+      ],
+      "questions": [
+        "Should the dashboard conversation context include all projects or be global/meta?",
+        "Do we show archived projects or only active?",
+        "Should project creation always be conversational or allow quick-add?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["frontend"],
+    "steps": [
+      {
+        "id": "dsh01",
+        "title": "Adapt ideation-ui DashboardPage to tend",
+        "scope": "frontend",
+        "description": "Copy packages/ideation-ui/src/pages/DashboardPage.tsx structure. Replace with TendLayout (same three-column grid). Keep layout structure, replace session-specific content with project-specific. Route: / → DashboardPage.",
+        "acceptance_criteria": ["ac1"]
+      },
+      {
+        "id": "dsh02",
+        "title": "Create project list component",
+        "scope": "frontend",
+        "description": "Create ProjectListColumn component. Render text-based list (not cards) of projects from GET /api/projects. Each entry: project name, step progress ('7/10 · 3 running' — calculate from plan steps), attention signals (⟳ needs input, • running, ✓ done, ✗ failed). Use attention symbols from context. Click project → navigate to /projects/:id.",
+        "dependencies": ["dsh01"],
+        "acceptance_criteria": ["ac2", "ac5", "ac9"]
+      },
+      {
+        "id": "dsh03",
+        "title": "Wire center column conversation",
+        "scope": "frontend",
+        "description": "Copy ConversationPane from packages/planner-ui or packages/ideation-ui. At dashboard level, conversation is global/meta (discusses priorities, next actions across projects). Reuses same chat UI components (ChatInput, ChatMessageList, ChatBubble). Connects to TendInterviewerService on #dashboard channel (or global).",
+        "dependencies": ["dsh01"],
+        "acceptance_criteria": ["ac3"]
+      },
+      {
+        "id": "dsh04",
+        "title": "Left column behavior at dashboard level",
+        "scope": "frontend",
+        "description": "At dashboard level, left column shows project drafts (forming projects before graduation) OR collapses when empty. Copy collapsible column pattern from ideation-ui NowColumn. Future: cultivate signals showing projects needing attention. Empty state: collapsed with subtle hint text.",
+        "dependencies": ["dsh01"],
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "dsh05",
+        "title": "Implement project creation",
+        "scope": "frontend",
+        "description": "Add [+ new] button in project list (right column header). Click → opens conversational creation flow in center column OR quick-create modal. POST /api/projects creates project + linked session + plan. After creation, navigate to /projects/:id or stay at dashboard showing new project in list.",
+        "dependencies": ["dsh02", "dsh03"],
+        "acceptance_criteria": ["ac6"]
+      },
+      {
+        "id": "dsh06",
+        "title": "Implement empty states",
+        "scope": "frontend",
+        "description": "Copy empty state pattern from implementation doc. First-time greeting in center column: 'What would you like to work on? I can help you explore an idea, plan a feature, or jump into building.' Zen garden aesthetic: peaceful, warm, inviting. Left column collapsed. Right column shows only [+ new] button. WORK and ARTIFACTS sections in right column hidden when no projects exist.",
+        "dependencies": ["dsh02", "dsh03", "dsh04"],
+        "acceptance_criteria": ["ac7", "ac8"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "layout": "same TendLayout three-column grid",
+      "source_dashboard": "ideation-ui DashboardPage (adapt structure)",
+      "project_list_style": "text-based with attention indicators, not cards",
+      "empty_state": "zen garden aesthetic, warm AI greeting",
+      "sections": {
+        "left": "project drafts (future: cultivate signals), collapses when empty",
+        "center": "AI conversation for priorities and meta-discussion",
+        "right": "project list with WORK and ARTIFACTS sections"
+      },
+      "project_entry_format": "name, progress (7/10 · 3 running), attention signals",
+      "attention_symbols": {
+        "needs_attention": "⟳",
+        "running": "•",
+        "completed": "✓",
+        "failed": "✗"
+      },
+      "navigation": "clicking project → /projects/:id"
+    }
+  }
+}

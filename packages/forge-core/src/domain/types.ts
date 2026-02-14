@@ -233,6 +233,12 @@ export const ForgeStepSchema = z.object({
   repo_url: z.string().optional(),
   cli: z.string().optional(),
   audit: z.boolean().optional(),
+  /** Reference to a sub-plan that this step expands into (creates child Run) */
+  sub_plan_id: z.string().uuid().optional(),
+  /** Implementation specification from planner (target files, patterns, architecture) */
+  specification: z.record(z.string(), z.unknown()).optional(),
+  /** Target directory within workspace where agent should create files */
+  target_path: z.string().optional(),
 });
 
 export type ForgeStep = z.infer<typeof ForgeStepSchema>;
@@ -248,6 +254,10 @@ export const ForgePlanSchema = z.object({
     context: z.string().optional(),
   }),
   steps: z.array(ForgeStepSchema),
+  /** Architect context — design decisions, type definitions, patterns (plan-level) */
+  context: z.record(z.string(), z.unknown()).optional(),
+  /** Understanding — codebase observations, architectural insights (plan-level) */
+  understanding: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ForgePlan = z.infer<typeof ForgePlanSchema>;
@@ -261,8 +271,8 @@ export type ForgePlan = z.infer<typeof ForgePlanSchema>;
  * Research basis: METR 2025 - P(success) ~= (0.5)^(T/50min)
  */
 export const BudgetsConfigSchema = z.object({
-  /** Maximum time per task in seconds (default: 300 = 5 minutes) */
-  per_task_time_seconds: z.number().int().positive().default(300),
+  /** Maximum time per task in seconds (default: 900 = 15 minutes) */
+  per_task_time_seconds: z.number().int().positive().default(900),
   /** Maximum tokens per task (default: 100000) */
   per_task_token_limit: z.number().int().positive().default(100000),
   /** Maximum total cost for the entire run in USD (default: 10.0) */
@@ -276,8 +286,8 @@ export type BudgetsConfig = z.infer<typeof BudgetsConfigSchema>;
  * Research basis: Reflexion 2023 - Self-correction with failure analysis +20-30% improvement
  */
 export const RetryConfigSchema = z.object({
-  /** Maximum retry attempts per task (default: 3) */
-  max_retries_per_task: z.number().int().min(0).default(3),
+  /** Maximum retry attempts per task (default: 2 — allows 1 retry with failure context) */
+  max_retries_per_task: z.number().int().min(0).default(2),
   /** Backoff strategy (default: exponential) */
   backoff: z.enum(['none', 'linear', 'exponential']).default('exponential'),
   /** Base seconds for backoff calculation (default: 30) */
@@ -313,12 +323,12 @@ export const RecoveryStrategySchema = z.nativeEnum(RecoveryStrategy);
  * Parallelism configuration for concurrent task execution
  */
 export const ParallelismConfigSchema = z.object({
-  /** Maximum concurrent tasks across run (default: 5) */
-  max_concurrent_tasks: z.number().int().positive().default(5),
-  /** Maximum concurrent tasks per scope (optional) */
-  max_concurrent_per_scope: z.number().int().positive().optional(),
-  /** Prefer sequential execution within same scope (default: false) */
-  prefer_sequential_in_scope: z.boolean().default(false),
+  /** Maximum concurrent tasks across run (default: 3) */
+  max_concurrent_tasks: z.number().int().positive().default(3),
+  /** Maximum concurrent tasks per scope (default: 2) */
+  max_concurrent_per_scope: z.number().int().positive().default(2),
+  /** Prefer sequential execution within same scope (default: true — prevents file conflicts in shared worktrees) */
+  prefer_sequential_in_scope: z.boolean().default(true),
 });
 
 export type ParallelismConfig = z.infer<typeof ParallelismConfigSchema>;
@@ -349,6 +359,41 @@ export const ConfidenceConfigSchema = z.object({
 export type ConfidenceConfig = z.infer<typeof ConfidenceConfigSchema>;
 
 /**
+ * Quality gate configuration for PREP/POST phases.
+ * Controls automated analysis at tier boundaries and after task completion.
+ */
+export const QualityConfigSchema = z.object({
+  /** Run PREP analysis at tier boundaries (default: true) */
+  prep_enabled: z.boolean().default(true),
+  /** Run TASK_POST verification after each task (default: true) */
+  task_post_enabled: z.boolean().default(true),
+  /** Run RUN_POST integration review after all tasks (default: true) */
+  run_post_enabled: z.boolean().default(true),
+  /** Model for PREP analysis — deep codebase analysis benefits from stronger model */
+  prep_model: z.string().default('sonnet'),
+  /** Model for TASK_POST — fast quarter-review, haiku is sufficient */
+  task_post_model: z.string().default('haiku'),
+  /** Model for RUN_POST — integration review with focused prompt */
+  run_post_model: z.string().default('haiku'),
+  /** Skip PREP for runs with fewer tasks than this (default: 3) */
+  prep_min_tasks: z.number().int().min(1).default(3),
+  /** Skip PREP for tiers with fewer tasks than this (default: 2) */
+  prep_min_tier_tasks: z.number().int().min(1).default(2),
+  /** PREP timeout in milliseconds (default: 300000 = 5min) */
+  prep_timeout_ms: z.number().int().min(30000).default(300000),
+  /** TASK_POST timeout in milliseconds (default: 300000 = 5min) */
+  task_post_timeout_ms: z.number().int().min(30000).default(300000),
+  /** Run feature-level AC audit after RUN_POST (default: true) */
+  run_post_ac_audit: z.boolean().default(true),
+  /** Model for AC audit — deeper reasoning benefits from stronger model */
+  run_post_ac_model: z.string().default('sonnet'),
+  /** AC audit timeout in milliseconds (default: 300000 = 5min) */
+  run_post_ac_timeout_ms: z.number().int().min(30000).default(300000),
+});
+
+export type QualityConfig = z.infer<typeof QualityConfigSchema>;
+
+/**
  * ExecutionPolicy controls all DOT Framework knobs for a run.
  * All fields are optional with sensible defaults to maintain backward compatibility.
  */
@@ -363,6 +408,8 @@ export const ExecutionPolicySchema = z.object({
   replan: ReplanConfigSchema.default({}),
   /** Confidence thresholds */
   confidence: ConfidenceConfigSchema.default({}),
+  /** Quality gate configuration for PREP/POST phases */
+  quality: QualityConfigSchema.default({}),
 });
 
 export type ExecutionPolicy = z.infer<typeof ExecutionPolicySchema>;
@@ -371,6 +418,16 @@ export type ExecutionPolicy = z.infer<typeof ExecutionPolicySchema>;
  * Default execution policy with research-backed values
  */
 export const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = ExecutionPolicySchema.parse({});
+
+/**
+ * Parallelism defaults for master runs (all tasks dispatch child runs).
+ * Master run tasks don't edit files directly, so sequential-in-scope is unnecessary.
+ * User-provided execution_policy always takes precedence over these defaults.
+ */
+export const MASTER_RUN_PARALLELISM: Partial<ParallelismConfig> = {
+  prefer_sequential_in_scope: false,
+  max_concurrent_per_scope: 3,
+};
 
 // ============================================
 // Run Entity
@@ -386,6 +443,10 @@ export const RunSchema = z.object({
   execution_policy: ExecutionPolicySchema.optional(),
   /** Workspace directory for agent execution (propagated to all tasks) */
   workspace_path: z.string().optional(),
+  /** Parent run ID if this run was spawned by a task in another run (hierarchical runs) */
+  parent_run_id: z.string().uuid().optional(),
+  /** Parent task ID that spawned this run (hierarchical runs) */
+  parent_task_id: z.string().uuid().optional(),
   started_at: z.string().datetime().optional(),
   completed_at: z.string().datetime().optional(),
   error: z.string().optional(),
@@ -437,6 +498,15 @@ export const TaskSchema = z.object({
   input_artifacts: z.array(ArtifactReferenceSchema).optional(),
   /** Artifacts this task produces as output (for dependency validation) */
   output_artifacts: z.array(ArtifactReferenceSchema).optional(),
+  /** Reference to a sub-plan that this step expands into (creates child Run) */
+  sub_plan_id: z.string().uuid().optional(),
+  /** Run ID of the child run created for this task (when sub_plan_id is set) */
+  child_run_id: z.string().uuid().optional(),
+  /** Implementation specification from planner (target files, patterns, architecture) */
+  specification: z.record(z.string(), z.unknown()).optional(),
+  /** Target directory within workspace where agent should create files */
+  target_path: z.string().optional(),
+  error: z.string().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -698,6 +768,10 @@ export interface CreateRunOptions {
   executionPolicy?: ExecutionPolicy;
   /** Workspace directory for agent execution */
   workspacePath?: string;
+  /** Parent run ID if this run was spawned by a task in another run */
+  parentRunId?: string;
+  /** Parent task ID that spawned this run */
+  parentTaskId?: string;
 }
 
 /**
@@ -713,6 +787,8 @@ export function createRun(forgePlan: ForgePlan, options?: CreateRunOptions): Run
     has_pending_gate: false,
     execution_policy: options?.executionPolicy,
     workspace_path: options?.workspacePath,
+    parent_run_id: options?.parentRunId,
+    parent_task_id: options?.parentTaskId,
     created_at: now,
     updated_at: now,
   };
@@ -736,6 +812,9 @@ export function createTask(runId: string, forgeStep: ForgeStep, workspacePath?: 
     workspace_path: workspacePath,
     step_description: forgeStep.description,
     acceptance_criteria: forgeStep.acceptance_criteria,
+    sub_plan_id: forgeStep.sub_plan_id,
+    specification: forgeStep.specification,
+    target_path: forgeStep.target_path,
     created_at: now,
     updated_at: now,
   };
@@ -1050,6 +1129,178 @@ export function createActiveGuardian(
 }
 
 // ============================================
+// Cultivate Domain Types
+// ============================================
+
+/**
+ * Greenhouse operation mode
+ */
+export const GreenhouseMode = {
+  Active: 'active',
+  Paused: 'paused',
+  Archived: 'archived',
+} as const;
+
+export type GreenhouseMode = (typeof GreenhouseMode)[keyof typeof GreenhouseMode];
+
+export const GreenhouseModeSchema = z.enum(['active', 'paused', 'archived']);
+
+/**
+ * Cluster trend direction
+ */
+export const ClusterTrend = {
+  Rising: 'rising',
+  Stable: 'stable',
+  Declining: 'declining',
+} as const;
+
+export type ClusterTrend = (typeof ClusterTrend)[keyof typeof ClusterTrend];
+
+export const ClusterTrendSchema = z.enum(['rising', 'stable', 'declining']);
+
+/**
+ * Signal status lifecycle
+ */
+export const SignalStatus = {
+  New: 'new',
+  Processed: 'processed',
+  Clustered: 'clustered',
+  Linked: 'linked',
+  Archived: 'archived',
+} as const;
+
+export type SignalStatus = (typeof SignalStatus)[keyof typeof SignalStatus];
+
+export const SignalStatusSchema = z.enum([
+  'new',
+  'processed',
+  'clustered',
+  'linked',
+  'archived',
+]);
+
+/**
+ * Signal source type
+ */
+export const SourceType = {
+  Slack: 'slack',
+  GitHub: 'github',
+  Email: 'email',
+  Linear: 'linear',
+  Manual: 'manual',
+} as const;
+
+export type SourceType = (typeof SourceType)[keyof typeof SourceType];
+
+export const SourceTypeSchema = z.enum(['slack', 'github', 'email', 'linear', 'manual']);
+
+/**
+ * Author type for signals
+ */
+export const AuthorType = {
+  Human: 'human',
+  Bot: 'bot',
+  System: 'system',
+} as const;
+
+export type AuthorType = (typeof AuthorType)[keyof typeof AuthorType];
+
+export const AuthorTypeSchema = z.enum(['human', 'bot', 'system']);
+
+/**
+ * Tracks progression through the cultivate pipeline
+ */
+export const StepProvenanceSchema = z.object({
+  /** Pipeline step name (e.g., 'ingestion', 'scoring', 'clustering') */
+  step: z.string().min(1),
+  /** When the signal entered this step */
+  timestamp: z.string().datetime(),
+  /** Additional context about this step (e.g., model used, confidence score) */
+  details: z.record(z.unknown()).optional(),
+});
+
+export type StepProvenance = z.infer<typeof StepProvenanceSchema>;
+
+/**
+ * Signal represents a single request/feedback item from any source
+ */
+export const SignalSchema = z.object({
+  id: z.string().uuid(),
+  greenhouse_id: z.string().uuid(),
+  source_type: SourceTypeSchema,
+  /** External identifier from the source system */
+  external_id: z.string().min(1),
+  title: z.string().min(1),
+  body: z.string(),
+  author: z.string().min(1),
+  author_type: AuthorTypeSchema,
+  /** Optional URL to the original source */
+  url: z.string().url().optional(),
+  /** Composite score from scoring service */
+  score: z.number(),
+  /** Individual scoring factors (urgency, impact, clarity, etc.) */
+  scoring_factors: z.record(z.number()),
+  /** Cluster this signal belongs to (if clustered) */
+  cluster_id: z.string().uuid().optional(),
+  status: SignalStatusSchema,
+  /** Pipeline progression history */
+  provenance: z.array(StepProvenanceSchema),
+  /** User-defined or auto-generated tags */
+  tags: z.array(z.string()),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  /** Plan ID if this signal has been linked to a plan */
+  linked_plan_id: z.string().uuid().optional(),
+});
+
+export type Signal = z.infer<typeof SignalSchema>;
+
+/**
+ * Greenhouse defines a filtered collection of signals from specific sources
+ */
+export const GreenhouseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  /** Current operation mode */
+  mode: GreenhouseModeSchema,
+  /** Keywords that must be present (OR condition) */
+  keyword_require: z.array(z.string()),
+  /** Keywords that must NOT be present */
+  keyword_exclude: z.array(z.string()),
+  /** Source identifiers to monitor (e.g., channel IDs, repo names) */
+  source_ids: z.array(z.string()),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type Greenhouse = z.infer<typeof GreenhouseSchema>;
+
+/**
+ * Cluster represents a group of related signals
+ */
+export const ClusterSchema = z.object({
+  id: z.string().uuid(),
+  greenhouse_id: z.string().uuid(),
+  /** Human-readable cluster label */
+  label: z.string().min(1),
+  /** AI-generated summary of the cluster theme */
+  summary: z.string(),
+  /** Number of signals in this cluster */
+  signal_count: z.number().int().min(0),
+  /** Trend direction based on recent signal velocity */
+  trend: ClusterTrendSchema,
+  /** New signals per week */
+  velocity_weekly: z.number(),
+  /** New signals per month */
+  velocity_monthly: z.number(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type Cluster = z.infer<typeof ClusterSchema>;
+
+// ============================================
 // Task Execution Metric (DOT Framework)
 // ============================================
 
@@ -1139,7 +1390,7 @@ export const VALID_RUN_TRANSITIONS: Record<RunStatus, RunStatus[]> = {
   ],
   [RunStatus.Paused]: [RunStatus.Running, RunStatus.Cancelled],
   [RunStatus.Completed]: [],
-  [RunStatus.Failed]: [],
+  [RunStatus.Failed]: [RunStatus.Running], // Retry: resume failed run
   [RunStatus.Cancelled]: [],
 };
 

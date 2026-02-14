@@ -62,4 +62,6 @@ prpm.lock
 docs/*
 !docs/flow/
 !docs/flow/**
+!docs/cultivate-forge-operations.md
 docs/flow/**/.DS_Store
+packages/server/.forge-worktrees/

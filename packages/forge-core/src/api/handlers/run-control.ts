@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ForgeStorage } from '../../storage/interface.js';
 import type { TrajectoryCapture } from '../../services/trajectory-capture.js';
-import { RunStatus, validateRunTransition } from '../../domain/types.js';
+import { RunStatus, TaskStatus, validateRunTransition } from '../../domain/types.js';
 import { TrajectoryEventType } from '../../domain/trajectory-events.js';
 import type { RunControlResponse } from '../schemas.js';
 
@@ -133,6 +133,35 @@ export function resumeRunHandler(deps: RunControlHandlerDeps) {
       }
 
       const previousStatus = run.status;
+
+      // When resuming a failed run, reset failed and blocked tasks to pending
+      // so the orchestrator can retry them instead of immediately cascading failure
+      if (previousStatus === RunStatus.Failed) {
+        const tasks = deps.storage.listTasksByRun(runId);
+        const failedTasks = tasks.filter(t => t.status === TaskStatus.Failed);
+        const blockedTasks = tasks.filter(t => t.status === (TaskStatus as any).Blocked || t.status === 'blocked');
+
+        // Build set of failed step_ids for dependency resolution
+        const failedStepIds = new Set(failedTasks.map(t => t.step_id));
+
+        // Reset failed tasks to pending
+        for (const task of failedTasks) {
+          deps.storage.updateTask(task.task_id, { status: TaskStatus.Pending });
+        }
+
+        // Reset blocked tasks whose dependencies include a failed task
+        for (const task of blockedTasks) {
+          const deps_list = task.dependencies || [];
+          const blockedByFailure = deps_list.some(dep => failedStepIds.has(dep));
+          if (blockedByFailure || failedStepIds.size > 0) {
+            deps.storage.updateTask(task.task_id, { status: TaskStatus.Pending });
+          }
+        }
+
+        console.log(
+          `[RunControlHandler] Resume: reset ${failedTasks.length} failed + ${blockedTasks.length} blocked tasks to pending`
+        );
+      }
 
       // Update run status
       const updatedRun = deps.storage.updateRunStatus(runId, RunStatus.Running);

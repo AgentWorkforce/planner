@@ -12,7 +12,10 @@ import { createEventsHandler } from './handlers/events.js';
 import { createInitiativeHandlers } from './handlers/initiatives.js';
 import { createQuestionHandlers } from './handlers/questions.js';
 import { createTrajectoryHandlers } from './handlers/trajectories.js';
-import { createChatHandlers } from './handlers/chat.js';
+import { createProjectHandlers } from './handlers/projects.js';
+import { createSuggestionHandlers } from './handlers/chat.js';
+import { createVersionDataHandlers } from './handlers/version-data.js';
+import { createHierarchyHandlers } from './handlers/hierarchy.js';
 import { createOptionalMcpAuthMiddleware } from './middleware/mcp-auth.js';
 
 /**
@@ -32,7 +35,10 @@ export function createRouter(storage: PlanStorage): Router {
   const initiativeHandlers = createInitiativeHandlers(storage);
   const questionHandlers = createQuestionHandlers(storage);
   const trajectoryHandlers = createTrajectoryHandlers(storage);
-  const chatHandlers = createChatHandlers(storage);
+  const projectHandlers = createProjectHandlers(storage);
+  const suggestionHandlers = createSuggestionHandlers(storage);
+  const versionDataHandlers = createVersionDataHandlers(storage);
+  const hierarchyHandlers = createHierarchyHandlers(storage);
   const mcpAuth = createOptionalMcpAuthMiddleware(storage);
 
   // Plan routes
@@ -43,6 +49,16 @@ export function createRouter(storage: PlanStorage): Router {
   router.get('/plans/:id/versions', planHandlers.listVersions);
   router.get('/plans/:id/versions/:version', planHandlers.getVersion);
   router.post('/plans/:id/versions', planHandlers.createVersion);
+  router.post('/plans/:id/versions/:version/restore', planHandlers.restoreVersion);
+
+  // Version data routes (context & understanding)
+  router.patch('/plans/:id/context/:role', versionDataHandlers.updateContext);
+  router.patch('/plans/:id/understanding/:role', versionDataHandlers.updateUnderstanding);
+
+  // Sub-plan hierarchy routes
+  router.get('/plans/:id/sub-plans', hierarchyHandlers.listSubPlans);
+  router.get('/plans/:id/dependents', hierarchyHandlers.listDependents);
+  router.get('/plans/:id/resolved', hierarchyHandlers.getResolved);
 
   // Session routes
   router.get('/plans/:id/session', sessionHandlers.getSession);
@@ -113,8 +129,16 @@ export function createRouter(storage: PlanStorage): Router {
   router.get('/plans/:id/trajectory/preferences', trajectoryHandlers.getPreferences);
   router.get('/plans/:id/trajectory/similar', trajectoryHandlers.findSimilar);
 
-  // AI suggestion routes (domain logic only - chat route is in server package)
-  router.post('/ai/suggestions/apply', chatHandlers.applySuggestion);
+  // AI suggestion routes
+  router.post('/ai/suggestions/apply', suggestionHandlers.applySuggestion);
+
+  // Project routes
+  router.get('/projects', projectHandlers.list);
+  router.post('/projects', projectHandlers.create);
+  router.get('/projects/:id', projectHandlers.get);
+  router.put('/projects/:id', projectHandlers.update);
+  router.post('/projects/:id/focus', projectHandlers.updateFocus);
+  router.post('/projects/:id/graduate', projectHandlers.graduate);
 
   return router;
 }

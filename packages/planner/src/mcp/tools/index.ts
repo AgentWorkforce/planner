@@ -14,7 +14,7 @@ import { planTools, handleListPlans, handleReadPlan, handleCreatePlan, handleSub
 import { stepTools, handleAddStep, handleEditStep, handleRemoveStep, handleSetDependencies } from './step-tools.js';
 import { criteriaTools, handleAddCriteria, handleRemoveCriteria, handleEditCriteria } from './criteria-tools.js';
 import { gateTools, handleAddGate, handleRemoveGate } from './gate-tools.js';
-import { versionTools, handleCreateDraftVersion } from './version-tools.js';
+import { versionTools, handleCreateDraftVersion, handleRestoreVersion } from './version-tools.js';
 import { improvementTools, handleSuggestImprovement } from './improvement-tools.js';
 
 // Re-export shared types and utilities
@@ -96,6 +96,8 @@ function executeToolCall(
     // Version tools
     case 'create_draft_version':
       return handleCreateDraftVersion(storage, args);
+    case 'restore_version':
+      return handleRestoreVersion(storage, args);
 
     // Improvement tools
     case 'suggest_improvement':

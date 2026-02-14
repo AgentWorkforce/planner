@@ -44,4 +44,10 @@ export function registerAgentRoutes(
   };
 
   router.get('/agents', listActiveAgentsHandler(handlerDeps));
+
+  // Alias: frontend calls /runs/:id/agents — forward as ?run_id query
+  router.get('/runs/:id/agents', (req, res) => {
+    req.query.run_id = req.params.id;
+    return listActiveAgentsHandler(handlerDeps)(req, res);
+  });
 }

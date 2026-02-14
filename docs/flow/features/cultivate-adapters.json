@@ -1,0 +1,76 @@
+{
+  "feature_id": "cultivate-adapters",
+  "title": "Generic Adapter Types + Source Health Policy",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain", "cultivate-auth-encryption"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Four generic adapter types: PollApiAdapter (endpoint template, pagination, rate limiting), WebhookAdapter (HMAC verification), PushAdapter (chunking strategies), StructuredPullAdapter (query template). Source health escalation: 1 fail is warn, 3 consecutive failures is unhealthy plus SSE, 10 is disabled, auth error triggers immediate disable.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "SourceAdapter interface defines common contract for all adapter types with fetch/receive methods" },
+      { "id": "ac2", "description": "PollApiAdapter supports endpoint URL templates, cursor-based and offset pagination, and per-source rate limiting" },
+      { "id": "ac3", "description": "WebhookAdapter validates incoming requests via HMAC signature verification before processing" },
+      { "id": "ac4", "description": "PushAdapter handles document ingestion with configurable chunking strategies (recursive, speaker-aware)" },
+      { "id": "ac5", "description": "StructuredPullAdapter executes query templates against structured APIs (GraphQL, SQL-like)" },
+      { "id": "ac6", "description": "Source health escalation: 1 fail warn, 3 consecutive unhealthy + SSE source:error, 10 disabled, auth error immediate disable" },
+      { "id": "ac7", "description": "createAdapter(sourceConfig) factory returns the correct adapter type based on source configuration" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "ca-s1",
+        "title": "Define SourceAdapter interface",
+        "scope": "cultivate",
+        "description": "Create the SourceAdapter interface that all adapter types implement. Methods: initialize(config) for setup, fetch() for poll/pull adapters that actively retrieve data, receive(request) for webhook/push adapters that accept incoming data, getHealth() returning current health status. Define AdapterType enum: 'poll_api', 'webhook', 'push', 'structured_pull'. Define SourceHealth type with status (healthy/warn/unhealthy/disabled), consecutive_failures count, and last_error.",
+        "dependencies": []
+      },
+      {
+        "id": "ca-s2",
+        "title": "Implement PollApiAdapter",
+        "scope": "cultivate",
+        "description": "Build PollApiAdapter implementing SourceAdapter. Supports: endpoint URL templates with variable substitution (e.g., /api/v1/reviews?since={{last_poll}}), cursor-based pagination (follow next_cursor in response), offset-based pagination (increment offset until empty page), per-source rate limiting (configurable requests/minute with token bucket). Decrypts auth credentials via cultivate-auth-encryption before making requests. Returns NormalizedEvent[] from fetched data.",
+        "dependencies": ["ca-s1"]
+      },
+      {
+        "id": "ca-s3",
+        "title": "Implement WebhookAdapter",
+        "scope": "cultivate",
+        "description": "Build WebhookAdapter implementing SourceAdapter. On receive(request): (1) extract HMAC signature from headers (configurable header name), (2) compute expected HMAC using the source's webhook secret (decrypted from storage), (3) compare signatures using timing-safe comparison, (4) reject with 401 if signature mismatch, (5) normalize the verified payload into NormalizedEvent[]. Support common HMAC algorithms (sha256, sha1).",
+        "dependencies": ["ca-s1"]
+      },
+      {
+        "id": "ca-s4",
+        "title": "Implement PushAdapter with chunking strategies",
+        "scope": "cultivate",
+        "description": "Build PushAdapter implementing SourceAdapter for document ingestion. On receive(document): apply configured chunking strategy to split large documents into processable signals. Chunking strategies: recursive (split by headings then paragraphs then sentences), speaker-aware (for interview transcripts, split on speaker changes preserving speaker context). Each chunk becomes a separate NormalizedEvent with chunk metadata (index, total, parent_document_id).",
+        "dependencies": ["ca-s1"]
+      },
+      {
+        "id": "ca-s5",
+        "title": "Implement StructuredPullAdapter",
+        "scope": "cultivate",
+        "description": "Build StructuredPullAdapter implementing SourceAdapter. Supports query templates for structured data sources: variable substitution in query strings, configurable response mapping (JSONPath-like field extraction), pagination via cursor or page tokens in query parameters. Designed for GraphQL APIs, database-like interfaces, and structured export endpoints. Returns NormalizedEvent[] from query results.",
+        "dependencies": ["ca-s1"]
+      },
+      {
+        "id": "ca-s6",
+        "title": "Implement source health escalation policy",
+        "scope": "cultivate",
+        "description": "Build SourceHealthTracker that monitors adapter failures and escalates: 1 consecutive failure sets status to 'warn', 3 consecutive failures sets 'unhealthy' and emits SSE source:error event, 10 consecutive failures sets 'disabled' (adapter stops fetching), any authentication error (401/403) immediately sets 'disabled' and emits SSE source:auth_expired. Successful fetch resets consecutive_failures to 0 and status to 'healthy'. Health state persisted in sources table.",
+        "dependencies": ["ca-s1"]
+      },
+      {
+        "id": "ca-s7",
+        "title": "Add createAdapter factory function",
+        "scope": "cultivate",
+        "description": "Build createAdapter(sourceConfig: SourceConfig): SourceAdapter factory that inspects sourceConfig.adapter_type and returns the appropriate adapter instance (PollApiAdapter, WebhookAdapter, PushAdapter, or StructuredPullAdapter) initialized with the source's configuration. Throw BadRequestError for unknown adapter types. Integrate with SourceHealthTracker so each adapter instance tracks its own health.",
+        "dependencies": ["ca-s2", "ca-s3", "ca-s4", "ca-s5", "ca-s6"]
+      }
+    ]
+  }
+}

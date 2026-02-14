@@ -1,0 +1,132 @@
+{
+  "feature_id": "tend-conversation-core",
+  "title": "Adapt center column from session chat to project conversation",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["tend-theming"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Adapt the center column from session chat to project conversation with system events, context markers, and relay integration.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "SessionChatView renamed to ConversationPane"
+      },
+      {
+        "id": "ac2",
+        "description": "ChatInput renamed to ConversationInput, ChatMessageList to ConversationMessages"
+      },
+      {
+        "id": "ac3",
+        "description": "SystemEvent component renders compact inline markers (e.g., '┊ Step completed · 4m 12s · PR #43 created') at attention level 1"
+      },
+      {
+        "id": "ac4",
+        "description": "ContextMarker component renders subtle dividers when conversation focus shifts"
+      },
+      {
+        "id": "ac5",
+        "description": "RelayProvider (copied from planner-ui) wraps the app, provides shared WebSocket connection"
+      },
+      {
+        "id": "ac6",
+        "description": "useRelayConnection (from planner-ui) manages WebSocket lifecycle"
+      },
+      {
+        "id": "ac7",
+        "description": "FocusMode stays for forming block inspection"
+      },
+      {
+        "id": "ac8",
+        "description": "ChatBubble stays, TypingIndicator stays"
+      },
+      {
+        "id": "ac9",
+        "description": "Conversation renders both user/AI messages and system events in chronological order"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The center column keeps most of ideation-ui's chat infrastructure.",
+        "Key additions: SystemEvent (new, inspired by planner-ui MessageStream inline events), ContextMarker (new), and relay WebSocket integration (copy RelayProvider + useRelayConnection from planner-ui).",
+        "The conversation is one continuous thread per project."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "cnv01",
+        "title": "Rename chat components to conversation naming",
+        "scope": "tend",
+        "description": "Rename packages/tend/src/components/chat/SessionChatView.tsx → ConversationPane.tsx. Rename ChatInput.tsx → ConversationInput.tsx. Rename ChatMessageList.tsx → ConversationMessages.tsx. Update all imports across packages/tend/.",
+        "acceptance_criteria": ["ac1", "ac2"]
+      },
+      {
+        "id": "cnv02",
+        "title": "Create SystemEvent component for inline markers",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/conversation/SystemEvent.tsx. Render compact inline format: '┊ Step completed · 4m 12s · PR #43 created'. Use attention level 1 styling (lower font weight, blends in). Clickable to open relevant context (agent tab or tree node).",
+        "dependencies": ["cnv01"],
+        "acceptance_criteria": ["ac3"]
+      },
+      {
+        "id": "cnv03",
+        "title": "Create ContextMarker component for focus shifts",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/conversation/ContextMarker.tsx. Render subtle divider when conversation focus shifts (e.g., from dashboard to project, or between tree scopes). Minimal styling, fades into background.",
+        "dependencies": ["cnv01"],
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "cnv04",
+        "title": "Copy RelayProvider and useRelayConnection from planner-ui",
+        "scope": "tend",
+        "description": "Copy packages/planner-ui/src/contexts/RelayContext.tsx → packages/tend/src/contexts/RelayContext.tsx. Copy packages/planner-ui/src/hooks/useRelayConnection.ts → packages/tend/src/hooks/useRelayConnection.ts. Wire WebSocket connection in App.tsx. Update relay channel IDs to project-scoped (#project-{id}).",
+        "dependencies": ["cnv01"],
+        "acceptance_criteria": ["ac5", "ac6"]
+      },
+      {
+        "id": "cnv05",
+        "title": "Update ConversationMessages to render system events and markers",
+        "scope": "tend",
+        "description": "In ConversationMessages: update message rendering to support ProjectMessage interface (role, content, metadata). Render user/AI messages (ChatBubble), system events (SystemEvent), and context markers (ContextMarker) chronologically. Sort by created_at. Keep FocusMode, TypingIndicator.",
+        "dependencies": ["cnv02", "cnv03"],
+        "acceptance_criteria": ["ac7", "ac8", "ac9"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "renames": {
+        "SessionChatView": "ConversationPane",
+        "ChatInput": "ConversationInput",
+        "ChatMessageList": "ConversationMessages"
+      },
+      "copy_from_planner": [
+        "RelayProvider",
+        "useRelayConnection"
+      ],
+      "new_components": [
+        "SystemEvent (compact inline markers)",
+        "ContextMarker (subtle dividers)"
+      ],
+      "keep_from_ideation": [
+        "FocusMode",
+        "ChatBubble",
+        "TypingIndicator"
+      ],
+      "system_event_format": "┊ Step completed · 4m 12s · PR #43 created",
+      "attention_levels": {
+        "system_events": 1,
+        "context_shifts": "subtle divider"
+      }
+    }
+  }
+}

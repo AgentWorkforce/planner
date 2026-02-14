@@ -12,6 +12,7 @@ import {
 } from '../domain/types.js';
 import type { TrajectoryCapture } from './trajectory-capture.js';
 import { TrajectoryEventType } from '../domain/trajectory-events.js';
+import type { UserTrajectoryService } from './user-trajectory-service.js';
 
 // ============================================
 // Question Service Types
@@ -23,8 +24,10 @@ import { TrajectoryEventType } from '../domain/trajectory-events.js';
 export interface AskQuestionOptions extends CreateQuestionOptions {
   /** Enable trajectory-aware deduplication check */
   checkTrajectory?: boolean;
-  /** Similarity threshold for trajectory matching (0-1, default 0.8) */
+  /** Similarity threshold for trajectory matching (0-1, default 0.85) */
   similarityThreshold?: number;
+  /** User ID for trajectory lookup (if not provided, trajectory check is skipped) */
+  userId?: string;
 }
 
 /**
@@ -95,6 +98,7 @@ export class QuestionService {
   private storage: ForgeStorage;
   private trajectoryCapture: TrajectoryCapture;
   private notifySubscribers?: NotifySubscribersFn;
+  private userTrajectoryService?: UserTrajectoryService;
 
   /** Default timeout for auto-defaulting in milliseconds (5 minutes) */
   private defaultTimeoutMs: number;
@@ -105,11 +109,13 @@ export class QuestionService {
     options?: {
       notifySubscribers?: NotifySubscribersFn;
       defaultTimeoutMs?: number;
+      userTrajectoryService?: UserTrajectoryService;
     }
   ) {
     this.storage = storage;
     this.trajectoryCapture = trajectoryCapture;
     this.notifySubscribers = options?.notifySubscribers;
+    this.userTrajectoryService = options?.userTrajectoryService;
     this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 5 * 60 * 1000; // 5 minutes
   }
 
@@ -142,22 +148,25 @@ export class QuestionService {
     options?: AskQuestionOptions
   ): AskQuestionResult {
     const checkTrajectory = options?.checkTrajectory ?? true;
-    const similarityThreshold = options?.similarityThreshold ?? 0.8;
+    const similarityThreshold = options?.similarityThreshold ?? 0.85;
+    const userId = options?.userId;
 
-    // Step 1: Check trajectory for similar answered questions
-    if (checkTrajectory) {
-      const trajectoryMatch = this.findSimilarAnswerInTrajectory(
-        runId,
-        text,
-        similarityThreshold
-      );
+    // Step 1: Check user trajectory for similar answered questions
+    if (checkTrajectory && userId && this.userTrajectoryService) {
+      const similarQuestions = this.userTrajectoryService.findSimilarQuestions({
+        userId,
+        questionText: text,
+        threshold: similarityThreshold,
+        limit: 1,
+      });
 
-      if (trajectoryMatch) {
+      const match = similarQuestions[0];
+      if (match) {
         // Create question with auto-answered status
         const question = createQuestion(runId, agentId, text, blockingLevel, {
           ...options,
           status: QStatus.AutoAnsweredFromTrajectory,
-          answer: trajectoryMatch.answer,
+          answer: match.event.selected_option,
           answeredBy: 'system',
         });
 
@@ -168,16 +177,16 @@ export class QuestionService {
           question_id: question.question_id,
           agent_id: agentId,
           text,
-          answer: trajectoryMatch.answer,
-          source_question_id: trajectoryMatch.sourceQuestionId,
-          similarity_score: trajectoryMatch.similarity,
+          answer: match.event.selected_option,
+          source_question_id: match.event.event_id,
+          similarity_score: match.similarity,
         });
 
         return {
           question,
           wasSubscribed: false,
           wasAutoAnswered: true,
-          sourceQuestionId: trajectoryMatch.sourceQuestionId,
+          sourceQuestionId: match.event.event_id,
         };
       }
     }
@@ -356,6 +365,24 @@ export class QuestionService {
       },
       question.task_id
     );
+
+    // Record in user trajectory for preference learning
+    if (this.userTrajectoryService) {
+      try {
+        this.userTrajectoryService.recordUserDecision({
+          userId: answeredBy,
+          scope: 'run',
+          questionText: question.text,
+          selectedOption: answer,
+          runId: question.run_id,
+          taskId: question.task_id,
+          category: question.blocking_level,
+        });
+      } catch (err) {
+        // Don't let trajectory recording failures block the answer flow
+        console.error('[QuestionService] Failed to record user decision:', err);
+      }
+    }
 
     // Notify all subscribers (original agent + subscribers)
     const allAgentsToNotify = [question.agent_id, ...question.subscribers];
@@ -585,59 +612,13 @@ export class QuestionService {
   }
 
   // ============================================
-  // Trajectory Deduplication Helpers
+  // Deduplication Helpers
   // ============================================
 
   /**
-   * Finds a similar answered question in trajectory history.
-   *
-   * Uses simple text similarity for now - can be enhanced with embeddings later.
-   */
-  private findSimilarAnswerInTrajectory(
-    runId: string,
-    questionText: string,
-    threshold: number
-  ): { answer: string; sourceQuestionId: string; similarity: number } | null {
-    // Get answered questions from trajectory
-    const events = this.storage.listTrajectoryEvents(runId, {
-      event_type: 'question_answered',
-    });
-
-    for (const event of events) {
-      const payload = event.payload as {
-        question_id?: string;
-        text?: string;
-        answer?: string;
-      };
-
-      // We need to get the original question text
-      // Look up the question or find it in human_input_requested events
-      const questionId = payload.question_id;
-      if (!questionId || !payload.answer) {
-        continue;
-      }
-
-      // Get the original question to compare text
-      const question = this.storage.getQuestion(questionId);
-      if (!question) {
-        continue;
-      }
-
-      const similarity = this.calculateTextSimilarity(questionText, question.text);
-      if (similarity >= threshold) {
-        return {
-          answer: payload.answer,
-          sourceQuestionId: questionId,
-          similarity,
-        };
-      }
-    }
-
-    return null;
-  }
-
-  /**
    * Finds a similar pending question to subscribe to.
+   *
+   * Uses simple Jaccard similarity on words.
    */
   private findSimilarPendingQuestion(
     pendingQuestions: Question[],
@@ -657,7 +638,7 @@ export class QuestionService {
    * Calculates text similarity between two strings.
    *
    * Simple implementation using Jaccard similarity on words.
-   * Can be replaced with embeddings for better semantic matching.
+   * Used for pending question deduplication.
    */
   private calculateTextSimilarity(text1: string, text2: string): number {
     // Normalize texts
@@ -699,6 +680,7 @@ export function createQuestionService(
   options?: {
     notifySubscribers?: NotifySubscribersFn;
     defaultTimeoutMs?: number;
+    userTrajectoryService?: UserTrajectoryService;
   }
 ): QuestionService {
   return new QuestionService(storage, trajectoryCapture, options);

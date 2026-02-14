@@ -1,0 +1,24 @@
+{
+  "sessionId": "44a0cda7-2a74-4c4f-9f5b-17f5585bd542",
+  "entitiesSinceLastLlm": [],
+  "factsSinceLastLlm": [
+    {
+      "slug": "recovery-8fbabd6a-9f3e-4fbe-ab7e-db2f27c1feb4",
+      "text": "Recovery: revise",
+      "source": "forge:44a0cda7-2a74-4c4f-9f5b-17f5585bd542",
+      "timestamp": "2026-02-14T18:32:19.741Z",
+      "entities": [],
+      "isPreStructured": true
+    },
+    {
+      "slug": "recovery-5d24d887-d405-4780-af50-f3e963e7fe9a",
+      "text": "Recovery: escalate",
+      "source": "forge:44a0cda7-2a74-4c4f-9f5b-17f5585bd542",
+      "timestamp": "2026-02-14T18:32:51.747Z",
+      "entities": [],
+      "isPreStructured": true
+    }
+  ],
+  "lastLlmRunAt": null,
+  "lastDeterministicAt": "2026-02-14T18:32:51.748Z"
+}

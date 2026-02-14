@@ -1,0 +1,132 @@
+{
+  "feature_id": "tend-graduation-bridge",
+  "title": "Graduation Bridge (Ideation → Planner)",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["tend-project-entity", "tend-project-tree"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Build the atomic bridge that converts forming blocks into plan steps, connecting ideation and planner domains.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "POST /api/projects/:id/graduate endpoint accepts { block_ids: string[] }"
+      },
+      {
+        "id": "ac2",
+        "description": "For each block: creates a Step in the PlanVersion (title, scope, description derived from block)"
+      },
+      {
+        "id": "ac3",
+        "description": "Each graduated block is marked as graduated in ideation storage"
+      },
+      {
+        "id": "ac4",
+        "description": "Both block_graduated (ideation SSE) and step_added (planner SSE) events emitted atomically"
+      },
+      {
+        "id": "ac5",
+        "description": "Frontend receives both events and plays left→right animation (block shrinks in NowColumn, step appears in ProjectTree)"
+      },
+      {
+        "id": "ac6",
+        "description": "Graduation is conversational — Interviewer proposes, user confirms, then API called"
+      },
+      {
+        "id": "ac7",
+        "description": "Dependencies between graduated steps are inferred from block relationships and AI context"
+      },
+      {
+        "id": "ac8",
+        "description": "Failed graduation (e.g., blocks already graduated) returns appropriate error without partial state"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is the key new cross-domain bridge",
+        "Today ideation has send_to_planner tool which hands off via relay",
+        "In tend, graduation is a direct API call that operates on both ideation storage (mark block graduated) and planner storage (create step)",
+        "The operation must be atomic — both succeed or both fail",
+        "The Interviewer triggers graduation through its graduate_blocks tool when the user confirms",
+        "Block → Step mapping: title=block.title, scope=inferred from block.context, description=block.content",
+        "Dependencies use existing planner dependency inference logic but seeded with block relationships"
+      ],
+      "questions": [
+        "Should we use a database transaction across both ideation.db and planner.db?",
+        "How do we handle partial failures (e.g., 3 blocks succeed, 1 fails)?",
+        "Should graduated blocks be soft-deleted or marked with a flag?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["backend", "frontend"],
+    "steps": [
+      {
+        "id": "grb01",
+        "title": "Implement POST /api/projects/:id/graduate handler",
+        "scope": "backend",
+        "description": "Add graduate endpoint to project router (packages/planner or packages/server). Read blocks from IdeationStorage via session_id, create corresponding Steps in PlanStorage. Map: block.title→step.title, block.content→step.description, infer scope from block.context. Mark blocks as graduated (add graduated flag to blocks table if needed).",
+        "acceptance_criteria": ["ac1", "ac2", "ac3"]
+      },
+      {
+        "id": "grb02",
+        "title": "Ensure atomicity with try/catch/rollback",
+        "scope": "backend",
+        "description": "Wrap block marking and step creation in try/catch. On any failure, rollback both operations (revert graduated flag, delete created steps). Better-sqlite3 supports transactions — use db.transaction(). Both succeed or both fail.",
+        "dependencies": ["grb01"],
+        "acceptance_criteria": ["ac8"]
+      },
+      {
+        "id": "grb03",
+        "title": "Emit dual SSE events",
+        "scope": "backend",
+        "description": "Copy SSE emission pattern from packages/ideation and packages/planner. After successful graduation, emit block_graduated event on ideation SSE stream (GET /api/ideation/sessions/:id/events) and step_added event on planner SSE stream (GET /api/plans/:id/events). Use existing SSE infrastructure.",
+        "dependencies": ["grb01"],
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "grb04",
+        "title": "Frontend graduation animation",
+        "scope": "frontend",
+        "description": "Copy coordinated animation pattern from packages/ideation-ui physics animations. Subscribe to both block_graduated and step_added events via useProjectEvents. When block graduates: add 'graduating' CSS class (shrink animation in NowColumn), when step added: add 'appearing' CSS class (slide-in animation in ProjectTree). Coordinated timing: 400ms duration.",
+        "dependencies": ["grb03"],
+        "acceptance_criteria": ["ac5"]
+      },
+      {
+        "id": "grb05",
+        "title": "Add error handling for edge cases",
+        "scope": "backend",
+        "description": "Handle: blocks already graduated (409 Conflict), missing blocks (404 Not Found), partial failures (rollback, return 500 with details). Copy error handling pattern from @plannr/errors package (ConflictError, NotFoundError). Return appropriate HTTP status codes.",
+        "dependencies": ["grb02"],
+        "acceptance_criteria": ["ac8"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "cross_domain": "reads ideation blocks, writes planner steps",
+      "atomicity": "both storage operations in one transaction or rollback",
+      "events": "dual SSE emission for frontend animation",
+      "trigger": "Interviewer's graduate_blocks tool → POST /api/projects/:id/graduate",
+      "mapping": {
+        "block_to_step": {
+          "title": "block.title",
+          "scope": "inferred from block.context or AI",
+          "description": "block.content",
+          "dependencies": "inferred from block relationships + AI context"
+        }
+      },
+      "storage_operations": [
+        "UPDATE ideation blocks SET graduated=true WHERE id IN (...)",
+        "INSERT planner steps (...) for each block",
+        "Emit block_graduated events (ideation SSE)",
+        "Emit step_added events (planner SSE)"
+      ],
+      "error_handling": "all-or-nothing: rollback both ideation and planner changes on any failure"
+    }
+  }
+}

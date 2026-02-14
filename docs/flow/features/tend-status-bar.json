@@ -1,0 +1,130 @@
+{
+  "feature_id": "tend-status-bar",
+  "title": "Agent Dock Status Bar",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["tend-theming"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Replace ideation-ui's simple status bar with planner-ui's richer agent dock (avatars, progress rings, question bubbles).",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "Ideation StatusBar component replaced with planner-ui's StatusBar pattern"
+      },
+      {
+        "id": "ac2",
+        "description": "AgentAvatar components (from planner-ui) render with progress rings showing step completion"
+      },
+      {
+        "id": "ac3",
+        "description": "AgentActivityDot (from planner-ui) shows working (green), needs_input (yellow), blocked (red) states"
+      },
+      {
+        "id": "ac4",
+        "description": "Question bubbles pop up from agent avatars for 10-15s (blocking: 30s, FYI: 8s), then shrink to badge"
+      },
+      {
+        "id": "ac5",
+        "description": "useAgentOrchestration hook (from planner-ui) polls agent status every 5s"
+      },
+      {
+        "id": "ac6",
+        "description": "useQuestionNotifications hook (from planner-ui) manages bubble lifecycle"
+      },
+      {
+        "id": "ac7",
+        "description": "Connection status indicator appears when relay disconnects (hidden when connected)"
+      },
+      {
+        "id": "ac8",
+        "description": "Pending question count badge shows on status bar when items waiting"
+      },
+      {
+        "id": "ac9",
+        "description": "Colors adapted to tend's earth-tone palette (green=moss, red=brick, yellow=clay)"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The ideation-ui status bar is minimal (session status + specialist count)",
+        "planner-ui's StatusBar is feature-rich with agent avatars, progress rings, question bubbles, and connection indicators",
+        "Components to copy: AgentAvatar, AgentActivityDot, useAgentOrchestration, useQuestionNotifications, ChatBubble pattern from planner-ui",
+        "The question pipeline: useQuestionQueue (SSE polling) → useQuestionNotifications (auto-advance bubble) → status bar display",
+        "Timing behavior: blocking questions stay 30s, normal 15s, FYI 8s before collapsing to badge",
+        "Progress rings visualize step completion percentage per agent",
+        "Activity dots use color to signal state, not just decoration"
+      ],
+      "questions": [
+        "Should we preserve ideation's specialist count or replace with agent count?",
+        "Do we need session status in tend's status bar or is that redundant with project state?",
+        "Should question bubbles be dismissible or only auto-collapse?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "stb01",
+        "title": "Remove ideation StatusBar and copy planner-ui StatusBar pattern",
+        "scope": "tend",
+        "description": "Delete packages/tend/src/components/StatusBar.tsx (ideation version). Copy packages/planner-ui/src/components/status/StatusBar.tsx → packages/tend/src/components/status/StatusBar.tsx. Copy AgentAvatar.tsx and AgentActivityDot.tsx components from planner-ui.",
+        "acceptance_criteria": ["ac1", "ac2", "ac3"]
+      },
+      {
+        "id": "stb02",
+        "title": "Copy useAgentOrchestration hook and wire to status bar",
+        "scope": "tend",
+        "description": "Copy packages/planner-ui/src/hooks/useAgentOrchestration.ts → packages/tend/src/hooks/useAgentOrchestration.ts. Polls agent status every 5s. Wire to StatusBar to display agent avatars with progress rings. Update API endpoint to fetch project-scoped agents.",
+        "dependencies": ["stb01"],
+        "acceptance_criteria": ["ac5"]
+      },
+      {
+        "id": "stb03",
+        "title": "Copy useQuestionNotifications and ChatBubble for question pipeline",
+        "scope": "tend",
+        "description": "Copy packages/planner-ui/src/hooks/useQuestionNotifications.ts → packages/tend/src/hooks/useQuestionNotifications.ts. Copy ChatBubble component. Configure timing: blocking 30s, normal 15s, FYI 8s. Wire to StatusBar for bubble rendering. After timeout, shrink to badge.",
+        "dependencies": ["stb01"],
+        "acceptance_criteria": ["ac4", "ac6", "ac8"]
+      },
+      {
+        "id": "stb04",
+        "title": "Add connection status indicator",
+        "scope": "tend",
+        "description": "In StatusBar: add connection indicator (copy from planner-ui StatusBar if exists). Hidden when relay WebSocket connected. Shows on disconnect with reconnection state. Uses RelayContext connection status.",
+        "dependencies": ["stb01"],
+        "acceptance_criteria": ["ac7"]
+      },
+      {
+        "id": "stb05",
+        "title": "Adapt all colors to tend's earth-tone palette",
+        "scope": "tend",
+        "description": "In StatusBar, AgentAvatar, AgentActivityDot: replace planner-ui's neon colors with tend palette. Moss green (#4a7c59) for working, brick red (#b54a3a) for blocked, clay (#c4703e) for needs_input. Update progress ring colors. Test in both light and dark themes.",
+        "dependencies": ["stb01", "stb02", "stb03"],
+        "acceptance_criteria": ["ac9"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_components": "planner-ui: StatusBar, AgentAvatar, AgentActivityDot, useAgentOrchestration, useQuestionNotifications",
+      "replaces": "ideation-ui IdeationStatusBar",
+      "bubble_timing": "blocking: 30s, normal: 15s, FYI: 8s",
+      "color_mapping": {
+        "working": "moss green",
+        "needs_input": "clay yellow",
+        "blocked": "brick red"
+      },
+      "hooks_to_copy": [
+        "useAgentOrchestration (agent status polling)",
+        "useQuestionNotifications (bubble lifecycle)",
+        "useQuestionQueue (SSE-based pending questions)"
+      ]
+    }
+  }
+}

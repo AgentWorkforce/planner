@@ -68,6 +68,9 @@ export const TrajectoryEventType = {
   RetrospectiveParseError: 'retrospective_parse_error',
   RetrospectiveValidationError: 'retrospective_validation_error',
 
+  // Timeout events
+  TaskTimeout: 'task_timeout',
+
   // Recovery events
   RecoveryStrategySelected: 'recovery_strategy_selected',
   TaskEscalated: 'task_escalated',
@@ -77,6 +80,10 @@ export const TrajectoryEventType = {
   BudgetInitialized: 'budget_initialized',
   BudgetUpdated: 'budget_updated',
   BudgetWarning: 'budget_warning',
+
+  // AC Audit events
+  RunAcAuditStarted: 'run_ac_audit_started',
+  RunAcAuditCompleted: 'run_ac_audit_completed',
 } as const;
 
 export type TrajectoryEventType =
@@ -120,12 +127,15 @@ export const TrajectoryEventTypeSchema = z.enum([
   'retrospective_timeout',
   'retrospective_parse_error',
   'retrospective_validation_error',
+  'task_timeout',
   'recovery_strategy_selected',
   'task_escalated',
   'task_skipped',
   'budget_initialized',
   'budget_updated',
   'budget_warning',
+  'run_ac_audit_started',
+  'run_ac_audit_completed',
 ]);
 
 // ============================================
@@ -480,6 +490,19 @@ export const GuardianTriggerReceivedPayloadSchema = z.object({
 export type GuardianTriggerReceivedPayload = z.infer<typeof GuardianTriggerReceivedPayloadSchema>;
 
 // ============================================
+// Timeout Event Payloads
+// ============================================
+
+export const TaskTimeoutPayloadSchema = z.object({
+  task_id: z.string().min(1),
+  agent_id: z.string().optional(),
+  timeout_ms: z.number().int().optional(),
+  started_at: z.string().optional(),
+});
+
+export type TaskTimeoutPayload = z.infer<typeof TaskTimeoutPayloadSchema>;
+
+// ============================================
 // Recovery Event Payloads
 // ============================================
 
@@ -540,6 +563,27 @@ export const BudgetWarningPayloadSchema = z.object({
 export type BudgetWarningPayload = z.infer<typeof BudgetWarningPayloadSchema>;
 
 // ============================================
+// AC Audit Event Payloads
+// ============================================
+
+export const RunAcAuditStartedPayloadSchema = z.object({
+  run_id: z.string().uuid(),
+  criteria_count: z.number().int(),
+});
+
+export type RunAcAuditStartedPayload = z.infer<typeof RunAcAuditStartedPayloadSchema>;
+
+export const RunAcAuditCompletedPayloadSchema = z.object({
+  run_id: z.string().uuid(),
+  feature_goal_met: z.boolean(),
+  unmet_count: z.number().int(),
+  total_count: z.number().int(),
+  duration_ms: z.number().int(),
+});
+
+export type RunAcAuditCompletedPayload = z.infer<typeof RunAcAuditCompletedPayloadSchema>;
+
+// ============================================
 // Payload Schema Map
 // ============================================
 
@@ -585,6 +629,8 @@ export const TrajectoryPayloadSchemas: Record<TrajectoryEventType, z.ZodType> = 
   [TrajectoryEventType.RetrospectiveTimeout]: RetrospectiveTimeoutPayloadSchema,
   [TrajectoryEventType.RetrospectiveParseError]: RetrospectiveParseErrorPayloadSchema,
   [TrajectoryEventType.RetrospectiveValidationError]: RetrospectiveValidationErrorPayloadSchema,
+  // Timeout events
+  [TrajectoryEventType.TaskTimeout]: TaskTimeoutPayloadSchema,
   // Recovery events
   [TrajectoryEventType.RecoveryStrategySelected]: RecoveryStrategySelectedPayloadSchema,
   [TrajectoryEventType.TaskEscalated]: TaskEscalatedPayloadSchema,
@@ -593,6 +639,9 @@ export const TrajectoryPayloadSchemas: Record<TrajectoryEventType, z.ZodType> = 
   [TrajectoryEventType.BudgetInitialized]: BudgetInitializedPayloadSchema,
   [TrajectoryEventType.BudgetUpdated]: BudgetUpdatedPayloadSchema,
   [TrajectoryEventType.BudgetWarning]: BudgetWarningPayloadSchema,
+  // AC Audit events
+  [TrajectoryEventType.RunAcAuditStarted]: RunAcAuditStartedPayloadSchema,
+  [TrajectoryEventType.RunAcAuditCompleted]: RunAcAuditCompletedPayloadSchema,
 };
 
 /**

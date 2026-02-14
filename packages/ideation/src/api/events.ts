@@ -22,6 +22,7 @@ export type SessionEventType =
   | 'session:block_updated'
   | 'session:block_deleted'
   | 'session:block_curated'
+  | 'session:blocks_graduated'
   | 'session:synthesis_updated';
 
 export interface SessionEvent {
