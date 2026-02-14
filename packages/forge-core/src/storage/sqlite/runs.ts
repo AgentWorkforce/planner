@@ -7,12 +7,12 @@ export function createRun(db: Database.Database, run: Run): Run {
     INSERT INTO runs (
       run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
       parent_run_id, parent_task_id,
-      started_at, completed_at, error, document, created_at, updated_at
+      started_at, completed_at, error, execution_policy, document, created_at, updated_at
     )
     VALUES (
       @run_id, @plan_id, @plan_version, @status, @has_pending_gate, @workspace_path,
       @parent_run_id, @parent_task_id,
-      @started_at, @completed_at, @error, @document, @created_at, @updated_at
+      @started_at, @completed_at, @error, @execution_policy, @document, @created_at, @updated_at
     )
   `);
   stmt.run({
@@ -27,6 +27,7 @@ export function createRun(db: Database.Database, run: Run): Run {
     started_at: run.started_at ?? null,
     completed_at: run.completed_at ?? null,
     error: run.error ?? null,
+    execution_policy: run.execution_policy ? JSON.stringify(run.execution_policy) : null,
     document: null, // Can be populated separately if needed
     created_at: run.created_at,
     updated_at: run.updated_at,
@@ -38,7 +39,7 @@ export function getRun(db: Database.Database, runId: string): Run | null {
   const stmt = db.prepare<string, RunRow>(`
     SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
            parent_run_id, parent_task_id,
-           started_at, completed_at, error, document, created_at, updated_at
+           started_at, completed_at, error, execution_policy, document, created_at, updated_at
     FROM runs
     WHERE run_id = ?
   `);
@@ -71,6 +72,10 @@ export function updateRun(db: Database.Database, runId: string, updates: Partial
   if (updates.error !== undefined) {
     fields.push('error = @error');
     values.error = updates.error ?? null;
+  }
+  if (updates.execution_policy !== undefined) {
+    fields.push('execution_policy = @execution_policy');
+    values.execution_policy = updates.execution_policy ? JSON.stringify(updates.execution_policy) : null;
   }
   if ((updates as Record<string, unknown>).document !== undefined) {
     fields.push('document = @document');
@@ -129,7 +134,7 @@ export function listRuns(db: Database.Database, status?: RunStatus): Run[] {
   let sql = `
     SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
            parent_run_id, parent_task_id,
-           started_at, completed_at, error, document, created_at, updated_at
+           started_at, completed_at, error, execution_policy, document, created_at, updated_at
     FROM runs
   `;
   const params: unknown[] = [];
@@ -150,7 +155,7 @@ export function getActiveRuns(db: Database.Database): Run[] {
   const stmt = db.prepare<[], RunRow>(`
     SELECT run_id, plan_id, plan_version, status, has_pending_gate, workspace_path,
            parent_run_id, parent_task_id,
-           started_at, completed_at, error, document, created_at, updated_at
+           started_at, completed_at, error, execution_policy, document, created_at, updated_at
     FROM runs
     WHERE status IN ('running', 'paused')
     ORDER BY created_at ASC

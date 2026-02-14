@@ -13,7 +13,7 @@
  */
 
 import type { ForgeStorage } from '../storage/interface.js';
-import type { ExecutionPolicy, Task, Run } from '../domain/types.js';
+import type { ExecutionPolicy, Task, Run, ParallelismConfig } from '../domain/types.js';
 import { DEFAULT_EXECUTION_POLICY } from '../domain/types.js';
 import { TrajectoryCapture } from './trajectory-capture.js';
 import { BudgetService, createBudgetService } from './budget-service.js';
@@ -251,6 +251,14 @@ export class RunService {
       `(max_concurrent: ${policy.parallelism.max_concurrent_tasks}, ` +
       `budget: $${policy.budgets.total_cost_limit_usd})`
     );
+  }
+
+  /**
+   * Updates parallelism config on the task queue.
+   * Used by orchestrator for master-run auto-detection after tasks are loaded.
+   */
+  updateParallelism(config: Partial<ParallelismConfig>): void {
+    this.taskQueue.updateConfig(config);
   }
 
   /**

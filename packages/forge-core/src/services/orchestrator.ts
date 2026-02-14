@@ -41,6 +41,7 @@ import {
   type ForgePlan,
   type QualityConfig,
   DEFAULT_EXECUTION_POLICY,
+  MASTER_RUN_PARALLELISM,
 } from '../domain/types.js';
 import { PlannerClient } from '../adapters/planner-client.js';
 import { transformToForgePlan } from '../adapters/plan-transformer.js';
@@ -491,8 +492,21 @@ export class Orchestrator {
       console.log(`[Orchestrator] Run ${runId} has ${maxTier + 1} dependency tiers`);
     }
 
+    // Master-run auto-detection: if all tasks dispatch child runs (have sub_plan_id),
+    // relax parallelism since master run tasks don't edit files directly.
+    // User-provided execution_policy always takes precedence.
+    if (allTasksInitial.length > 0 && allTasksInitial.every(t => t.sub_plan_id)) {
+      if (!run.execution_policy) {
+        // No user-provided policy — apply master-run defaults
+        this.runService.updateParallelism(MASTER_RUN_PARALLELISM);
+        console.log(`[Orchestrator] Detected master run ${runId} — relaxed parallelism for sub-plan dispatch (prefer_sequential=false, max_per_scope=3)`);
+      } else {
+        console.log(`[Orchestrator] Detected master run ${runId} — using user-provided execution policy`);
+      }
+    }
+
     // Get quality config from execution policy
-    const executionPolicy = this.storage.getRun(runId)?.execution_policy ?? DEFAULT_EXECUTION_POLICY;
+    const executionPolicy = run.execution_policy ?? DEFAULT_EXECUTION_POLICY;
     const qualityConfig: QualityConfig = (executionPolicy as any).quality ?? {};
 
     const startTime = Date.now();

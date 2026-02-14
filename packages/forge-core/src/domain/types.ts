@@ -323,8 +323,8 @@ export const RecoveryStrategySchema = z.nativeEnum(RecoveryStrategy);
  * Parallelism configuration for concurrent task execution
  */
 export const ParallelismConfigSchema = z.object({
-  /** Maximum concurrent tasks across run (default: 5) */
-  max_concurrent_tasks: z.number().int().positive().default(5),
+  /** Maximum concurrent tasks across run (default: 3) */
+  max_concurrent_tasks: z.number().int().positive().default(3),
   /** Maximum concurrent tasks per scope (default: 2) */
   max_concurrent_per_scope: z.number().int().positive().default(2),
   /** Prefer sequential execution within same scope (default: true — prevents file conflicts in shared worktrees) */
@@ -418,6 +418,16 @@ export type ExecutionPolicy = z.infer<typeof ExecutionPolicySchema>;
  * Default execution policy with research-backed values
  */
 export const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = ExecutionPolicySchema.parse({});
+
+/**
+ * Parallelism defaults for master runs (all tasks dispatch child runs).
+ * Master run tasks don't edit files directly, so sequential-in-scope is unnecessary.
+ * User-provided execution_policy always takes precedence over these defaults.
+ */
+export const MASTER_RUN_PARALLELISM: Partial<ParallelismConfig> = {
+  prefer_sequential_in_scope: false,
+  max_concurrent_per_scope: 3,
+};
 
 // ============================================
 // Run Entity

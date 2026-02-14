@@ -28,6 +28,20 @@ export const CreateRunRequestSchema = z
      * Workspace directory for agent execution (propagated to all tasks)
      */
     workspace_path: z.string().optional(),
+    /**
+     * Execution policy overrides (partial policy, rest uses defaults from DOT Framework)
+     */
+    execution_policy: z.object({
+      parallelism: z.object({
+        max_concurrent_tasks: z.number().int().positive().optional(),
+        max_concurrent_per_scope: z.number().int().positive().optional(),
+        prefer_sequential_in_scope: z.boolean().optional(),
+      }).optional(),
+      budgets: z.object({
+        total_cost_limit_usd: z.number().positive().optional(),
+        max_total_tokens: z.number().int().positive().optional(),
+      }).optional(),
+    }).optional(),
   })
   .refine((data) => data.plan || data.plan_id, {
     message: 'Either plan or plan_id must be provided',

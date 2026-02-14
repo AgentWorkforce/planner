@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import type { ForgeStorage } from '../../storage/interface.js';
 import type { TrajectoryCapture } from '../../services/trajectory-capture.js';
 import type { ForgePlan, Run, Task, TaskStatus } from '../../domain/types.js';
-import { createRun, createTask, RunStatus, TaskStatus as TaskStatusEnum } from '../../domain/types.js';
+import { createRun, createTask, RunStatus, TaskStatus as TaskStatusEnum, ExecutionPolicySchema } from '../../domain/types.js';
 import type { PlannerClient } from '../../adapters/planner-client.js';
 import { transformToForgePlan } from '../../adapters/plan-transformer.js';
 import { createDefaultConfig } from '../../config/forge-config.js';
@@ -139,13 +139,14 @@ export function createRunHandler(deps: RunHandlerDeps) {
         return;
       }
 
-      // Extract workspace_path from request
+      // Extract workspace_path and execution_policy from request
       const workspacePath = body.workspace_path;
+      const executionPolicy = body.execution_policy ? ExecutionPolicySchema.parse(body.execution_policy) : undefined;
 
       // Create run and tasks in a transaction
       const { run, tasks } = deps.storage.transaction(() => {
         // Create the run
-        const newRun = createRun(plan, { workspacePath });
+        const newRun = createRun(plan, { workspacePath, executionPolicy });
         const savedRun = deps.storage.createRun(newRun);
 
         // Store plan-level context and understanding in run document

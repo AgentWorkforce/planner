@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS runs (
   started_at TEXT,
   completed_at TEXT,
   error TEXT,
+  execution_policy TEXT,
   document TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -756,4 +757,6 @@ export const MIGRATION_STATEMENTS = [
   `ALTER TABLE tasks ADD COLUMN child_run_id TEXT`,
   // Specification column for step-level implementation details
   `ALTER TABLE tasks ADD COLUMN specification TEXT`,
+  // Execution policy for DOT Framework knobs
+  `ALTER TABLE runs ADD COLUMN execution_policy TEXT`,
 ];

@@ -198,3 +198,76 @@ describe('TaskQueue - Per-Scope Parallelism', () => {
     expect(infraSelected.length).toBe(1); // Only 1 ready
   });
 });
+
+describe('TaskQueue - updateConfig', () => {
+  it('updates prefer_sequential_in_scope dynamically', () => {
+    const queue = new TaskQueue({
+      max_concurrent_tasks: 5,
+      max_concurrent_per_scope: 2,
+      prefer_sequential_in_scope: true,
+    });
+
+    const readyTasks: QueuedTask[] = [
+      { task_id: 'b1', step_id: 's1', scope: 'backend' },
+      { task_id: 'b2', step_id: 's2', scope: 'backend' },
+      { task_id: 'b3', step_id: 's3', scope: 'backend' },
+    ];
+
+    // Sequential mode: only 1 per scope
+    let selected = queue.getNextReadyTasks(readyTasks, []);
+    expect(selected.length).toBe(1);
+
+    // Dynamically disable sequential mode
+    queue.updateConfig({ prefer_sequential_in_scope: false });
+
+    // Now should select up to per-scope limit
+    selected = queue.getNextReadyTasks(readyTasks, []);
+    expect(selected.length).toBe(2);
+  });
+
+  it('updates max_concurrent_per_scope dynamically', () => {
+    const queue = new TaskQueue({
+      max_concurrent_tasks: 10,
+      max_concurrent_per_scope: 2,
+      prefer_sequential_in_scope: false,
+    });
+
+    const readyTasks: QueuedTask[] = [
+      { task_id: 'b1', step_id: 's1', scope: 'backend' },
+      { task_id: 'b2', step_id: 's2', scope: 'backend' },
+      { task_id: 'b3', step_id: 's3', scope: 'backend' },
+      { task_id: 'b4', step_id: 's4', scope: 'backend' },
+    ];
+
+    // Per-scope limit 2
+    let selected = queue.getNextReadyTasks(readyTasks, []);
+    expect(selected.length).toBe(2);
+
+    // Increase per-scope limit to 3
+    queue.updateConfig({ max_concurrent_per_scope: 3 });
+
+    selected = queue.getNextReadyTasks(readyTasks, []);
+    expect(selected.length).toBe(3);
+  });
+
+  it('partial updateConfig only changes specified fields', () => {
+    const queue = new TaskQueue({
+      max_concurrent_tasks: 5,
+      max_concurrent_per_scope: 2,
+      prefer_sequential_in_scope: true,
+    });
+
+    // Only update per-scope limit, leave sequential mode untouched
+    queue.updateConfig({ max_concurrent_per_scope: 3 });
+
+    const readyTasks: QueuedTask[] = [
+      { task_id: 'b1', step_id: 's1', scope: 'backend' },
+      { task_id: 'b2', step_id: 's2', scope: 'backend' },
+      { task_id: 'b3', step_id: 's3', scope: 'backend' },
+    ];
+
+    // Sequential mode still active — only 1 per scope
+    const selected = queue.getNextReadyTasks(readyTasks, []);
+    expect(selected.length).toBe(1);
+  });
+});

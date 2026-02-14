@@ -47,6 +47,7 @@ export interface RunRow {
   started_at: string | null;
   completed_at: string | null;
   error: string | null;
+  execution_policy: string | null;
   document: string | null;
   created_at: string;
   updated_at: string;
@@ -283,6 +284,7 @@ export function rowToRun(row: RunRow): Run {
     plan_version: row.plan_version,
     status: row.status as RunStatus,
     has_pending_gate: row.has_pending_gate === 1,
+    execution_policy: row.execution_policy ? JSON.parse(row.execution_policy) : undefined,
     workspace_path: row.workspace_path ?? undefined,
     parent_run_id: row.parent_run_id ?? undefined,
     parent_task_id: row.parent_task_id ?? undefined,
