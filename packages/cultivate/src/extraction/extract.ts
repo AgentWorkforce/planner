@@ -182,7 +182,7 @@ export async function extractSignal(
     source,
     timestamp,
     anthropic,
-    model = 'claude-sonnet-4-latest',
+    model = process.env.CULTIVATE_EXTRACT_MODEL ?? 'claude-sonnet-4-latest',
   } = context;
 
   // Create user prompt with signal metadata

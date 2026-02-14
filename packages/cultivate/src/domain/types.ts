@@ -262,18 +262,33 @@ export const SourceConfigSchema = z.object({
 export type SourceConfig = z.infer<typeof SourceConfigSchema>;
 
 /**
- * Source preset template for common integrations
+ * Input field definition for adapter configuration
+ * Represents a required or optional input parameter for a source adapter
+ */
+export const InputFieldSchema = z.object({
+  key: z.string().describe('Unique identifier for the input field'),
+  label: z.string().describe('Human-readable label for the input field'),
+  type: z.string().describe('Data type of the input (e.g., string, number, url, password)'),
+  description: z.string().describe('Detailed description of what this input is used for'),
+  default: z.unknown().optional().describe('Optional default value for this input'),
+});
+
+export type InputField = z.infer<typeof InputFieldSchema>;
+
+/**
+ * Source preset configuration template for adapter integration
+ * Defines the structure and requirements for a reusable source adapter configuration
  */
 export const SourcePresetSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  adapter_type: AdapterTypeSchema,
-  endpoint_template: z.string(),
-  auth_type: AuthTypeSchema,
-  default_poll_interval_ms: z.number(),
-  tier: z.number(), // Source tier (1-5)
+  name: z.string().describe('Human-readable name of the preset'),
+  adapter_type: AdapterTypeSchema.describe('Type of adapter this preset is for'),
+  description: z.string().describe('Detailed description of the preset and its purpose'),
+  required_inputs: z.array(InputFieldSchema).describe('Array of required input fields for configuring this adapter'),
+  optional_inputs: z.array(InputFieldSchema).describe('Array of optional input fields with sensible defaults'),
+  defaults: z.record(z.unknown()).describe('Pre-configured default values for adapter settings'),
+  channel_authority: z.number().min(0).max(1).describe('Source tier weight (0-1) representing channel authority/credibility'),
 });
+
 export type SourcePreset = z.infer<typeof SourcePresetSchema>;
 
 /**
