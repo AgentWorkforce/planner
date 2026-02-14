@@ -103,6 +103,18 @@ export class WorktreeManager {
    * Remove a git worktree after run completion.
    */
   async remove(worktreePath: string): Promise<void> {
+    // Safety guard: only remove forge-created worktrees.
+    // Without this, cleanup of runs that use the project directory itself
+    // would run `git worktree remove --force` on the project, destroying
+    // the parent repo's worktree metadata and potentially deleting files.
+    if (!worktreePath.includes('forge-run-') && !worktreePath.includes('forge-build-')) {
+      console.warn(
+        `[WorktreeManager] Refusing to remove non-forge worktree: ${worktreePath}. ` +
+        `Only paths containing 'forge-run-' or 'forge-build-' are safe to remove.`
+      );
+      return;
+    }
+
     if (!existsSync(worktreePath)) {
       console.warn(`[WorktreeManager] Worktree not found: ${worktreePath}`);
       return;

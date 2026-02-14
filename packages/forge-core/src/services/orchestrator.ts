@@ -2364,6 +2364,13 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
    * Cherry-picks [forge:*] commits in order, then removes the worktree.
    */
   private async mergeWorktreeCommits(runId: string, worktreePath: string): Promise<void> {
+    // Safety: never merge from non-forge worktrees (project dir would self-cherry-pick)
+    if (!worktreePath.includes('forge-run-') && !worktreePath.includes('forge-build-')) {
+      console.warn(
+        `[Orchestrator] Run ${runId}: skipping merge for non-forge worktree: ${worktreePath}`
+      );
+      return;
+    }
     try {
       // Get the worktree HEAD
       const { stdout: worktreeHead } = await execFileAsync(
@@ -2442,6 +2449,14 @@ CRITICAL: Output ONLY a raw JSON object. No markdown, no code blocks.
   private async cleanupWorktree(runId: string): Promise<void> {
     const worktreePath = this.runWorktrees.get(runId);
     if (worktreePath && this.worktreeManager) {
+      // Safety: never remove non-forge worktrees (WorktreeManager also guards, but belt-and-suspenders)
+      if (!worktreePath.includes('forge-run-') && !worktreePath.includes('forge-build-')) {
+        console.warn(
+          `[Orchestrator] Run ${runId}: refusing to cleanup non-forge worktree: ${worktreePath}`
+        );
+        this.runWorktrees.delete(runId);
+        return;
+      }
       await this.worktreeManager.remove(worktreePath);
       this.runWorktrees.delete(runId);
     }
