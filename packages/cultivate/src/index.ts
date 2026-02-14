@@ -122,6 +122,11 @@ export {
   createTeamsPreset,
   createCRMNotesPreset,
   createSalesCallPreset,
+  createRedditPreset,
+  createHackerNewsPreset,
+  createTwitterPreset,
+  createRSSPreset,
+  createWebScraperPreset,
 } from './presets/index.js';
 
 export type {
