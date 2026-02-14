@@ -410,14 +410,16 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
       ? options.task
       : `${options.task}\n${buildMcpContext(options)}`;
 
-    const result = await client.spawn({
+    // SDK spawn(options, timeoutMs?) — timeout MUST be 2nd arg, not inside options
+    const SPAWN_TIMEOUT = 90_000;
+    const spawnOpts = {
       name: options.name,
       cli: options.cli || 'claude',
       task: taskWithContext,
       cwd: options.cwd,
       team: options.team,
-      timeoutMs: 90000,
-    });
+    };
+    const result = await client.spawn(spawnOpts, SPAWN_TIMEOUT);
 
     if (result.success) {
       const channelId = options.planId ? `#plan-${options.planId}` : undefined;
