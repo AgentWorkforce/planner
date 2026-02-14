@@ -416,6 +416,7 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResul
       task: taskWithContext,
       cwd: options.cwd,
       team: options.team,
+      timeoutMs: 90000,
     });
 
     if (result.success) {

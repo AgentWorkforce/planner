@@ -6,6 +6,7 @@ import type { Redis } from 'ioredis';
 import type { Queue, Worker } from 'bullmq';
 import type { Router } from 'express';
 import type Anthropic from '@anthropic-ai/sdk';
+import type { FilterRuleRegistry } from './filters/rule-registry.js';
 
 /**
  * Configuration required to start Cultivate
@@ -55,6 +56,8 @@ export interface CultivateContext {
   workers: CultivateWorkers;
   /** Configuration used at startup */
   config: CultivateStartupConfig;
+  /** Filter rule registry for Tier 1 signal filtering */
+  filterRegistry: FilterRuleRegistry;
 }
 
 /**

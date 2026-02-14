@@ -1,7 +1,9 @@
 {
   "extends": "../../tsconfig.node.json",
   "compilerOptions": {
-    "noEmit": true
+    "composite": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "references": [
     { "path": "../cultivate" },

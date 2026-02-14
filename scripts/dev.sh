@@ -5,6 +5,7 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$PROJECT_DIR"
 
 # Load .env file if it exists
@@ -117,6 +118,25 @@ start_redis() {
     return 1
 }
 
+# Ensure Redis is available (soft dependency — cultivate needs it, other services don't)
+ensure_redis() {
+    log "Checking Redis availability..."
+    log "  Using: ${CULTIVATE_REDIS_URL:-redis://localhost:6379}"
+
+    if ! check_redis; then
+        log "Redis is not available, attempting to start..."
+        if ! start_redis; then
+            warn "Redis not available — cultivate service will be disabled."
+            warn "  Other services (planner, forge, ideation, mull) work without Redis."
+            warn "  To enable cultivate, install Redis:"
+            warn "    macOS:  brew install redis && brew services start redis"
+            warn "    Docker: docker run -d -p 6379:6379 redis:latest"
+            return 0
+        fi
+    fi
+    success "Redis ready at ${CULTIVATE_REDIS_URL:-redis://localhost:6379}"
+}
+
 # Check agent-relay daemon status
 check_relay() {
     agent-relay status 2>/dev/null | grep -qi "running" && return 0 || return 1
@@ -128,7 +148,7 @@ start_relay() {
         success "Agent-relay daemon already running"
     else
         log "Starting agent-relay daemon..."
-        agent-relay up --dashboard &
+        agent-relay up &
         sleep 2
         if check_relay; then
             success "Agent-relay daemon started"
@@ -157,8 +177,7 @@ start_backend() {
     if ! check_redis; then
         log "Redis is not available, attempting to start..."
         if ! start_redis; then
-            error "Cannot start backend without Redis. Please start Redis manually."
-            return 1
+            warn "Redis unavailable — cultivate will be disabled, other services unaffected."
         fi
     fi
 
@@ -348,9 +367,9 @@ show_status() {
 
     # Redis status
     if check_redis; then
-        success "Redis: running at localhost:6379"
+        success "Redis: running at ${CULTIVATE_REDIS_URL:-redis://localhost:6379}"
     else
-        warn "Redis: not running"
+        warn "Redis: not running (expected at ${CULTIVATE_REDIS_URL:-redis://localhost:6379})"
     fi
 
     # Relay status
@@ -440,6 +459,14 @@ case "${1:-start}" in
     start)
         log "Starting development environment..."
         echo ""
+
+        # Ensure Redis is available before starting any services
+        if ! ensure_redis; then
+            error "Failed to start development environment"
+            exit 1
+        fi
+        echo ""
+
         start_relay
         start_backend
         start_tuner
@@ -472,9 +499,9 @@ case "${1:-start}" in
         ;;
     restart)
         log "Restarting development environment..."
-        "$0" stop
+        "$SCRIPT_PATH" stop
         sleep 1
-        "$0" start
+        "$SCRIPT_PATH" start
         ;;
     status)
         show_status

@@ -11,6 +11,7 @@
  * - ANTHROPIC_UNAVAILABLE: API key missing or health check failed
  * - TUNER_UNAVAILABLE: Tuner service unreachable (warning only, not thrown)
  * - QUEUE_INIT_FAILED: BullMQ queue creation error
+ * - MISSING_CULTIVATE_SECRET: CULTIVATE_SECRET environment variable not set
  */
 export type CultivateStartupErrorCode =
   | 'REDIS_UNAVAILABLE'
@@ -18,7 +19,8 @@ export type CultivateStartupErrorCode =
   | 'ML_MODEL_LOAD_FAILED'
   | 'ANTHROPIC_UNAVAILABLE'
   | 'TUNER_UNAVAILABLE'
-  | 'QUEUE_INIT_FAILED';
+  | 'QUEUE_INIT_FAILED'
+  | 'MISSING_CULTIVATE_SECRET';
 
 /**
  * Diagnostic information for startup errors
@@ -40,6 +42,14 @@ export class CultivateStartupError extends Error {
   public readonly cause: unknown;
   public readonly diagnostics?: CultivateStartupDiagnostics;
 
+  /**
+   * Creates a new CultivateStartupError
+   *
+   * @param code - Error code identifying the type of startup failure
+   * @param message - Human-readable error message
+   * @param cause - Optional underlying error that caused this failure
+   * @param diagnostics - Optional diagnostic information for debugging
+   */
   constructor(
     code: CultivateStartupErrorCode,
     message: string,
@@ -179,7 +189,38 @@ export class CultivateStartupError extends Error {
   }
 
   /**
-   * Format error with diagnostic information
+   * Static factory: Missing CULTIVATE_SECRET
+   */
+  static missingCultivateSecret(): CultivateStartupError {
+    const message = `CULTIVATE_SECRET environment variable is required but not set.
+
+This environment variable is used to encrypt source configuration credentials (API keys, tokens, client secrets, etc.) for secure storage.
+
+To generate a secure CULTIVATE_SECRET, run:
+  openssl rand -hex 32
+
+Then set the environment variable:
+  export CULTIVATE_SECRET="<generated-value>"
+
+Or add it to your .env file:
+  CULTIVATE_SECRET=<generated-value>`;
+
+    return new CultivateStartupError(
+      'MISSING_CULTIVATE_SECRET',
+      message,
+      null,
+      {
+        dependency: 'Environment Variables',
+        connectionInfo: 'CULTIVATE_SECRET',
+        retryAttempts: 0,
+      }
+    );
+  }
+
+  /**
+   * Format error with diagnostic information for JSON serialization
+   *
+   * @returns Serialized error object with code, diagnostics, and stack trace
    */
   toJSON() {
     return {
@@ -197,12 +238,24 @@ export class CultivateStartupError extends Error {
  * Internal processing error (non-fatal, for logging)
  *
  * Used for unexpected runtime failures that need investigation.
+ *
+ * @example
+ * try {
+ *   // ... risky operation
+ * } catch (err) {
+ *   throw new CultivateInternalError('cluster-assignment', err, { userId: '123' });
+ * }
  */
 export class CultivateInternalError extends Error {
   public readonly operation: string;
   public readonly cause: Error;
   public readonly context: Record<string, unknown>;
 
+  /**
+   * @param operation - String describing what was being done (e.g., 'cluster-assignment', 'score-computation')
+   * @param cause - Original error that triggered this internal error
+   * @param context - Arbitrary key-value diagnostics for debugging
+   */
   constructor(
     operation: string,
     cause: Error,
@@ -233,6 +286,11 @@ export interface SignalMetadata {
  * Signal filtered by pipeline (expected behavior, not an error)
  *
  * This is NOT an error condition — it's the expected path for noise rejection.
+ *
+ * @param filter_tier - Tier at which signal was filtered (0, 1, or 2)
+ * @param reason - Human-readable rejection reason
+ * @param signal_metadata - Signal tracking metadata
+ * @param rule_name - Rule name for tier 1 rejections (e.g., 'noise_reject'), empty for tier 0/2
  */
 export class SignalFilteredError extends Error {
   public readonly filter_tier: 0 | 1 | 2;
@@ -240,6 +298,14 @@ export class SignalFilteredError extends Error {
   public readonly reason: string;
   public readonly signal_metadata: SignalMetadata;
 
+  /**
+   * Creates a new SignalFilteredError
+   *
+   * @param filter_tier - Tier at which signal was filtered (0, 1, or 2)
+   * @param reason - Human-readable rejection reason
+   * @param signal_metadata - Signal tracking metadata (source_type, external_id, greenhouse_id)
+   * @param rule_name - Rule name for tier 1 rejections (e.g., 'noise_reject'), empty for tier 0/2
+   */
   constructor(
     filter_tier: 0 | 1 | 2,
     reason: string,
@@ -257,6 +323,23 @@ export class SignalFilteredError extends Error {
       Error.captureStackTrace(this, SignalFilteredError);
     }
   }
+
+  /**
+   * Serialize error to JSON for logging and debugging
+   *
+   * @returns Serialized error object with filter details and signal metadata
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      filter_tier: this.filter_tier,
+      rule_name: this.rule_name,
+      reason: this.reason,
+      signal_metadata: this.signal_metadata,
+      message: this.message,
+      stack: this.stack,
+    };
+  }
 }
 
 /**
@@ -269,6 +352,13 @@ export class SignalProcessingError extends Error {
   public readonly signal_id: string;
   public readonly cause: Error;
 
+  /**
+   * Creates a new SignalProcessingError
+   *
+   * @param pipeline_step - Pipeline step where failure occurred (e.g., 'tier3-extraction', 'scoring')
+   * @param signal_id - Signal identifier for dead-letter tracking
+   * @param cause - Original error that caused the processing failure
+   */
   constructor(pipeline_step: string, signal_id: string, cause: Error) {
     super(`Signal processing failed at ${pipeline_step}: ${cause.message}`);
     this.name = 'SignalProcessingError';
@@ -279,5 +369,21 @@ export class SignalProcessingError extends Error {
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, SignalProcessingError);
     }
+  }
+
+  /**
+   * Serialize error to JSON for logging and dead-letter tracking
+   *
+   * @returns Serialized error object with pipeline step, signal ID, and cause details
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      pipeline_step: this.pipeline_step,
+      signal_id: this.signal_id,
+      cause: this.cause.message,
+      message: this.message,
+      stack: this.stack,
+    };
   }
 }

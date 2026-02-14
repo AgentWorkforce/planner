@@ -202,15 +202,34 @@ export const NormalizedEventSchema = z.object({
 export type NormalizedEvent = z.infer<typeof NormalizedEventSchema>;
 
 /**
- * LLM extraction results (themes, entities, and scoring hints)
+ * Entity structure within extraction results
+ * Represents a named entity with its classification type
+ */
+const EntitySchema = z.object({
+  name: z.string().describe('Entity name or value'),
+  type: z.string().describe('Entity type classification (e.g., PERSON, ORGANIZATION, LOCATION)'),
+});
+
+/**
+ * Extraction result containing analyzed signal data
+ * Produced by extraction jobs and used for clustering and analysis
  */
 export const ExtractionResultSchema = z.object({
-  themes: z.array(z.string()),
-  entities: z.array(z.string()),
-  actionability_hint: z.number(), // LLM-provided score
-  quality_hint: z.number(), // LLM-provided score
-  strategic_fit_hint: z.number(), // LLM-provided score
+  summary: z.string().describe('Brief summary of the extracted content'),
+  keywords: z.array(z.string()).describe('List of key terms and phrases extracted from content'),
+  entities: z.array(EntitySchema).describe('Named entities found in content with their types'),
+  aspects: z.array(z.string()).describe('Key aspects, themes, or dimensions discussed'),
+  quotes: z.array(z.string()).describe('Notable direct quotes from the source'),
+  reasoning: z.string().describe('AI reasoning explaining the extraction choices and key findings'),
+  specificity: z.number().min(0).max(1).describe('Score 0-1 indicating how specific/general the content is'),
+  emotional_intensity: z.number().min(0).max(1).describe('Score 0-1 indicating emotional charge or intensity'),
+  actionability: z.number().min(0).max(1).describe('Score 0-1 indicating how actionable the signal is'),
 });
+
+/**
+ * TypeScript type inferred from ExtractionResultSchema
+ * Use this for type annotations in functions and data structures
+ */
 export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
 
 /**

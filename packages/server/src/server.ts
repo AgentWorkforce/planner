@@ -210,7 +210,6 @@ async function start(): Promise<void> {
 
     try {
       await cultivateService.initialize();
-      app.use('/api/cultivate', cultivateService.router);
       console.log(`[cultivate] ✅ Initialized (database: ${serverConfig.cultivate.dbPath})`);
     } catch (error) {
       if (error instanceof CultivateStartupError) {
@@ -237,6 +236,11 @@ async function start(): Promise<void> {
       throw new Error('CULTIVATE_SECRET is required when CULTIVATE_REQUIRED=true');
     }
     console.log('[cultivate] Skipped (CULTIVATE_SECRET not provided)');
+  }
+
+  // Mount cultivate router if initialization succeeded
+  if (cultivateService) {
+    app.use('/api/cultivate', cultivateService.router);
   }
 
   // Initialize mull service (after planner and forge — reads their databases)

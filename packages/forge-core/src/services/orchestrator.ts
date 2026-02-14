@@ -14,7 +14,8 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path, { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -23,7 +24,7 @@ import type { RunService, TaskOutcomeEmission, RunOutcomeEmission } from './run-
 import { estimateComplexityLevel } from './complexity-estimator.js';
 
 const execFileAsync = promisify(execFile);
-import type { SpawnTaskFn, TerminateAgentFn, SpawnTaskOptions, AgentExitInfo } from './agent-spawner.js';
+import type { SpawnTaskFn, TerminateAgentFn, SpawnTaskOptions, AgentExitInfo, SpawnGateAgentFn } from './agent-spawner.js';
 import type { ForgeConfig } from '../config/forge-config.js';
 import { resolveCliConfig, createDefaultConfig } from '../config/forge-config.js';
 import {
@@ -45,7 +46,7 @@ import { PlannerClient } from '../adapters/planner-client.js';
 import { transformToForgePlan } from '../adapters/plan-transformer.js';
 import { computeDependencyTiers } from '../adapters/plan-validator.js';
 import type { WorktreeManager } from './worktree-manager.js';
-import type { AnalysisTool, AnalysisResult } from './analysis-tool.js';
+import type { AnalysisResult } from './analysis-tool.js';
 
 // ============================================
 // Configuration
@@ -70,8 +71,8 @@ export interface OrchestratorConfig {
   plannerClient?: PlannerClient;
   /** WorktreeManager for git worktree isolation (optional) */
   worktreeManager?: WorktreeManager;
-  /** AnalysisTool for PREP/POST quality gates (optional — quality gates disabled if absent) */
-  analysisTool?: AnalysisTool;
+  /** SpawnGateAgentFn for relay-based quality gates (subscription billing) */
+  spawnGateAgent?: SpawnGateAgentFn;
 }
 
 // ============================================
@@ -137,7 +138,7 @@ export class Orchestrator {
   private forgeConfig?: ForgeConfig;
   private plannerClient?: PlannerClient;
   private worktreeManager?: WorktreeManager;
-  private analysisTool?: AnalysisTool;
+  private spawnGateAgent?: SpawnGateAgentFn;
   private pollIntervalMs: number;
   private maxStallIterations: number;
 
@@ -161,12 +162,121 @@ export class Orchestrator {
     this.forgeConfig = config.forgeConfig;
     this.plannerClient = config.plannerClient;
     this.worktreeManager = config.worktreeManager;
-    this.analysisTool = config.analysisTool;
+    this.spawnGateAgent = config.spawnGateAgent;
     this.pollIntervalMs = config.pollIntervalMs ?? 2000;
     this.maxStallIterations = config.maxStallIterations ?? 50;
 
     // Wire retry function to RunService
     this.runService.setRetryTaskFn(this.retryTask.bind(this));
+  }
+
+  private get hasQualityGateMechanism(): boolean {
+    return !!this.spawnGateAgent;
+  }
+
+  private async runQualityGate(
+    prompt: string,
+    options: { model?: string; cwd?: string; timeoutMs?: number; retries?: number }
+  ): Promise<AnalysisResult> {
+    if (!this.spawnGateAgent) {
+      throw new Error('Quality gate requires spawnGateAgent (relay connection) — no fallback');
+    }
+    return this.runGateViaRelay(prompt, options);
+  }
+
+  private async runGateViaRelay(
+    prompt: string,
+    options: { model?: string; cwd?: string; timeoutMs?: number }
+  ): Promise<AnalysisResult> {
+    const gateId = randomUUID();
+    const resultFile = `/tmp/gate-${gateId}.json`;
+    const timeoutMs = options?.timeoutMs ?? 120000;
+    const startTime = Date.now();
+
+    return new Promise<AnalysisResult>((resolve, reject) => {
+      let timeoutHandle: ReturnType<typeof setTimeout>;
+      let pollHandle: ReturnType<typeof setInterval>;
+      let settled = false;
+      let spawnResult: { agentId: string; pid?: number } | undefined;
+
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutHandle);
+        clearInterval(pollHandle);
+        fn();
+      };
+
+      const tryReadResult = (): AnalysisResult | null => {
+        try {
+          if (!existsSync(resultFile)) return null;
+          const content = readFileSync(resultFile, 'utf8');
+          const parsed = JSON.parse(content);
+          try { unlinkSync(resultFile); } catch {}
+          return {
+            output: content,
+            parsed,
+            durationMs: Date.now() - startTime,
+            model: options?.model ?? 'sonnet',
+          };
+        } catch {
+          return null;
+        }
+      };
+
+      const killAgent = () => {
+        if (this.terminateAgent && spawnResult?.agentId) {
+          this.terminateAgent(spawnResult.agentId).catch(() => {});
+        }
+      };
+
+      const onExited = (_exitCode: number | null) => {
+        settle(() => {
+          const result = tryReadResult();
+          if (result) {
+            resolve(result);
+          } else {
+            reject(new Error(
+              `Gate agent exited (code=${_exitCode}) but no valid result file at ${resultFile}`
+            ));
+          }
+        });
+      };
+
+      this.spawnGateAgent!({
+        gateId,
+        prompt,
+        cwd: options?.cwd,
+        model: options?.model,
+      }, onExited).then(result => {
+        spawnResult = result;
+
+        // Poll for result file every 5s — gate agent may write file before exiting
+        pollHandle = setInterval(() => {
+          const gateResult = tryReadResult();
+          if (gateResult) {
+            settle(() => {
+              killAgent();
+              resolve(gateResult);
+            });
+          }
+        }, 5000);
+
+        timeoutHandle = setTimeout(() => {
+          settle(() => {
+            killAgent();
+            const gateResult = tryReadResult();
+            if (gateResult) {
+              resolve(gateResult);
+            } else {
+              reject(new Error(`Gate agent timed out after ${timeoutMs}ms`));
+            }
+          });
+        }, timeoutMs);
+      }).catch(err => {
+        settle(() => reject(err));
+      });
+    });
   }
 
   /**
@@ -560,7 +670,7 @@ export class Orchestrator {
         );
         const minTierTasks = qualityConfig.prep_min_tier_tasks ?? 2;
 
-        if (currentTier > lastPrepTier && this.analysisTool && qualityConfig.prep_enabled !== false
+        if (currentTier > lastPrepTier && this.hasQualityGateMechanism && qualityConfig.prep_enabled !== false
             && allTasks.length >= (qualityConfig.prep_min_tasks ?? 3)
             && currentTierTasks.length >= minTierTasks) {
           // Optimization: Categorize tasks by complexity
@@ -1128,7 +1238,7 @@ export class Orchestrator {
     const qualityConfig: QualityConfig = (executionPolicy as any).quality ?? {};
     let taskPostResult: TaskPostResult | undefined;
 
-    if (this.analysisTool && qualityConfig.task_post_enabled !== false) {
+    if (this.hasQualityGateMechanism && qualityConfig.task_post_enabled !== false) {
       taskPostResult = await this.runTaskPost(task, runId, qualityConfig);
 
       if (taskPostResult && !taskPostResult.passed) {
@@ -1258,7 +1368,7 @@ export class Orchestrator {
     const qualityConfig: QualityConfig = (executionPolicy as any).quality ?? {};
     let runPostResult: Record<string, unknown> | undefined;
 
-    if (this.analysisTool && qualityConfig.run_post_enabled !== false) {
+    if (this.hasQualityGateMechanism && qualityConfig.run_post_enabled !== false) {
       runPostResult = await this.runRunPost(runId, qualityConfig);
       if (runPostResult) {
         this.accumulateRunDoc(runId, 'run_post', runPostResult);
@@ -1271,7 +1381,7 @@ export class Orchestrator {
 
     // AC AUDIT: feature-level acceptance criteria verification (advisory, non-blocking)
     let acAuditResult: Record<string, unknown> | undefined;
-    if (this.analysisTool && qualityConfig.run_post_ac_audit !== false) {
+    if (this.hasQualityGateMechanism && qualityConfig.run_post_ac_audit !== false) {
       acAuditResult = await this.runRunAcAudit(runId, qualityConfig);
       if (acAuditResult) {
         this.accumulateRunDoc(runId, 'ac_audit', acAuditResult);
@@ -1474,7 +1584,7 @@ export class Orchestrator {
       );
 
       try {
-        const result = await this.analysisTool!.run(prompt, {
+        const result = await this.runQualityGate(prompt, {
           model: qualityConfig.prep_model ?? 'sonnet',
           cwd: workspacePath,
           timeoutMs: qualityConfig.prep_timeout_ms ?? 90000,
@@ -1546,7 +1656,7 @@ export class Orchestrator {
     const prompt = this.buildTaskPostPrompt(task, prepFindings, workspacePath, fileStat);
 
     try {
-      const result = await this.analysisTool!.run(prompt, {
+      const result = await this.runQualityGate(prompt, {
         model: qualityConfig.task_post_model ?? 'haiku',
         cwd: workspacePath,
         timeoutMs: qualityConfig.task_post_timeout_ms ?? 120000,
@@ -1621,7 +1731,7 @@ export class Orchestrator {
     const prompt = this.buildRunPostPrompt(run, allTasks, runDoc, tierMap, workspacePath, fileStat);
 
     try {
-      const result = await this.analysisTool!.run(prompt, {
+      const result = await this.runQualityGate(prompt, {
         model: qualityConfig.run_post_model ?? 'haiku',
         cwd: workspacePath,
         timeoutMs: 300000, // 5 min — accounts for relay spawn overhead
@@ -1666,7 +1776,7 @@ export class Orchestrator {
     const prompt = this.buildRunAcAuditPrompt(run, allTasks, runDoc, workspacePath, fileStat);
 
     try {
-      const result = await this.analysisTool!.run(prompt, {
+      const result = await this.runQualityGate(prompt, {
         model: qualityConfig.run_post_ac_model ?? 'sonnet',
         cwd: workspacePath,
         timeoutMs: qualityConfig.run_post_ac_timeout_ms ?? 300000,

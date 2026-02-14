@@ -14,7 +14,7 @@ import { GateResultRegistry } from './services/gate-registry.js';
 import { createPlannerClient } from './adapters/planner-client.js';
 import { WorktreeManager } from './services/worktree-manager.js';
 import { BuildCoordinator } from './services/build-coordinator.js';
-import { AnalysisTool } from './services/analysis-tool.js';
+import { createGateService } from './services/gate-service.js';
 import { createQuestionService } from './services/question-service.js';
 import { UserTrajectoryService } from './services/user-trajectory-service.js';
 import {
@@ -289,19 +289,16 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     // Create gate infrastructure for agent-based quality gates
     gateRegistry = config.spawnGateAgent ? new GateResultRegistry() : undefined;
 
-    // Create AnalysisTool for PREP/POST quality gates
-    const analysisTool = new AnalysisTool({ cli: 'claude' });
-
-    // Create Orchestrator
+    // Create Orchestrator — quality gates require spawnGateAgent (relay-pty), no fallback
     const orchestrator = createOrchestrator({
       storage,
       runService,
       spawnTask: config.spawnTask,
       terminateAgent: config.terminateAgent,
+      spawnGateAgent: config.spawnGateAgent,
       forgeConfig,
       plannerClient,
       worktreeManager,
-      analysisTool,
     });
 
     scheduleReadyTasks = (runId: string) => orchestrator.scheduleReadyTasks(runId);
@@ -346,8 +343,10 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     userTrajectoryService,
   });
 
-  // Create router with scheduleReadyTasks callback and trajectory capture (for MCP routes)
-  // gateRegistry is only created in real mode — undefined in test mode is fine (MCP tool will error gracefully)
+  // Create GateService for gate routes (pending gates, approve/reject)
+  const gateService = createGateService(storage, trajectoryCapture);
+
+  // Create router with all services
   const router = createForgeRouter({
     storage,
     trajectoryCapture,
@@ -355,6 +354,7 @@ export function createForgeService(config: ForgeServiceConfig = {}): ForgeServic
     plannerClient,
     buildCoordinator,
     gateRegistry,
+    gateService,
     questionService,
     userTrajectoryService,
   });

@@ -1,0 +1,16 @@
+{
+  "sessionId": "499657bb-5a4d-4418-af0a-65c53ffd2534",
+  "entitiesSinceLastLlm": [],
+  "factsSinceLastLlm": [
+    {
+      "slug": "recovery-2de5da75-9a74-4bf5-a1fd-9a225188c25b",
+      "text": "Recovery: revise",
+      "source": "forge:499657bb-5a4d-4418-af0a-65c53ffd2534",
+      "timestamp": "2026-02-14T10:53:45.842Z",
+      "entities": [],
+      "isPreStructured": true
+    }
+  ],
+  "lastLlmRunAt": null,
+  "lastDeterministicAt": "2026-02-14T10:53:45.842Z"
+}

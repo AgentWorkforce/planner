@@ -18,6 +18,8 @@ import { CultivateStorage } from './storage/index.js';
 import { createQueues } from './jobs/queues.js';
 import { createWorkers } from './jobs/workers.js';
 import { createSSEBroadcaster } from './sse/broadcaster.js';
+import { FilterRuleRegistry } from './filters/rule-registry.js';
+import { registerDefaultRules } from './filters/default-rules.js';
 
 /**
  * Initialize Cultivate with ordered dependency checks
@@ -28,9 +30,10 @@ import { createSSEBroadcaster } from './sse/broadcaster.js';
  * 3. Transformers.js ML model
  * 4. Anthropic API health check
  * 5. Tuner config fetch (optional)
- * 6. SSE broadcaster
- * 7. BullMQ queues
- * 8. Scheduled job repeaters
+ * 6. Filter rule registry with default rules
+ * 7. SSE broadcaster
+ * 8. BullMQ queues
+ * 9. Scheduled job repeaters
  *
  * Each step fails fast if the dependency is unavailable.
  *
@@ -44,12 +47,12 @@ export async function startCultivate(
   console.log('[cultivate] Starting initialization sequence...');
 
   // Step 1: Connect to Redis
-  console.log('[cultivate] Step 1/8: Connecting to Redis...');
+  console.log('[cultivate] Step 1/9: Connecting to Redis...');
   const redis = await connectRedis(config);
   console.log('[cultivate] ✓ Redis connected');
 
   // Step 2: Initialize SQLite storage
-  console.log('[cultivate] Step 2/8: Initializing SQLite storage...');
+  console.log('[cultivate] Step 2/9: Initializing SQLite storage...');
   const storage = await initializeStorage(config.dbPath);
   console.log('[cultivate] ✓ Storage initialized');
 
@@ -57,36 +60,45 @@ export async function startCultivate(
   await ensureDefaultGreenhouse(storage);
 
   // Step 3: Load Transformers.js zero-shot classifier model
-  console.log('[cultivate] Step 3/8: Loading Transformers.js ML model...');
+  console.log('[cultivate] Step 3/9: Loading Transformers.js ML model...');
   const mlModel = await loadMLModel();
   console.log('[cultivate] ✓ ML model loaded');
 
   // Step 4: Verify Anthropic API key and health
-  console.log('[cultivate] Step 4/8: Verifying Anthropic API...');
+  console.log('[cultivate] Step 4/9: Verifying Anthropic API...');
   const anthropic = await verifyAnthropicAPI(config.anthropicApiKey);
   console.log('[cultivate] ✓ Anthropic API verified');
 
   // Step 5: Fetch initial Tuner config (optional - falls back to defaults)
-  console.log('[cultivate] Step 5/8: Fetching Tuner config...');
+  console.log('[cultivate] Step 5/9: Fetching Tuner config...');
   const tunerConfig = await fetchTunerConfig(config.tunerUrl);
   if (tunerConfig) {
     console.log('[cultivate] ✓ Tuner config loaded');
+    // Save Tuner config to storage so workers can load it
+    await storage.setConfig(tunerConfig);
+    console.log('[cultivate] ✓ Tuner config saved to storage');
   } else {
     console.log('[cultivate] ⚠ Tuner unavailable, using defaults');
   }
 
-  // Step 6: Create SSE broadcaster
-  console.log('[cultivate] Step 6/8: Creating SSE broadcaster...');
+  // Step 6: Initialize filter rule registry with default rules
+  console.log('[cultivate] Step 6/9: Initializing filter rule registry...');
+  const filterRegistry = new FilterRuleRegistry();
+  registerDefaultRules(filterRegistry);
+  console.log('[cultivate] ✓ Filter rule registry initialized with default rules');
+
+  // Step 7: Create SSE broadcaster
+  console.log('[cultivate] Step 7/9: Creating SSE broadcaster...');
   const sseBroadcaster = createSSEBroadcaster();
   console.log('[cultivate] ✓ SSE broadcaster created');
 
-  // Step 7: Create BullMQ queues with Redis connection
-  console.log('[cultivate] Step 7/8: Creating BullMQ queues...');
+  // Step 8: Create BullMQ queues with Redis connection
+  console.log('[cultivate] Step 8/9: Creating BullMQ queues...');
   const queues = await createQueues(redis);
   console.log('[cultivate] ✓ BullMQ queues created');
 
-  // Step 8: Start scheduled job repeaters (workers)
-  console.log('[cultivate] Step 8/8: Starting job workers...');
+  // Step 9: Start scheduled job repeaters (workers)
+  console.log('[cultivate] Step 9/9: Starting job workers...');
   const workers = await createWorkers(redis, {
     storage,
     mlModel,
@@ -94,6 +106,7 @@ export async function startCultivate(
     sseBroadcaster,
     queues,
     config,
+    filterRegistry,
   });
   console.log('[cultivate] ✓ Job workers started');
 
@@ -109,6 +122,7 @@ export async function startCultivate(
     queues,
     workers,
     config,
+    filterRegistry,
   };
 }
 
