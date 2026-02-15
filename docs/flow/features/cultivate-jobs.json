@@ -20,6 +20,21 @@
       { "id": "cj-ac8", "description": "All 6 queues have dead letter handling that captures diagnostic context (job data, error message, stack trace, attempt count)" }
     ]
   },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "partial",
+    "criteria": [
+      { "id": "cj-ac1", "status": "satisfied", "evidence": "src/jobs/queues.ts:31-42" },
+      { "id": "cj-ac2", "status": "missing", "evidence": "src/jobs/workers.ts:65-76 poll-sources worker is a TODO stub" },
+      { "id": "cj-ac3", "status": "satisfied", "evidence": "src/jobs/workers.ts:78-189" },
+      { "id": "cj-ac4", "status": "missing", "evidence": "src/jobs/workers.ts:191-202 ingest-document worker is a TODO stub" },
+      { "id": "cj-ac5", "status": "satisfied", "evidence": "src/jobs/workers.ts:204-245" },
+      { "id": "cj-ac6", "status": "satisfied", "evidence": "src/jobs/workers.ts:247-287" },
+      { "id": "cj-ac7", "status": "satisfied", "evidence": "src/jobs/workers.ts:289+" },
+      { "id": "cj-ac8", "status": "satisfied", "evidence": "src/jobs/workers.ts:30-48" }
+    ],
+    "drift": []
+  },
   "plan_implementation": {
     "scopes": ["cultivate"],
     "steps": [

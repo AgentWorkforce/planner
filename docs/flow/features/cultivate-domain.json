@@ -2,7 +2,7 @@
   "feature_id": "cultivate-domain",
   "title": "Domain Types & Zod Schemas",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": [],
   "parent": "cultivate-package",
@@ -33,6 +33,35 @@
       { "id": "cd-ac21", "description": "All types exported from package root: import { Signal, Greenhouse, Cluster, ... } from '@plannr/cultivate'" },
       { "id": "cd-ac22", "description": "Zod schemas enable runtime validation of adapter output, LLM extraction responses, config, and API request bodies" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cd-ac1", "status": "satisfied", "evidence": "src/domain/types.ts:10-18" },
+      { "id": "cd-ac2", "status": "satisfied", "evidence": "src/domain/types.ts:339-350" },
+      { "id": "cd-ac3", "status": "satisfied", "evidence": "src/domain/types.ts:24-29" },
+      { "id": "cd-ac4", "status": "satisfied", "evidence": "src/domain/types.ts:34-38" },
+      { "id": "cd-ac5", "status": "satisfied", "evidence": "src/domain/types.ts:167-177" },
+      { "id": "cd-ac6", "status": "satisfied", "evidence": "src/domain/types.ts:111-121" },
+      { "id": "cd-ac7", "status": "satisfied", "evidence": "src/domain/types.ts:126-136" },
+      { "id": "cd-ac8", "status": "satisfied", "evidence": "src/domain/types.ts:141-150" },
+      { "id": "cd-ac9", "status": "satisfied", "evidence": "src/domain/types.ts:155-162" },
+      { "id": "cd-ac10", "status": "satisfied", "evidence": "src/domain/types.ts:298-310" },
+      { "id": "cd-ac11", "status": "satisfied", "evidence": "src/domain/types.ts:248-262" },
+      { "id": "cd-ac12", "status": "satisfied", "evidence": "src/domain/types.ts:239-243" },
+      { "id": "cd-ac13", "status": "satisfied", "evidence": "src/domain/types.ts:44-50" },
+      { "id": "cd-ac14", "status": "satisfied", "evidence": "src/domain/types.ts:55-62" },
+      { "id": "cd-ac15", "status": "satisfied", "evidence": "src/domain/types.ts:182-188" },
+      { "id": "cd-ac16", "status": "satisfied", "evidence": "src/domain/types.ts:193-203" },
+      { "id": "cd-ac17", "status": "satisfied", "evidence": "src/domain/types.ts:218-234" },
+      { "id": "cd-ac18", "status": "satisfied", "evidence": "src/domain/types.ts:315-323" },
+      { "id": "cd-ac19", "status": "satisfied", "evidence": "src/domain/types.ts:329-334" },
+      { "id": "cd-ac20", "status": "satisfied", "evidence": "src/domain/types.ts:283-293" },
+      { "id": "cd-ac21", "status": "satisfied", "evidence": "src/index.ts:164-206" },
+      { "id": "cd-ac22", "status": "satisfied", "evidence": "src/index.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

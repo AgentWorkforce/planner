@@ -2,7 +2,7 @@
   "feature_id": "cultivate-storage",
   "title": "SQLite Storage Layer",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain", "cultivate-errors"],
   "parent": "cultivate-package",
@@ -22,6 +22,24 @@
       { "id": "cs-ac10", "description": "Signal queries support filtering by greenhouse_id, status, cluster_id with pagination (offset+limit)" },
       { "id": "cs-ac11", "description": "cultivate_config table is a single-row key-value store for the current CultivateConfig JSON" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cs-ac1", "status": "satisfied", "evidence": "src/storage/interface.ts:215-447" },
+      { "id": "cs-ac2", "status": "satisfied", "evidence": "src/storage/sqlite.ts:42" },
+      { "id": "cs-ac3", "status": "satisfied", "evidence": "src/storage/sqlite.ts:189-197" },
+      { "id": "cs-ac4", "status": "satisfied", "evidence": "src/storage/sqlite.ts:94-105" },
+      { "id": "cs-ac5", "status": "satisfied", "evidence": "src/storage/sqlite.ts:195-196" },
+      { "id": "cs-ac6", "status": "satisfied", "evidence": "src/storage/sqlite.ts:131-147" },
+      { "id": "cs-ac7", "status": "satisfied", "evidence": "src/storage/sqlite.ts:149-160" },
+      { "id": "cs-ac8", "status": "satisfied", "evidence": "src/storage/sqlite.ts:162-173" },
+      { "id": "cs-ac9", "status": "satisfied", "evidence": "src/storage/sqlite.ts:200-232" },
+      { "id": "cs-ac10", "status": "satisfied", "evidence": "src/storage/sqlite.ts:366-391" },
+      { "id": "cs-ac11", "status": "satisfied", "evidence": "src/storage/sqlite.ts:175-186" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

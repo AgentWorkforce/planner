@@ -1,6 +1,13 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@plannr/storage-base': path.resolve(__dirname, 'packages/storage-base/src/index.ts'),
+      '@plannr/errors': path.resolve(__dirname, 'packages/errors/src/index.ts'),
+    },
+  },
   test: {
     // Run backend tests from packages
     include: [

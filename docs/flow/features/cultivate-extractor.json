@@ -2,7 +2,7 @@
   "feature_id": "cultivate-extractor",
   "title": "Tier 3 LLM Extraction (Sonnet)",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "ac5", "description": "After max BullMQ retries, failed job lands in dead letter queue" },
       { "id": "ac6", "description": "Extraction model is configurable via CULTIVATE_EXTRACT_MODEL env var, defaulting to Sonnet" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/extraction/extract.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/extraction/extract.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/extraction/extract.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/extraction/extract.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/extraction/extract.ts" },
+      { "id": "ac6", "status": "satisfied", "evidence": "src/extraction/extract.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

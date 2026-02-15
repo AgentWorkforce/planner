@@ -2,7 +2,7 @@
   "feature_id": "cultivate-auth-encryption",
   "title": "Credential Encryption",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "high",
   "dependencies": ["cultivate-domain"],
   "parent": "cultivate-package",
@@ -18,6 +18,20 @@
       { "id": "cae-ac6", "description": "Missing CULTIVATE_SECRET env var throws descriptive error at startup, not at first encrypt call" },
       { "id": "cae-ac7", "description": "EncryptedCredential type distinguishes encrypted strings from plain strings at the type level" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cae-ac1", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac2", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac3", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac4", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac5", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac6", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac7", "status": "satisfied", "evidence": "src/auth/encryption.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

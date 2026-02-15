@@ -2,7 +2,7 @@
   "feature_id": "cultivate-filter-tier2",
   "title": "Tier 2 Local ML Classification",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain", "cultivate-errors"],
   "parent": "cultivate-package",
@@ -18,6 +18,20 @@
       { "id": "cft2-ac6", "description": "Per-signal classification failure does NOT crash — signal routes to dead-letter with error context" },
       { "id": "cft2-ac7", "description": "Model loaded once at startup, reused for all classifications (singleton)" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "cft2-ac1", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" },
+      { "id": "cft2-ac2", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" },
+      { "id": "cft2-ac3", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" },
+      { "id": "cft2-ac4", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" },
+      { "id": "cft2-ac5", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" },
+      { "id": "cft2-ac6", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" },
+      { "id": "cft2-ac7", "status": "satisfied", "evidence": "src/filters/ml-classifier.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

@@ -198,7 +198,7 @@ export function createCultivateService(config: CultivateServiceConfig = {}): Cul
         // Since we don't have a direct cleanup method, we'll broadcast a shutdown event
         // and rely on clients to handle disconnect
         try {
-          shutdownContext.sseBroadcaster.broadcast('shutdown', {
+          shutdownContext.sseBroadcaster.emit('shutdown' as any, {
             message: 'Cultivate service shutting down',
             timestamp: new Date().toISOString(),
           });

@@ -7,7 +7,7 @@
  */
 
 import type { Signal, ExtractionResult } from '../domain/types.js';
-import type { CultivateStorage } from '../storage/index.js';
+import type { CultivateStorage } from '../storage/interface.js';
 
 /**
  * Compute keyword overlap as Jaccard similarity (intersection/union)

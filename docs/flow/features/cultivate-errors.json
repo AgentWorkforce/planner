@@ -2,7 +2,7 @@
   "feature_id": "cultivate-errors",
   "title": "Error Types",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": [],
   "parent": "cultivate-package",
@@ -18,6 +18,20 @@
       { "id": "ce-ac6", "description": "All errors extend base Error class and are instanceof-checkable" },
       { "id": "ce-ac7", "description": "All error types exported from package root" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ce-ac1", "status": "satisfied", "evidence": "src/errors.ts:14-17" },
+      { "id": "ce-ac2", "status": "satisfied", "evidence": "src/errors.ts:23-29" },
+      { "id": "ce-ac3", "status": "satisfied", "evidence": "src/errors.ts:220-252" },
+      { "id": "ce-ac4", "status": "satisfied", "evidence": "src/errors.ts:264-304" },
+      { "id": "ce-ac5", "status": "satisfied", "evidence": "src/errors.ts:306-344" },
+      { "id": "ce-ac6", "status": "satisfied", "evidence": "src/errors.ts" },
+      { "id": "ce-ac7", "status": "satisfied", "evidence": "src/index.ts:45-49" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

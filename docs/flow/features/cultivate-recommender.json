@@ -2,7 +2,7 @@
   "feature_id": "cultivate-recommender",
   "title": "Recommendation Engine",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "high",
   "dependencies": ["cultivate-storage", "cultivate-clusterer"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "cr-ac5", "description": "Cache invalidated when a high-relevance signal is ingested" },
       { "id": "cr-ac6", "description": "Recommendations filterable by Greenhouse ID" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "cr-ac1", "status": "satisfied", "evidence": "src/recommender/index.ts" },
+      { "id": "cr-ac2", "status": "satisfied", "evidence": "src/recommender/index.ts" },
+      { "id": "cr-ac3", "status": "satisfied", "evidence": "src/recommender/index.ts" },
+      { "id": "cr-ac4", "status": "satisfied", "evidence": "src/recommender/index.ts" },
+      { "id": "cr-ac5", "status": "satisfied", "evidence": "src/recommender/index.ts" },
+      { "id": "cr-ac6", "status": "satisfied", "evidence": "src/recommender/index.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

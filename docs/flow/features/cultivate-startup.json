@@ -2,7 +2,7 @@
   "feature_id": "cultivate-startup",
   "title": "Fail-Fast Startup Sequence",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-api", "cultivate-jobs", "cultivate-filter-tier2", "cultivate-tuner"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "cs-ac5", "description": "createCultivateService() returns { router, initialize, shutdown } matching plugin pattern" },
       { "id": "cs-ac6", "description": "Graceful shutdown stops workers, closes queues, closes Redis, closes SQLite in reverse order" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "cs-ac1", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac2", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac3", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac4", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac5", "status": "satisfied", "evidence": "src/service.ts" },
+      { "id": "cs-ac6", "status": "satisfied", "evidence": "src/service.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

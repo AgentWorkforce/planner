@@ -142,6 +142,7 @@ export const CultivateConfigSchema = z.object({
   weights: z.record(z.string(), CultivateWeightsSchema), // keyed by greenhouse_id
   filter_rules: z.record(z.string(), z.object({ enabled: z.boolean() })), // keyed by rule_id
   tier1_strictness: z.number(),
+  tier2_enabled: z.boolean().optional(), // Whether to use ML classifier (default: false)
   tier2_threshold: z.number(),
   extract_model: z.string().optional(),
   cluster_model: z.string().optional(),
@@ -368,6 +369,7 @@ export const GreenhouseSchema = z.object({
   keyword_require: z.array(z.string()), // All required keywords
   keyword_exclude: z.array(z.string()), // Exclusion keywords
   source_ids: z.array(z.string()), // Connected source configurations
+  weight_overrides: CultivateWeightsSchema.partial().optional(), // Per-greenhouse scoring weight overrides
   created_at: z.string(),
   updated_at: z.string(),
 });

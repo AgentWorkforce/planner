@@ -2,7 +2,7 @@
   "feature_id": "cultivate-sse",
   "title": "SSE Broadcaster (Shared Infrastructure)",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain"],
   "parent": "cultivate-package",
@@ -18,6 +18,20 @@
       { "id": "csse-ac6", "description": "GET /events endpoint helper sets correct SSE headers (Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive)" },
       { "id": "csse-ac7", "description": "Broadcaster is injectable — pipeline, workers, and API all receive the same instance" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "csse-ac1", "status": "satisfied", "evidence": "src/sse/broadcaster.ts" },
+      { "id": "csse-ac2", "status": "satisfied", "evidence": "src/sse/broadcaster.ts" },
+      { "id": "csse-ac3", "status": "satisfied", "evidence": "src/sse/broadcaster.ts" },
+      { "id": "csse-ac4", "status": "satisfied", "evidence": "src/sse/broadcaster.ts" },
+      { "id": "csse-ac5", "status": "satisfied", "evidence": "src/sse/broadcaster.ts" },
+      { "id": "csse-ac6", "status": "satisfied", "evidence": "src/sse/handler.ts" },
+      { "id": "csse-ac7", "status": "satisfied", "evidence": "src/sse/broadcaster.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

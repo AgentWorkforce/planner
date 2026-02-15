@@ -2,7 +2,7 @@
   "feature_id": "cultivate-scorer",
   "title": "Multi-Factor Scoring Engine",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain", "cultivate-storage"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "ac5", "description": "scoreSignal() returns composite score (0-1) along with individual factor scores and resolved weights" },
       { "id": "ac6", "description": "Per-Greenhouse weight overrides allow different scoring priorities for different Greenhouses" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/scoring/factors.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/scoring/weights.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/scoring/factors.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/scoring/score.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/scoring/score.ts" },
+      { "id": "ac6", "status": "satisfied", "evidence": "src/scoring/score.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

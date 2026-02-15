@@ -2,7 +2,7 @@
   "feature_id": "cultivate-decay-trends",
   "title": "Signal Decay + Trend Detection + Weekly Recluster",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "high",
   "dependencies": ["cultivate-storage", "cultivate-clusterer", "cultivate-scorer", "cultivate-sse"],
   "parent": "cultivate-package",
@@ -19,6 +19,21 @@
       { "id": "cdt-ac7", "description": "cluster:trending SSE event emitted when a cluster transitions to rising" },
       { "id": "cdt-ac8", "description": "Weekly recluster uses Sonnet to review clusters and can merge, split, or rename them" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "cdt-ac1", "status": "satisfied", "evidence": "src/temporal/decay.ts" },
+      { "id": "cdt-ac2", "status": "satisfied", "evidence": "src/temporal/decay.ts" },
+      { "id": "cdt-ac3", "status": "satisfied", "evidence": "src/temporal/decay.ts" },
+      { "id": "cdt-ac4", "status": "satisfied", "evidence": "src/temporal/decay.ts" },
+      { "id": "cdt-ac5", "status": "satisfied", "evidence": "src/temporal/trends.ts" },
+      { "id": "cdt-ac6", "status": "satisfied", "evidence": "src/temporal/trends.ts" },
+      { "id": "cdt-ac7", "status": "satisfied", "evidence": "src/temporal/trends.ts" },
+      { "id": "cdt-ac8", "status": "satisfied", "evidence": "src/temporal/recluster.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],
