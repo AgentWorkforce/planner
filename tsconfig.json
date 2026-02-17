@@ -2,6 +2,7 @@
   "references": [
     { "path": "./packages/cultivate" },
     { "path": "./packages/planner" },
+    { "path": "./packages/portfolio-core" },
     { "path": "./packages/server" },
     { "path": "./packages/ideation" },
     { "path": "./packages/forge-core" },

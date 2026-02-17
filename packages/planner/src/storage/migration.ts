@@ -37,6 +37,9 @@ export function runMigrations(db: Database.Database): void {
 
   // 8. Add context_json column to versions if missing
   migrateVersionsContext(db);
+
+  // 9. Add priority and value_score columns to plans if missing
+  migratePlansPriorityValueScore(db);
 }
 
 /**
@@ -191,5 +194,26 @@ function migrateVersionsContext(db: Database.Database): void {
 
   if (!hasContext) {
     db.exec(`ALTER TABLE versions ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`);
+  }
+}
+
+/**
+ * Adds priority and value_score columns to plans table if missing.
+ * Priority: 1-5 scale (how urgent/important), default 3
+ * Value Score: 1-10 scale (how valuable), default 5
+ */
+function migratePlansPriorityValueScore(db: Database.Database): void {
+  const columns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(plans)`)
+    .all();
+  const hasPriority = columns.some((c) => c.name === 'priority');
+  const hasValueScore = columns.some((c) => c.name === 'value_score');
+
+  if (!hasPriority) {
+    db.exec(`ALTER TABLE plans ADD COLUMN priority INTEGER NOT NULL DEFAULT 3`);
+  }
+
+  if (!hasValueScore) {
+    db.exec(`ALTER TABLE plans ADD COLUMN value_score INTEGER NOT NULL DEFAULT 5`);
   }
 }

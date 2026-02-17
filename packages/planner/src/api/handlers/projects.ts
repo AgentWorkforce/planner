@@ -278,6 +278,8 @@ export function createProjectHandlers(storage: PlanStorage) {
               org_id: 'default',
               owner_user_id: existing.owner_id ?? undefined,
               initiative_id: existing.initiative_id ?? undefined,
+              priority: 3,
+              value_score: 5,
               created_at: now,
               updated_at: now,
             };

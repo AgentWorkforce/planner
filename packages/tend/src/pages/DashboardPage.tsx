@@ -4,8 +4,16 @@ import { TendLayout } from '@/components/layout/TendLayout';
 import { StatusBar } from '@/components/status/StatusBar';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ProjectsColumn } from '@/components/dashboard/ProjectsColumn';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { NewProjectModal } from '@/components/sessions/NewSessionModal';
+import { PortfolioSummary } from '@/components/dashboard/PortfolioSummary';
+import { SuggestionCard } from '@/components/dashboard/SuggestionCard';
+import { SuggestionsList } from '@/components/dashboard/SuggestionsList';
+import { InitiativeTree } from '@/components/dashboard/InitiativeTree';
+import { usePortfolioOverview } from '@/hooks/usePortfolioOverview';
+import { useSuggestions } from '@/hooks/useSuggestions';
+import { useInitiativeHealth } from '@/hooks/useInitiativeHealth';
+import { useInitiatives } from '@/hooks/useInitiatives';
+import type { Suggestion } from '@/hooks/useSuggestions';
 
 interface Project {
   id: string;
@@ -17,45 +25,64 @@ interface Project {
   updated_at: string;
 }
 
+interface PlanSummary {
+  plan_id: string;
+  goal: string;
+  status: string;
+  initiative_id: string | null;
+}
+
 /**
  * DashboardPage
  *
- * Same three-column layout as project pages (the-now.md: "This layout never changes"):
+ * Three-column layout:
  * - Left: Project DRAFTS as physics blocks (early-stage projects only).
- * - Center: AI conversation with the Navigator — discusses priorities, suggests next actions.
- *           NOT a project-creation form. Projects are created via [+ new] in the tree.
- * - Right: Projects as a tree. "Projects live in the tree (right column)." (the-now.md line 149)
- *
- * No forms. No wizards. The center is a real AI conversation.
- * (tend-spec.md §3.7: "Center: the AI discusses priorities, suggests next actions")
+ * - Center: Portfolio intelligence — summary, top suggestion, secondary suggestions, contextual greeting.
+ * - Right: Initiative tree with health indicators.
  *
  * @route /
  */
 export function DashboardPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
+  // Portfolio hooks
+  const { overview, loading: overviewLoading } = usePortfolioOverview();
+  const { suggestions, loading: suggestionsLoading } = useSuggestions();
+  const { healthMap } = useInitiativeHealth();
+  const { initiatives } = useInitiatives();
+
   useEffect(() => {
-    fetchProjects();
+    fetchData();
   }, []);
 
-  const fetchProjects = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setFetchError(null);
 
     try {
-      const response = await fetch('/api/projects');
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const [projectsRes, plansRes] = await Promise.all([
+        fetch('/api/projects'),
+        fetch('/api/plans'),
+      ]);
+
+      if (!projectsRes.ok) {
+        throw new Error(`HTTP ${projectsRes.status}: ${projectsRes.statusText}`);
       }
 
-      const data = await response.json();
-      setProjects(data.projects);
+      const projectsData = await projectsRes.json();
+      setProjects(projectsData.projects);
+
+      if (plansRes.ok) {
+        const plansData = await plansRes.json();
+        setPlans(plansData.plans || []);
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load projects';
+      const message = err instanceof Error ? err.message : 'Failed to load data';
       setFetchError(message);
     } finally {
       setLoading(false);
@@ -65,19 +92,31 @@ export function DashboardPage() {
   // Split projects: drafts (early-stage, session only) vs established (have plan or run)
   const drafts = projects.filter(p => p.session_id && !p.plan_id && !p.run_id);
 
-  // Helper: phase text for tree items
-  const getPhaseText = (project: Project): string | null => {
-    if (project.run_id) return 'forging';
-    if (project.plan_id) return 'planning';
-    if (project.session_id) return 'ideating';
-    return null;
+  // Map plan_id → project_id for navigation
+  const projectByPlanId = new Map(
+    projects.filter(p => p.plan_id).map(p => [p.plan_id, p.id]),
+  );
+
+  const handleSuggestionOpen = (suggestion: Suggestion) => {
+    if (suggestion.project_id) {
+      navigate(`/projects/${suggestion.project_id}`);
+    } else if (suggestion.plan_id) {
+      const projectId = projectByPlanId.get(suggestion.plan_id);
+      if (projectId) {
+        navigate(`/projects/${projectId}`);
+      }
+    }
   };
 
+  const handlePlanSelect = (planId: string) => {
+    const projectId = projectByPlanId.get(planId);
+    if (projectId) {
+      navigate(`/projects/${projectId}`);
+    }
+  };
 
-  // Build contextual greeting based on project state (the-conversation.md lines 158-170)
-  // Returns JSX nodes so we can include clickable links for project names
+  // Build contextual greeting based on project state
   const getGreeting = (): { main: React.ReactNode; sub: React.ReactNode } => {
-    // First time — no projects (the-conversation.md line 172)
     if (projects.length === 0) {
       return {
         main: 'What would you like to work on?',
@@ -85,17 +124,13 @@ export function DashboardPage() {
       };
     }
 
-    // Sort by most recent activity
     const sorted = [...projects].sort(
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
 
-    // Active projects (with sessions/plans/runs)
     const active = sorted.filter(p => p.session_id || p.plan_id || p.run_id);
     const mostRecent = active[0];
 
-    // Active work exists (the-conversation.md lines 161-163)
-    // "Links, not buttons. Directional, not pushy."
     if (mostRecent) {
       return {
         main: (
@@ -116,7 +151,6 @@ export function DashboardPage() {
       };
     }
 
-    // Nothing active (the-conversation.md lines 167-168)
     return {
       main: `Nothing active right now.`,
       sub: 'Want to revisit a project from the tree, or start something new?',
@@ -125,7 +159,11 @@ export function DashboardPage() {
 
   const greeting = getGreeting();
 
-  // ─── Nav: just "tend" + theme toggle ───
+  // Primary suggestion (#1) and secondary suggestions (#2-5)
+  const primarySuggestion = suggestions[0] || null;
+  const secondarySuggestions = suggestions.slice(1, 5);
+
+  // ─── Nav ───
   const nav = (
     <div className="flex items-center justify-between h-full px-4">
       <span className="text-text-primary text-sm font-medium tracking-wide">tend</span>
@@ -134,8 +172,6 @@ export function DashboardPage() {
   );
 
   // ─── Left panel: project DRAFTS as physics blocks ───
-  // "project drafts in progress — projects that haven't matured past early conversation"
-  // (the-now.md lines 95-111)
   const leftPanel = (
     <ProjectsColumn
       projects={drafts}
@@ -145,10 +181,40 @@ export function DashboardPage() {
     />
   );
 
-  // ─── Center: contextual greeting ───
-  // Future: Navigator AI conversation (tend-spec.md §3.7)
+  // ─── Center: portfolio intelligence + greeting ───
   const center = (
-    <div className="flex flex-col h-full items-center justify-center px-6 py-4">
+    <div className="flex flex-col h-full overflow-y-auto px-6 py-4 space-y-4">
+      {/* Portfolio summary */}
+      <PortfolioSummary
+        initiativeCount={overview?.initiative_count ?? 0}
+        activePlanCount={overview?.active_plan_count ?? 0}
+        healthSummary={overview?.health_summary ?? { healthy: 0, warning: 0, critical: 0 }}
+        opportunityCount={overview?.opportunity_count ?? 0}
+        loading={overviewLoading}
+      />
+
+      {/* Primary suggestion */}
+      {primarySuggestion && (
+        <SuggestionCard
+          suggestion={primarySuggestion}
+          onOpen={handleSuggestionOpen}
+        />
+      )}
+
+      {/* Secondary suggestions */}
+      {secondarySuggestions.length > 0 && (
+        <SuggestionsList
+          suggestions={secondarySuggestions}
+          onSelect={handleSuggestionOpen}
+        />
+      )}
+
+      {/* Separator before greeting */}
+      {(primarySuggestion || secondarySuggestions.length > 0) && (
+        <div className="border-t border-border-subtle" />
+      )}
+
+      {/* Contextual greeting */}
       <div className="max-w-lg">
         <div className="bg-bg-secondary rounded-2xl px-5 py-4 shadow-sm">
           <p className="text-text-primary text-sm leading-relaxed">
@@ -161,61 +227,46 @@ export function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Loading skeleton for suggestions */}
+      {suggestionsLoading && !primarySuggestion && (
+        <div className="bg-bg-secondary rounded-2xl p-4 animate-pulse">
+          <div className="h-4 bg-bg-tertiary rounded w-40 mb-2" />
+          <div className="h-3 bg-bg-tertiary rounded w-64" />
+        </div>
+      )}
     </div>
   );
 
-  // ─── Right panel: projects as ASCII tree ───
-  // the-tree.md lines 205-248: "Text-based list with attention indicators. Not cards."
-  // ASCII symbols for structure: └, ·, ⟳, 🔴
+  // ─── Right panel: initiative tree ───
   const rightPanel = (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-4 py-4 font-mono text-sm">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <LoadingSpinner size="sm" />
+      <div className="flex-1 overflow-y-auto px-3 py-3">
+        {initiatives.length > 0 || plans.length > 0 ? (
+          <InitiativeTree
+            initiatives={initiatives}
+            plans={plans}
+            healthMap={healthMap}
+            onSelectPlan={handlePlanSelect}
+            onNewPlan={() => setIsNewProjectOpen(true)}
+          />
+        ) : loading ? (
+          <div className="space-y-2 animate-pulse">
+            <div className="h-4 bg-bg-tertiary rounded w-32" />
+            <div className="h-3 bg-bg-tertiary rounded w-48 ml-4" />
+            <div className="h-3 bg-bg-tertiary rounded w-40 ml-4" />
           </div>
-        ) : projects.length === 0 ? (
-          /* Empty state — zen garden (the-conversation.md line 172) */
-          <p className="text-text-muted">No projects yet</p>
         ) : (
-          <div className="space-y-3">
-            {projects.map((project) => {
-              const phase = getPhaseText(project);
-
-              return (
-                <button
-                  key={project.id}
-                  onClick={() => navigate(`/projects/${project.id}`)}
-                  className="w-full text-left group"
-                >
-                  {/* Project name — typography for hierarchy, no decoration */}
-                  <div className="text-text-primary font-semibold group-hover:text-accent-primary transition-colors truncate">
-                    {project.name}
-                  </div>
-                  {/* Sub-line with └ prefix, phase, and time */}
-                  {phase && (
-                    <div className="text-text-muted text-xs mt-0.5 pl-0.5">
-                      <span className="text-text-muted/60">└ </span>
-                      {phase}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+          <div className="space-y-3 px-1 py-1">
+            <p className="text-text-muted text-sm font-mono">No projects yet</p>
+            <button
+              onClick={() => setIsNewProjectOpen(true)}
+              className="text-text-muted hover:text-text-secondary text-sm font-mono transition-colors"
+            >
+              [+ new]
+            </button>
           </div>
         )}
-      </div>
-
-      {/* Separator + [+ new] at bottom-right of project tree */}
-      {/* the-tree.md lines 219-238 */}
-      <div className="px-4 pb-4">
-        <div className="border-t border-border-subtle mb-3" />
-        <button
-          onClick={() => setIsNewProjectOpen(true)}
-          className="text-text-muted hover:text-text-secondary text-sm font-mono transition-colors"
-        >
-          [+ new]
-        </button>
       </div>
     </div>
   );

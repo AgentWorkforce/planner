@@ -29,6 +29,8 @@ export const PlanSchema = z.object({
   initiative_id: z.string().uuid().optional(),
   owner_user_id: z.string().optional(),
   source: PlanSourceSchema.optional(),
+  priority: z.number().int().min(1).max(5).default(3),
+  value_score: z.number().int().min(1).max(10).default(5),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -81,6 +83,8 @@ export function createPlan(
     org_id,
     owner_user_id,
     source: source ?? { type: 'manual' },
+    priority: 3,
+    value_score: 5,
     created_at: now,
     updated_at: now,
   };

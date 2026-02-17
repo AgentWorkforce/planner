@@ -69,6 +69,12 @@ export function createPlanHandlers(storage: PlanStorage) {
         if (body.initiative_id) {
           plan.initiative_id = body.initiative_id;
         }
+        if (body.priority !== undefined) {
+          plan.priority = body.priority;
+        }
+        if (body.value_score !== undefined) {
+          plan.value_score = body.value_score;
+        }
         storage.createPlan(plan);
 
         // Create initial draft version with optional understanding and decomposition config
@@ -163,6 +169,8 @@ export function createPlanHandlers(storage: PlanStorage) {
                 .map((s) => s.sub_plan_id as string) ?? [],
               initiative_id: plan.initiative_id,
               initiative,
+              priority: plan.priority,
+              value_score: plan.value_score,
               created_at: plan.created_at,
               updated_at: plan.updated_at,
             };
@@ -224,6 +232,8 @@ export function createPlanHandlers(storage: PlanStorage) {
               .map((s) => s.sub_plan_id as string) ?? [],
             initiative_id: plan.initiative_id,
             initiative,
+            priority: plan.priority,
+            value_score: plan.value_score,
             created_at: plan.created_at,
             updated_at: plan.updated_at,
             attention_types: attentionTypes,
@@ -280,10 +290,21 @@ export function createPlanHandlers(storage: PlanStorage) {
           throw notFound('Version');
         }
 
-        // Update initiative_id if provided (plan-level, allowed regardless of version status)
+        // Update plan-level fields if provided (allowed regardless of version status)
         let updatedPlan = plan;
+        const planUpdates: { initiative_id?: string | null; priority?: number; value_score?: number } = {};
         if (body.initiative_id !== undefined) {
-          const result = storage.updatePlan(id, { initiative_id: body.initiative_id });
+          planUpdates.initiative_id = body.initiative_id;
+        }
+        if (body.priority !== undefined) {
+          planUpdates.priority = body.priority;
+        }
+        if (body.value_score !== undefined) {
+          planUpdates.value_score = body.value_score;
+        }
+
+        if (Object.keys(planUpdates).length > 0) {
+          const result = storage.updatePlan(id, planUpdates);
           if (!result) {
             throw notFound('Plan');
           }

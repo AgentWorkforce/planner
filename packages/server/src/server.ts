@@ -27,6 +27,10 @@ import {
   CultivateStartupError,
   type CultivateService,
 } from '../../cultivate/src/index.js';
+import {
+  createPortfolioService,
+  type PortfolioService,
+} from '../../portfolio-core/src/index.js';
 
 // Mull adapter implementations + bridge
 import {
@@ -64,6 +68,8 @@ import {
   isConnected,
   spawnAgent,
   emitAgentStatusUpdate,
+  emitAgentParked,
+  initSessionPresence,
   type AgentState,
 } from './relay/index.js';
 
@@ -105,6 +111,7 @@ let ideationService: IdeationService;
 let forgeService: ForgeService;
 let mullService: MullService;
 let cultivateService: CultivateService | undefined;
+let portfolioService: PortfolioService;
 let mullTriggerCleanup: TriggerCleanupFn | null = null;
 
 // =============================================================================
@@ -243,6 +250,36 @@ async function start(): Promise<void> {
     app.use('/api/cultivate', cultivateService.router);
   }
 
+  // Initialize portfolio service (after planner, forge, and cultivate for cross-domain reads)
+  // Create adapter to match PlannerStorageReader interface
+  const plannerStorageAdapter = {
+    listPlansWithAttention: storage.listPlansWithAttention.bind(storage),
+    getInitiative: storage.getInitiative?.bind(storage),
+    listInitiatives: storage.listInitiatives?.bind(storage),
+    listTrajectoryEvents: storage.listTrajectoryEvents?.bind(storage),
+    listProjects: (filter?: { plan_id?: string }) => {
+      // ProjectFilter doesn't support plan_id — fetch all and filter in-memory
+      const all = storage.listProjects().map((p) => ({
+        id: p.id,
+        plan_id: p.plan_id ?? null,
+        run_id: p.run_id ?? null,
+      }));
+      if (filter?.plan_id) {
+        return all.filter((p) => p.plan_id === filter.plan_id);
+      }
+      return all;
+    },
+  };
+
+  portfolioService = createPortfolioService({
+    plannerStorage: plannerStorageAdapter,
+    cultivateStorage: cultivateService?.getContext?.()?.storage,
+    forgeStorage: forgeService.getStorage(),
+  });
+  await portfolioService.initialize();
+  app.use('/api/portfolio', portfolioService.router);
+  console.log('[portfolio] Initialized');
+
   // Initialize mull service (after planner and forge — reads their databases)
   mullService = createMullService({
     memoryDir: MULL_MEMORY_DIR,
@@ -312,6 +349,19 @@ async function start(): Promise<void> {
 
   // Initialize ideation bridge (routes relay messages to ideation package)
   initIdeationBridge(lifecycle, ideationService.getStorage());
+
+  // Initialize session presence tracking (manages grace/park timers)
+  initSessionPresence({
+    onPark: async (sessionId, agentName) => {
+      console.log(`[server] Parking agent ${agentName} for session ${sessionId}`);
+      try {
+        await lifecycle.release(agentName);
+        emitAgentParked(agentName, 'no_users_5min');
+      } catch (err) {
+        console.error(`[server] Failed to park agent ${agentName}:`, err);
+      }
+    },
+  });
 
   // Initialize channel management
   initChannelManagement();
@@ -431,6 +481,7 @@ async function start(): Promise<void> {
     plannerService.shutdown();
     await ideationService.shutdown();
     forgeService.shutdown();
+    portfolioService.shutdown();
     mullService.shutdown();
 
     // Exit after cleanup

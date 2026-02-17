@@ -55,6 +55,8 @@ export interface PlanRow {
   initiative_id: string | null;
   owner_user_id: string | null;
   source_json: string;
+  priority: number;
+  value_score: number;
   created_at: string;
   updated_at: string;
 }
@@ -211,6 +213,8 @@ export function rowToPlan(row: PlanRow): Plan {
     initiative_id: row.initiative_id ?? undefined,
     owner_user_id: row.owner_user_id ?? undefined,
     source: JSON.parse(row.source_json) as PlanSource,
+    priority: row.priority,
+    value_score: row.value_score,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
