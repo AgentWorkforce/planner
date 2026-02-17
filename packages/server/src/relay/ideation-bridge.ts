@@ -15,7 +15,8 @@ import {
 } from './client.js';
 import { getPlanChannelId } from './channels.js';
 import { onUserChannelJoin } from './ws-proxy.js';
-import { emitAgentJoined, emitAgentLeft, emitAgentStatusUpdate } from './agent-status.js';
+import { emitAgentJoined, emitAgentLeft, emitAgentStatusUpdate, emitAgentWarming } from './agent-status.js';
+import { setAgentForSession, getAgentLifecycleState } from './session-presence.js';
 import type { AgentLifecycleManager } from '../agents/lifecycle.js';
 import {
   setConnectionState as setIdeationState,
@@ -142,7 +143,7 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
         if (!dataType) {
           const role: 'user' | 'assistant' = from.startsWith('user-') ? 'user' : 'assistant';
           const message = createTranscriptMessage(role, body);
-          ideationStorage.appendTranscript(sessionId, message).catch((err) => {
+          ideationStorage.appendTranscript(sessionId, message).catch((err: unknown) => {
             console.error('[ideation-bridge] Failed to persist message:', err);
           });
         }
@@ -202,10 +203,41 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
   onUserChannelJoin((channel) => {
     if (!isIdeationChannel(channel)) return;
     const sessionId = joinedSessionChannels.get(channel);
-    if (sessionId) {
+    if (sessionId && lifecycleManager && ideationStorage) {
       console.log(`[ideation-bridge] User joined session channel ${channel}, ensuring Interviewer spawned`);
-      emitAgentJoined(INTERVIEWER_CONFIG.agentId, 'interviewer', INTERVIEWER_CONFIG.displayName);
-      ensureInterviewerSpawned(sessionId);
+
+      const agentName = `Interviewer-${sessionId.slice(0, 8)}`;
+      const lifecycleState = getAgentLifecycleState(agentName);
+
+      if (lifecycleState === 'parked') {
+        // Agent was parked, warm it up with transcript context
+        console.log(`[ideation-bridge] Agent ${agentName} was parked, warming up`);
+        emitAgentWarming(agentName, 'Resuming session...');
+
+        // Get transcript summary for context (last 10 messages)
+        ideationStorage.getSession(sessionId).then(async (session: { transcript?: Array<{ role: string; content: string }> } | null) => {
+          let transcriptSummary: string | undefined;
+          if (session?.transcript?.length) {
+            const recentMessages = session.transcript.slice(-10);
+            transcriptSummary = recentMessages
+              .map((m: { role: string; content: string }) => `${m.role}: ${m.content.slice(0, 200)}`)
+              .join('\n');
+          }
+
+          await lifecycleManager?.warmInterviewer(sessionId, { transcriptSummary });
+          setAgentForSession(channel, agentName);
+        }).catch((err: unknown) => {
+          console.error(`[ideation-bridge] Failed to fetch transcript for warm-up:`, err);
+          // Fall back to cold start
+          ensureInterviewerSpawned(sessionId);
+          setAgentForSession(channel, agentName);
+        });
+      } else {
+        // Normal spawn or already active
+        emitAgentJoined(INTERVIEWER_CONFIG.agentId, 'interviewer', INTERVIEWER_CONFIG.displayName);
+        ensureInterviewerSpawned(sessionId);
+        setAgentForSession(channel, agentName);
+      }
     }
   });
 

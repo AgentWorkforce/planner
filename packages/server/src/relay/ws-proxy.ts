@@ -15,6 +15,7 @@ import { RelayClient, type ClientState, type SendPayload, type SendMeta, type Ch
 import { getRelayConfig } from './config.js';
 import { getRelayMode } from './service.js';
 import { setBrowserBroadcast } from './agent-status.js';
+import { addWatcher, removeWatcher } from './session-presence.js';
 import { randomUUID } from 'crypto';
 
 /** Incoming message from browser */
@@ -86,6 +87,7 @@ function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): vo
           conn.channels.add(message.channel);
           sendToBrowser(ws, { type: 'joined', channel: message.channel });
           onUserChannelJoinCallback?.(message.channel);
+          addWatcher(message.channel, conn.userId);
         } else {
           sendToBrowser(ws, { type: 'error', error: `Failed to join channel ${message.channel}` });
         }
@@ -98,6 +100,7 @@ function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): vo
         if (left) {
           conn.channels.delete(message.channel);
           sendToBrowser(ws, { type: 'left', channel: message.channel });
+          removeWatcher(message.channel, conn.userId);
         }
       }
       break;
@@ -290,6 +293,10 @@ export function initWebSocketProxy(server: Server): WebSocketServer {
 
       ws.on('close', () => {
         console.log(`[ws-proxy] User ${displayName} (${userId}) disconnected`);
+        // Remove watchers for all channels this user was in
+        for (const channel of conn.channels) {
+          removeWatcher(channel, conn.userId);
+        }
         conn.client?.destroy();
         connections.delete(ws);
       });

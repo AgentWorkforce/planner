@@ -70,10 +70,6 @@ export const FILLS = {
   },
 
   // -- Static states --
-  normal: {
-    interval: 0,
-    frames: ['---'],
-  },
   idle: {
     interval: 0,
     frames: ['···'],
@@ -105,7 +101,6 @@ export const FILLS = {
 // ---------------------------------------------------------------------------
 
 export const STATE_CHARS: Record<string, string> = {
-  normal: '·',
   idle: ' ',
   needs_input: '?',
   error: '!',

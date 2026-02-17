@@ -43,7 +43,7 @@ export class AgentLifecycleManager {
     this.mcpServerUrl = options.mcpServerUrl || 'http://localhost:3001';
   }
 
-  async spawnInterviewer(sessionId: string, context?: { goal?: string }): Promise<void> {
+  async spawnInterviewer(sessionId: string, context?: { goal?: string; transcriptSummary?: string }): Promise<void> {
     const name = interviewerName(sessionId);
 
     if (isAgentSpawned(name) || this.spawning.has(name)) {
@@ -56,6 +56,7 @@ export class AgentLifecycleManager {
       const task = interviewerPrompt(sessionId, {
         goal: context?.goal,
         mcpServerUrl: this.mcpServerUrl,
+        transcriptSummary: context?.transcriptSummary,
       });
 
       const channelId = `#ideation-${sessionId.slice(0, 8)}`;
@@ -82,6 +83,11 @@ export class AgentLifecycleManager {
     } finally {
       this.spawning.delete(name);
     }
+  }
+
+  async warmInterviewer(sessionId: string, context?: { goal?: string; transcriptSummary?: string }): Promise<void> {
+    console.log(`[lifecycle] Warming Interviewer for session ${sessionId}`);
+    await this.spawnInterviewer(sessionId, context);
   }
 
   async spawnPlannerLead(planId: string, context?: { goal?: string }): Promise<void> {

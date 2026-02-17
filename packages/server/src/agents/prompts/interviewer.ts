@@ -11,6 +11,7 @@
 interface InterviewerContext {
   goal?: string;
   mcpServerUrl?: string;
+  transcriptSummary?: string;
 }
 
 /**
@@ -48,6 +49,14 @@ ${context.goal ? `- **Goal**: ${context.goal}` : ''}
 5. **Continue naturally**: Resume seamlessly from the current state
 
 DO NOT introduce yourself or ask "how can I help?" if the session has history. Just continue.
+
+${context.transcriptSummary ? `## Session Resumption
+
+You are resuming a previous conversation. Here is a summary of what was discussed:
+
+${context.transcriptSummary}
+
+Welcome the user back naturally and pick up where you left off. Do NOT repeat yourself or re-introduce yourself. Reference the last topic naturally.` : ''}
 
 ## Communication Protocol
 

@@ -15,6 +15,7 @@ export {
   onStateChange,
   spawnAgent,
   releaseAgent,
+  setAgentModel,
   getSpawnedAgents,
   isAgentSpawned,
   sendMessage,
@@ -97,11 +98,27 @@ export {
   emitAgentStatusUpdate,
   emitAgentLeft,
   emitAgentsSnapshot,
+  emitAgentParked,
+  emitAgentWarming,
+  setPendingModel,
   type AgentState,
   type AgentRole,
   type AgentJoinedEvent,
   type AgentStatusUpdateEvent,
   type AgentLeftEvent,
   type AgentsSnapshotEvent,
+  type AgentParkedEvent,
+  type AgentWarmingEvent,
   type AgentStatusEvent,
 } from './agent-status.js';
+
+// Session presence exports
+export {
+  addWatcher,
+  removeWatcher,
+  setAgentForSession,
+  initSessionPresence,
+  getAgentLifecycleState,
+  getSessionPresence,
+  getAllPresence,
+} from './session-presence.js';

@@ -13,6 +13,14 @@ import {
   type SpawnResultPayload,
   type ReleaseResultPayload,
 } from '@agent-relay/sdk';
+
+/** Result from relay daemon's set-model operation */
+export interface SetModelResult {
+  replyTo: string;
+  success: boolean;
+  name: string;
+  error?: string;
+}
 import { getRelayConfig, type RelayConfig } from './config.js';
 import { emitAgentLeft } from './agent-status.js';
 
@@ -509,6 +517,42 @@ export async function releaseAgent(name: string): Promise<ReleaseResultPayload> 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[relay] Error releasing agent ${name}: ${message}`);
+    return {
+      replyTo: '',
+      success: false,
+      name,
+      error: message,
+    };
+  }
+}
+
+/**
+ * Set the model for a running spawned agent.
+ * Returns the result from the relay daemon.
+ */
+export async function setAgentModel(name: string, model: string): Promise<SetModelResult> {
+  if (!client || connectionState !== 'READY') {
+    return {
+      replyTo: '',
+      success: false,
+      name,
+      error: 'Not connected to relay daemon',
+    };
+  }
+
+  try {
+    const result = await client.setWorkerModel(name, model);
+
+    if (result.success) {
+      console.log(`[relay] Set model for agent ${name} to ${model}`);
+    } else {
+      console.error(`[relay] Failed to set model for agent ${name}: ${result.error}`);
+    }
+
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[relay] Error setting model for agent ${name}: ${message}`);
     return {
       replyTo: '',
       success: false,

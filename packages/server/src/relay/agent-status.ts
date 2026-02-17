@@ -7,7 +7,7 @@
  * in the UI status bar.
  */
 
-import { sendMessage } from './client.js';
+import { sendMessage, setAgentModel } from './client.js';
 
 // ============================================================================
 // Browser Broadcast
@@ -105,13 +105,35 @@ export interface AgentsSnapshotEvent {
 }
 
 /**
+ * Event emitted when an agent is parked (released due to inactivity).
+ */
+export interface AgentParkedEvent {
+  type: 'agent_parked';
+  agentId: string;
+  reason?: string;
+  timestamp: string;
+}
+
+/**
+ * Event emitted when an agent is warming up (resuming from parked state).
+ */
+export interface AgentWarmingEvent {
+  type: 'agent_warming';
+  agentId: string;
+  activity?: string;
+  timestamp: string;
+}
+
+/**
  * Union of all agent status event types.
  */
 export type AgentStatusEvent =
   | AgentJoinedEvent
   | AgentStatusUpdateEvent
   | AgentLeftEvent
-  | AgentsSnapshotEvent;
+  | AgentsSnapshotEvent
+  | AgentParkedEvent
+  | AgentWarmingEvent;
 
 // ============================================================================
 // Agent Registry
@@ -122,6 +144,58 @@ export type AgentStatusEvent =
  * Maps agentId -> agent metadata and current state.
  */
 const activeAgents = new Map<string, { role: AgentRole; displayName: string; state: AgentState }>();
+
+// ============================================================================
+// Pending Model Changes
+// ============================================================================
+
+/**
+ * Queue of pending model changes. When a model switch is requested while
+ * the agent is busy, we store the desired model here and apply it when
+ * the agent next reports idle.
+ */
+const pendingModelChanges = new Map<string, string>();
+
+/**
+ * Queue a model change for an agent. Will be applied when the agent
+ * next transitions to idle state.
+ */
+export function setPendingModel(agentId: string, model: string): void {
+  pendingModelChanges.set(agentId, model);
+  console.log(`[agent-status] Queued model change for ${agentId}: ${model}`);
+}
+
+/**
+ * Apply any pending model change for an agent.
+ * Called internally when agent transitions to idle.
+ */
+async function applyPendingModel(agentId: string): Promise<void> {
+  const model = pendingModelChanges.get(agentId);
+  if (!model) return;
+
+  pendingModelChanges.delete(agentId);
+  console.log(`[agent-status] Applying pending model change for ${agentId}: ${model}`);
+
+  try {
+    const result = await setAgentModel(agentId, model);
+    if (result.success) {
+      console.log(`[agent-status] Model switch applied: ${agentId} -> ${model}`);
+      // Broadcast model_changed so the frontend can confirm
+      broadcastEvent({
+        type: 'agent_status_update',
+        agentId,
+        state: 'idle',
+        activity: `Model switched to ${model}`,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      console.error(`[agent-status] Pending model switch failed for ${agentId}: ${result.error}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[agent-status] Error applying pending model for ${agentId}: ${message}`);
+  }
+}
 
 // ============================================================================
 // Event Emitters
@@ -209,6 +283,13 @@ export function emitAgentStatusUpdate(
     timestamp: new Date().toISOString(),
   };
   broadcastEvent(event);
+
+  // When agent goes idle, apply any pending model change
+  if (state === 'idle' && pendingModelChanges.has(agentId)) {
+    applyPendingModel(agentId).catch((err) => {
+      console.error(`[agent-status] Failed to apply pending model for ${agentId}:`, err);
+    });
+  }
 }
 
 /**
@@ -254,4 +335,42 @@ export function emitAgentsSnapshot(): void {
  */
 export function getActiveAgents(): Map<string, { role: AgentRole; displayName: string; state: AgentState }> {
   return new Map(activeAgents);
+}
+
+/**
+ * Emit an agent_parked event when an agent is released due to inactivity.
+ *
+ * @param agentId - The agent's unique identifier
+ * @param reason - Optional reason for parking (e.g., 'no_users_5min', 'session_timeout')
+ */
+export function emitAgentParked(agentId: string, reason?: string): void {
+  // Remove from active agents registry
+  activeAgents.delete(agentId);
+
+  const event: AgentParkedEvent = {
+    type: 'agent_parked',
+    agentId,
+    ...(reason && { reason }),
+    timestamp: new Date().toISOString(),
+  };
+  broadcastEvent(event);
+}
+
+/**
+ * Emit an agent_warming event when an agent is resuming from parked state.
+ *
+ * @param agentId - The agent's unique identifier
+ * @param activity - Optional description of warm-up activity
+ */
+export function emitAgentWarming(agentId: string, activity?: string): void {
+  // Add to active agents with working state
+  activeAgents.set(agentId, { role: 'interviewer', displayName: agentId, state: 'working' });
+
+  const event: AgentWarmingEvent = {
+    type: 'agent_warming',
+    agentId,
+    activity: activity || 'Resuming session...',
+    timestamp: new Date().toISOString(),
+  };
+  broadcastEvent(event);
 }
