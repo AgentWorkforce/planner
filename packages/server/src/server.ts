@@ -82,6 +82,9 @@ import { AgentLifecycleManager } from './agents/lifecycle.js';
 // Server API routes (relay-aware channel handlers)
 import { createServerRouter } from './api/routes.js';
 
+// Git service
+import { GitService } from './services/git-service.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =============================================================================
@@ -138,9 +141,14 @@ async function start(): Promise<void> {
   // Mount QA channel middleware (broadcasts QA messages when questions are answered)
   app.use('/api', qaChannelMiddleware);
 
+  // Initialize git service (no external deps, safe to do early)
+  const gitService = new GitService({ repoRoot: process.cwd() });
+  await gitService.initialize();
+  console.log(`[git] Initialized (available: ${gitService.available})`);
+
   // Mount server API router (relay-aware channel handlers - must come BEFORE planner router)
   const storage = plannerService.getStorage();
-  const serverRouter = createServerRouter(storage);
+  const serverRouter = createServerRouter(storage, gitService);
   app.use('/api', serverRouter);
 
   // Mount plugin routers

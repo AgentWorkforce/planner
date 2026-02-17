@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { ProjectProvider, useProject } from '@/contexts';
 import { TendLayout } from '@/components/layout/TendLayout';
@@ -6,7 +6,7 @@ import { CanvasHeader } from '@/components/canvas/CanvasHeader';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
 import { CuratedBlocksColumn } from '@/components/canvas/CuratedBlocksColumn';
 import { ConversationPane } from '@/components/conversation/ConversationPane';
-import { ProjectTree } from '@/components/tree/ProjectTree';
+import { TreePanel } from '@/components/tree/TreePanel';
 import { StatusBar } from '@/components/status/StatusBar';
 import { FocusMode } from '@/components/canvas/FocusMode';
 import { useBlocks } from '@/hooks/useBlocks';
@@ -97,27 +97,9 @@ function ProjectPageContent() {
   // Wire agent orchestration for StatusBar
   const { agents: relayAgents, questions, sessionDuration, isConnected } = useAgentOrchestration(project?.id);
 
-  // Build agents list from relay (source of truth for who is active).
-  // The Interviewer is always present during an active session but never
-  // appears in relay data (it IS the ideation service), so we synthesize it.
-  const agents = useMemo(() => {
-    // Relay agents are the only real-time source; session.active_specialists
-    // is a historical list that includes agents who have finished — don't use it.
-    const merged = [...relayAgents];
-
-    // Inject Interviewer if session exists and it's not already in the list
-    if (session && !merged.some(a => a.role === 'interviewer')) {
-      merged.unshift({
-        id: 'ideation-interviewer',
-        role: 'interviewer' as const,
-        state: 'normal' as const,
-        displayName: 'Interviewer',
-        hasQuestion: false,
-      });
-    }
-
-    return merged;
-  }, [relayAgents, session]);
+  // Agents come directly from relay orchestration (server-authoritative).
+  // No placeholders — if an agent hasn't connected yet, the status bar is empty.
+  const agents = relayAgents;
 
   // Wire question notifications for ReplyBar
   const { dismiss, queue, addToQueue } = useQuestionNotifications();
@@ -182,8 +164,9 @@ function ProjectPageContent() {
   // Map agent state to ConversationPane format
   const mapAgentState = (state: string): 'active' | 'completed' | 'blocked' => {
     if (state === 'working' || state === 'needs_input') return 'active';
+    if (state === 'idle') return 'active'; // idle = available/ready, not done
     if (state === 'error') return 'blocked';
-    return 'completed'; // 'idle' and 'normal' considered completed/resting
+    return 'active'; // default to active
   };
 
   const mappedAgents = agents.map(agent => ({
@@ -319,7 +302,7 @@ function ProjectPageContent() {
           )
         }
         rightPanel={
-          <ProjectTree
+          <TreePanel
             steps={steps}
             projectName={project.name}
           />
@@ -408,7 +391,7 @@ function ProjectPageContent() {
           )
         }
         rightPanel={
-          <ProjectTree
+          <TreePanel
             steps={steps}
             projectName={project.name}
           />
@@ -497,7 +480,7 @@ function ProjectPageContent() {
           )
         }
         rightPanel={
-          <ProjectTree
+          <TreePanel
             steps={steps}
             projectName={project.name}
           />

@@ -13,6 +13,8 @@ import { createChannelHandlers } from './handlers/channels.js';
 import { createHealthHandlers } from './handlers/health.js';
 import { createAgentHandlers } from './handlers/agents.js';
 import { createCapabilitiesHandlers } from './handlers/capabilities.js';
+import { createGitHandlers } from './handlers/git.js';
+import type { GitService } from '../services/git-service.js';
 
 /** Storage interface subset needed for routes */
 interface RouteStorage {
@@ -22,7 +24,7 @@ interface RouteStorage {
 /**
  * Create server API router with relay-aware handlers.
  */
-export function createServerRouter(storage: RouteStorage): Router {
+export function createServerRouter(storage: RouteStorage, gitService?: GitService): Router {
   const router = Router();
   const channelHandlers = createChannelHandlers(storage);
   const healthHandlers = createHealthHandlers();
@@ -37,11 +39,20 @@ export function createServerRouter(storage: RouteStorage): Router {
 
   // Agent routes
   router.get('/agents', agentHandlers.list);
+  router.post('/agents/:name/model', agentHandlers.setModel);
 
   // Channel routes
   router.get('/channels', channelHandlers.list);
   router.get('/channels/:id/messages', channelHandlers.messages);
   router.get('/channels/:id/presence', channelHandlers.presence);
+
+  // Git routes (only when git service is available)
+  if (gitService) {
+    const gitHandlers = createGitHandlers(gitService);
+    router.get('/git/status', gitHandlers.status);
+    router.get('/git/log', gitHandlers.log);
+    router.get('/git/commits/:hash/files', gitHandlers.commitFiles);
+  }
 
   return router;
 }
