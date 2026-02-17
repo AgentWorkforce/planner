@@ -4,7 +4,10 @@
     "composite": true,
     "rootDir": "./src",
     "outDir": "./dist",
-    "declarationMap": true
+    "declarationMap": true,
+    "allowImportingTsExtensions": false,
+    "moduleResolution": "node",
+    "isolatedModules": false
   },
   "include": ["src/**/*"]
 }
