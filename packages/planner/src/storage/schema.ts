@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS plans (
   initiative_id TEXT,
   owner_user_id TEXT,
   source_json TEXT NOT NULL DEFAULT '{"type":"manual"}',
+  source_session_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (org_id) REFERENCES organizations(org_id) ON DELETE CASCADE,

@@ -75,6 +75,8 @@ export interface PlanFilter {
   initiative_id?: string;
   owner_user_id?: string;
   status?: PlanStatus;
+  /** Filter plans by originating ideation session */
+  source_session_id?: string;
 }
 
 /**

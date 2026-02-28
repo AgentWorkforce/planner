@@ -64,8 +64,8 @@ export function createPlanHandlers(storage: PlanStorage) {
         // Get default org for MVP single-org mode
         const orgId = getDefaultOrgId(storage);
 
-        // Create plan with org, optional initiative, and optional source
-        const plan = createPlan(orgId, undefined, body.source);
+        // Create plan with org, optional initiative, optional source, and optional source_session_id
+        const plan = createPlan(orgId, undefined, body.source, body.source_session_id);
         if (body.initiative_id) {
           plan.initiative_id = body.initiative_id;
         }
@@ -126,12 +126,15 @@ export function createPlanHandlers(storage: PlanStorage) {
         const query = ListPlansQuerySchema.parse(req.query);
 
         // Build filter from query params
-        const filter: { status?: PlanStatus; initiative_id?: string } = {};
+        const filter: { status?: PlanStatus; initiative_id?: string; source_session_id?: string } = {};
         if (query.status) {
           filter.status = query.status;
         }
         if (query.initiative_id) {
           filter.initiative_id = query.initiative_id;
+        }
+        if (query.source_session_id) {
+          filter.source_session_id = query.source_session_id;
         }
 
         // Standard flow without attention data

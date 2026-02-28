@@ -11,8 +11,8 @@ import type { PlanRow, VersionRow, StepRow } from './converters.js';
 
 export function createPlan(db: Database.Database, plan: Plan): Plan {
   const stmt = db.prepare(`
-    INSERT INTO plans (plan_id, org_id, initiative_id, owner_user_id, source_json, priority, value_score, created_at, updated_at)
-    VALUES (@plan_id, @org_id, @initiative_id, @owner_user_id, @source_json, @priority, @value_score, @created_at, @updated_at)
+    INSERT INTO plans (plan_id, org_id, initiative_id, owner_user_id, source_json, source_session_id, priority, value_score, created_at, updated_at)
+    VALUES (@plan_id, @org_id, @initiative_id, @owner_user_id, @source_json, @source_session_id, @priority, @value_score, @created_at, @updated_at)
   `);
   stmt.run({
     plan_id: plan.plan_id,
@@ -20,6 +20,7 @@ export function createPlan(db: Database.Database, plan: Plan): Plan {
     initiative_id: plan.initiative_id ?? null,
     owner_user_id: plan.owner_user_id ?? null,
     source_json: JSON.stringify(plan.source ?? { type: 'manual' }),
+    source_session_id: plan.source_session_id ?? null,
     priority: plan.priority,
     value_score: plan.value_score,
     created_at: plan.created_at,
@@ -30,7 +31,7 @@ export function createPlan(db: Database.Database, plan: Plan): Plan {
 
 export function getPlan(db: Database.Database, planId: string): Plan | null {
   const stmt = db.prepare<string, PlanRow>(`
-    SELECT plan_id, org_id, initiative_id, owner_user_id, source_json, priority, value_score, created_at, updated_at
+    SELECT plan_id, org_id, initiative_id, owner_user_id, source_json, source_session_id, priority, value_score, created_at, updated_at
     FROM plans
     WHERE plan_id = ?
   `);
@@ -106,12 +107,16 @@ export function listPlans(db: Database.Database, filter?: PlanFilter): Plan[] {
     whereClauses.push('v.status = @status');
     params.status = filter.status;
   }
+  if (filter?.source_session_id) {
+    whereClauses.push('p.source_session_id = @source_session_id');
+    params.source_session_id = filter.source_session_id;
+  }
 
   let sql: string;
   if (filter?.status) {
     // Need to join with versions to filter by status
     sql = `
-      SELECT DISTINCT p.plan_id, p.org_id, p.initiative_id, p.owner_user_id, p.source_json, p.priority, p.value_score, p.created_at, p.updated_at
+      SELECT DISTINCT p.plan_id, p.org_id, p.initiative_id, p.owner_user_id, p.source_json, p.source_session_id, p.priority, p.value_score, p.created_at, p.updated_at
       FROM plans p
       INNER JOIN versions v ON p.plan_id = v.plan_id
       ${whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''}
@@ -119,7 +124,7 @@ export function listPlans(db: Database.Database, filter?: PlanFilter): Plan[] {
     `;
   } else {
     sql = `
-      SELECT plan_id, org_id, initiative_id, owner_user_id, source_json, priority, value_score, created_at, updated_at
+      SELECT plan_id, org_id, initiative_id, owner_user_id, source_json, source_session_id, priority, value_score, created_at, updated_at
       FROM plans p
       ${whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''}
       ORDER BY updated_at DESC
@@ -156,6 +161,7 @@ interface PlanWithAttentionRow {
   initiative_id: string | null;
   owner_user_id: string | null;
   source_json: string;
+  source_session_id: string | null;
   priority: number;
   value_score: number;
   plan_created_at: string;
@@ -198,6 +204,10 @@ export function listPlansWithAttention(
     whereClauses.push('v.status = @status');
     params.status = filter.status;
   }
+  if (filter?.source_session_id) {
+    whereClauses.push('p.source_session_id = @source_session_id');
+    params.source_session_id = filter.source_session_id;
+  }
 
   // Single query with LEFT JOINs to get plans with latest version and attention counts
   const sql = `
@@ -207,6 +217,7 @@ export function listPlansWithAttention(
       p.initiative_id,
       p.owner_user_id,
       p.source_json,
+      p.source_session_id,
       p.priority,
       p.value_score,
       p.created_at as plan_created_at,
@@ -259,6 +270,7 @@ export function listPlansWithAttention(
         initiative_id: row.initiative_id ?? undefined,
         owner_user_id: row.owner_user_id ?? undefined,
         source: JSON.parse(row.source_json) as PlanSource,
+        source_session_id: row.source_session_id ?? undefined,
         priority: row.priority,
         value_score: row.value_score,
         created_at: row.plan_created_at,
