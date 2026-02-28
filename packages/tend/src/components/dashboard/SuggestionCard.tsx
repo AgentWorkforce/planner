@@ -21,85 +21,40 @@ interface SuggestionCardProps {
 }
 
 export function SuggestionCard({ suggestion, onOpen }: SuggestionCardProps) {
-  const topReasons = suggestion.reasons.slice(0, 3);
+  const topReason = suggestion.reasons[0] || null;
 
   return (
-    <div className="bg-bg-card rounded-2xl p-4 border border-[var(--color-accent-primary)]/20">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        {suggestion.type === 'plan' ? (
-          <svg
-            className="w-4 h-4 text-[var(--color-accent-primary)]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <circle cx="12" cy="12" r="10" strokeWidth="2" />
-            <circle cx="12" cy="12" r="4" strokeWidth="2" />
-          </svg>
-        ) : (
-          <svg
-            className="w-4 h-4 text-[var(--color-accent-primary)]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M12 2l3 7h7l-5.5 4 2 7-6.5-5-6.5 5 2-7L2 9h7l3-7z"
-            />
-          </svg>
-        )}
-        <span className="text-xs text-text-muted font-medium uppercase tracking-wider">
-          Suggested Next
-        </span>
-      </div>
-
-      {/* Title */}
-      <h3 className="text-base font-medium text-text-primary line-clamp-2 mb-1">
-        {suggestion.plan_goal}
-      </h3>
-
-      {/* Subtitle */}
-      {suggestion.initiative_name && (
-        <p className="text-xs text-text-secondary mb-3">
-          {suggestion.initiative_name}
-        </p>
+    <button
+      onClick={() => onOpen?.(suggestion)}
+      className={cn(
+        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left",
+        "bg-bg-secondary hover:bg-bg-tertiary transition-colors"
       )}
+    >
+      {/* Accent bar */}
+      <div className="w-0.5 self-stretch rounded-full bg-[var(--color-accent-primary)] shrink-0" />
 
-      {/* Reasons */}
-      {topReasons.length > 0 && (
-        <ul className="space-y-1 mb-3">
-          {topReasons.map((reason, index) => (
-            <li key={index} className="flex items-start gap-2 text-sm text-text-secondary">
-              <span className="text-[var(--color-accent-primary)] mt-1">•</span>
-              <span>{reason}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Signal count */}
-      {suggestion.signal_count > 0 && (
-        <p className="text-xs text-[var(--color-accent-primary)] mb-3">
-          Backed by {suggestion.signal_count} external signal{suggestion.signal_count !== 1 ? 's' : ''}
-        </p>
-      )}
-
-      {/* Footer */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => onOpen?.(suggestion)}
-          className={cn(
-            "text-sm font-medium text-[var(--color-accent-primary)]",
-            "hover:underline transition-all"
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-text-primary font-medium truncate">
+            {suggestion.plan_goal}
+          </span>
+          {suggestion.phase && (
+            <span className="text-[10px] text-text-muted shrink-0">
+              {suggestion.phase}
+            </span>
           )}
-        >
-          {suggestion.type === 'opportunity' ? 'Create Plan' : 'Open'}
-        </button>
+        </div>
+        {topReason && (
+          <p className="text-xs text-text-muted mt-0.5 truncate">
+            {topReason}
+          </p>
+        )}
       </div>
-    </div>
+
+      {/* Arrow */}
+      <span className="text-text-muted text-xs shrink-0">&rsaquo;</span>
+    </button>
   );
 }

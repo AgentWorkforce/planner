@@ -26,45 +26,32 @@ export function SuggestionsList({ suggestions, onSelect }: SuggestionsListProps)
   }
 
   return (
-    <div className="space-y-1">
-      {suggestions.map((suggestion, index) => {
-        const firstReason = suggestion.reasons[0];
+    <div className="space-y-0.5">
+      {suggestions.map((suggestion, index) => (
+        <div
+          key={index}
+          onClick={() => onSelect?.(suggestion)}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-lg",
+            "hover:bg-bg-secondary cursor-pointer transition-colors"
+          )}
+        >
+          {/* Bullet */}
+          <span className="text-text-muted text-xs shrink-0">·</span>
 
-        return (
-          <div
-            key={index}
-            onClick={() => onSelect?.(suggestion)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-lg",
-              "hover:bg-bg-secondary cursor-pointer transition-colors"
-            )}
-          >
-            {/* Type badge */}
-            <span
-              className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded shrink-0",
-                suggestion.type === 'plan'
-                  ? "bg-bg-secondary text-text-muted"
-                  : "bg-[var(--color-accent-primary)]/10 text-[var(--color-accent-primary)]"
-              )}
-            >
-              {suggestion.type}
+          {/* Goal */}
+          <span className="text-sm text-text-primary flex-1 truncate">
+            {suggestion.plan_goal}
+          </span>
+
+          {/* Phase badge (more useful than reason text) */}
+          {suggestion.phase && (
+            <span className="text-[10px] text-text-muted shrink-0">
+              {suggestion.phase}
             </span>
-
-            {/* Goal */}
-            <span className="text-sm text-text-primary flex-1 truncate">
-              {suggestion.plan_goal}
-            </span>
-
-            {/* First reason */}
-            {firstReason && (
-              <span className="text-xs text-text-muted hidden sm:block max-w-[200px] truncate">
-                {firstReason}
-              </span>
-            )}
-          </div>
-        );
-      })}
+          )}
+        </div>
+      ))}
     </div>
   );
 }

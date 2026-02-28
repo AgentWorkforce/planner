@@ -8,25 +8,6 @@ interface PortfolioSummaryProps {
   loading?: boolean;
 }
 
-/**
- * PortfolioSummary - Compact summary card for portfolio metrics
- *
- * Displays:
- * - Initiative and active plan counts
- * - Health status distribution (green/yellow/red dots)
- * - Opportunity count (when > 0)
- * - Loading state with pulse animation
- *
- * Usage:
- * ```tsx
- * <PortfolioSummary
- *   initiativeCount={12}
- *   activePlanCount={8}
- *   healthSummary={{ healthy: 5, warning: 2, critical: 1 }}
- *   opportunityCount={3}
- * />
- * ```
- */
 export function PortfolioSummary({
   initiativeCount,
   activePlanCount,
@@ -36,57 +17,77 @@ export function PortfolioSummary({
 }: PortfolioSummaryProps) {
   if (loading) {
     return (
-      <div className="bg-bg-secondary rounded-2xl p-4 space-y-2 animate-pulse">
-        <div className="h-4 bg-bg-tertiary rounded w-48" />
-        <div className="h-4 bg-bg-tertiary rounded w-32" />
+      <div className="flex gap-4 animate-pulse">
+        <div className="h-12 bg-bg-tertiary rounded-xl flex-1" />
+        <div className="h-12 bg-bg-tertiary rounded-xl flex-1" />
+        <div className="h-12 bg-bg-tertiary rounded-xl flex-1" />
       </div>
     );
   }
 
+  const totalHealth = healthSummary.healthy + healthSummary.warning + healthSummary.critical;
+
   return (
-    <div className="bg-bg-secondary rounded-2xl p-4 space-y-2">
-      {/* First line: Initiative and plan counts */}
-      <div className="text-sm text-text-secondary">
-        {initiativeCount} {initiativeCount === 1 ? 'initiative' : 'initiatives'} · {activePlanCount} active {activePlanCount === 1 ? 'plan' : 'plans'}
+    <div className="flex gap-3">
+      {/* Initiatives */}
+      <div className="flex-1 bg-bg-secondary rounded-xl px-3 py-2.5">
+        <div className="text-lg font-semibold text-text-primary leading-tight">
+          {initiativeCount}
+        </div>
+        <div className="text-[11px] text-text-muted mt-0.5">
+          {initiativeCount === 1 ? 'initiative' : 'initiatives'}
+        </div>
       </div>
 
-      {/* Second line: Health dots */}
-      <div className="flex items-center gap-1.5">
-        {/* Healthy (green) dots */}
-        {Array.from({ length: healthSummary.healthy }).map((_, i) => (
-          <HealthIndicator
-            key={`healthy-${i}`}
-            score={100}
-            size="sm"
-            showTooltip={false}
-          />
-        ))}
-
-        {/* Warning (yellow) dots */}
-        {Array.from({ length: healthSummary.warning }).map((_, i) => (
-          <HealthIndicator
-            key={`warning-${i}`}
-            score={55}
-            size="sm"
-            showTooltip={false}
-          />
-        ))}
-
-        {/* Critical (red) dots */}
-        {Array.from({ length: healthSummary.critical }).map((_, i) => (
-          <HealthIndicator
-            key={`critical-${i}`}
-            score={20}
-            size="sm"
-            showTooltip={false}
-          />
-        ))}
+      {/* Active plans */}
+      <div className="flex-1 bg-bg-secondary rounded-xl px-3 py-2.5">
+        <div className="text-lg font-semibold text-text-primary leading-tight">
+          {activePlanCount}
+        </div>
+        <div className="text-[11px] text-text-muted mt-0.5">
+          active plans
+        </div>
       </div>
 
-      {/* Third line: Opportunities (conditional) */}
+      {/* Health */}
+      <div className="flex-1 bg-bg-secondary rounded-xl px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          {healthSummary.healthy > 0 && (
+            <span className="flex items-center gap-0.5">
+              <HealthIndicator score={100} size="sm" showTooltip={false} />
+              <span className="text-xs text-text-muted">{healthSummary.healthy}</span>
+            </span>
+          )}
+          {healthSummary.warning > 0 && (
+            <span className="flex items-center gap-0.5">
+              <HealthIndicator score={55} size="sm" showTooltip={false} />
+              <span className="text-xs text-text-muted">{healthSummary.warning}</span>
+            </span>
+          )}
+          {healthSummary.critical > 0 && (
+            <span className="flex items-center gap-0.5">
+              <HealthIndicator score={20} size="sm" showTooltip={false} />
+              <span className="text-xs text-text-muted">{healthSummary.critical}</span>
+            </span>
+          )}
+          {totalHealth === 0 && (
+            <span className="text-xs text-text-muted">--</span>
+          )}
+        </div>
+        <div className="text-[11px] text-text-muted mt-0.5">
+          health
+        </div>
+      </div>
+
+      {/* Opportunities (only if > 0) */}
       {opportunityCount > 0 && (
-        <div className="text-sm text-[var(--color-accent-primary)]">
-          {opportunityCount} {opportunityCount === 1 ? 'opportunity' : 'opportunities'}
+        <div className="flex-1 bg-bg-secondary rounded-xl px-3 py-2.5">
+          <div className="text-lg font-semibold text-[var(--color-accent-primary)] leading-tight">
+            {opportunityCount}
+          </div>
+          <div className="text-[11px] text-text-muted mt-0.5">
+            {opportunityCount === 1 ? 'opportunity' : 'opportunities'}
+          </div>
         </div>
       )}
     </div>
