@@ -63,6 +63,9 @@ export interface PlannerClient {
     session_id: string;
     plan_id: string;
   }): Promise<void>;
+
+  /** Optional: fetch basic plan info (goal and status) for a given plan ID. */
+  getPlan?(planId: string): Promise<{ goal?: string; status?: string } | null>;
 }
 
 export interface HandlerConfig {
@@ -319,14 +322,17 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
       // Call planner API if client available, otherwise mock
       let result: { plan_id: string; plan_version: number };
 
-      // Check if this is a subsequent send
-      const isSubsequentSend = existingSession.planner_sends.length > 0;
+      // Determine whether to create a new plan or a new version on the most recent plan.
+      // new_plan=true always creates a fresh plan; otherwise, subsequent sends create versions.
+      const isNewPlan = parsed.data.new_plan === true;
+      const hasPriorSends = existingSession.planner_sends.length > 0;
+      const isVersionUpdate = !isNewPlan && hasPriorSends;
 
       if (plannerClient) {
-        if (isSubsequentSend) {
-          // Get the plan_id from the first send
-          const firstSend = existingSession.planner_sends[0]!;
-          const planId = firstSend.result?.plan_id;
+        if (isVersionUpdate) {
+          // Get the plan_id from the most recent send
+          const lastSend = existingSession.planner_sends[existingSession.planner_sends.length - 1]!;
+          const planId = lastSend.result?.plan_id;
 
           if (!planId) {
             res.status(500).json({ error: 'Cannot create version: previous send has no plan_id' });
@@ -352,7 +358,7 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
             plan_version: plannerResult.version,
           };
         } else {
-          // First send - create new plan
+          // Create a new independent plan (first send, or explicit new_plan=true)
           const plannerResult = await plannerClient.createPlan({
             goal: payload.goal,
             context: payload.context,
@@ -386,7 +392,7 @@ export function createHandlers(config: IdeationStorage | HandlerConfig) {
         type: 'plan_from_ideation',
         plan_id: result.plan_id,
         session_id: existingSession.id,
-        is_update: isSubsequentSend,
+        is_update: isVersionUpdate,
         goal: payload.goal,
       });
 

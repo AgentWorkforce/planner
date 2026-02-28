@@ -57,7 +57,51 @@ export async function executeTool(
         if (!session) {
           return { success: false, error: `Session not found: ${session_id}` };
         }
-        return { success: true, data: session };
+
+        // Collect plan IDs from all planner sends in this session
+        const planIds = session.planner_sends
+          .map((s) => s.result?.plan_id)
+          .filter((id): id is string => !!id);
+
+        // Remove duplicates (multiple sends may reference the same plan)
+        const uniquePlanIds = [...new Set(planIds)];
+
+        let linked_plans: Array<{ plan_id: string; goal?: string; status?: string }> = [];
+
+        if (uniquePlanIds.length > 0) {
+          if (plannerClient?.getPlan) {
+            // Use plannerClient if it exposes getPlan
+            linked_plans = await Promise.all(
+              uniquePlanIds.map(async (planId) => {
+                try {
+                  const planData = await plannerClient.getPlan!(planId);
+                  return { plan_id: planId, goal: planData?.goal, status: planData?.status };
+                } catch {
+                  return { plan_id: planId };
+                }
+              })
+            );
+          } else {
+            // Fallback: fetch directly from the planner API
+            const baseUrl = `http://localhost:${process.env.PORT || 3001}`;
+            linked_plans = await Promise.all(
+              uniquePlanIds.map(async (planId) => {
+                try {
+                  const res = await fetch(`${baseUrl}/api/plans/${planId}`);
+                  if (!res.ok) return { plan_id: planId };
+                  const body = await res.json() as { plan?: Record<string, unknown>; version?: Record<string, unknown> };
+                  const goal = (body.version?.summary as Record<string, unknown> | undefined)?.goal as string | undefined;
+                  const status = body.version?.status as string | undefined;
+                  return { plan_id: planId, goal, status };
+                } catch {
+                  return { plan_id: planId };
+                }
+              })
+            );
+          }
+        }
+
+        return { success: true, data: { ...session, linked_plans } };
       }
 
       case 'update_understanding': {
@@ -243,7 +287,15 @@ export async function executeTool(
       }
 
       case 'graduate_blocks': {
-        const { session_id, block_ids: providedBlockIds, scope } = input as GraduateBlocksInput;
+        const { session_id, block_ids: providedBlockIds, scope, target_plan_id } = input as GraduateBlocksInput;
+
+        // Validate target_plan_id is a UUID if provided
+        if (target_plan_id !== undefined) {
+          const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!UUID_RE.test(target_plan_id)) {
+            return { success: false, error: `Invalid target_plan_id: must be a valid UUID` };
+          }
+        }
 
         // Get session
         const session = await storage.getSession(session_id);
@@ -360,21 +412,20 @@ export async function executeTool(
 
         let result: { plan_id: string; plan_version: number };
 
-        // Check if this session has already sent to planner
-        const isUpdate = session.planner_sends.length > 0;
+        // Determine which plan to target:
+        //   1. Explicit target_plan_id provided by the agent → create new version on that plan
+        //   2. Session already has a prior send → create new version on most recent plan
+        //   3. No prior context → create a brand-new plan
+        const existingPlanId: string | undefined =
+          target_plan_id ??
+          (session.planner_sends.length > 0
+            ? session.planner_sends[session.planner_sends.length - 1]!.result?.plan_id
+            : undefined);
 
         try {
-          if (isUpdate) {
-            // Update existing plan with new version
-            const firstSend = session.planner_sends[0]!;
-            const planId = firstSend.result?.plan_id;
-
-            if (!planId) {
-              return { success: false, error: 'Cannot graduate blocks: previous send has no plan_id' };
-            }
-
+          if (existingPlanId) {
             const plannerResult = await plannerClient.createVersion({
-              plan_id: planId,
+              plan_id: existingPlanId,
               goal: payload.goal,
               context: payload.context,
               understanding: payload.understanding,
