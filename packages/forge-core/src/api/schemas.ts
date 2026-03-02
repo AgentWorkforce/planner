@@ -3,6 +3,22 @@ import { RunStatusSchema, ForgePlanSchema, AuditFindingSchema } from '../domain/
 import { BuildStatusSchema, BuildRunStatusSchema, BuildRequestSchema, BuildTierSchema } from '../domain/build-types.js';
 
 // ============================================
+// Step Override
+// ============================================
+
+/**
+ * Per-step execution overrides for a run.
+ * Allows skipping steps or forcing a specific model for a step.
+ */
+export const StepOverrideSchema = z.object({
+  step_id: z.string().min(1),
+  model: z.enum(['haiku', 'sonnet', 'opus']).optional(),
+  skip: z.boolean().optional(),
+});
+
+export type StepOverride = z.infer<typeof StepOverrideSchema>;
+
+// ============================================
 // Create Run Request
 // ============================================
 
@@ -42,6 +58,10 @@ export const CreateRunRequestSchema = z
         max_total_tokens: z.number().int().positive().optional(),
       }).optional(),
     }).optional(),
+    /**
+     * Per-step overrides: skip individual steps or force a specific model
+     */
+    step_overrides: z.array(StepOverrideSchema).optional(),
   })
   .refine((data) => data.plan || data.plan_id, {
     message: 'Either plan or plan_id must be provided',

@@ -159,10 +159,16 @@ export function createRunHandler(deps: RunHandlerDeps) {
           deps.storage.setRunDocument(savedRun.run_id, planDoc);
         }
 
+        // Build step override map for O(1) lookup per step
+        const overrides = new Map((body.step_overrides ?? []).map(o => [o.step_id, o]));
+
         // Create tasks from plan steps (propagate workspace_path to all tasks)
         const createdTasks: Task[] = [];
         for (const step of plan.steps) {
-          const task = createTask(savedRun.run_id, step, workspacePath);
+          const override = overrides.get(step.step_id);
+          if (override?.skip) continue; // Skip this step entirely
+
+          const task = createTask(savedRun.run_id, step, workspacePath, override?.model);
           const savedTask = deps.storage.createTask(task);
           createdTasks.push(savedTask);
         }

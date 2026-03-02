@@ -25,13 +25,26 @@ const BranchIcon = () => (
  * cleared. When switching back to plan mode the changes-specific param
  * (expand) is cleared.
  */
+interface TreePanelProps extends ProjectTreeProps {
+  onStartBuild?: () => void;
+  planStatus?: string;
+  /** Current build status when a run is active */
+  buildStatus?: 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled' | null;
+  /** Cancel the current build */
+  onCancelBuild?: () => void;
+}
+
 export function TreePanel({
   steps,
   projectName = 'Project',
   className,
   onStepUpdate,
   onSendMessage,
-}: ProjectTreeProps) {
+  onStartBuild,
+  planStatus,
+  buildStatus,
+  onCancelBuild,
+}: TreePanelProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { totalChanges, branch, detachedHead } = useWorkingChanges();
   const branchLabel = branch ?? detachedHead ?? null;
@@ -82,8 +95,17 @@ export function TreePanel({
   if (effectiveMode === 'plan') {
     return (
       <div className={cn('relative flex flex-col h-full', className)}>
-        {/* Mode toggle floated into ProjectTree's header area */}
-        <div className="absolute top-0 right-3 h-9 flex items-center z-10">
+        {/* Controls floated into ProjectTree's header area */}
+        <div className="absolute top-0 right-3 h-9 flex items-center gap-2 z-10">
+          {planStatus === 'published' && onStartBuild && (
+            <button
+              type="button"
+              onClick={onStartBuild}
+              className="px-3 py-1 text-xs font-medium bg-accent-cyan text-bg-deep rounded-md hover:shadow-glow-cyan transition-all"
+            >
+              Start Build
+            </button>
+          )}
           <TreeModeSwitch
             mode={effectiveMode}
             onModeChange={handleModeChange}
@@ -91,6 +113,35 @@ export function TreePanel({
             changeCount={totalChanges}
           />
         </div>
+        {/* Build status banner — shown below the header when a run is active */}
+        {buildStatus && (
+          <div className={cn(
+            'flex-shrink-0 flex items-center justify-between px-3 py-1.5 text-xs font-medium border-b',
+            buildStatus === 'running' && 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20',
+            buildStatus === 'paused' && 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+            buildStatus === 'completed' && 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            buildStatus === 'failed' && 'bg-red-500/10 text-red-400 border-red-500/20',
+            buildStatus === 'cancelled' && 'bg-text-muted/10 text-text-muted border-border-subtle',
+            buildStatus === 'pending' && 'bg-text-muted/10 text-text-muted border-border-subtle',
+          )}>
+            <span className="flex items-center gap-1.5">
+              {buildStatus === 'running' && <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan animate-pulse" />}
+              {buildStatus === 'paused' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+              {buildStatus === 'completed' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+              {buildStatus === 'failed' && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
+              Build {buildStatus}
+            </span>
+            {(buildStatus === 'running' || buildStatus === 'paused') && onCancelBuild && (
+              <button
+                type="button"
+                onClick={onCancelBuild}
+                className="px-2 py-0.5 text-xs text-text-muted hover:text-red-400 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        )}
         <ProjectTree
           steps={steps}
           projectName={projectName}

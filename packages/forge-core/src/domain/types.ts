@@ -506,6 +506,8 @@ export const TaskSchema = z.object({
   specification: z.record(z.string(), z.unknown()).optional(),
   /** Target directory within workspace where agent should create files */
   target_path: z.string().optional(),
+  /** User-specified model override for this task (bypasses automatic model selection) */
+  model_override: z.enum(['haiku', 'sonnet', 'opus']).optional(),
   error: z.string().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
@@ -798,7 +800,12 @@ export function createRun(forgePlan: ForgePlan, options?: CreateRunOptions): Run
 /**
  * Creates a new Task from a ForgeStep
  */
-export function createTask(runId: string, forgeStep: ForgeStep, workspacePath?: string): Task {
+export function createTask(
+  runId: string,
+  forgeStep: ForgeStep,
+  workspacePath?: string,
+  modelOverride?: 'haiku' | 'sonnet' | 'opus'
+): Task {
   const now = new Date().toISOString();
   const task: Task = {
     task_id: crypto.randomUUID(),
@@ -815,6 +822,7 @@ export function createTask(runId: string, forgeStep: ForgeStep, workspacePath?: 
     sub_plan_id: forgeStep.sub_plan_id,
     specification: forgeStep.specification,
     target_path: forgeStep.target_path,
+    model_override: modelOverride,
     created_at: now,
     updated_at: now,
   };

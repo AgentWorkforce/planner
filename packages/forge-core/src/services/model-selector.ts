@@ -123,6 +123,17 @@ export class ModelSelector {
   selectModelForTask(context: ModelSelectionContext): ModelSelectionResult {
     const { task, runId, complexityScore, languageTier, stepRole } = context;
 
+    // Check for explicit model override (user-specified per-step)
+    if (task.model_override) {
+      const result: ModelSelectionResult = {
+        model: task.model_override as ModelType,
+        reason: 'User-specified model override',
+        complexityCategory: 'override',
+      };
+      this.logSelection(runId, task.task_id, result);
+      return result;
+    }
+
     // Check for architecture role first
     if (isArchitectureRole(stepRole) || isArchitectureRole(task.step_title)) {
       const result: ModelSelectionResult = {

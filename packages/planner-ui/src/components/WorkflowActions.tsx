@@ -1,11 +1,15 @@
 import { useState, useCallback } from 'react';
 import type { PlanVersion } from '@/types';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ForgeConfigPanel } from '@plannr/shared-ui';
+import type { ForgeConfig } from '@plannr/shared-ui';
 
 interface WorkflowActionsProps {
   version: PlanVersion;
   onSubmit: () => Promise<void>;
   onApprove: (approver: string) => Promise<void>;
   onPublish: () => Promise<void>;
+  onStartBuild?: (config: ForgeConfig) => Promise<void>;
   currentUser?: string;
 }
 
@@ -14,12 +18,14 @@ export function WorkflowActions({
   onSubmit,
   onApprove,
   onPublish,
+  onStartBuild,
   currentUser = 'User',
 }: WorkflowActionsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approverName, setApproverName] = useState(currentUser);
+  const [buildSheetOpen, setBuildSheetOpen] = useState(false);
 
   const handleSubmit = useCallback(async () => {
     setLoading('submit');
@@ -138,9 +144,14 @@ export function WorkflowActions({
         )}
 
         {version.status === 'published' && (
-          <div className="text-xs text-accent-cyan font-medium text-center">
-            Ready for Orchestrator
-          </div>
+          <button
+            type="button"
+            className="w-full px-4 py-2 bg-accent-cyan text-bg-deep font-medium rounded-lg transition-all duration-150 hover:shadow-glow-cyan disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setBuildSheetOpen(true)}
+            disabled={loading !== null || !onStartBuild}
+          >
+            Start Build
+          </button>
         )}
       </div>
 
@@ -190,6 +201,32 @@ export function WorkflowActions({
             </div>
           </div>
         </div>
+      )}
+
+      {onStartBuild && (
+        <Sheet open={buildSheetOpen} onOpenChange={setBuildSheetOpen}>
+          <SheetContent className="w-[480px] sm:w-[540px] bg-bg-secondary border-border-subtle overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-text-primary">Configure Build</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <ForgeConfigPanel
+                steps={(version as any).steps?.map((s: any) => ({
+                  step_id: s.step_id,
+                  title: s.title,
+                  scope: s.scope,
+                  owner_role: s.owner_role,
+                })) ?? []}
+                onStart={async (config) => {
+                  await onStartBuild(config);
+                  setBuildSheetOpen(false);
+                }}
+                onCancel={() => setBuildSheetOpen(false)}
+                loading={loading === 'build'}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

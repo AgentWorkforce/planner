@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { SessionProvider, useSession } from '@/contexts/SessionContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { ForgeConfigPanel } from '@plannr/shared-ui';
+import type { ForgeConfig } from '@plannr/shared-ui';
 import { TendLayout } from '@/components/layout/TendLayout';
 import { CanvasHeader } from '@/components/canvas/CanvasHeader';
 import { FormingBlocksColumn } from '@/components/canvas/FormingBlocksColumn';
@@ -31,6 +34,11 @@ function SessionWorkspaceContent() {
     error,
     planRefreshKey,
     blockRefreshKey,
+    startBuild,
+    buildStatus,
+    buildSteps,
+    isBuildMonitoring,
+    cancelBuild,
   } = useSession();
 
   const [searchParams] = useSearchParams();
@@ -87,6 +95,30 @@ function SessionWorkspaceContent() {
   // ── Plan steps (for tree panel) ───────────────────────────────────────────
 
   const { steps } = usePlanSteps(activePlan?.plan_id, planRefreshKey);
+
+  // ── Build dialog ──────────────────────────────────────────────────────────
+
+  const [buildDialogOpen, setBuildDialogOpen] = useState(false);
+  const [buildLoading, setBuildLoading] = useState(false);
+
+  const handleStartBuild = useCallback(async (config: ForgeConfig) => {
+    if (!activePlan) return;
+    setBuildLoading(true);
+    try {
+      await startBuild(activePlan.plan_id, activePlan.version ?? 1, config);
+      setBuildDialogOpen(false);
+    } finally {
+      setBuildLoading(false);
+    }
+  }, [activePlan, startBuild]);
+
+  const handleCancelBuild = useCallback(async () => {
+    try {
+      await cancelBuild();
+    } catch (err) {
+      console.error('[SessionWorkspace] Failed to cancel build:', err);
+    }
+  }, [cancelBuild]);
 
   // ── Step focus from URL ───────────────────────────────────────────────────
 
@@ -214,9 +246,29 @@ function SessionWorkspaceContent() {
     );
   }
 
+  // ── Merge build step statuses into plan steps for display ─────────────────
+
+  const stepsWithBuildStatus = steps.map(step => {
+    const buildStep = buildSteps.get(step.step_id);
+    if (!buildStep) return step;
+    const statusMap: Record<string, 'pending' | 'running' | 'done' | 'blocked' | 'failed'> = {
+      pending: 'pending',
+      running: 'running',
+      completed: 'done',
+      failed: 'failed',
+      skipped: 'blocked',
+      retrying: 'running',
+    };
+    return {
+      ...step,
+      execution_status: statusMap[buildStep.status] ?? step.execution_status,
+    };
+  });
+
   // ── Layout ────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <TendLayout
       leftCollapsed={false}
       focusMode={!!focusedBlock}
@@ -284,8 +336,12 @@ function SessionWorkspaceContent() {
       }
       rightPanel={
         <TreePanel
-          steps={steps}
+          steps={stepsWithBuildStatus}
           projectName={sessionTitle}
+          planStatus={activePlan?.status}
+          onStartBuild={activePlan?.status === 'published' && !isBuildMonitoring ? () => setBuildDialogOpen(true) : undefined}
+          buildStatus={isBuildMonitoring ? buildStatus : undefined}
+          onCancelBuild={isBuildMonitoring ? handleCancelBuild : undefined}
         />
       }
       statusBar={
@@ -300,6 +356,27 @@ function SessionWorkspaceContent() {
         />
       }
     />
+    <Dialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
+      <DialogContent className="max-w-2xl bg-bg-secondary">
+        <DialogHeader>
+          <DialogTitle>Configure Build</DialogTitle>
+        </DialogHeader>
+        {activePlan && (
+          <ForgeConfigPanel
+            steps={steps.map((s) => ({
+              step_id: s.step_id,
+              title: s.title,
+              scope: s.scope,
+              owner_role: s.owner_role,
+            }))}
+            onStart={handleStartBuild}
+            onCancel={() => setBuildDialogOpen(false)}
+            loading={buildLoading}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

@@ -2,6 +2,8 @@ import { createContext, useContext, ReactNode, useState, useCallback, useEffect,
 import { useParams, useLocation } from 'react-router-dom';
 import type { Plan, PlanVersion, ParentPlanInfo, SubPlanNavigationState, Step, Comment } from '@/types';
 import { getPlan, updatePlan, getComments, createComment, resolveComment, unresolveComment, submitVersion, approveVersion, publishVersion, getVersion, getResolvedPlan } from '@/api';
+import { startBuild } from '@plannr/shared-ui';
+import type { ForgeConfig } from '@plannr/shared-ui';
 import type { ResolvedStep } from '@/api';
 import { usePlanEvents } from '@/hooks';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -63,6 +65,7 @@ interface PlanEditorContextValue {
   handleWorkflowSubmit: () => Promise<void>;
   handleWorkflowApprove: (approver: string) => Promise<void>;
   handleWorkflowPublish: () => Promise<void>;
+  handleStartBuild: (config: ForgeConfig) => Promise<void>;
 
   // Version switching
   switchVersion: (versionNumber: number) => Promise<void>;
@@ -402,6 +405,17 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     setVersion(result.version);
   }, [planId, version]);
 
+  const handleStartBuild = useCallback(async (config: ForgeConfig) => {
+    if (!planId || !version) return;
+    await startBuild({
+      plan_id: planId,
+      plan_version: version.version,
+      workspace_path: config.workspace_path,
+      execution_policy: config.execution_policy,
+      step_overrides: config.step_overrides,
+    });
+  }, [planId, version]);
+
   // Handler for updating the plan goal (title)
   const handleGoalUpdate = useCallback(
     async (newGoal: string) => {
@@ -484,6 +498,7 @@ export function PlanEditorProvider({ children }: { children: ReactNode }) {
     handleWorkflowSubmit,
     handleWorkflowApprove,
     handleWorkflowPublish,
+    handleStartBuild,
     switchVersion,
     isEventStreamConnected,
     eventStreamError,

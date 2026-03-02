@@ -14,6 +14,19 @@
  */
 
 import { createContext, useContext, ReactNode, useState, useCallback, useEffect, useRef } from 'react';
+import {
+  startBuild as forgeStartBuild,
+  approveGate as forgeApproveGate,
+  rejectGate as forgeRejectGate,
+  answerQuestion as forgeAnswerQuestion,
+  dismissQuestion as forgeDismissQuestion,
+  pauseRun as forgePauseRun,
+  resumeRun as forgeResumeRun,
+  cancelRun as forgeCancelRun,
+} from '@plannr/shared-ui';
+import type { ForgeConfig } from '@plannr/shared-ui';
+import { useBuildMonitor } from '@/hooks/useBuildMonitor';
+import type { RunStatus, StepState, GateState, QuestionState } from '@/hooks/useBuildMonitor';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -98,6 +111,30 @@ export interface SessionContextValue {
 
   /** Reload session and plans from API */
   refetch: () => void;
+
+  /** Start a forge build for the given plan */
+  startBuild: (planId: string, version: number, config: ForgeConfig) => Promise<string>;
+
+  /** Active forge-next run ID, or null if no build is running */
+  activeRunId: string | null;
+  /** Build monitoring state */
+  buildStatus: RunStatus | null;
+  buildSteps: Map<string, StepState>;
+  buildGates: GateState[];
+  buildQuestions: QuestionState[];
+  buildError: string | null;
+  isBuildMonitoring: boolean;
+  pendingGateCount: number;
+  pendingQuestionCount: number;
+
+  /** Build control actions */
+  pauseBuild: () => Promise<void>;
+  resumeBuild: () => Promise<void>;
+  cancelBuild: () => Promise<void>;
+  approveGate: (gateId: string, note?: string) => Promise<void>;
+  rejectGate: (gateId: string, note?: string) => Promise<void>;
+  answerQuestion: (questionId: string, answer: string) => Promise<void>;
+  dismissQuestion: (questionId: string) => Promise<void>;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -330,6 +367,9 @@ export function SessionProvider({ sessionId, children }: SessionProviderProps) {
   const [planRefreshKey, setPlanRefreshKey] = useState(0);
   const [blockRefreshKey, setBlockRefreshKey] = useState(0);
   const [transcriptRefreshKey, setTranscriptRefreshKey] = useState(0);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+
+  const buildMonitor = useBuildMonitor(activeRunId);
 
   // ── Plan fetching ─────────────────────────────────────────────────────────
 
@@ -465,6 +505,51 @@ export function SessionProvider({ sessionId, children }: SessionProviderProps) {
   const hasBlocks = blocks.length > 0;
   const hasPlans = plans.length > 0;
 
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  const startBuild = useCallback(async (planId: string, version: number, config: ForgeConfig): Promise<string> => {
+    const result = await forgeStartBuild({
+      plan_id: planId,
+      plan_version: version,
+      workspace_path: config.workspace_path,
+      execution_policy: config.execution_policy,
+      step_overrides: config.step_overrides,
+    });
+    setActiveRunId(result.run_id);
+    return result.run_id;
+  }, []);
+
+  const pauseBuild = useCallback(async () => {
+    if (!activeRunId) return;
+    await forgePauseRun(activeRunId);
+  }, [activeRunId]);
+
+  const resumeBuild = useCallback(async () => {
+    if (!activeRunId) return;
+    await forgeResumeRun(activeRunId);
+  }, [activeRunId]);
+
+  const cancelBuild = useCallback(async () => {
+    if (!activeRunId) return;
+    await forgeCancelRun(activeRunId);
+  }, [activeRunId]);
+
+  const handleApproveGate = useCallback(async (gateId: string, note?: string) => {
+    await forgeApproveGate(gateId, undefined, note);
+  }, []);
+
+  const handleRejectGate = useCallback(async (gateId: string, note?: string) => {
+    await forgeRejectGate(gateId, undefined, note);
+  }, []);
+
+  const handleAnswerQuestion = useCallback(async (questionId: string, answer: string) => {
+    await forgeAnswerQuestion(questionId, answer);
+  }, []);
+
+  const handleDismissQuestion = useCallback(async (questionId: string) => {
+    await forgeDismissQuestion(questionId);
+  }, []);
+
   const value: SessionContextValue = {
     session,
     plans,
@@ -478,6 +563,23 @@ export function SessionProvider({ sessionId, children }: SessionProviderProps) {
     blockRefreshKey,
     transcriptRefreshKey,
     refetch: fetchAll,
+    startBuild,
+    activeRunId,
+    buildStatus: buildMonitor.runStatus,
+    buildSteps: buildMonitor.steps,
+    buildGates: buildMonitor.gates,
+    buildQuestions: buildMonitor.questions,
+    buildError: buildMonitor.runError,
+    isBuildMonitoring: buildMonitor.isMonitoring,
+    pendingGateCount: buildMonitor.pendingGateCount,
+    pendingQuestionCount: buildMonitor.pendingQuestionCount,
+    pauseBuild,
+    resumeBuild,
+    cancelBuild,
+    approveGate: handleApproveGate,
+    rejectGate: handleRejectGate,
+    answerQuestion: handleAnswerQuestion,
+    dismissQuestion: handleDismissQuestion,
   };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
