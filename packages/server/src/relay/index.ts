@@ -11,17 +11,27 @@ export {
   destroy,
   isConnected,
   getConnectionState,
-  getClient,
+  getRelay,
+  getAgentHandle,
   onStateChange,
+  onMessage,
+  onAgentExited,
   spawnAgent,
   releaseAgent,
+  removeAgent,
   setAgentModel,
   getSpawnedAgents,
   isAgentSpawned,
+  getSpawnedAgentChannel,
+  getConnectionMetrics,
   sendMessage,
   sendChannelMessage,
-  type ClientState,
+  type ConnectionState,
+  type ConnectionMetrics,
   type SpawnAgentOptions,
+  type SpawnResult as RelaySpawnResult,
+  type AgentExitInfo,
+  type SetModelResult,
 } from './client.js';
 
 // Config exports
@@ -30,13 +40,12 @@ export {
   type RelayConfig,
 } from './config.js';
 
-// Service exports
+// Relay mode exports (formerly in service.ts)
 export {
   isRelayAvailable,
   getRelayMode,
-  onModeChange,
   type RelayMode,
-} from './service.js';
+} from './client.js';
 
 // Spawner exports
 export {

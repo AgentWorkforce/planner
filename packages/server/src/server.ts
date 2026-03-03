@@ -55,7 +55,6 @@ import {
   connect as connectRelay,
   destroy as destroyRelay,
   getRelayConfig,
-  getRelayMode,
   initChannelManagement,
   registerPlanChannels,
   initWebSocketProxy,
@@ -65,7 +64,6 @@ import {
   syncIdeationSessionChannels,
   planChannelMiddleware,
   qaChannelMiddleware,
-  isConnected,
   spawnAgent,
   emitAgentStatusUpdate,
   emitAgentParked,
@@ -155,24 +153,16 @@ async function start(): Promise<void> {
   app.use('/api', plannerService.router);
   // Ideation and Forge routers mounted after relay connection to enable specialist spawning and mode detection
 
-  // Attempt relay connection (non-blocking on failure)
+  // Connect to relay broker (throws on failure)
   const relayConfig = getRelayConfig();
-  console.log(`[relay] Attempting connection to ${relayConfig.socketPath}...`);
+  console.log(`[relay] Connecting (cwd: ${relayConfig.cwd})...`);
 
-  try {
-    await connectRelay();
-  } catch {
-    // Connection errors are already logged in the client module
-    // Server should continue starting even if relay is unavailable
-  }
+  await connectRelay();
 
-  const mode = getRelayMode();
-  console.log(`[relay] Mode: ${mode}`);
+  console.log('[relay] Connected');
 
   // Initialize ideation service (after relay connection to enable specialist spawning)
-  const specialistSpawner = isConnected()
-    ? createSpecialistSpawner({ spawnAgent })
-    : undefined;
+  const specialistSpawner = createSpecialistSpawner({ spawnAgent });
 
   ideationService = createIdeationService({
     dbPath: IDEATION_DB_PATH,
@@ -190,10 +180,6 @@ async function start(): Promise<void> {
   // NEVER silently fall back to test mode — test mode must be explicit via FORGE_MODE=test
   const forgeMode: ForgeExecutionMode =
     (process.env.FORGE_MODE as ForgeExecutionMode) || 'real';
-
-  if (forgeMode === 'real' && !isConnected()) {
-    console.warn('[forge] WARNING: Relay not connected but mode is "real" — agents will fail until relay connects');
-  }
 
   forgeService = createForgeService({
     dbPath: FORGE_DB_PATH,
@@ -309,14 +295,11 @@ async function start(): Promise<void> {
     dbPath: DB_PATH,
   }));
 
-  // Relay daemon adapter - reads agent session data (only if connected)
-  if (isConnected()) {
-    const relayConfig = getRelayConfig();
-    const relayDataDir = path.dirname(relayConfig.socketPath);
-    sessionAdapters.push(new RelayDaemonAdapter({
-      dataDir: relayDataDir,
-    }));
-  }
+  // Relay daemon adapter - reads agent session data from embedded broker data dir
+  const relayDataDir = path.join(relayConfig.cwd, '.agent-relay');
+  sessionAdapters.push(new RelayDaemonAdapter({
+    dataDir: relayDataDir,
+  }));
 
   // Bridge SessionAdapter[] → MullAdapter[] for the pipeline
   const mullDir = path.resolve(__dirname, '../../../.mull');
@@ -374,16 +357,14 @@ async function start(): Promise<void> {
   // Initialize channel management
   initChannelManagement();
 
-  // Register plan channels with existing plans (lazy joining on first use)
-  if (mode === 'connected') {
-    const plans = storage.listPlans();
-    const planIds = plans.map((p) => p.plan_id);
-    registerPlanChannels(planIds);
+  // Register plan channels with existing plans (local bookkeeping for routing)
+  const plans = storage.listPlans();
+  const planIds = plans.map((p) => p.plan_id);
+  registerPlanChannels(planIds);
 
-    // Sync ideation session channels with existing active sessions
-    const ideationStorage = ideationService.getStorage();
-    await syncIdeationSessionChannels(ideationStorage);
-  }
+  // Sync ideation session channels with existing active sessions
+  const ideationStorage = ideationService.getStorage();
+  await syncIdeationSessionChannels(ideationStorage);
 
   // Note: PlannerLead agents are now spawned on-demand via AgentLifecycleManager
 

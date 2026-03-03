@@ -10,12 +10,10 @@ import {
   onStateChange as onServerStateChange,
   onMessage as onServerMessage,
   sendChannelMessage as serverSendChannelMessage,
-  getClient,
-  spawnAgent as serverSpawnAgent,
 } from './client.js';
 import { getPlanChannelId } from './channels.js';
 import { onUserChannelJoin } from './ws-proxy.js';
-import { emitAgentJoined, emitAgentLeft, emitAgentStatusUpdate, emitAgentWarming } from './agent-status.js';
+import { emitAgentJoined, emitAgentStatusUpdate, emitAgentWarming } from './agent-status.js';
 import { setAgentForSession, getAgentLifecycleState } from './session-presence.js';
 import type { AgentLifecycleManager } from '../agents/lifecycle.js';
 import {
@@ -23,23 +21,17 @@ import {
   dispatchMessage as dispatchToIdeation,
   setSender as setIdeationSender,
 } from '../../../ideation/src/relay/index.js';
-import { isIdeationChannel, sessionChannelId, IDEATION_CHANNEL, INTERVIEWER_CONFIG } from '../../../ideation/src/interviewer/config.js';
+import { isIdeationChannel, sessionChannelId, INTERVIEWER_CONFIG } from '../../../ideation/src/interviewer/config.js';
 import { ideationEvents } from '../../../ideation/src/api/events.js';
 import { createTranscriptMessage } from '../../../ideation/src/domain/index.js';
 import type { IdeationStorage } from '../../../ideation/src/storage/index.js';
-import type { ClientState } from '@agent-relay/sdk';
+import type { ConnectionState } from './client.js';
 
-/** Track joined session channels for reconnection */
+/** Track joined session channels (channelId → sessionId) */
 const joinedSessionChannels = new Map<string, string>();
 
-/** Track plan channels the Interviewer has joined (planChannelId → sessionId) */
+/** Track plan channels the Interviewer is registered for (planChannelId → sessionId) */
 const planChannelToSession = new Map<string, string>();
-
-/** Track joined plan channels for reconnection */
-const joinedPlanChannels = new Set<string>();
-
-/** Track channels actively joined this session (for reconnection) */
-const activelyJoinedChannels = new Set<string>();
 
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeMessage: (() => void) | null = null;
@@ -68,21 +60,6 @@ function ensureInterviewerSpawned(sessionId: string): void {
   });
 }
 
-/**
- * Map SDK client state to ideation client state.
- */
-function mapState(sdkState: ClientState): 'connecting' | 'connected' | 'disconnected' | 'error' {
-  switch (sdkState) {
-    case 'CONNECTING':
-      return 'connecting';
-    case 'READY':
-      return 'connected';
-    case 'DISCONNECTED':
-      return 'disconnected';
-    default:
-      return 'disconnected';
-  }
-}
 
 /**
  * Initialize the bridge between server relay and ideation relay.
@@ -103,40 +80,19 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
   console.log(`[ideation-bridge] Initial state: ${connected ? 'connected' : 'disconnected'}`);
 
   // Subscribe to server relay state changes
-  unsubscribeState = onServerStateChange((state: ClientState) => {
-    const mappedState = mapState(state);
-    setIdeationState(mappedState);
-    console.log(`[ideation-bridge] State changed: ${mappedState}`);
-
-    // Rejoin channels on reconnection
-    if (state === 'READY') {
-      const client = getClient();
-      if (client) {
-        // Rejoin main ideation channel
-        client.joinChannel(IDEATION_CHANNEL);
-        console.log(`[ideation-bridge] Rejoined ${IDEATION_CHANNEL}`);
-
-        // Only rejoin channels that were actively joined this session
-        for (const channelId of activelyJoinedChannels) {
-          client.joinChannel(channelId);
-        }
-        if (activelyJoinedChannels.size > 0) {
-          console.log(`[ideation-bridge] Rejoined ${activelyJoinedChannels.size} active channels`);
-        }
-      }
-    }
+  unsubscribeState = onServerStateChange((state: ConnectionState) => {
+    setIdeationState(state);
+    console.log(`[ideation-bridge] State changed: ${state}`);
   });
 
   // Subscribe to server relay messages and route ideation ones + plan channel ones
-  unsubscribeMessage = onServerMessage((from, body, threadId, data) => {
-    const channel = data?.channel as string | undefined;
-
+  unsubscribeMessage = onServerMessage((from, to, body, threadId, data) => {
     // Route ideation channel messages
-    if (channel && isIdeationChannel(channel)) {
-      console.log(`[ideation-bridge] Routing message from ${from} on ${channel}`);
+    if (isIdeationChannel(to)) {
+      console.log(`[ideation-bridge] Routing message from ${from} on ${to}`);
 
       // Persist user and agent content messages to transcript (transport-layer persistence)
-      const sessionId = joinedSessionChannels.get(channel);
+      const sessionId = joinedSessionChannels.get(to);
       if (sessionId && ideationStorage && body) {
         const dataType = (data as Record<string, unknown> | undefined)?.type as string | undefined;
         // Skip system messages (thinking, tool_action) — already persisted by MCP handler
@@ -149,7 +105,7 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
         }
       }
 
-      dispatchToIdeation(from, body, threadId, { ...data, channel });
+      dispatchToIdeation(from, body, threadId, { ...data, channel: to });
 
       // Broadcast Interviewer status transitions based on message source
       if (from.startsWith('user-')) {
@@ -170,29 +126,20 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
     }
 
     // Route plan channel messages to Interviewer when registered
-    if (channel && planChannelToSession.has(channel)) {
+    if (planChannelToSession.has(to)) {
       // Don't route Interviewer's own messages back (prevent loops)
       if (data?.fromAgent === INTERVIEWER_CONFIG.agentId) return;
 
-      const sessionId = planChannelToSession.get(channel)!;
-      console.log(`[ideation-bridge] Routing plan channel message from ${from} on ${channel} (session: ${sessionId})`);
+      const sessionId = planChannelToSession.get(to)!;
+      console.log(`[ideation-bridge] Routing plan channel message from ${from} on ${to} (session: ${sessionId})`);
       dispatchToIdeation(from, body, threadId, {
         ...data,
-        channel,
+        channel: to,
         planContext: true,
         sessionId,
       });
     }
   });
-
-  // Join the main ideation channel
-  const client = getClient();
-  if (client) {
-    const joined = client.joinChannel('#ideation');
-    if (joined) {
-      console.log('[ideation-bridge] Joined #ideation channel');
-    }
-  }
 
   // Inject sender so ideation can send through server relay
   console.log('[ideation-bridge] Injecting sender function');
@@ -243,20 +190,13 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
 
   // Subscribe to session:created events to notify Interviewer
   const handleSessionCreated = (event: { data: { id: string; source?: { initial_intent?: string } } }) => {
-    if (!isServerRelayConnected()) return;
-
     const session = event.data;
     const channelId = sessionChannelId(session.id);
     const initialIntent = session.source?.initial_intent || 'New brainstorming session';
 
-    // Join the session channel first
-    const client = getClient();
-    if (client) {
-      client.joinChannel(channelId);
-      joinedSessionChannels.set(channelId, session.id);
-      activelyJoinedChannels.add(channelId);
-      console.log(`[ideation-bridge] Joined session channel ${channelId}`);
-    }
+    // Register the session channel mapping (agents join channels at spawn time)
+    joinedSessionChannels.set(channelId, session.id);
+    console.log(`[ideation-bridge] Registered session channel ${channelId}`);
 
     // Register Interviewer in the agent status system so the UI shows it
     emitAgentJoined(INTERVIEWER_CONFIG.agentId, 'interviewer', INTERVIEWER_CONFIG.displayName);
@@ -274,8 +214,6 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
 
   // Subscribe to blocks_graduated events to join Interviewer to plan channel
   const handleBlocksGraduated = (event: { data: { id: string; planner_sends: Array<{ result?: { plan_id?: string } }> } }) => {
-    if (!isServerRelayConnected()) return;
-
     const session = event.data;
     const latestSend = session.planner_sends[session.planner_sends.length - 1];
     const planId = latestSend?.result?.plan_id;
@@ -287,21 +225,17 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
 
     const planChannelId = getPlanChannelId(planId);
 
-    // Join the plan channel
-    const relayClient = getClient();
-    if (relayClient) {
-      relayClient.joinChannel(planChannelId);
-      joinedPlanChannels.add(planChannelId);
-      activelyJoinedChannels.add(planChannelId);
-      planChannelToSession.set(planChannelId, session.id);
-      console.log(`[ideation-bridge] Joined plan channel ${planChannelId} for session ${session.id}`);
-    }
+    // Register the plan channel mapping (agents join channels at spawn time)
+    planChannelToSession.set(planChannelId, session.id);
+    console.log(`[ideation-bridge] Registered plan channel ${planChannelId} for session ${session.id}`);
 
     // Announce Interviewer presence in the plan channel
     serverSendChannelMessage(planChannelId,
       'Interviewer has joined this plan channel. I have context from the brainstorming session and can answer domain questions about this plan.',
       { type: 'interviewer_joined', sessionId: session.id, fromAgent: INTERVIEWER_CONFIG.agentId }
-    );
+    ).catch((err) => {
+      console.error(`[ideation-bridge] Failed to send Interviewer announcement to ${planChannelId}:`, err);
+    });
     console.log(`[ideation-bridge] Interviewer announcement sent to ${planChannelId}`);
 
     // Register Interviewer as an active agent
@@ -325,6 +259,7 @@ export function initIdeationBridge(lifecycle?: AgentLifecycleManager, storage?: 
 /**
  * Send a message from ideation through the server relay.
  * This replaces the ideation stub's sendChannelMessage.
+ * Fire-and-forget: returns true optimistically; errors are logged.
  */
 export function sendIdeationChannelMessage(
   channel: string,
@@ -333,26 +268,11 @@ export function sendIdeationChannelMessage(
 ): boolean {
   console.log(`[ideation-bridge] sendIdeationChannelMessage called for ${channel}`);
 
-  if (!isServerRelayConnected()) {
-    console.log(`[ideation-bridge] Cannot send to ${channel}: not connected`);
-    return false;
-  }
+  serverSendChannelMessage(channel, body, data).catch((err) => {
+    console.error(`[ideation-bridge] Failed to send to ${channel}:`, err);
+  });
 
-  // Join the channel if needed (relay auto-creates channels)
-  const client = getClient();
-  if (client) {
-    const joined = client.joinChannel(channel);
-    if (joined && isIdeationChannel(channel)) {
-      activelyJoinedChannels.add(channel);
-    }
-    console.log(`[ideation-bridge] Joined channel ${channel}: ${joined}`);
-  } else {
-    console.log(`[ideation-bridge] No client available for ${channel}`);
-  }
-
-  const result = serverSendChannelMessage(channel, body, data);
-  console.log(`[ideation-bridge] serverSendChannelMessage result for ${channel}: ${result}`);
-  return result;
+  return true;
 }
 
 /**
@@ -380,8 +300,6 @@ export function stopIdeationBridge(): void {
   setIdeationSender(null);
   joinedSessionChannels.clear();
   planChannelToSession.clear();
-  joinedPlanChannels.clear();
-  activelyJoinedChannels.clear();
   lifecycleManager = null;
   ideationStorage = null;
   bridgeInitialized = false;
@@ -391,27 +309,15 @@ export function stopIdeationBridge(): void {
 /**
  * Sync ideation session channels with existing sessions in storage.
  * Call this on startup to register channels for existing active sessions.
- * Channels are registered but not actively joined until needed.
+ * Channels are registered locally so message routing works when messages arrive.
  */
 export async function syncIdeationSessionChannels(storage: IdeationStorage): Promise<void> {
-  if (!isServerRelayConnected()) {
-    console.log('[ideation-bridge] Skipping session channel sync: relay not connected');
-    return;
-  }
-
-  const client = getClient();
-  if (!client) {
-    console.log('[ideation-bridge] Skipping session channel sync: no client');
-    return;
-  }
-
   // Get all active sessions
   const activeSessions = await storage.listSessions({ status: 'active' });
 
   for (const session of activeSessions) {
     const channelId = sessionChannelId(session.id);
     if (!joinedSessionChannels.has(channelId)) {
-      // Register the mapping without joining (lazy join on first user interaction)
       joinedSessionChannels.set(channelId, session.id);
       console.log(`[ideation-bridge] Registered session channel ${channelId}`);
     }

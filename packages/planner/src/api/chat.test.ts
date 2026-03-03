@@ -11,11 +11,6 @@ vi.mock('../relay/chat.js', () => ({
   notifyAgent: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../relay/service.js', () => ({
-  getRelayMode: vi.fn().mockReturnValue('mock'),
-  isRelayAvailable: vi.fn().mockReturnValue(false),
-}));
-
 describe('Chat API', () => {
   let storage: PlanStorage & { listOrganizations: () => { org_id: string }[] };
   let app: ReturnType<typeof createApp>;

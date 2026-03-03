@@ -7,23 +7,39 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock the @agent-relay/sdk module
+// Mock the @agent-relay/sdk module with AgentRelay (3.x API)
 vi.mock('@agent-relay/sdk', () => {
-  const mockClient = {
-    connect: vi.fn().mockResolvedValue(undefined),
-    disconnect: vi.fn(),
-    destroy: vi.fn(),
-    state: 'DISCONNECTED' as const,
-    onStateChange: undefined as ((state: string) => void) | undefined,
-    onError: undefined as ((error: Error) => void) | undefined,
-  };
+  const mockShutdown = vi.fn().mockResolvedValue(undefined);
+  const mockSpawn = vi.fn().mockResolvedValue({
+    name: 'TestAgent',
+    release: vi.fn().mockResolvedValue(undefined),
+    waitForExit: vi.fn().mockResolvedValue('exited'),
+    waitForReady: vi.fn().mockResolvedValue(undefined),
+    exitCode: undefined,
+    exitSignal: undefined,
+    channels: [],
+    status: 'ready',
+    runtime: 'pty',
+    sendMessage: vi.fn(),
+    onOutput: vi.fn(),
+  });
+
+  const mockHuman = vi.fn().mockReturnValue({
+    name: 'PlannerCore',
+    sendMessage: vi.fn().mockResolvedValue({ eventId: 'e1', from: 'PlannerCore', to: 'Test', text: 'hello' }),
+  });
 
   return {
-    RelayClient: vi.fn().mockImplementation((config) => {
-      // Store config for testing
-      (mockClient as any)._config = config;
-      return mockClient;
-    }),
+    AgentRelay: vi.fn().mockImplementation(() => ({
+      shutdown: mockShutdown,
+      spawn: mockSpawn,
+      human: mockHuman,
+      listAgents: vi.fn().mockResolvedValue([]),
+      onMessageReceived: null,
+      onAgentExited: null,
+      onAgentSpawned: null,
+      onAgentReady: null,
+    })),
   };
 });
 
@@ -35,124 +51,112 @@ beforeEach(async () => {
 afterEach(() => {
   vi.clearAllMocks();
   // Clean up environment variables
-  delete process.env.RELAY_SOCKET_PATH;
-  delete process.env.RELAY_RECONNECT_INTERVAL;
-  delete process.env.RELAY_MAX_RECONNECT_ATTEMPTS;
+  delete process.env.RELAY_CWD;
+  delete process.env.MCP_SERVER_URL;
+  delete process.env.MCP_SERVER_HOST;
+  delete process.env.PORT;
 });
 
 describe('relay/config', () => {
   describe('getRelayConfig', () => {
-    it('returns default socket path when RELAY_SOCKET_PATH not set', async () => {
+    it('returns cwd defaulting to project root', async () => {
       const { getRelayConfig } = await import('./config.js');
       const config = getRelayConfig();
 
-      // Default path is project-local .agent-relay/relay.sock
-      expect(config.socketPath).toContain('.agent-relay/relay.sock');
+      // Default cwd is resolved to the project root (4 levels up from this file)
+      expect(typeof config.cwd).toBe('string');
+      expect(config.cwd.length).toBeGreaterThan(0);
     });
 
-    it('uses custom socket path from RELAY_SOCKET_PATH env var', async () => {
-      process.env.RELAY_SOCKET_PATH = '/custom/path/relay.sock';
-
+    it('returns mcpServerUrl defaulting to http://localhost:3001/api/mcp', async () => {
       const { getRelayConfig } = await import('./config.js');
       const config = getRelayConfig();
 
-      expect(config.socketPath).toBe('/custom/path/relay.sock');
+      expect(config.mcpServerUrl).toBe('http://localhost:3001/api/mcp');
     });
 
-    it('returns default reconnect interval of 5000ms', async () => {
+    it('uses RELAY_CWD env var to override cwd', async () => {
+      process.env.RELAY_CWD = '/custom/project/root';
+
       const { getRelayConfig } = await import('./config.js');
       const config = getRelayConfig();
 
-      expect(config.reconnectInterval).toBe(5000);
+      expect(config.cwd).toBe('/custom/project/root');
     });
 
-    it('uses custom reconnect interval from env var', async () => {
-      process.env.RELAY_RECONNECT_INTERVAL = '10000';
+    it('uses MCP_SERVER_URL env var to override mcpServerUrl', async () => {
+      process.env.MCP_SERVER_URL = 'http://custom-host:9999/mcp';
 
       const { getRelayConfig } = await import('./config.js');
       const config = getRelayConfig();
 
-      expect(config.reconnectInterval).toBe(10000);
-    });
-
-    it('returns default max reconnect attempts of 0 (unlimited)', async () => {
-      const { getRelayConfig } = await import('./config.js');
-      const config = getRelayConfig();
-
-      expect(config.maxReconnectAttempts).toBe(0);
-    });
-
-    it('uses custom max reconnect attempts from env var', async () => {
-      process.env.RELAY_MAX_RECONNECT_ATTEMPTS = '5';
-
-      const { getRelayConfig } = await import('./config.js');
-      const config = getRelayConfig();
-
-      expect(config.maxReconnectAttempts).toBe(5);
+      expect(config.mcpServerUrl).toBe('http://custom-host:9999/mcp');
     });
   });
 });
 
 describe('relay/client', () => {
   describe('connect', () => {
-    it('establishes connection to daemon socket', async () => {
-      const { RelayClient } = await import('@agent-relay/sdk');
-      const { connect, isConnected } = await import('./client.js');
-
-      // Initially not connected
-      expect(isConnected()).toBe(false);
+    it('creates AgentRelay with correct cwd from config', async () => {
+      const { AgentRelay } = await import('@agent-relay/sdk');
+      const { connect } = await import('./client.js');
 
       await connect();
 
-      expect(RelayClient).toHaveBeenCalledWith(
+      expect(AgentRelay).toHaveBeenCalledWith(
         expect.objectContaining({
-          agentName: 'Relay',
-          socketPath: expect.any(String),
-          reconnect: true,
+          cwd: expect.any(String),
         })
       );
     });
 
-    it('catches and logs connection errors without throwing', async () => {
-      const { RelayClient } = await import('@agent-relay/sdk');
-      const mockClient = {
-        connect: vi.fn().mockRejectedValue(new Error('Connection refused')),
-        disconnect: vi.fn(),
-        destroy: vi.fn(),
-        onStateChange: undefined,
-        onError: undefined,
-      };
-      (RelayClient as any).mockImplementation(() => mockClient);
+    it('wires onMessageReceived, onAgentExited, and onAgentSpawned hooks', async () => {
+      const { AgentRelay } = await import('@agent-relay/sdk');
+      let capturedInstance: Record<string, unknown> | null = null;
 
-      const { connect, isConnected } = await import('./client.js');
+      (AgentRelay as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        const instance: Record<string, unknown> = {
+          shutdown: vi.fn().mockResolvedValue(undefined),
+          spawn: vi.fn(),
+          human: vi.fn().mockReturnValue({ name: 'PlannerCore', sendMessage: vi.fn() }),
+          listAgents: vi.fn().mockResolvedValue([]),
+          onMessageReceived: null,
+          onAgentExited: null,
+          onAgentSpawned: null,
+          onAgentReady: null,
+        };
+        capturedInstance = instance;
+        return instance;
+      });
 
-      // Should not throw
-      await expect(connect()).resolves.not.toThrow();
-
-      // Should remain disconnected
-      expect(isConnected()).toBe(false);
-    });
-  });
-
-  describe('disconnect', () => {
-    it('cleanly closes connection', async () => {
-      const { RelayClient } = await import('@agent-relay/sdk');
-      const mockDisconnect = vi.fn();
-      const mockClient = {
-        connect: vi.fn().mockResolvedValue(undefined),
-        disconnect: mockDisconnect,
-        destroy: vi.fn(),
-        onStateChange: undefined,
-        onError: undefined,
-      };
-      (RelayClient as any).mockImplementation(() => mockClient);
-
-      const { connect, disconnect } = await import('./client.js');
-
+      const { connect } = await import('./client.js');
       await connect();
-      disconnect();
 
-      expect(mockDisconnect).toHaveBeenCalled();
+      expect(capturedInstance).not.toBeNull();
+      expect(typeof capturedInstance!.onMessageReceived).toBe('function');
+      expect(typeof capturedInstance!.onAgentExited).toBe('function');
+      expect(typeof capturedInstance!.onAgentSpawned).toBe('function');
+    });
+
+    it('creates humanHandle via relay.human({ name: "PlannerCore" })', async () => {
+      const { AgentRelay } = await import('@agent-relay/sdk');
+      const mockHumanFn = vi.fn().mockReturnValue({ name: 'PlannerCore', sendMessage: vi.fn() });
+
+      (AgentRelay as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+        shutdown: vi.fn().mockResolvedValue(undefined),
+        spawn: vi.fn(),
+        human: mockHumanFn,
+        listAgents: vi.fn().mockResolvedValue([]),
+        onMessageReceived: null,
+        onAgentExited: null,
+        onAgentSpawned: null,
+        onAgentReady: null,
+      }));
+
+      const { connect } = await import('./client.js');
+      await connect();
+
+      expect(mockHumanFn).toHaveBeenCalledWith({ name: 'PlannerCore' });
     });
   });
 
@@ -162,18 +166,79 @@ describe('relay/client', () => {
 
       expect(isConnected()).toBe(false);
     });
+
+    it('returns true after connect()', async () => {
+      const { connect, isConnected } = await import('./client.js');
+
+      await connect();
+
+      expect(isConnected()).toBe(true);
+    });
   });
 
-  describe('getClient', () => {
-    it('returns null when not connected', async () => {
-      const { getClient } = await import('./client.js');
+  describe('disconnect', () => {
+    it('calls relay.shutdown()', async () => {
+      const { AgentRelay } = await import('@agent-relay/sdk');
+      const mockShutdown = vi.fn().mockResolvedValue(undefined);
 
-      expect(getClient()).toBeNull();
+      (AgentRelay as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+        shutdown: mockShutdown,
+        spawn: vi.fn(),
+        human: vi.fn().mockReturnValue({ name: 'PlannerCore', sendMessage: vi.fn() }),
+        listAgents: vi.fn().mockResolvedValue([]),
+        onMessageReceived: null,
+        onAgentExited: null,
+        onAgentSpawned: null,
+        onAgentReady: null,
+      }));
+
+      const { connect, disconnect } = await import('./client.js');
+
+      await connect();
+      await disconnect();
+
+      expect(mockShutdown).toHaveBeenCalled();
+    });
+  });
+
+  describe('getRelay', () => {
+    it('returns null before connect()', async () => {
+      const { getRelay } = await import('./client.js');
+
+      expect(getRelay()).toBeNull();
+    });
+
+    it('returns the AgentRelay instance after connect()', async () => {
+      const { connect, getRelay } = await import('./client.js');
+
+      await connect();
+
+      expect(getRelay()).not.toBeNull();
+    });
+  });
+
+  describe('spawnAgent', () => {
+    it('throws when not connected', async () => {
+      const { spawnAgent } = await import('./client.js');
+
+      await expect(
+        spawnAgent({ name: 'TestAgent', cli: 'claude', task: 'Do something' })
+      ).rejects.toThrow('[relay] Cannot spawn agent: not connected');
+    });
+  });
+
+  describe('sendMessage', () => {
+    it('throws when not connected', async () => {
+      const { sendMessage } = await import('./client.js');
+
+      await expect(
+        sendMessage('SomeAgent', 'hello')
+      ).rejects.toThrow('[relay] Cannot send message: not connected');
     });
   });
 
   describe('onStateChange', () => {
-    it('notifies subscribers of state changes', async () => {
+    it('registers a callback and returns an unsubscribe function', async () => {
       const { onStateChange } = await import('./client.js');
 
       const callback = vi.fn();
@@ -181,93 +246,36 @@ describe('relay/client', () => {
 
       expect(typeof unsubscribe).toBe('function');
 
-      // Cleanup
       unsubscribe();
+    });
+
+    it('unsubscribing prevents future state notifications', async () => {
+      const { onStateChange, connect } = await import('./client.js');
+
+      const callback = vi.fn();
+      const unsubscribe = onStateChange(callback);
+      unsubscribe();
+
+      // connect() triggers a state change to 'connected'
+      await connect();
+
+      expect(callback).not.toHaveBeenCalled();
     });
   });
 });
 
-describe('relay/service', () => {
+describe('relay/client (mode helpers)', () => {
   describe('isRelayAvailable', () => {
     it('returns false before connect() called', async () => {
-      const { isRelayAvailable } = await import('./service.js');
+      const { isRelayAvailable } = await import('./client.js');
 
       expect(isRelayAvailable()).toBe(false);
     });
   });
 
   describe('getRelayMode', () => {
-    it('returns disconnected when daemon not running', async () => {
-      const { getRelayMode } = await import('./service.js');
-
-      expect(getRelayMode()).toBe('disconnected');
-    });
-
-    it('returns mock when force mock mode enabled', async () => {
-      const { getRelayMode, setForceMockMode } = await import('./service.js');
-
-      setForceMockMode(true);
-
-      expect(getRelayMode()).toBe('mock');
-
-      // Cleanup
-      setForceMockMode(false);
-    });
-  });
-
-  describe('onModeChange', () => {
-    it('notifies subscribers of mode changes', async () => {
-      const { onModeChange, setForceMockMode } = await import('./service.js');
-
-      const callback = vi.fn();
-      const unsubscribe = onModeChange(callback);
-
-      // Trigger mode change
-      setForceMockMode(true);
-
-      expect(callback).toHaveBeenCalledWith('mock');
-
-      // Cleanup
-      unsubscribe();
-      setForceMockMode(false);
-    });
-
-    it('allows unsubscribing from mode changes', async () => {
-      const { onModeChange, setForceMockMode } = await import('./service.js');
-
-      const callback = vi.fn();
-      const unsubscribe = onModeChange(callback);
-
-      // Unsubscribe
-      unsubscribe();
-
-      // Trigger mode change
-      setForceMockMode(true);
-      setForceMockMode(false);
-
-      // Should not have been called since we unsubscribed
-      expect(callback).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('setForceMockMode', () => {
-    it('enables mock mode', async () => {
-      const { setForceMockMode, getRelayMode, isRelayAvailable } = await import('./service.js');
-
-      setForceMockMode(true);
-
-      expect(getRelayMode()).toBe('mock');
-      expect(isRelayAvailable()).toBe(false);
-
-      // Cleanup
-      setForceMockMode(false);
-    });
-
-    it('disables mock mode', async () => {
-      const { setForceMockMode, getRelayMode } = await import('./service.js');
-
-      setForceMockMode(true);
-      setForceMockMode(false);
+    it('returns disconnected before connect() called', async () => {
+      const { getRelayMode } = await import('./client.js');
 
       expect(getRelayMode()).toBe('disconnected');
     });

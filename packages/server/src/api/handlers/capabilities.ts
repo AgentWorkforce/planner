@@ -41,7 +41,7 @@ export function createCapabilitiesHandlers() {
       const response: CapabilitiesResponse = {
         relay: {
           available: relayConnected,
-          url: relayConfig.socketPath,
+          url: relayConfig.mcpServerUrl,
           status: relayMode,
         },
         forge: {

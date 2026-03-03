@@ -8,7 +8,7 @@
 
 import type { Request, Response } from 'express';
 import {
-  getClient,
+  getRelay,
   getActiveAgents,
   getRelayMode,
   setPendingModel,
@@ -58,14 +58,14 @@ export function createAgentHandlers() {
           return;
         }
 
-        const client = getClient();
+        const relay = getRelay();
         const activeAgents = getActiveAgents();
 
         // Get connected agents from relay (presence)
         let connectedAgentNames: Set<string> = new Set();
-        if (client) {
+        if (relay) {
           try {
-            const connectedAgents = await client.listConnectedAgents();
+            const connectedAgents = await relay.listAgents();
             connectedAgentNames = new Set(connectedAgents.map((a) => a.name));
           } catch (error) {
             console.warn('[agents] Failed to get connected agents from relay:', error);
