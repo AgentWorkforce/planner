@@ -71,20 +71,23 @@ interface Plugin {
 
 Plugins are self-contained: own storage, own API routes, own domain logic.
 
-## Relay Integration
+## Relay Integration (SDK 3.x)
+
+Uses `@agent-relay/sdk` 3.x with broker-based connection.
 
 ### WebSocket Proxy (`/ws/relay`)
 
-Bridges browser WebSocket clients to relay daemon:
-- Forwards client messages to relay
-- Broadcasts relay messages to subscribed clients
-- Handles channel membership and presence
+Server-as-router pattern — the server acts as the message router for browser clients rather than proxying to a relay daemon WebSocket:
+- Routes client messages to agents via the SDK broker
+- Broadcasts agent messages to subscribed browser clients
+- Manages channel membership and presence locally
 
 ### Channel Management
 
+Local registry pattern — channel state is maintained in-process:
 - **Plan Channels**: `#plan-{uuid}` created on plan creation, synced on startup
 - **Session Channels**: `#session-{uuid}` for ideation sessions
-- Auto-join agents to relevant channels
+- SDK handles relay-side channel operations; server tracks local subscriptions
 
 ### PlannerLead Agent
 
@@ -95,7 +98,10 @@ Persistent service agent that:
 
 ### Forge Spawner
 
-Spawns task-specific agents via `spawn()` for discrete work items.
+Manages agent lifecycle for forge task execution:
+- Spawns task-specific agents via SDK agent handles
+- Tracks active agents for health reporting
+- Emits lifecycle events (spawned, completed, failed)
 
 ## Middleware Stack
 
