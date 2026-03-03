@@ -23,7 +23,7 @@ interface UseInitiativesResult {
   refetch: () => Promise<void>;
 }
 
-const API_BASE_URL = '/api/planner';
+const API_BASE_URL = '/api';
 
 /**
  * useInitiatives
@@ -52,8 +52,9 @@ export function useInitiatives(): UseInitiativesResult {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
       }
       const data = await response.json();
+      const list: Initiative[] = data.initiatives || [];
       // Sort by display_order
-      const sorted = [...data].sort((a, b) => a.display_order - b.display_order);
+      const sorted = [...list].sort((a, b) => a.display_order - b.display_order);
       setInitiatives(sorted);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));

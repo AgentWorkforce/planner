@@ -2,7 +2,7 @@
   "feature_id": "cultivate-pipeline",
   "title": "Processing Pipeline Orchestration",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-filter-rules", "cultivate-filter-tier2", "cultivate-extractor", "cultivate-scorer", "cultivate-clusterer", "cultivate-dedup", "cultivate-sse"],
   "parent": "cultivate-package",
@@ -18,6 +18,20 @@
       { "id": "ac6", "description": "SSE signal:new event is broadcast on successful pipeline completion" },
       { "id": "ac7", "description": "Pipeline integrates with BullMQ process-signal worker as the job processor" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/pipeline/index.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/pipeline/index.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/pipeline/index.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/pipeline/index.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/pipeline/index.ts" },
+      { "id": "ac6", "status": "satisfied", "evidence": "src/pipeline/index.ts" },
+      { "id": "ac7", "status": "satisfied", "evidence": "src/pipeline/index.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

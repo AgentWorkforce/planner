@@ -2,7 +2,7 @@
   "feature_id": "cultivate-clusterer",
   "title": "AI Cluster Assignment (Haiku)",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain", "cultivate-storage"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "ac5", "description": "Clustering model is configurable via CULTIVATE_CLUSTER_MODEL env var, defaulting to Haiku" },
       { "id": "ac6", "description": "Cluster assignment prompt includes existing cluster names and summaries for the Greenhouse as context" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/clustering/assign.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/clustering/create.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/clustering/regenerate-summary.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/clustering/assign.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/clustering/assign.ts" },
+      { "id": "ac6", "status": "satisfied", "evidence": "src/clustering/assign.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

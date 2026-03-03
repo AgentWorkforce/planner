@@ -78,6 +78,7 @@ export interface CreateGreenhouseInput {
   keyword_require: string[];
   keyword_exclude: string[];
   source_ids: string[];
+  weight_overrides?: Record<string, number>;
 }
 
 /**
@@ -90,6 +91,7 @@ export interface UpdateGreenhouseInput {
   keyword_require?: string[];
   keyword_exclude?: string[];
   source_ids?: string[];
+  weight_overrides?: Record<string, number>;
 }
 
 /**

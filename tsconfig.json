@@ -2,9 +2,11 @@
   "references": [
     { "path": "./packages/cultivate" },
     { "path": "./packages/planner" },
+    { "path": "./packages/portfolio-core" },
     { "path": "./packages/server" },
     { "path": "./packages/ideation" },
     { "path": "./packages/forge-core" },
+    { "path": "./packages/forge-next" },
     { "path": "./packages/testbench" },
     { "path": "./packages/tuner" },
     { "path": "./packages/planner-ui" },

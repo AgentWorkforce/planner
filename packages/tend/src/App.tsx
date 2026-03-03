@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ProjectPage } from '@/pages/ProjectPage';
+import { SessionWorkspace } from '@/pages/SessionWorkspace';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 import { Toaster } from '@/components/ui/Toaster';
@@ -19,6 +20,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/projects/:id" element={<ProjectPage />} />
+        <Route path="/s/:id" element={<SessionWorkspace />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
 

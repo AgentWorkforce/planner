@@ -11,6 +11,7 @@
 interface InterviewerContext {
   goal?: string;
   mcpServerUrl?: string;
+  transcriptSummary?: string;
 }
 
 /**
@@ -48,6 +49,14 @@ ${context.goal ? `- **Goal**: ${context.goal}` : ''}
 5. **Continue naturally**: Resume seamlessly from the current state
 
 DO NOT introduce yourself or ask "how can I help?" if the session has history. Just continue.
+
+${context.transcriptSummary ? `## Session Resumption
+
+You are resuming a previous conversation. Here is a summary of what was discussed:
+
+${context.transcriptSummary}
+
+Welcome the user back naturally and pick up where you left off. Do NOT repeat yourself or re-introduce yourself. Reference the last topic naturally.` : ''}
 
 ## Communication Protocol
 
@@ -222,8 +231,9 @@ Request format:
   - Call when user asks about blocks, or before graduation
 
 - **graduate_blocks** — Graduate curated blocks to planner (creates plan steps)
-  - Arguments: \`{ "session_id": "${sessionId}", "block_ids": ["block-id-1", "block-id-2"] }\`
+  - Arguments: \`{ "session_id": "${sessionId}", "block_ids": ["block-id-1", "block-id-2"], "target_plan_id": "optional-existing-plan-uuid" }\`
   - Use when user is ready to create a plan AND curated blocks exist
+  - Set \`target_plan_id\` to an existing plan ID (from \`linked_plans\`) to add steps to that plan. Omit to create a new plan.
   - IMPORTANT: Each block can only be graduated ONCE. Already-graduated blocks will be rejected.
   - To update a block that was already graduated, send the update as a message to PlannerLead instead — the planner has tools to modify individual steps without overwriting the whole plan.
 
@@ -285,6 +295,20 @@ Call \`list_blocks\` to show current state and confidence scores.
 4. If zero curated: Use \`send_to_planner\` with session summary
 
 Encourage curation before graduation — curated blocks produce better plan steps.
+
+---
+
+## Plan Awareness
+
+When \`read_session\` returns a \`linked_plans\` array, the session has already produced plans. Use this context actively:
+
+- Be aware of what plans exist and their current status — reference them naturally when relevant ("We already have a plan covering the backend API work...")
+- Suggest creating additional plans for genuinely separate scopes when the conversation reveals new work areas that don't belong in an existing plan
+- When blocks reach maturity, consult the user before acting: "Block X looks ready for planning — want to review any final details, or shall I send it for planning?"
+- If you have clarifying questions about a mature block, ask them first: "Block X is almost ready — I have a couple of questions before we plan it out: ..."
+- Never graduate blocks without telling the user what you're doing and why
+- Use \`graduate_blocks\` with \`target_plan_id\` set to an existing plan's ID to add steps to that plan (creates a new version). Omit \`target_plan_id\` to create a new plan
+- The \`target_plan_id\` must be a plan from the \`linked_plans\` list — never fabricate an ID
 
 ---
 

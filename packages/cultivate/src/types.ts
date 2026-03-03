@@ -8,6 +8,9 @@ import type { Router } from 'express';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { FilterRuleRegistry } from './filters/rule-registry.js';
 
+// Re-export CultivateStorage for external use
+export type { CultivateStorage } from './storage/interface.js';
+
 /**
  * Configuration required to start Cultivate
  */
@@ -91,6 +94,7 @@ export interface CultivateConfig {
   weights: Record<string, CultivateWeights>; // keyed by greenhouse_id
   filter_rules: Record<string, { enabled: boolean }>; // keyed by rule_id
   tier1_strictness: number;
+  tier2_enabled?: boolean; // Whether to use ML classifier (default: false)
   tier2_threshold: number;
   extract_model?: string;
   cluster_model?: string;
@@ -114,8 +118,21 @@ export interface CultivateWeights {
  * SSE broadcaster for real-time events
  */
 export interface SSEBroadcaster {
-  broadcast(event: string, data: unknown): void;
+  start(): void;
+  stop(): void;
   addClient(res: any): () => void;
+  removeClient(res: any): void;
+  readonly clientCount: number;
+  emit(event: string, data: any): void;
+  emitSignalNew(payload: any): void;
+  emitSignalUpdated(payload: any): void;
+  emitClusterNew(payload: any): void;
+  emitClusterUpdated(payload: any): void;
+  emitClusterTrending(payload: any): void;
+  emitIngestionProgress(payload: any): void;
+  emitIngestionComplete(payload: any): void;
+  emitSourceError(payload: any): void;
+  emitSourceAuthExpired(payload: any): void;
 }
 
 /**
@@ -127,3 +144,8 @@ export interface CultivateService {
   shutdown(): Promise<void>;
   getContext?: () => CultivateContext | undefined;
 }
+
+/**
+ * Factory function to create SSE broadcaster instance
+ */
+export { createSSEBroadcaster } from './sse/broadcaster.js';

@@ -16,6 +16,7 @@
     "@agent-relay/sdk": "^2.0.37",
     "@plannr/cultivate": "*",
     "@plannr/errors": "*",
+    "@plannr/portfolio-core": "*",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",

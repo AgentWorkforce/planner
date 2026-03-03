@@ -25,6 +25,7 @@ export function PlanEditorHeader({ activeTab }: PlanEditorHeaderProps) {
     handleWorkflowSubmit,
     handleWorkflowApprove,
     handleWorkflowPublish,
+    handleStartBuild,
     switchVersion,
   } = usePlanEditor();
 
@@ -186,6 +187,7 @@ export function PlanEditorHeader({ activeTab }: PlanEditorHeaderProps) {
               onSubmit={handleWorkflowSubmit}
               onApprove={handleWorkflowApprove}
               onPublish={handleWorkflowPublish}
+              onStartBuild={handleStartBuild}
             />
           </div>
         </div>

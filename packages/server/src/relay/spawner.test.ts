@@ -6,29 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock the @agent-relay/sdk module
-vi.mock('@agent-relay/sdk', () => {
-  return {
-    RelayClient: vi.fn().mockImplementation(() => ({
-      connect: vi.fn().mockResolvedValue(undefined),
-      disconnect: vi.fn(),
-      destroy: vi.fn(),
-      state: 'READY',
-      onStateChange: undefined,
-      onError: undefined,
-      spawn: vi.fn().mockResolvedValue({
-        name: 'Planner-test1234',
-        success: true,
-        pid: 12345,
-      }),
-      release: vi.fn().mockResolvedValue({
-        released: true,
-      }),
-    })),
-  };
-});
-
-// Reset modules before each test
+// Reset modules before each test for clean state
 beforeEach(async () => {
   vi.resetModules();
 });
@@ -75,10 +53,10 @@ describe('spawner/system-prompt', () => {
 
 describe('spawner/spawnPlanningAgent', () => {
   it('throws when relay not connected', async () => {
-    // Mock client as not connected
+    // spawnAgent() throws '[relay] Cannot spawn agent: not connected' when relay is null
     vi.doMock('./client.js', () => ({
-      getClient: () => null,
-      isConnected: () => false,
+      spawnAgent: vi.fn().mockRejectedValue(new Error('[relay] Cannot spawn agent: not connected')),
+      releaseAgent: vi.fn(),
     }));
 
     const { spawnPlanningAgent } = await import('./spawner.js');
@@ -88,20 +66,20 @@ describe('spawner/spawnPlanningAgent', () => {
         planId: 'test-plan-id',
         goal: 'Test goal',
       })
-    ).rejects.toThrow('Relay client not connected');
+    ).rejects.toThrow('[relay] Cannot spawn agent: not connected');
   });
 });
 
 describe('spawner/terminateAgent', () => {
-  it('handles not connected gracefully', async () => {
+  it('does not throw when releaseAgent throws (agent already gone)', async () => {
     vi.doMock('./client.js', () => ({
-      getClient: () => null,
-      isConnected: () => false,
+      spawnAgent: vi.fn(),
+      releaseAgent: vi.fn().mockRejectedValue(new Error('[relay] Cannot release agent test-agent: not tracked')),
     }));
 
     const { terminateAgent } = await import('./spawner.js');
 
-    // Should not throw
+    // terminateAgent wraps releaseAgent in try/catch and does not re-throw
     await expect(terminateAgent('test-agent')).resolves.not.toThrow();
   });
 });
@@ -148,8 +126,8 @@ describe('spawner/revision-agent-prompt', () => {
 describe('spawner/spawnRevisionAgent', () => {
   it('throws when relay not connected', async () => {
     vi.doMock('./client.js', () => ({
-      getClient: () => null,
-      isConnected: () => false,
+      spawnAgent: vi.fn().mockRejectedValue(new Error('[relay] Cannot spawn agent: not connected')),
+      releaseAgent: vi.fn(),
     }));
 
     const { spawnRevisionAgent } = await import('./spawner.js');
@@ -173,7 +151,7 @@ describe('spawner/spawnRevisionAgent', () => {
         changeRequest,
         currentVersion: 1,
       })
-    ).rejects.toThrow('Relay client not connected');
+    ).rejects.toThrow('[relay] Cannot spawn agent: not connected');
   });
 });
 
@@ -224,7 +202,6 @@ describe('mock-spawner', () => {
     const { createMockSpawner } = await import('./mock-spawner.js');
     const spawner = createMockSpawner({ terminateDelayMs: 0 });
 
-    // Should not throw
     await expect(spawner.terminate('non-existent-agent')).resolves.not.toThrow();
   });
 

@@ -7,7 +7,7 @@
  */
 
 import type { AdapterType } from '../domain/types.js';
-import type { CultivateStorage } from '../storage/index.js';
+import type { CultivateStorage } from '../storage/interface.js';
 
 /**
  * Check for an exact duplicate signal

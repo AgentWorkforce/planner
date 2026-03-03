@@ -8,9 +8,10 @@
 
 import type { Request, Response } from 'express';
 import {
-  getClient,
+  getRelay,
   getActiveAgents,
   getRelayMode,
+  setPendingModel,
   type AgentRole,
   type AgentState,
 } from '../../relay/index.js';
@@ -57,14 +58,14 @@ export function createAgentHandlers() {
           return;
         }
 
-        const client = getClient();
+        const relay = getRelay();
         const activeAgents = getActiveAgents();
 
         // Get connected agents from relay (presence)
         let connectedAgentNames: Set<string> = new Set();
-        if (client) {
+        if (relay) {
           try {
-            const connectedAgents = await client.listConnectedAgents();
+            const connectedAgents = await relay.listAgents();
             connectedAgentNames = new Set(connectedAgents.map((a) => a.name));
           } catch (error) {
             console.warn('[agents] Failed to get connected agents from relay:', error);
@@ -101,17 +102,70 @@ export function createAgentHandlers() {
           }
         }
 
+        // Filter out system and user clients — only return real agents
+        const filteredAgents = agents.filter((a) => {
+          if (a.name === 'Relay') return false;
+          if (a.name.startsWith('user-')) return false;
+          if (a.name.startsWith('dev-user-')) return false;
+          return true;
+        });
+
         res.json({
-          agents,
+          agents: filteredAgents,
           mode,
           meta: {
-            totalConnected: connectedAgentNames.size,
-            totalWithState: activeAgents.size,
+            totalConnected: filteredAgents.length,
+            totalWithState: filteredAgents.filter((a) => activeAgents.has(a.agentId)).length,
           },
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error('[agents] Error listing agents:', message);
+        res.status(500).json({ error: message });
+      }
+    },
+
+    /**
+     * POST /api/agents/:name/model
+     *
+     * Set the model for a running agent via relay daemon.
+     * Body: { model: string }
+     */
+    setModel: async (req: Request, res: Response): Promise<void> => {
+      try {
+        const name = req.params.name as string;
+        const { model } = req.body;
+
+        if (!name) {
+          res.status(400).json({ error: 'Agent name is required' });
+          return;
+        }
+
+        if (!model || typeof model !== 'string') {
+          res.status(400).json({ error: 'model is required and must be a string' });
+          return;
+        }
+
+        const mode = getRelayMode();
+        if (mode !== 'connected') {
+          res.status(503).json({ error: 'Relay daemon not connected' });
+          return;
+        }
+
+        // Queue the model change — it will be applied when the agent next goes idle.
+        // This avoids blocking (the relay daemon waits for agent idle, which can timeout).
+        setPendingModel(name, model);
+
+        res.json({
+          success: true,
+          pending: true,
+          name,
+          model,
+          message: 'Model will apply when agent finishes current response',
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[agents] Error setting agent model:', message);
         res.status(500).json({ error: message });
       }
     },

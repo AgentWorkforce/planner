@@ -99,6 +99,7 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
         keyword_require TEXT NOT NULL,
         keyword_exclude TEXT NOT NULL,
         source_ids TEXT NOT NULL,
+        weight_overrides TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -408,6 +409,7 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       keyword_require: input.keyword_require,
       keyword_exclude: input.keyword_exclude,
       source_ids: input.source_ids,
+      weight_overrides: input.weight_overrides,
       created_at: now,
       updated_at: now,
     };
@@ -415,8 +417,8 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     this.db
       .prepare(
         `INSERT INTO greenhouses (
-          id, name, description, mode, keyword_require, keyword_exclude, source_ids, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          id, name, description, mode, keyword_require, keyword_exclude, source_ids, weight_overrides, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         greenhouse.id,
@@ -426,6 +428,7 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
         JSON.stringify(greenhouse.keyword_require),
         JSON.stringify(greenhouse.keyword_exclude),
         JSON.stringify(greenhouse.source_ids),
+        input.weight_overrides ? JSON.stringify(input.weight_overrides) : null,
         greenhouse.created_at,
         greenhouse.updated_at
       );
@@ -466,6 +469,10 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     if (input.source_ids !== undefined) {
       updates.push('source_ids = ?');
       values.push(JSON.stringify(input.source_ids));
+    }
+    if (input.weight_overrides !== undefined) {
+      updates.push('weight_overrides = ?');
+      values.push(JSON.stringify(input.weight_overrides));
     }
 
     updates.push('updated_at = ?');
@@ -1000,6 +1007,7 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       keyword_require: this.safeJsonParse(row.keyword_require, []),
       keyword_exclude: this.safeJsonParse(row.keyword_exclude, []),
       source_ids: this.safeJsonParse(row.source_ids, []),
+      weight_overrides: row.weight_overrides ? this.safeJsonParse(row.weight_overrides, undefined) : undefined,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };

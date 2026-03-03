@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import type { TreeStep } from '../tree/ProjectTree';
 import { EditableText } from './EditableText';
 import { EditableTextarea } from './EditableTextarea';
@@ -237,6 +238,102 @@ export function StepSheet({ step, onUpdate, onSendMessage, disabled = false }: S
         )}
       </div>
 
+      {/* Quality Score — shown when step has been scored */}
+      {step.score !== undefined && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Quality</h4>
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                'text-2xl font-mono tabular-nums',
+                step.score >= 80 ? 'text-success' : step.score >= 50 ? 'text-text-primary' : 'text-accent-secondary'
+              )}
+            >
+              {step.score}
+            </div>
+            <div className="flex-1">
+              <div className="h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    step.score >= 80 ? 'bg-success' : step.score >= 50 ? 'bg-accent-primary' : 'bg-accent-secondary'
+                  )}
+                  style={{ width: `${step.score}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          {step.scoreReasoning && (
+            <p className="text-xs text-text-muted">{step.scoreReasoning}</p>
+          )}
+          {/* Matched / failed criteria breakdown */}
+          {((step.matchedCriteria && step.matchedCriteria.length > 0) || (step.failedCriteria && step.failedCriteria.length > 0)) && (
+            <div className="space-y-1 pt-1">
+              {step.matchedCriteria && step.matchedCriteria.length > 0 && (
+                <div className="space-y-0.5">
+                  {step.matchedCriteria.map((c, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-success">
+                      <span className="flex-shrink-0 mt-0.5">✓</span>
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step.failedCriteria && step.failedCriteria.length > 0 && (
+                <div className="space-y-0.5">
+                  {step.failedCriteria.map((c, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-accent-secondary">
+                      <span className="flex-shrink-0 mt-0.5">✗</span>
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Execution Metrics — shown when step has timing / cost data */}
+      {(step.estimatedCostUsd !== undefined || step.durationMs !== undefined || step.model) && (
+        <div className="space-y-1">
+          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Execution</h4>
+          <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
+            {step.model && <span>Model: {step.model}</span>}
+            {step.durationMs !== undefined && (
+              <span>
+                Duration:{' '}
+                {step.durationMs < 60000
+                  ? `${Math.round(step.durationMs / 1000)}s`
+                  : `${Math.round(step.durationMs / 60000)}m`}
+              </span>
+            )}
+            {step.estimatedCostUsd !== undefined && (
+              <span>Est. cost: ${step.estimatedCostUsd.toFixed(3)}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Failure History — shown when step has accumulated failures */}
+      {step.failures && step.failures.length > 0 && (
+        <div className="space-y-1">
+          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+            Failures ({step.failures.length})
+          </h4>
+          <ul className="space-y-1">
+            {step.failures.map((failure, i) => (
+              <li
+                key={i}
+                className="text-xs text-accent-secondary bg-bg-tertiary rounded px-2 py-1 font-mono"
+              >
+                {failure}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Execution Info - only shown when step has execution data */}
       {step.execution_status && step.execution_status !== 'pending' && (
         <div className="pt-6 border-t border-border-subtle">
@@ -251,23 +348,48 @@ export function StepSheet({ step, onUpdate, onSendMessage, disabled = false }: S
                   {statusLabel}
                 </span>
               </div>
-              {/* Agent assignment placeholder - will be populated when execution data available */}
-              <div>
-                <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
-                  Agent
-                </label>
-                <span className="text-sm text-text-muted italic">Not assigned</span>
-              </div>
+              {step.model ? (
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
+                    Model
+                  </label>
+                  <span className="text-sm text-text-primary font-mono">{step.model}</span>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
+                    Agent
+                  </label>
+                  <span className="text-sm text-text-muted italic">Not assigned</span>
+                </div>
+              )}
             </div>
-            {/* Time tracking placeholder - will be populated when execution data available */}
             <div>
               <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
                 Duration
               </label>
-              <span className="text-sm text-text-muted italic">Not started</span>
+              {step.durationMs !== undefined ? (
+                <span className="text-sm text-text-primary">
+                  {step.durationMs < 60000
+                    ? `${Math.round(step.durationMs / 1000)}s`
+                    : `${Math.round(step.durationMs / 60000)}m`}
+                </span>
+              ) : (
+                <span className="text-sm text-text-muted italic">Not started</span>
+              )}
             </div>
             {/* Error details - shown only if failed */}
-            {step.execution_status === 'failed' && (
+            {step.execution_status === 'failed' && step.error && (
+              <div>
+                <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
+                  Error
+                </label>
+                <div className="px-3 py-2 bg-error-light border border-error rounded-md text-sm text-error font-mono">
+                  {step.error}
+                </div>
+              </div>
+            )}
+            {step.execution_status === 'failed' && !step.error && (
               <div>
                 <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
                   Error

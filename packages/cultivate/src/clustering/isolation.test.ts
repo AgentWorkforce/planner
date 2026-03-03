@@ -9,7 +9,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import Database from 'better-sqlite3';
 import { SqliteCultivateStorage } from '../storage/sqlite.js';
 import type { Cluster } from '../domain/types.js';
 
@@ -17,19 +16,17 @@ describe('Cluster Isolation Invariant', () => {
   let storage: SqliteCultivateStorage;
   let greenhouse1: string;
   let greenhouse2: string;
-  let db: Database.Database;
 
   beforeEach(() => {
     // Use in-memory database for testing
-    db = new Database(':memory:');
-    storage = new SqliteCultivateStorage(db);
+    storage = new SqliteCultivateStorage(':memory:');
 
     // Create two test greenhouses
     greenhouse1 = randomUUID();
     greenhouse2 = randomUUID();
     const now = new Date().toISOString();
 
-    db.exec(`
+    (storage as any).db.exec(`
       INSERT INTO greenhouses (id, name, description, mode, keyword_require, keyword_exclude, source_ids, created_at, updated_at)
       VALUES
         ('${greenhouse1}', 'Greenhouse 1', NULL, 'refinement', '[]', '[]', '[]', '${now}', '${now}'),
@@ -41,7 +38,7 @@ describe('Cluster Isolation Invariant', () => {
     it('should enforce NOT NULL greenhouse_id constraint', async () => {
       // Attempt to create a cluster without greenhouse_id should fail
       expect(() => {
-        db.exec(`
+        (storage as any).db.exec(`
           INSERT INTO clusters (id, greenhouse_id, label, summary, signal_count, trend, velocity_weekly, velocity_monthly, created_at, updated_at)
           VALUES ('test-id', NULL, 'Test', 'Test cluster', 0, 'stable', 0, 0, datetime('now'), datetime('now'))
         `);
@@ -54,7 +51,7 @@ describe('Cluster Isolation Invariant', () => {
 
       // Attempt to create a cluster with non-existent greenhouse_id should fail
       expect(() => {
-        db.exec(`
+        (storage as any).db.exec(`
           INSERT INTO clusters (id, greenhouse_id, label, summary, signal_count, trend, velocity_weekly, velocity_monthly, created_at, updated_at)
           VALUES ('${clusterId}', 'invalid-gh-id', 'Test', 'Test cluster', 0, 'stable', 0, 0, '${now}', '${now}')
         `);
@@ -70,14 +67,14 @@ describe('Cluster Isolation Invariant', () => {
       });
 
       // Same label in same greenhouse should fail
-      expect(() => {
+      await expect(
         storage.createCluster({
           greenhouse_id: greenhouse1,
           label: 'API Issues',
           summary: 'Different summary',
           trend: 'stable',
-        });
-      }).rejects.toThrow();
+        })
+      ).rejects.toThrow();
 
       // Same label in different greenhouse should succeed
       const cluster2 = await storage.createCluster({
@@ -253,7 +250,7 @@ describe('Cluster Isolation Invariant', () => {
 
       // Attempting to create a cluster with same ID should fail (PRIMARY KEY violation)
       expect(() => {
-        db.exec(`
+        (storage as any).db.exec(`
           INSERT INTO clusters (id, greenhouse_id, label, summary, signal_count, trend, velocity_weekly, velocity_monthly, created_at, updated_at)
           VALUES ('${cluster1.id}', '${greenhouse2}', 'Test Cluster 2', 'Test', 0, 'stable', 0, 0, '${now}', '${now}')
         `);

@@ -18,3 +18,25 @@ export * from "./theme";
 
 // Utils
 export { cn } from "./utils/cn";
+
+// Forge API client
+export {
+  startBuild,
+  getRunDetails,
+  pauseRun,
+  resumeRun,
+  cancelRun,
+  listGates,
+  approveGate,
+  rejectGate,
+  listQuestions,
+  answerQuestion,
+  dismissQuestion,
+  type StepOverride,
+  type ForgeConfig,
+  type StartBuildRequest,
+  type StartBuildResponse,
+  type Gate,
+  type AgentQuestion,
+  type RunDetails,
+} from "./api/forge";

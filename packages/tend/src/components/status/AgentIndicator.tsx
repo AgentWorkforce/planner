@@ -47,7 +47,6 @@ const ROLE_ABBREV: Record<AgentRole, string> = {
 
 // Static spinner animations for non-working states (module-level for stable refs)
 const STATIC_SPINNERS: Record<string, Animation> = {
-  normal: { interval: 0, frames: [STATE_CHARS.normal ?? '·'] },
   idle: { interval: 0, frames: [STATE_CHARS.idle ?? ' '] },
   needs_input: { interval: 0, frames: [STATE_CHARS.needs_input ?? '?'] },
   error: { interval: 0, frames: [STATE_CHARS.error ?? '!'] },
@@ -55,19 +54,17 @@ const STATIC_SPINNERS: Record<string, Animation> = {
 
 // Human-readable state labels
 const STATE_LABELS: Record<AgentState, string> = {
-  normal: 'Ready',
+  idle: 'Idle',
   working: 'Working',
   needs_input: 'Needs input',
-  idle: 'Idle',
   error: 'Error',
 };
 
 // Color class per state — only color states that require user attention.
 // Animation (spinner, fill) already conveys activity; color is reserved for action-needed.
 const STATE_COLORS: Record<AgentState, string> = {
-  working: 'text-text-secondary',
-  normal: 'text-text-secondary',
   idle: 'text-text-muted opacity-50',
+  working: 'text-text-secondary',
   needs_input: 'text-warning',
   error: 'text-error',
 };
@@ -87,7 +84,7 @@ export function AgentIndicator({
   // Select spinner animation based on state
   const spinnerAnim = useMemo((): Animation => {
     if (state === 'working') return SPINNERS.dots;
-    return STATIC_SPINNERS[state] ?? STATIC_SPINNERS.normal!;
+    return STATIC_SPINNERS[state] ?? STATIC_SPINNERS.idle!;
   }, [state]);
 
   // Select fill animation based on state + progress + priority
@@ -101,8 +98,6 @@ export function AgentIndicator({
           return FILLS['working:100'];
         }
         return FILLS['working:indeterminate'];
-      case 'normal':
-        return FILLS.normal;
       case 'idle':
         return FILLS.idle;
       case 'needs_input': {

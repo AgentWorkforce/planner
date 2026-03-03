@@ -29,6 +29,10 @@ export const PlanSchema = z.object({
   initiative_id: z.string().uuid().optional(),
   owner_user_id: z.string().optional(),
   source: PlanSourceSchema.optional(),
+  /** Denormalized session ID extracted from source for efficient querying. Soft FK to ideation.db. */
+  source_session_id: z.string().uuid().optional(),
+  priority: z.number().int().min(1).max(5).default(3),
+  value_score: z.number().int().min(1).max(10).default(5),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -68,19 +72,26 @@ export const PlanVersionSchema = z.object({
 export type PlanVersion = z.infer<typeof PlanVersionSchema>;
 
 /**
- * Creates a new Plan with generated UUID and timestamps
+ * Creates a new Plan with generated UUID and timestamps.
+ * source_session_id is automatically derived from source.session_id when not
+ * explicitly provided, keeping the denormalized column in sync at creation time.
  */
 export function createPlan(
   org_id: string,
   owner_user_id?: string,
-  source?: PlanSource
+  source?: PlanSource,
+  source_session_id?: string
 ): Plan {
   const now = new Date().toISOString();
+  const resolvedSource = source ?? { type: 'manual' };
   const plan: Plan = {
     plan_id: crypto.randomUUID(),
     org_id,
     owner_user_id,
-    source: source ?? { type: 'manual' },
+    source: resolvedSource,
+    source_session_id: source_session_id ?? resolvedSource.session_id,
+    priority: 3,
+    value_score: 5,
     created_at: now,
     updated_at: now,
   };

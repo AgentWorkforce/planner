@@ -19,6 +19,20 @@
       { "id": "ac7", "description": "All presets retrievable via a registry with catalog endpoint support" }
     ]
   },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "partial",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/domain/types.ts:283-293" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/presets/tier-1.ts" },
+      { "id": "ac3", "status": "missing", "evidence": "No tier-2.ts file exists" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/presets/tier-3.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/presets/tier-4.ts" },
+      { "id": "ac6", "status": "missing", "evidence": "No tier-5.ts file exists" },
+      { "id": "ac7", "status": "partial", "evidence": "Presets exported from index.ts; API builds catalog dynamically; no formal PresetRegistry class" }
+    ],
+    "drift": []
+  },
   "plan_implementation": {
     "scopes": ["cultivate"],
     "steps": [

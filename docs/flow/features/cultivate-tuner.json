@@ -2,7 +2,7 @@
   "feature_id": "cultivate-tuner",
   "title": "Tuner Integration",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "high",
   "dependencies": ["cultivate-domain", "cultivate-storage", "cultivate-scorer", "cultivate-filter-rules"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "ct-ac5", "description": "Falls back to hardcoded defaults on first run or when Tuner is unavailable" },
       { "id": "ct-ac6", "description": "Config changes from Tuner are applied without restart" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "ct-ac1", "status": "satisfied", "evidence": "src/tuner/client.ts" },
+      { "id": "ct-ac2", "status": "satisfied", "evidence": "src/tuner/client.ts" },
+      { "id": "ct-ac3", "status": "satisfied", "evidence": "src/tuner/outcomes.ts" },
+      { "id": "ct-ac4", "status": "satisfied", "evidence": "src/tuner/outcomes.ts" },
+      { "id": "ct-ac5", "status": "satisfied", "evidence": "src/tuner/defaults.ts" },
+      { "id": "ct-ac6", "status": "satisfied", "evidence": "src/tuner/client.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

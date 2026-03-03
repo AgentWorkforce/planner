@@ -1,286 +1,32 @@
 /**
  * Relay Client Wrapper
  *
- * Wraps @agent-relay/sdk client with connection management.
- * Handles errors gracefully - catches and logs, doesn't throw.
+ * Wraps @agent-relay/sdk AgentRelay (3.x) with connection management.
+ * Fail fast: errors propagate — no fallbacks, no mock modes, no silent swallowing.
  */
 
-import {
-  RelayClient,
-  type ClientState,
-  type SendPayload,
-  type SendMeta,
-  type SpawnResultPayload,
-  type ReleaseResultPayload,
-} from '@agent-relay/sdk';
-import { getRelayConfig, type RelayConfig } from './config.js';
+import { AgentRelay, type Agent, type HumanHandle } from '@agent-relay/sdk';
+import { getRelayConfig } from './config.js';
 import { emitAgentLeft } from './agent-status.js';
 
-let client: RelayClient | null = null;
-let connectionState: ClientState = 'DISCONNECTED';
-let config: RelayConfig | null = null;
+// ---------------------------------------------------------------------------
+// Exported types
+// ---------------------------------------------------------------------------
 
-/** Connection metrics for health monitoring and debugging */
-interface ConnectionMetrics {
-  connectCount: number;
-  disconnectCount: number;
-  lastConnectedAt: number | null;
-  lastDisconnectedAt: number | null;
-  lastError: string | null;
-  lastStateChangeAt: number;
-  currentStateDurationMs: number;
+/** Connection state for the embedded relay broker */
+export type ConnectionState = 'connected' | 'disconnected';
+
+/** Result from a successful agent spawn */
+export interface SpawnResult {
+  name: string;
 }
 
-const metrics: ConnectionMetrics = {
-  connectCount: 0,
-  disconnectCount: 0,
-  lastConnectedAt: null,
-  lastDisconnectedAt: null,
-  lastError: null,
-  lastStateChangeAt: Date.now(),
-  currentStateDurationMs: 0,
-};
-
-const stateChangeListeners: Set<(state: ClientState) => void> = new Set();
-
-/** Message handler type */
-type MessageHandler = (from: string, body: string, threadId?: string, data?: Record<string, unknown>) => void;
-
-/** Registered message handlers */
-const messageHandlers: Set<MessageHandler> = new Set();
-
-/**
- * Register a handler for incoming messages.
- * Returns unsubscribe function.
- */
-export function onMessage(handler: MessageHandler): () => void {
-  messageHandlers.add(handler);
-  return () => {
-    messageHandlers.delete(handler);
-  };
-}
-
-/**
- * Internal: route incoming message to all registered handlers.
- */
-function routeMessage(from: string, payload: SendPayload, messageId: string, meta?: SendMeta): void {
-  const body = payload.body || '';
-  const threadId = payload.thread;
-  const data = payload.data;
-
-  console.log(`[relay] Received message from ${from}${threadId ? ` (thread: ${threadId})` : ''}`);
-
-  for (const handler of messageHandlers) {
-    try {
-      handler(from, body, threadId, data);
-    } catch (error) {
-      console.error('[relay] Error in message handler:', error);
-    }
-  }
-}
-
-/**
- * Connect to the relay daemon.
- * Connection errors are caught and logged, not thrown.
- */
-export async function connect(): Promise<void> {
-  if (client && connectionState === 'READY') {
-    return;
-  }
-
-  config = getRelayConfig();
-
-  try {
-    client = new RelayClient({
-      agentName: 'Relay',
-      socketPath: config.socketPath,
-      reconnect: true,
-      maxReconnectAttempts: config.maxReconnectAttempts,
-      reconnectDelayMs: config.reconnectInterval,
-      reconnectMaxDelayMs: config.maxReconnectDelay,
-      quiet: false,
-    });
-
-    client.onStateChange = (newState: ClientState) => {
-      const oldState = connectionState;
-      connectionState = newState;
-
-      if (oldState !== newState) {
-        const now = Date.now();
-        const prevDuration = now - metrics.lastStateChangeAt;
-        metrics.lastStateChangeAt = now;
-        metrics.currentStateDurationMs = 0;
-
-        if (newState === 'READY') {
-          metrics.connectCount++;
-          metrics.lastConnectedAt = now;
-          console.log(`[relay] Connection state: ${oldState} -> READY (was ${oldState} for ${(prevDuration / 1000).toFixed(1)}s, connects: ${metrics.connectCount})`);
-        } else if (newState === 'DISCONNECTED') {
-          metrics.disconnectCount++;
-          metrics.lastDisconnectedAt = now;
-          console.log(`[relay] Connection state: ${oldState} -> DISCONNECTED (was ${oldState} for ${(prevDuration / 1000).toFixed(1)}s, disconnects: ${metrics.disconnectCount})`);
-        } else {
-          console.log(`[relay] Connection state: ${oldState} -> ${newState}`);
-        }
-
-        notifyStateChange(newState);
-      }
-    };
-
-    client.onError = (error: Error) => {
-      metrics.lastError = error.message;
-      console.error('[relay] Client error:', error.message);
-    };
-
-    // Wire up message routing to registered handlers
-    client.onMessage = routeMessage;
-
-    // Wire up channel message routing - channel messages are different from direct messages
-    client.onChannelMessage = (from: string, channel: string, body: string, envelope: { id: string; ts?: number; payload?: { data?: Record<string, unknown> } }) => {
-      console.log(`[relay] Received channel message from ${from} in ${channel}: "${body.substring(0, 50)}..."`);
-      // Route to handlers with channel info in data
-      for (const handler of messageHandlers) {
-        try {
-          handler(from, body, undefined, { channel, messageId: envelope.id, ...envelope.payload?.data });
-        } catch (error) {
-          console.error('[relay] Error in message handler:', error);
-        }
-      }
-    };
-
-    await client.connect();
-    console.log(`[relay] Connected to daemon at ${config.socketPath}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[relay] Failed to connect to daemon at ${config?.socketPath}: ${message}`);
-    connectionState = 'DISCONNECTED';
-  }
-}
-
-/**
- * Disconnect from the relay daemon.
- */
-export function disconnect(): void {
-  if (!client) {
-    return;
-  }
-
-  try {
-    client.disconnect();
-    console.log('[relay] Disconnected from daemon');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[relay] Error during disconnect: ${message}`);
-  } finally {
-    connectionState = 'DISCONNECTED';
-    notifyStateChange('DISCONNECTED');
-  }
-}
-
-/**
- * Destroy the relay client permanently.
- */
-export function destroy(): void {
-  if (!client) {
-    return;
-  }
-
-  try {
-    client.destroy();
-    console.log('[relay] Client destroyed');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[relay] Error during destroy: ${message}`);
-  } finally {
-    client = null;
-    connectionState = 'DISCONNECTED';
-    notifyStateChange('DISCONNECTED');
-  }
-}
-
-/**
- * Check if the client is connected.
- */
-export function isConnected(): boolean {
-  return connectionState === 'READY';
-}
-
-/**
- * Get the current connection state.
- */
-export function getConnectionState(): ClientState {
-  return connectionState;
-}
-
-/**
- * Get the relay client instance.
- * Returns null when not connected.
- */
-export function getClient(): RelayClient | null {
-  if (connectionState !== 'READY') {
-    return null;
-  }
-  return client;
-}
-
-/**
- * Send a message to another agent.
- * Returns true if message was queued, false if not connected.
- */
-export function sendMessage(
-  to: string,
-  body: string,
-  kind?: string,
-  data?: Record<string, unknown>,
-  thread?: string
-): boolean {
-  if (!client || connectionState !== 'READY') {
-    console.error('[relay] Cannot send message: not connected');
-    return false;
-  }
-
-  return client.sendMessage(to, body, kind as 'message' | 'action' | 'state' | 'thinking', data, thread);
-}
-
-/**
- * Send a message to a channel.
- * Returns true if message was queued, false if not connected.
- */
-export function sendChannelMessage(
-  channel: string,
-  body: string,
-  data?: Record<string, unknown>
-): boolean {
-  console.log(`[relay] sendChannelMessage called: channel=${channel}, body="${body.substring(0, 50)}..."`);
-
-  if (!client || connectionState !== 'READY') {
-    console.error(`[relay] Cannot send channel message: not connected (client=${!!client}, state=${connectionState})`);
-    return false;
-  }
-
-  const result = client.sendChannelMessage(channel, body, { data });
-  console.log(`[relay] SDK sendChannelMessage result for ${channel}: ${result}`);
-  return result;
-}
-
-/**
- * Subscribe to connection state changes.
- */
-export function onStateChange(callback: (state: ClientState) => void): () => void {
-  stateChangeListeners.add(callback);
-  return () => {
-    stateChangeListeners.delete(callback);
-  };
-}
-
-function notifyStateChange(state: ClientState): void {
-  for (const listener of stateChangeListeners) {
-    try {
-      listener(state);
-    } catch (error) {
-      console.error('[relay] Error in state change listener:', error);
-    }
-  }
+/** Result from relay daemon's set-model operation */
+export interface SetModelResult {
+  replyTo: string;
+  success: boolean;
+  name: string;
+  error?: string;
 }
 
 /** Options for spawning an agent */
@@ -298,15 +44,268 @@ export interface SpawnAgentOptions {
   channels?: string[];
   /** Skip MCP context injection — forge agents use curl-based reporting, not relay */
   skipMcpContext?: boolean;
+  /** Model to use for the spawned agent */
+  model?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Internal state
+// ---------------------------------------------------------------------------
+
+let relay: AgentRelay | null = null;
+let humanHandle: HumanHandle | null = null;
+
+/**
+ * Agent handles keyed by name — single source of truth for tracked agents.
+ * Use agentHandles.has() for presence, agent.channels?.[0] for channel,
+ * agent.exitCode/exitSignal for exit info.
+ */
+const agentHandles = new Map<string, Agent>();
+
+let connected = false;
+
+/** Connection state change listeners */
+const stateChangeListeners: Set<(state: ConnectionState) => void> = new Set();
+
+/** Message handler type */
+type MessageHandler = (from: string, to: string, body: string, threadId?: string, data?: Record<string, unknown>) => void;
+
+/** Registered message handlers */
+const messageHandlers: Set<MessageHandler> = new Set();
+
+/** Agent exit info passed to exit listeners */
+export interface AgentExitInfo {
+  name: string;
+  exitCode?: number;
+  exitSignal?: string;
+}
+
+/** Agent exit listeners */
+type AgentExitHandler = (info: AgentExitInfo) => void;
+const agentExitListeners: Set<AgentExitHandler> = new Set();
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function notifyStateChange(state: ConnectionState): void {
+  for (const listener of stateChangeListeners) {
+    try {
+      listener(state);
+    } catch (error) {
+      console.error('[relay] Error in state change listener:', error);
+    }
+  }
+}
+
+function routeMessage(from: string, to: string, body: string, threadId?: string, data?: Record<string, unknown>): void {
+  console.log(`[relay] Received message from ${from} → ${to}${threadId ? ` (thread: ${threadId})` : ''}`);
+  for (const handler of messageHandlers) {
+    try {
+      handler(from, to, body, threadId, data);
+    } catch (error) {
+      console.error('[relay] Error in message handler:', error);
+    }
+  }
+}
+
+function handleAgentExited(agent: Agent): void {
+  const name = agent.name;
+  agentHandles.delete(name);
+
+  console.log(`[relay] Agent exited: ${name} (code: ${agent.exitCode ?? 'unknown'})`);
+
+  emitAgentLeft(name, 'exited');
+
+  for (const listener of agentExitListeners) {
+    try {
+      listener({ name, exitCode: agent.exitCode, exitSignal: agent.exitSignal });
+    } catch (error) {
+      console.error('[relay] Error in agent exit listener:', error);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public API: connection lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Connect to the embedded relay broker.
+ * Throws on failure — no silent error swallowing.
+ */
+export async function connect(): Promise<void> {
+  if (relay && connected) {
+    return;
+  }
+
+  const config = getRelayConfig();
+
+  relay = new AgentRelay({ cwd: config.cwd });
+
+  // Wire event hooks
+  relay.onMessageReceived = (message) => {
+    routeMessage(message.from, message.to, message.text, message.threadId, message.data);
+  };
+
+  relay.onAgentExited = (agent) => {
+    handleAgentExited(agent);
+  };
+
+  relay.onAgentSpawned = (agent) => {
+    agentHandles.set(agent.name, agent);
+    console.log(`[relay] Agent spawned: ${agent.name}`);
+  };
+
+  humanHandle = relay.human({ name: 'PlannerCore' });
+
+  connected = true;
+  notifyStateChange('connected');
+
+  console.log(`[relay] Connected (cwd: ${config.cwd})`);
 }
 
 /**
- * Track spawned agents for spawn metadata (PID, timestamp).
- * NOTE: This is NOT presence tracking. For actual presence (who's online),
- * use relay's listConnectedAgents(). This map tracks spawn metadata for
- * agents we spawned from this process.
+ * Disconnect from the relay broker.
  */
-const spawnedAgents: Map<string, { pid?: number; spawnedAt: Date; channelId?: string }> = new Map();
+export async function disconnect(): Promise<void> {
+  if (!relay) {
+    return;
+  }
+
+  await relay.shutdown();
+  connected = false;
+  notifyStateChange('disconnected');
+
+  console.log('[relay] Disconnected');
+}
+
+/**
+ * Destroy the relay broker and null all references.
+ */
+export async function destroy(): Promise<void> {
+  if (!relay) {
+    return;
+  }
+
+  await relay.shutdown();
+
+  relay = null;
+  humanHandle = null;
+  agentHandles.clear();
+  connected = false;
+  notifyStateChange('disconnected');
+
+  console.log('[relay] Destroyed');
+}
+
+// ---------------------------------------------------------------------------
+// Public API: state queries
+// ---------------------------------------------------------------------------
+
+export function isConnected(): boolean {
+  return connected;
+}
+
+export function getConnectionState(): ConnectionState {
+  return connected ? 'connected' : 'disconnected';
+}
+
+/**
+ * Get the AgentRelay instance (replaces getClient()).
+ * Returns null when not connected.
+ */
+export function getRelay(): AgentRelay | null {
+  return relay;
+}
+
+/**
+ * Get the Agent handle for a named agent.
+ */
+export function getAgentHandle(name: string): Agent | undefined {
+  return agentHandles.get(name);
+}
+
+// ---------------------------------------------------------------------------
+// Public API: messaging
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a direct message to an agent.
+ * Throws if not connected.
+ */
+export async function sendMessage(
+  to: string,
+  body: string,
+  _kind?: string,
+  data?: Record<string, unknown>,
+  _thread?: string
+): Promise<void> {
+  if (!humanHandle) {
+    throw new Error('[relay] Cannot send message: not connected');
+  }
+
+  await humanHandle.sendMessage({ to, text: body, data });
+}
+
+/**
+ * Send a message to a channel.
+ * Throws if not connected.
+ */
+export async function sendChannelMessage(
+  channel: string,
+  body: string,
+  data?: Record<string, unknown>
+): Promise<void> {
+  if (!humanHandle) {
+    throw new Error(`[relay] Cannot send channel message to ${channel}: not connected`);
+  }
+
+  console.log(`[relay] sendChannelMessage: channel=${channel}, body="${body.substring(0, 50)}..."`);
+
+  await humanHandle.sendMessage({ to: channel, text: body, data });
+}
+
+// ---------------------------------------------------------------------------
+// Public API: subscriptions
+// ---------------------------------------------------------------------------
+
+/**
+ * Subscribe to connection state changes.
+ * Returns unsubscribe function.
+ */
+export function onStateChange(callback: (state: ConnectionState) => void): () => void {
+  stateChangeListeners.add(callback);
+  return () => {
+    stateChangeListeners.delete(callback);
+  };
+}
+
+/**
+ * Register a handler for incoming messages.
+ * Returns unsubscribe function.
+ */
+export function onMessage(handler: MessageHandler): () => void {
+  messageHandlers.add(handler);
+  return () => {
+    messageHandlers.delete(handler);
+  };
+}
+
+/**
+ * Register a handler for agent exit events.
+ * Returns unsubscribe function.
+ */
+export function onAgentExited(callback: AgentExitHandler): () => void {
+  agentExitListeners.add(callback);
+  return () => {
+    agentExitListeners.delete(callback);
+  };
+}
+
+// ---------------------------------------------------------------------------
+// MCP context builder
+// ---------------------------------------------------------------------------
 
 /**
  * Build MCP context instructions for spawned agents.
@@ -386,153 +385,114 @@ Plan context: You are working on plan ${options.planId}`;
   return context;
 }
 
+// ---------------------------------------------------------------------------
+// Public API: agent lifecycle
+// ---------------------------------------------------------------------------
+
 /**
- * Spawn a new agent via the relay daemon.
- * Returns the spawn result with success/failure and PID.
- *
- * When planId is provided:
- * - MCP context is added to the task
- * - Agent is pre-joined to the plan channel
+ * Spawn a new agent via the relay broker.
+ * Throws on failure — no success/error wrapper.
  */
-export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResultPayload> {
-  if (!client || connectionState !== 'READY') {
-    return {
-      replyTo: '',
-      success: false,
-      name: options.name,
-      error: 'Not connected to relay daemon',
-    };
+export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnResult> {
+  if (!relay) {
+    throw new Error('[relay] Cannot spawn agent: not connected');
   }
 
-  try {
-    // Build task — skip MCP context for forge agents (they use curl, not relay)
-    const taskWithContext = options.skipMcpContext
-      ? options.task
-      : `${options.task}\n${buildMcpContext(options)}`;
+  const taskWithContext = options.skipMcpContext
+    ? options.task
+    : `${options.task}\n${buildMcpContext(options)}`;
 
-    // SDK spawn(options, timeoutMs?) — timeout MUST be 2nd arg, not inside options
-    const SPAWN_TIMEOUT = 90_000;
-    const spawnOpts = {
-      name: options.name,
-      cli: options.cli || 'claude',
-      task: taskWithContext,
+  const channelId = options.planId ? `#plan-${options.planId}` : undefined;
+
+  const channels: string[] = [];
+  if (channelId) channels.push(channelId);
+  if (options.channels) channels.push(...options.channels);
+
+  const agent = await relay.spawn(
+    options.name,
+    options.cli || 'claude',
+    taskWithContext,
+    {
+      channels: channels.length > 0 ? channels : undefined,
+      model: options.model,
       cwd: options.cwd,
       team: options.team,
-    };
-    const result = await client.spawn(spawnOpts, SPAWN_TIMEOUT);
-
-    if (result.success) {
-      const channelId = options.planId ? `#plan-${options.planId}` : undefined;
-      spawnedAgents.set(options.name, {
-        pid: result.pid,
-        spawnedAt: new Date(),
-        channelId,
-      });
-      console.log(`[relay] Spawned agent ${options.name} with PID ${result.pid}${channelId ? ` (channel: ${channelId})` : ''}`);
-
-      // Pre-join agent to plan channel for immediate communication
-      if (options.planId) {
-        const channel = `#plan-${options.planId}`;
-        const joined = client.adminJoinChannel(channel, options.name);
-        if (joined) {
-          console.log(`[relay] Pre-joined ${options.name} to ${channel}`);
-        } else {
-          console.warn(`[relay] Failed to pre-join ${options.name} to ${channel}`);
-        }
-      }
-
-      // Pre-join agent to additional channels
-      if (options.channels) {
-        for (const channel of options.channels) {
-          const joined = client.adminJoinChannel(channel, options.name);
-          if (joined) {
-            console.log(`[relay] Pre-joined ${options.name} to ${channel}`);
-          } else {
-            console.warn(`[relay] Failed to pre-join ${options.name} to ${channel}`);
-          }
-        }
-      }
-    } else {
-      console.error(`[relay] Failed to spawn agent ${options.name}: ${result.error}`);
     }
+  );
 
-    return result;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[relay] Error spawning agent ${options.name}: ${message}`);
-    return {
-      replyTo: '',
-      success: false,
-      name: options.name,
-      error: message,
-    };
-  }
+  agentHandles.set(agent.name, agent);
+
+  console.log(`[relay] Spawned agent ${agent.name}${channelId ? ` (channel: ${channelId})` : ''}`);
+
+  return { name: agent.name };
 }
 
 /**
  * Release (terminate) a spawned agent.
+ * Throws if agent is not tracked.
  */
-export async function releaseAgent(name: string): Promise<ReleaseResultPayload> {
-  if (!client || connectionState !== 'READY') {
-    return {
-      replyTo: '',
-      success: false,
-      name,
-      error: 'Not connected to relay daemon',
-    };
+export async function releaseAgent(name: string): Promise<void> {
+  const agent = agentHandles.get(name);
+  if (!agent) {
+    throw new Error(`[relay] Cannot release agent ${name}: not tracked`);
   }
 
-  try {
-    const result = await client.release(name);
+  await agent.release();
 
-    if (result.success) {
-      spawnedAgents.delete(name);
-      // Emit agent_left so UI knows agent is gone
-      emitAgentLeft(name, 'released');
-      console.log(`[relay] Released agent ${name}`);
+  agentHandles.delete(name);
+  emitAgentLeft(name, 'released');
 
-      // Deregister from relay registry to prevent agents.json bloat.
-      // Without this, every spawned agent stays in agents.json forever,
-      // causing CPU spiral as the daemon iterates over hundreds of stale entries.
-      try {
-        await client.removeAgent(name, { removeMessages: true });
-        console.log(`[relay] Deregistered agent ${name} from registry`);
-      } catch (removeErr) {
-        // Non-fatal — agent is already terminated, registry cleanup is best-effort
-        console.warn(`[relay] Failed to deregister agent ${name}: ${removeErr instanceof Error ? removeErr.message : removeErr}`);
-      }
-    } else {
-      console.error(`[relay] Failed to release agent ${name}: ${result.error}`);
-    }
-
-    return result;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[relay] Error releasing agent ${name}: ${message}`);
-    return {
-      replyTo: '',
-      success: false,
-      name,
-      error: message,
-    };
-  }
+  console.log(`[relay] Released agent ${name}`);
 }
 
 /**
- * Get list of currently tracked spawned agents.
+ * Remove agent tracking — safe to call even if agent has already exited.
+ * Does not throw if agent is not tracked.
  */
-export function getSpawnedAgents(): Array<{ name: string; pid?: number; spawnedAt: Date }> {
-  return Array.from(spawnedAgents.entries()).map(([name, info]) => ({
+export async function removeAgent(name: string): Promise<void> {
+  const agent = agentHandles.get(name);
+  if (agent) {
+    try {
+      await agent.release();
+    } catch (error) {
+      console.log(`[relay] Agent ${name} release during cleanup: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  agentHandles.delete(name);
+
+  console.log(`[relay] Removed agent ${name} from tracking`);
+}
+
+/**
+ * Set the model for a running spawned agent.
+ * NOTE: AgentRelay 3.x does not expose setModel directly.
+ * This is a known limitation of the 3.x migration.
+ */
+export async function setAgentModel(_name: string, _model: string): Promise<SetModelResult> {
+  throw new Error('[relay] setAgentModel is not yet supported in the 3.x SDK migration');
+}
+
+// ---------------------------------------------------------------------------
+// Public API: agent metadata queries
+// ---------------------------------------------------------------------------
+
+/**
+ * Get list of currently tracked spawned agents.
+ * channelId is derived from the agent's first channel membership.
+ */
+export function getSpawnedAgents(): Array<{ name: string; channelId?: string }> {
+  return Array.from(agentHandles.entries()).map(([name, agent]) => ({
     name,
-    ...info,
+    channelId: agent.channels?.[0],
   }));
 }
 
 /**
- * Check if an agent is currently spawned.
+ * Check if an agent is currently tracked as spawned.
  */
 export function isAgentSpawned(name: string): boolean {
-  return spawnedAgents.has(name);
+  return agentHandles.has(name);
 }
 
 /**
@@ -540,18 +500,69 @@ export function isAgentSpawned(name: string): boolean {
  * Returns undefined if the agent wasn't spawned with a plan context.
  */
 export function getSpawnedAgentChannel(name: string): string | undefined {
-  return spawnedAgents.get(name)?.channelId;
+  return agentHandles.get(name)?.channels?.[0];
+}
+
+export interface ConnectionMetrics {
+  connected: boolean;
+  trackedAgents: number;
+  broker?: {
+    agentCount: number;
+    pendingDeliveries: number;
+  };
+  agents?: Array<{
+    name: string;
+    pid?: number;
+  }>;
 }
 
 /**
- * Get relay connection metrics for health monitoring.
+ * Get connection metrics for health monitoring, including live broker and agent data
+ * from the relay daemon's status endpoint.
  */
-export function getConnectionMetrics(): ConnectionMetrics {
-  return {
-    ...metrics,
-    currentStateDurationMs: Date.now() - metrics.lastStateChangeAt,
+export async function getConnectionMetrics(): Promise<ConnectionMetrics> {
+  const base: ConnectionMetrics = {
+    connected,
+    trackedAgents: agentHandles.size,
   };
+
+  if (!relay || !connected) return base;
+
+  try {
+    const status = await relay.getStatus();
+
+    base.broker = {
+      agentCount: status.agent_count,
+      pendingDeliveries: status.pending_delivery_count,
+    };
+
+    base.agents = status.agents.map((a) => ({
+      name: a.name,
+      pid: a.pid,
+    }));
+  } catch (error) {
+    console.warn('[relay] Failed to fetch broker metrics:', error instanceof Error ? error.message : error);
+  }
+
+  return base;
 }
 
-// Re-export types
-export type { ClientState, SpawnResultPayload, ReleaseResultPayload };
+// ---------------------------------------------------------------------------
+// Public API: relay mode (formerly in service.ts)
+// ---------------------------------------------------------------------------
+
+export type RelayMode = ConnectionState;
+
+/**
+ * Get the current relay mode.
+ */
+export function getRelayMode(): RelayMode {
+  return getConnectionState();
+}
+
+/**
+ * Check if relay is available for use.
+ */
+export function isRelayAvailable(): boolean {
+  return isConnected();
+}

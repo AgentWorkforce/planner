@@ -4,9 +4,7 @@
  * Spawns Claude instances via relay-daemon for AI-assisted planning.
  */
 
-import { getClient, isConnected } from './client.js';
-import { getPlanningAgentPrompt } from './prompts/planning-agent.js';
-import { getRevisionAgentPrompt } from './prompts/revision-agent.js';
+import { spawnAgent, releaseAgent } from './client.js';
 import { randomUUID } from 'crypto';
 import type { ChangeRequest } from '../../../planner/src/domain/change-request.js';
 
@@ -230,29 +228,17 @@ Begin by reading the plan to understand its current state.`;
  * Spawn a planning agent via relay-daemon.
  */
 export async function spawnPlanningAgent(context: SpawnContext): Promise<SpawnResult> {
-  const client = getClient();
-
-  if (!client || !isConnected()) {
-    throw new Error('Relay client not connected');
-  }
-
   const agentName = generateAgentName(context.planId);
   const sessionToken = generateSessionToken();
   const task = buildInitialTask(context, sessionToken);
 
   try {
-    // Spawn the agent via relay
-    const result = await client.spawn({
-      name: agentName,
-      cli: 'claude',
-      task,
-      cwd: process.cwd(),
-    });
+    const result = await spawnAgent({ name: agentName, cli: 'claude', task, cwd: process.cwd() });
 
     console.log(`[spawner] Spawned planning agent: ${agentName} (${result.name})`);
 
     return {
-      agentId: result.name || agentName,
+      agentId: result.name,
       sessionToken,
       isMock: false,
     };
@@ -267,31 +253,19 @@ export async function spawnPlanningAgent(context: SpawnContext): Promise<SpawnRe
  * Spawn a revision agent via relay-daemon to handle a change request.
  */
 export async function spawnRevisionAgent(context: RevisionContext): Promise<SpawnResult> {
-  const client = getClient();
-
-  if (!client || !isConnected()) {
-    throw new Error('Relay client not connected');
-  }
-
   const agentName = generateRevisionAgentName(context.changeRequest.change_request_id);
   const sessionToken = generateSessionToken();
   const task = buildRevisionTask(context, sessionToken);
 
   try {
-    // Spawn the agent via relay
-    const result = await client.spawn({
-      name: agentName,
-      cli: 'claude',
-      task,
-      cwd: process.cwd(),
-    });
+    const result = await spawnAgent({ name: agentName, cli: 'claude', task, cwd: process.cwd() });
 
     console.log(
       `[spawner] Spawned revision agent: ${agentName} (${result.name}) for change request ${context.changeRequest.change_request_id}`
     );
 
     return {
-      agentId: result.name || agentName,
+      agentId: result.name,
       sessionToken,
       isMock: false,
     };
@@ -306,15 +280,8 @@ export async function spawnRevisionAgent(context: RevisionContext): Promise<Spaw
  * Terminate a planning agent.
  */
 export async function terminateAgent(agentId: string): Promise<void> {
-  const client = getClient();
-
-  if (!client || !isConnected()) {
-    console.log(`[spawner] Cannot terminate ${agentId}: relay not connected`);
-    return;
-  }
-
   try {
-    await client.release(agentId);
+    await releaseAgent(agentId);
     console.log(`[spawner] Terminated agent: ${agentId}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

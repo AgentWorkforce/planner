@@ -58,6 +58,24 @@ prpm.lock
 # Claude prompts (local snippets)
 .prompts/
 
+# Mull runtime data (realtime entity accumulator state)
+.mull/
+
+# Mull memory output (generated topic files)
+memory/
+
+# Vite caches
+.vite/
+
+# Forge worktrees
+.forge-worktrees/
+
+# Forge investigation artifacts
+FORGE_INVESTIGATION.md
+
+# Dev script PID files
+.dev-*.pid
+
 # Local docs (not tracked, except docs/flow/)
 docs/*
 !docs/flow/

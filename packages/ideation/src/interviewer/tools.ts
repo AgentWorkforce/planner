@@ -166,7 +166,7 @@ export const INTERVIEWER_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'graduate_blocks',
-    description: 'Graduate curated blocks into structured plan steps. This is the PREFERRED way to send work to the planner — always use this instead of send_to_planner when curated blocks exist. Converts validated specialist-reviewed blocks into concrete plan steps. NOTE: Each block can only be graduated once. Already-graduated blocks will be rejected — to update them after graduation, send changes as a message to the PlannerLead instead.',
+    description: 'Graduate curated blocks into structured plan steps. This is the PREFERRED way to send work to the planner — always use this instead of send_to_planner when curated blocks exist. Converts validated specialist-reviewed blocks into concrete plan steps. NOTE: Each block can only be graduated once. Already-graduated blocks will be rejected — to update them after graduation, send changes as a message to the PlannerLead instead. Use target_plan_id to add steps to an existing plan from this session rather than creating a new one.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -182,6 +182,10 @@ export const INTERVIEWER_TOOLS: ToolDefinition[] = [
         scope: {
           type: 'string',
           description: 'Optional target scope for the steps (e.g., repo, team, domain)',
+        },
+        target_plan_id: {
+          type: 'string',
+          description: 'Optional. UUID of an existing plan from this session to add steps to (creates a new version). Omit to create a new plan.',
         },
       },
       required: ['session_id'],
@@ -293,6 +297,7 @@ export interface GraduateBlocksInput {
   session_id: string;
   block_ids?: string[];
   scope?: string;
+  target_plan_id?: string;
 }
 
 export interface ReportAgentStatusInput {

@@ -64,10 +64,16 @@ export function createPlanHandlers(storage: PlanStorage) {
         // Get default org for MVP single-org mode
         const orgId = getDefaultOrgId(storage);
 
-        // Create plan with org, optional initiative, and optional source
-        const plan = createPlan(orgId, undefined, body.source);
+        // Create plan with org, optional initiative, optional source, and optional source_session_id
+        const plan = createPlan(orgId, undefined, body.source, body.source_session_id);
         if (body.initiative_id) {
           plan.initiative_id = body.initiative_id;
+        }
+        if (body.priority !== undefined) {
+          plan.priority = body.priority;
+        }
+        if (body.value_score !== undefined) {
+          plan.value_score = body.value_score;
         }
         storage.createPlan(plan);
 
@@ -120,12 +126,15 @@ export function createPlanHandlers(storage: PlanStorage) {
         const query = ListPlansQuerySchema.parse(req.query);
 
         // Build filter from query params
-        const filter: { status?: PlanStatus; initiative_id?: string } = {};
+        const filter: { status?: PlanStatus; initiative_id?: string; source_session_id?: string } = {};
         if (query.status) {
           filter.status = query.status;
         }
         if (query.initiative_id) {
           filter.initiative_id = query.initiative_id;
+        }
+        if (query.source_session_id) {
+          filter.source_session_id = query.source_session_id;
         }
 
         // Standard flow without attention data
@@ -163,6 +172,8 @@ export function createPlanHandlers(storage: PlanStorage) {
                 .map((s) => s.sub_plan_id as string) ?? [],
               initiative_id: plan.initiative_id,
               initiative,
+              priority: plan.priority,
+              value_score: plan.value_score,
               created_at: plan.created_at,
               updated_at: plan.updated_at,
             };
@@ -224,6 +235,8 @@ export function createPlanHandlers(storage: PlanStorage) {
               .map((s) => s.sub_plan_id as string) ?? [],
             initiative_id: plan.initiative_id,
             initiative,
+            priority: plan.priority,
+            value_score: plan.value_score,
             created_at: plan.created_at,
             updated_at: plan.updated_at,
             attention_types: attentionTypes,
@@ -280,10 +293,21 @@ export function createPlanHandlers(storage: PlanStorage) {
           throw notFound('Version');
         }
 
-        // Update initiative_id if provided (plan-level, allowed regardless of version status)
+        // Update plan-level fields if provided (allowed regardless of version status)
         let updatedPlan = plan;
+        const planUpdates: { initiative_id?: string | null; priority?: number; value_score?: number } = {};
         if (body.initiative_id !== undefined) {
-          const result = storage.updatePlan(id, { initiative_id: body.initiative_id });
+          planUpdates.initiative_id = body.initiative_id;
+        }
+        if (body.priority !== undefined) {
+          planUpdates.priority = body.priority;
+        }
+        if (body.value_score !== undefined) {
+          planUpdates.value_score = body.value_score;
+        }
+
+        if (Object.keys(planUpdates).length > 0) {
+          const result = storage.updatePlan(id, planUpdates);
           if (!result) {
             throw notFound('Plan');
           }

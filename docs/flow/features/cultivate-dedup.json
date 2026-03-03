@@ -2,7 +2,7 @@
   "feature_id": "cultivate-dedup",
   "title": "Deduplication (Exact + Near)",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "high",
   "dependencies": ["cultivate-domain", "cultivate-storage"],
   "parent": "cultivate-package",
@@ -16,6 +16,18 @@
       { "id": "ac4", "description": "When a near-duplicate is detected, the original signal receives a repetition score boost" },
       { "id": "ac5", "description": "Exact dedup runs pre-pipeline (before any processing), near dedup runs post-extraction (after keywords are available)" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/dedup/checkExactDuplicate.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/dedup/checkNearDuplicate.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/dedup/checkNearDuplicate.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/dedup/checkNearDuplicate.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/dedup/checkExactDuplicate.ts and src/dedup/checkNearDuplicate.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

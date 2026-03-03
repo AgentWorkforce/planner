@@ -14,7 +14,7 @@ import type { Request, Response, NextFunction } from 'express';
 import {
   getRelayMode,
   getChannelsForUser,
-  getClient,
+  getRelay,
   type ChannelInfo,
 } from '../../relay/index.js';
 
@@ -35,15 +35,6 @@ interface ChannelResponse {
     content: string;
     timestamp: number;
   };
-}
-
-/** Message response format */
-interface MessageResponse {
-  id: string;
-  from: string;
-  content: string;
-  timestamp: number;
-  data?: Record<string, unknown>;
 }
 
 /** Presence member format */
@@ -105,55 +96,13 @@ export function createChannelHandlers(storage: ChannelStorage) {
      * GET /api/channels/:id/messages
      * Get message history for a channel.
      */
-    messages: async (req: Request<ChannelParams>, res: Response, next: NextFunction) => {
+    messages: async (_req: Request<ChannelParams>, res: Response, next: NextFunction) => {
       try {
-        const { id: channelId } = req.params;
-        const limit = parseInt(req.query.limit as string) || 50;
-
         const mode = getRelayMode();
 
-        // When disconnected, return empty
-        if (mode !== 'connected') {
-          res.json({ messages: [], hasMore: false, mode });
-          return;
-        }
-
-        // Query messages from relay
-        const client = getClient();
-        if (!client) {
-          res.json({ messages: [], hasMore: false, mode: 'disconnected' });
-          return;
-        }
-
-        try {
-          // Query messages from relay client
-          const relayMessages = await client.queryMessages({ limit });
-
-          // Filter to channel messages and transform to canonical format
-          const channelMessages = relayMessages
-            .filter((msg) => msg.to === channelId || msg.channel === channelId)
-            .map((msg) => ({
-              id: msg.id,
-              from: msg.from,
-              fromName: msg.from,
-              entityType: 'agent' as const,
-              channelId: channelId,
-              content: msg.body || '',  // Transform wire 'body' to canonical 'content'
-              timestamp: typeof msg.timestamp === 'number'
-                ? new Date(msg.timestamp).toISOString()
-                : msg.timestamp,
-              data: msg.data,
-            }));
-
-          res.json({
-            messages: channelMessages,
-            hasMore: channelMessages.length >= limit,
-            mode,
-          });
-        } catch (error) {
-          console.error(`[channels] Failed to query messages for ${channelId}:`, error);
-          res.status(502).json({ messages: [], hasMore: false, mode, error: 'Failed to fetch messages from relay' });
-        }
+        // 3.x SDK does not expose message history queries.
+        // Message history is delivered in real-time via WebSocket; REST endpoint returns empty.
+        res.json({ messages: [], hasMore: false, mode });
       } catch (err) {
         next(err);
       }
@@ -176,15 +125,15 @@ export function createChannelHandlers(storage: ChannelStorage) {
         }
 
         // Query connected agents from relay
-        const client = getClient();
-        if (!client) {
+        const relay = getRelay();
+        if (!relay) {
           res.json({ members: [], onlineCount: 0, mode: 'disconnected' });
           return;
         }
 
         try {
           // Get list of connected agents
-          const agents = await client.listConnectedAgents();
+          const agents = await relay.listAgents();
 
           // Transform to presence format
           const members: PresenceMember[] = agents.map((agent) => ({

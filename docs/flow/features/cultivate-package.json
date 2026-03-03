@@ -111,6 +111,14 @@
     }
   },
 
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "partial",
+    "criteria": [],
+    "drift": [],
+    "notes": "20/22 child features verified. cultivate-presets missing Tier 2/5 presets. cultivate-jobs has stub workers for poll-sources and ingest-document."
+  },
+
   "context": {
     "architect": {
       "pattern": "Express plugin (createCultivateService) mounted by server",

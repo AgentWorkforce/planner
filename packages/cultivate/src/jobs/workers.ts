@@ -11,8 +11,10 @@
 import { Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { CultivateWorkers, CultivateQueues } from '../types.js';
-import { extractSignal } from '../extraction/index.js';
-import { updateRuleEffectiveness } from '../filters/effectiveness.js';
+import { processSignal as runPipeline } from '../pipeline/index.js';
+import type { ProcessSignalContext } from '../pipeline/types.js';
+import { SignalFilteredError, SignalProcessingError } from '../errors.js';
+import { DecayEngine, TrendDetector, Reclusterer } from '../temporal/index.js';
 
 interface WorkerDependencies {
   storage: any;
@@ -76,102 +78,106 @@ export async function createWorkers(
   const processSignal = new Worker(
     'cultivate:process-signal',
     async (job) => {
-      const { signal_id, title, body, author, author_type, source, timestamp, url } = job.data;
+      const {
+        signal_id,
+        title,
+        body,
+        author,
+        author_type,
+        source,
+        timestamp,
+        url,
+        greenhouse_id,
+      } = job.data;
 
       console.log(
         `[cultivate:worker:process-signal] Processing signal ${signal_id} (job ${job.id})`
       );
 
-      // Tier 1: Apply filter rules if registry is available
-      if (deps.filterRegistry && deps.storage) {
-        // Load current CultivateConfig from storage
+      try {
+        // Load greenhouse from storage
+        if (!greenhouse_id) {
+          throw new SignalProcessingError(
+            'greenhouse-lookup',
+            signal_id,
+            new Error('greenhouse_id is required in job data')
+          );
+        }
+
+        const greenhouse = await deps.storage.getGreenhouseById(greenhouse_id);
+        if (!greenhouse) {
+          throw new SignalProcessingError(
+            'greenhouse-lookup',
+            signal_id,
+            new Error(`Greenhouse ${greenhouse_id} not found`)
+          );
+        }
+
+        // Load current config from storage
         const config = await deps.storage.getConfig();
+        if (!config) {
+          throw new SignalProcessingError(
+            'config-lookup',
+            signal_id,
+            new Error('No Cultivate config found in storage')
+          );
+        }
 
-        // Extract enabled rule IDs from config.filter_rules
-        // If no config exists, all default rules are enabled
-        const enabledRuleIds: string[] = config
-          ? Object.entries(config.filter_rules)
-              .filter(([_, rule]: [string, any]) => rule.enabled)
-              .map(([ruleId]) => ruleId)
-          : deps.filterRegistry.list().map((rule: any) => rule.id);
-
-        // Get tier1_strictness from config (default 0.5)
-        const tier1_strictness = config?.tier1_strictness ?? 0.5;
-
-        // Create NormalizedEvent for rule execution
+        // Build NormalizedEvent
         const normalizedEvent = {
           title,
           body,
           author,
-          author_type: author_type || 'unknown' as const,
-          source_type: source ? 'webhook' as const : 'webhook' as const,
+          author_type: author_type || ('unknown' as const),
+          source_type: source || ('webhook' as const),
           external_id: signal_id,
           url,
           occurred_at: timestamp || new Date().toISOString(),
         };
 
-        // Execute Tier 1 filter rules with enabled rules only
-        const filterResult = deps.filterRegistry.execute(
-          normalizedEvent,
-          enabledRuleIds,
-          { tier1_strictness }
-        );
+        // Build ProcessSignalContext
+        const ctx: ProcessSignalContext = {
+          signal: normalizedEvent,
+          greenhouse,
+          config,
+          storage: deps.storage,
+          broadcaster: deps.sseBroadcaster,
+          filterRegistry: deps.filterRegistry,
+          provenance: [],
+        };
 
-        // Update effectiveness metrics for each evaluated rule
-        // Track signals_matched count for all enabled rules that were evaluated
-        for (const ruleId of enabledRuleIds) {
-          const rule = deps.filterRegistry.get(ruleId);
-          if (rule) {
-            // Rule exists and was evaluated, increment signals_matched
-            await updateRuleEffectiveness(deps.storage, ruleId, true);
-          }
-        }
+        // Run the pipeline
+        const result = await runPipeline(ctx);
 
-        // Handle rejection
-        if (!filterResult.passed) {
+        // Return success result
+        return {
+          signal_id,
+          stored_signal_id: result.storedSignalId,
+          cluster_id: result.clusterResult?.cluster_id,
+          score: result.scoringResult?.score,
+          provenance: result.provenance,
+          processed: true,
+        };
+      } catch (err) {
+        // Handle SignalFilteredError (expected path for noise rejection)
+        if (err instanceof SignalFilteredError) {
           console.log(
-            `[cultivate:worker:process-signal] Signal ${signal_id} rejected by Tier 1 filter: ${filterResult.rejection_reason}`
+            `[cultivate:worker:process-signal] Signal ${signal_id} filtered at Tier ${err.filter_tier}: ${err.reason}`
           );
+
+          // Return filtered result (no dead-letter)
           return {
             signal_id,
             filtered: true,
-            rejection_rule: filterResult.rejection_rule,
-            rejection_reason: filterResult.rejection_reason,
+            filter_tier: err.filter_tier,
+            rejection_reason: err.reason,
             processed: true,
           };
         }
 
-        // Log applied boost
-        if (filterResult.score_adjustment !== 0) {
-          console.log(
-            `[cultivate:worker:process-signal] Signal ${signal_id} boosted by ${filterResult.score_adjustment}`
-          );
-        }
+        // SignalProcessingError and other errors propagate to BullMQ for retry/dead-letter
+        throw err;
       }
-
-      // Extract signal insights using Anthropic SDK
-      // Errors (API errors, rate limits, validation failures) are wrapped in SignalProcessingError
-      // and propagate cleanly to BullMQ for retry and dead-letter routing
-      const extraction = await extractSignal('', {
-        signal_id,
-        title,
-        body,
-        author,
-        source,
-        timestamp,
-        anthropic: deps.anthropic,
-        model: deps.config.extractModel || 'claude-sonnet-4-latest',
-      });
-
-      // TODO: Score and classify the extracted signal
-      // TODO: Store extraction result and update signal status
-      // TODO: Emit SSE event for real-time progress
-
-      return {
-        signal_id,
-        extraction,
-        processed: true,
-      };
     },
     {
       connection,
@@ -199,8 +205,38 @@ export async function createWorkers(
     'cultivate:recluster',
     async (job) => {
       console.log(`[cultivate:worker:recluster] Processing job ${job.id}`);
-      // TODO: Implement recluster logic
-      return { processed: true };
+
+      // Get Anthropic API key from config
+      const anthropicApiKey = deps.config.anthropicApiKey;
+
+      // Instantiate Reclusterer
+      const reclusterer = new Reclusterer(deps.storage, anthropicApiKey);
+
+      // Get all greenhouses
+      const greenhouses = await deps.storage.listGreenhouses();
+
+      let totalMerged = 0;
+      let totalSplit = 0;
+      let totalRenamed = 0;
+
+      // Run recluster for each greenhouse
+      for (const greenhouse of greenhouses) {
+        const result = await reclusterer.recluster(greenhouse.id);
+        totalMerged += result.merged;
+        totalSplit += result.split;
+        totalRenamed += result.renamed;
+      }
+
+      console.log(
+        `[cultivate:worker:recluster] Completed: ${totalMerged} merged, ${totalSplit} split, ${totalRenamed} renamed`
+      );
+
+      return {
+        processed: true,
+        merged: totalMerged,
+        split: totalSplit,
+        renamed: totalRenamed,
+      };
     },
     {
       connection,
@@ -212,8 +248,37 @@ export async function createWorkers(
     'cultivate:decay',
     async (job) => {
       console.log(`[cultivate:worker:decay] Processing job ${job.id}`);
-      // TODO: Implement decay logic
-      return { processed: true };
+
+      // Instantiate DecayEngine
+      const decayEngine = new DecayEngine(deps.storage);
+
+      // Get all greenhouses
+      const greenhouses = await deps.storage.listGreenhouses();
+
+      let totalUpdated = 0;
+      let totalDecayed = 0;
+
+      // Run decay for each greenhouse
+      for (const greenhouse of greenhouses) {
+        const result = await decayEngine.applyDecay(
+          greenhouse.id,
+          90,    // halfLifeDays
+          0.15,  // decayThreshold
+          true   // linkedExempt
+        );
+        totalUpdated += result.updated;
+        totalDecayed += result.decayed;
+      }
+
+      console.log(
+        `[cultivate:worker:decay] Completed: ${totalUpdated} signals updated, ${totalDecayed} newly decayed`
+      );
+
+      return {
+        processed: true,
+        updated: totalUpdated,
+        decayed: totalDecayed,
+      };
     },
     {
       connection,
@@ -225,8 +290,39 @@ export async function createWorkers(
     'cultivate:trend-detect',
     async (job) => {
       console.log(`[cultivate:worker:trend-detect] Processing job ${job.id}`);
-      // TODO: Implement trend detection
-      return { processed: true };
+
+      // Instantiate TrendDetector
+      const trendDetector = new TrendDetector(deps.storage, deps.sseBroadcaster);
+
+      // Get all greenhouses
+      const greenhouses = await deps.storage.listGreenhouses();
+
+      let totalUpdated = 0;
+      let totalRising = 0;
+      let totalDeclining = 0;
+      let totalStable = 0;
+
+      // Run trend detection for each greenhouse
+      for (const greenhouse of greenhouses) {
+        const result = await trendDetector.detectTrends(greenhouse.id);
+        totalUpdated += result.updated;
+        totalRising += result.rising;
+        totalDeclining += result.declining;
+        totalStable += result.stable;
+      }
+
+      console.log(
+        `[cultivate:worker:trend-detect] Completed: ${totalUpdated} clusters updated ` +
+        `(${totalRising} rising, ${totalStable} stable, ${totalDeclining} declining)`
+      );
+
+      return {
+        processed: true,
+        updated: totalUpdated,
+        rising: totalRising,
+        declining: totalDeclining,
+        stable: totalStable,
+      };
     },
     {
       connection,

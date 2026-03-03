@@ -5,7 +5,9 @@
     "noUnusedParameters": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@plannr/shared-ui": ["../shared-ui/src/index.ts"],
+      "@plannr/shared-ui/*": ["../shared-ui/src/*"]
     }
   },
   "include": ["src"],

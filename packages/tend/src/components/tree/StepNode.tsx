@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import type { TreeStep } from './ProjectTree';
+import { TreeNodeLayout } from './TreeNodeLayout';
 
 export interface StepNodeProps {
   step: TreeStep;
@@ -8,64 +9,82 @@ export interface StepNodeProps {
   onClick?: () => void;
 }
 
+const STATUS_MAP: Record<string, { icon: string; className: string }> = {
+  pending: { icon: '○', className: 'text-text-muted' },
+  running: { icon: '◉', className: 'text-accent-primary animate-pulse' },
+  done: { icon: '✓', className: 'text-success' },
+  blocked: { icon: '⚠', className: 'text-accent-secondary' },
+  failed: { icon: '✗', className: 'text-accent-secondary' },
+};
+
 /**
  * StepNode - Compact step in the ASCII tree
  *
  * No borders, no backgrounds, no badges.
  * Just: status char + title + dep count (plain text).
  * Selected/focused states use text color, not backgrounds.
+ *
+ * Trailing indicators (right-to-left priority):
+ * 1. Click hint when focused awaiting second click
+ * 2. Stall warning for running steps
+ * 3. Satisfaction score for completed steps
+ * 4. Dependency count otherwise
  */
 export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = false, onClick }: StepNodeProps) {
   const status = step.execution_status || 'pending';
-
-  const statusConfig = {
-    pending: { icon: '○', className: 'text-text-muted' },
-    running: { icon: '◉', className: 'text-accent-primary animate-pulse' },
-    done: { icon: '✓', className: 'text-success' },
-    blocked: { icon: '⚠', className: 'text-accent-secondary' },
-    failed: { icon: '✗', className: 'text-accent-secondary' },
-  };
-
-  const { icon, className: statusClassName } = statusConfig[status];
+  const { icon, className: iconClassName } = STATUS_MAP[status] ?? STATUS_MAP.pending;
   const hasDependencies = step.dependencies && step.dependencies.length > 0;
 
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'flex items-center gap-1.5 cursor-pointer transition-colors font-mono',
-        'hover:text-text-primary',
-        isSelected && 'text-accent-primary',
-        isFocusedAwaitingClick && !isSelected && 'text-accent-primary/70',
-        !isSelected && !isFocusedAwaitingClick && 'text-text-secondary'
-      )}
-    >
-      {/* Status indicator */}
-      <span className={cn('text-sm flex-shrink-0', statusClassName)}>
-        {icon}
-      </span>
-
-      {/* Step title */}
-      <span className="text-sm truncate">{step.title || 'Untitled Step'}</span>
-
-      {/* Dot leaders */}
-      <span className="flex-1 min-w-0 overflow-hidden text-text-muted select-none opacity-40 leading-none">
-        {'·'.repeat(40)}
-      </span>
-
-      {/* Click hint for focused steps */}
+  const trailing = (
+    <>
+      {/* Click hint for focused steps — takes priority over everything else */}
       {isFocusedAwaitingClick && !isSelected && (
         <span className="flex-shrink-0 text-xs text-text-muted italic">
           click
         </span>
       )}
 
-      {/* Dependency count — plain text */}
-      {hasDependencies && !isFocusedAwaitingClick && (
-        <span className="flex-shrink-0 text-xs text-text-muted tabular-nums">
+      {/* Stall warning for running steps */}
+      {!isFocusedAwaitingClick && step.stallWarning && status === 'running' && (
+        <span
+          className="flex-shrink-0 text-xs text-amber-400 animate-pulse"
+          title="Agent may be stalled"
+        >
+          !
+        </span>
+      )}
+
+      {/* Satisfaction score for completed steps */}
+      {!isFocusedAwaitingClick && step.score !== undefined && status === 'done' && (
+        <span
+          className={cn(
+            'flex-shrink-0 text-xs tabular-nums',
+            step.score >= 80 ? 'text-success' : step.score >= 50 ? 'text-text-muted' : 'text-accent-secondary'
+          )}
+          title={`Satisfaction score: ${step.score}/100`}
+        >
+          {step.score}
+        </span>
+      )}
+
+      {/* Dependency count — only when no other indicator shown */}
+      {hasDependencies && !isFocusedAwaitingClick && step.score === undefined && !step.stallWarning && (
+        <span className={cn('flex-shrink-0 text-xs text-text-muted tabular-nums')}>
           {step.dependencies.length}
         </span>
       )}
-    </div>
+    </>
+  );
+
+  return (
+    <TreeNodeLayout
+      icon={icon}
+      iconClassName={iconClassName}
+      label={step.title || 'Untitled Step'}
+      trailing={trailing}
+      isSelected={isSelected}
+      isFocusedAwaitingClick={isFocusedAwaitingClick}
+      onClick={onClick}
+    />
   );
 }

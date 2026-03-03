@@ -2,7 +2,7 @@
   "feature_id": "cultivate-server-mount",
   "title": "Server Integration",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-startup"],
   "parent": "cultivate-package",
@@ -17,6 +17,19 @@
       { "id": "csm-ac5", "description": "@plannr/cultivate added to server package.json dependencies" },
       { "id": "csm-ac6", "description": "dev.sh updated to start Redis before server" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "csm-ac1", "status": "satisfied", "evidence": "packages/server/src/config.ts" },
+      { "id": "csm-ac2", "status": "satisfied", "evidence": "packages/server/src/server.ts" },
+      { "id": "csm-ac3", "status": "satisfied", "evidence": "packages/server/src/server.ts" },
+      { "id": "csm-ac4", "status": "satisfied", "evidence": "packages/server/src/server.ts" },
+      { "id": "csm-ac5", "status": "satisfied", "evidence": "packages/server/package.json" },
+      { "id": "csm-ac6", "status": "satisfied", "evidence": "scripts/dev.sh" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["server"],

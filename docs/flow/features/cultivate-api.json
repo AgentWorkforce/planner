@@ -2,7 +2,7 @@
   "feature_id": "cultivate-api",
   "title": "REST API Layer",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-storage", "cultivate-pipeline", "cultivate-presets", "cultivate-recommender", "cultivate-jobs", "cultivate-sse", "cultivate-tuner"],
   "parent": "cultivate-package",
@@ -23,6 +23,25 @@
       { "id": "ca-ac11", "description": "SSE endpoint: GET /events streams all cultivate SSE events" },
       { "id": "ca-ac12", "description": "All request bodies validated with Zod; validation errors return 422 with details" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "ca-ac1", "status": "satisfied", "evidence": "src/routes.ts:24" },
+      { "id": "ca-ac2", "status": "satisfied", "evidence": "src/routes.ts:40-44" },
+      { "id": "ca-ac3", "status": "satisfied", "evidence": "src/routes.ts:53-56" },
+      { "id": "ca-ac4", "status": "satisfied", "evidence": "src/routes.ts:60-61" },
+      { "id": "ca-ac5", "status": "satisfied", "evidence": "src/routes.ts:65-69" },
+      { "id": "ca-ac6", "status": "satisfied", "evidence": "src/routes.ts:72" },
+      { "id": "ca-ac7", "status": "satisfied", "evidence": "src/routes.ts:87-88" },
+      { "id": "ca-ac8", "status": "satisfied", "evidence": "src/routes.ts:95" },
+      { "id": "ca-ac9", "status": "satisfied", "evidence": "src/routes.ts:76-80" },
+      { "id": "ca-ac10", "status": "satisfied", "evidence": "src/routes.ts:99-102" },
+      { "id": "ca-ac11", "status": "satisfied", "evidence": "src/routes.ts:106" },
+      { "id": "ca-ac12", "status": "satisfied", "evidence": "src/api/schemas.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

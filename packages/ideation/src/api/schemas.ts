@@ -80,6 +80,11 @@ export const SendToPlannerRequestSchema = z.object({
   context: z.string().optional(),
   /** Optional initiative to associate the plan with */
   initiative_id: z.string().optional(),
+  /**
+   * When true, always create a new independent plan regardless of prior sends.
+   * When false/undefined and prior sends exist, creates a new version on the most recent plan.
+   */
+  new_plan: z.boolean().optional(),
 });
 export type SendToPlannerRequest = z.infer<typeof SendToPlannerRequestSchema>;
 

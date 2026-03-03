@@ -45,10 +45,9 @@ const ROLE_CONFIG: Record<AgentRole, { icon: string; label: string }> = {
 
 // Human-readable state labels
 const STATE_LABELS: Record<AgentState, string> = {
-  normal: 'Ready',
+  idle: 'Idle',
   working: 'Working',
   needs_input: 'Needs input',
-  idle: 'Idle',
   error: 'Error',
 };
 
@@ -76,10 +75,9 @@ const SIZE_CONFIG = {
 
 // State-based container styles
 const STATE_CONTAINER_STYLES: Record<AgentState, string> = {
-  normal: 'opacity-100',
+  idle: 'opacity-50',
   working: 'opacity-100',
   needs_input: 'opacity-100 ring-2 ring-warning/50 ring-offset-1 ring-offset-bg-secondary',
-  idle: 'opacity-50',
   error: 'opacity-100',
 };
 
@@ -175,7 +173,6 @@ function StateIndicator({
           ⚠
         </div>
       );
-    case 'normal':
     case 'idle':
     default:
       return null;
@@ -207,7 +204,7 @@ export function AgentAvatar({
   const [showCompletionGlow, setShowCompletionGlow] = useState(false);
 
   useEffect(() => {
-    if (prevStateRef.current === 'working' && (state === 'normal' || state === 'idle')) {
+    if (prevStateRef.current === 'working' && state === 'idle') {
       setShowCompletionGlow(true);
       const timer = setTimeout(() => setShowCompletionGlow(false), 1200);
       prevStateRef.current = state;

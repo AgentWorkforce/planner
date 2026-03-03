@@ -5,12 +5,16 @@
  * Used by the Interviewer to spawn specialists on-demand.
  */
 
-import type { SpawnResultPayload } from '@agent-relay/sdk';
 import { sessionChannelId } from '../interviewer/config.js';
 
 // =============================================================================
 // Types
 // =============================================================================
+
+interface SpawnResult {
+  name: string;
+  pid?: number;
+}
 
 /**
  * Signature matching the server relay's spawnAgent function.
@@ -21,7 +25,7 @@ export interface SpawnAgentFn {
     task: string;
     cwd?: string;
     cli?: string;
-  }): Promise<SpawnResultPayload>;
+  }): Promise<SpawnResult>;
 }
 
 /**
@@ -59,13 +63,8 @@ export function createSpecialistSpawner(
       cwd: process.cwd(),
     });
 
-    if (!result.success) {
-      console.error(`[specialist-spawner] Failed to spawn ${agentName}: ${result.error}`);
-      throw new Error(`Failed to spawn specialist ${name}: ${result.error}`);
-    }
-
-    console.log(`[specialist-spawner] Successfully spawned ${result.name || agentName}`);
-    return result.name || agentName;
+    console.log(`[specialist-spawner] Successfully spawned ${result.name}`);
+    return result.name;
   };
 }
 

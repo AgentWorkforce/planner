@@ -27,6 +27,18 @@ export interface TreeStep {
   created_at?: string;
   metadata?: Record<string, unknown>;
   acceptance_criteria?: Array<{ id: string; description: string; type?: string }>;
+  // Quality monitoring fields — populated from build monitor SSE events
+  score?: number;
+  scoreReasoning?: string;
+  matchedCriteria?: string[];
+  failedCriteria?: string[];
+  failures?: string[];
+  estimatedCostUsd?: number;
+  durationMs?: number;
+  model?: string;
+  stallWarning?: boolean;
+  /** Runtime error message for failed steps */
+  error?: string;
 }
 
 /**

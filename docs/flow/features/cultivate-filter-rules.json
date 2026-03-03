@@ -2,7 +2,7 @@
   "feature_id": "cultivate-filter-rules",
   "title": "Tier 0 + Tier 1 Filtering (Greenhouse Gate + Rule Registry)",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain", "cultivate-storage"],
   "parent": "cultivate-package",
@@ -22,6 +22,24 @@
       { "id": "cfr-ac10", "description": "Tier 1: tier1_strictness from config determines rejection threshold for aggregate rule scoring" },
       { "id": "cfr-ac11", "description": "Rejected signals throw SignalFilteredError with filter_tier, rule_name, and reason" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cfr-ac1", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" },
+      { "id": "cfr-ac2", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" },
+      { "id": "cfr-ac3", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" },
+      { "id": "cfr-ac4", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac5", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac6", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac7", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac8", "status": "satisfied", "evidence": "src/filters/rule-registry.ts" },
+      { "id": "cfr-ac9", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac10", "status": "satisfied", "evidence": "src/filters/rule-registry.ts" },
+      { "id": "cfr-ac11", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

@@ -1,20 +1,20 @@
 /**
  * WebSocket Proxy for Relay Communication
  *
- * Bridges browser WebSocket connections to the relay daemon.
- * Each browser connection gets its own RelayClient with entityType: 'user'.
+ * Bridges browser WebSocket connections to the single shared relay client.
+ * The server acts as a message router: one AgentRelay instance, many browsers.
+ * Channel membership is tracked locally per UserConnection — no per-browser relay clients.
  *
  * Protocol:
  * - Browser sends JSON: { type: 'join'|'leave'|'send'|'dm', ... }
- * - Browser receives JSON: { type: 'message'|'presence'|'error', ... }
+ * - Browser receives JSON: { type: 'message'|'channel_message'|'presence'|'status'|'error'|'joined'|'left', ... }
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
-import { RelayClient, type ClientState, type SendPayload, type SendMeta, type ChannelMessagePayload, type Envelope } from '@agent-relay/sdk';
-import { getRelayConfig } from './config.js';
-import { getRelayMode } from './service.js';
+import { sendMessage, sendChannelMessage, onMessage, onStateChange, isConnected, type ConnectionState } from './client.js';
 import { setBrowserBroadcast } from './agent-status.js';
+import { addWatcher, removeWatcher } from './session-presence.js';
 import { randomUUID } from 'crypto';
 
 /** Incoming message from browser */
@@ -37,14 +37,13 @@ interface RelayMessage {
   messageId?: string;
   timestamp?: number;
   data?: Record<string, unknown>;
-  status?: ClientState;
+  status?: ConnectionState;
   error?: string;
 }
 
-/** Active connection tracking */
+/** Active connection tracking — no relay client, just channel membership */
 interface UserConnection {
   ws: WebSocket;
-  client: RelayClient;
   userId: string;
   displayName: string;
   channels: Set<string>;
@@ -75,69 +74,50 @@ function sendToBrowser(ws: WebSocket, message: RelayMessage): void {
 /**
  * Handle incoming message from browser.
  */
-function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): void {
-  const { client, ws } = conn;
+async function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): Promise<void> {
+  const { ws } = conn;
 
   switch (message.type) {
     case 'join':
       if (message.channel) {
-        const joined = client.joinChannel(message.channel, conn.displayName);
-        if (joined) {
-          conn.channels.add(message.channel);
-          sendToBrowser(ws, { type: 'joined', channel: message.channel });
-          onUserChannelJoinCallback?.(message.channel);
-        } else {
-          sendToBrowser(ws, { type: 'error', error: `Failed to join channel ${message.channel}` });
-        }
+        conn.channels.add(message.channel);
+        sendToBrowser(ws, { type: 'joined', channel: message.channel });
+        onUserChannelJoinCallback?.(message.channel);
+        addWatcher(message.channel, conn.userId);
       }
       break;
 
     case 'leave':
       if (message.channel) {
-        const left = client.leaveChannel(message.channel);
-        if (left) {
-          conn.channels.delete(message.channel);
-          sendToBrowser(ws, { type: 'left', channel: message.channel });
-        }
+        conn.channels.delete(message.channel);
+        sendToBrowser(ws, { type: 'left', channel: message.channel });
+        removeWatcher(message.channel, conn.userId);
       }
       break;
 
     case 'send':
       if (message.channel && message.body) {
-        // Auto-join channel if not already a member (relay requires membership to send)
+        // Auto-track channel if not already tracked
         if (!conn.channels.has(message.channel)) {
-          console.log(`[ws-proxy] User ${conn.userId} auto-joining ${message.channel} before sending`);
-          const joined = client.joinChannel(message.channel, conn.displayName);
-          if (joined) {
-            conn.channels.add(message.channel);
-            sendToBrowser(ws, { type: 'joined', channel: message.channel });
-          } else {
-            console.log(`[ws-proxy] Failed to auto-join ${message.channel}`);
-            sendToBrowser(ws, { type: 'error', error: `Failed to join channel ${message.channel}` });
-            break;
-          }
+          conn.channels.add(message.channel);
+          sendToBrowser(ws, { type: 'joined', channel: message.channel });
         }
-
-        console.log(`[ws-proxy] User ${conn.userId} sending to ${message.channel}: "${message.body.slice(0, 50)}"`);
-        console.log(`[ws-proxy] User channels: ${Array.from(conn.channels).join(', ')}`);
-        console.log(`[ws-proxy] Client state: ${client.state}`);
-        const sent = client.sendChannelMessage(message.channel, message.body, {
-          data: message.data,
-        });
-        if (sent) {
-          console.log(`[ws-proxy] Message sent successfully to ${message.channel}`);
-        } else {
-          console.log(`[ws-proxy] Failed to send message - client not connected`);
-          sendToBrowser(ws, { type: 'error', error: 'Failed to send message: not connected' });
+        try {
+          await sendChannelMessage(message.channel, message.body, message.data);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          sendToBrowser(ws, { type: 'error', error: `Failed to send message: ${msg}` });
         }
       }
       break;
 
     case 'dm':
       if (message.to && message.body) {
-        const sent = client.sendMessage(message.to, message.body, 'message', message.data);
-        if (!sent) {
-          sendToBrowser(ws, { type: 'error', error: 'Failed to send direct message: not connected' });
+        try {
+          await sendMessage(message.to, message.body, undefined, message.data);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          sendToBrowser(ws, { type: 'error', error: `Failed to send direct message: ${msg}` });
         }
       }
       break;
@@ -145,85 +125,6 @@ function handleBrowserMessage(conn: UserConnection, message: BrowserMessage): vo
     default:
       sendToBrowser(ws, { type: 'error', error: `Unknown message type: ${(message as BrowserMessage).type}` });
   }
-}
-
-/**
- * Create a RelayClient for a browser user connection.
- */
-async function createUserClient(ws: WebSocket, userId: string, displayName: string): Promise<UserConnection> {
-  const config = getRelayConfig();
-
-  const client = new RelayClient({
-    agentName: userId,
-    socketPath: config.socketPath,
-    entityType: 'user',
-    displayName,
-    reconnect: true,
-    maxReconnectAttempts: 5,
-    reconnectDelayMs: 1000,
-    reconnectMaxDelayMs: 10000,
-    quiet: true,
-  });
-
-  const conn: UserConnection = {
-    ws,
-    client,
-    userId,
-    displayName,
-    channels: new Set(),
-  };
-
-  // Wire up relay callbacks to browser
-  client.onStateChange = (state: ClientState) => {
-    sendToBrowser(ws, { type: 'status', status: state });
-  };
-
-  client.onMessage = (from: string, payload: SendPayload, messageId: string, meta?: SendMeta) => {
-    // Determine entity type based on sender name pattern
-    const isUserMessage = from.startsWith('user-') || from.startsWith('anon-');
-    sendToBrowser(ws, {
-      type: 'message',
-      from,
-      fromName: from,
-      entityType: isUserMessage ? 'user' : 'agent',
-      body: payload.body || '',
-      messageId,
-      timestamp: Date.now(),
-      data: payload.data,
-    });
-  };
-
-  client.onChannelMessage = (from: string, channel: string, body: string, envelope: Envelope<ChannelMessagePayload>) => {
-    console.log(`[ws-proxy] Received channel message from ${from} in ${channel}: "${body.slice(0, 50)}"`);
-    // Determine entity type based on sender name pattern
-    const isUserMessage = from.startsWith('user-') || from.startsWith('anon-');
-    sendToBrowser(ws, {
-      type: 'channel_message',
-      channel,
-      from,
-      fromName: from,
-      entityType: isUserMessage ? 'user' : 'agent',
-      body,
-      messageId: envelope.id,
-      timestamp: envelope.ts || Date.now(),
-      data: envelope.payload?.data,
-    });
-  };
-
-  client.onError = (error: Error) => {
-    sendToBrowser(ws, { type: 'error', error: error.message });
-  };
-
-  try {
-    await client.connect();
-    console.log(`[ws-proxy] User ${displayName} (${userId}) connected to relay`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[ws-proxy] Failed to connect user ${userId} to relay: ${message}`);
-    sendToBrowser(ws, { type: 'error', error: `Failed to connect to relay: ${message}` });
-  }
-
-  return conn;
 }
 
 /**
@@ -235,6 +136,10 @@ function generateUserId(): string {
 
 /**
  * Initialize WebSocket proxy server.
+ *
+ * Registers a single global relay message handler that routes incoming relay
+ * messages to all subscribed browser connections. The relay is always available
+ * (embedded broker), so connections are never rejected based on relay mode.
  */
 export function initWebSocketProxy(server: Server): WebSocketServer {
   const wss = new WebSocketServer({
@@ -245,64 +150,97 @@ export function initWebSocketProxy(server: Server): WebSocketServer {
   console.log('[ws-proxy] WebSocket proxy initialized at /ws/relay');
 
   // Register direct-to-browser broadcast for agent status events
-  // (relay broadcasts may not reach user-type clients)
   setBrowserBroadcast((message) => {
-    broadcastToUsers(message as RelayMessage);
+    broadcastToUsers(message as unknown as RelayMessage);
   });
 
-  wss.on('connection', async (ws: WebSocket, req) => {
-    // Extract user info from query string or headers
-    // For now, generate anonymous user IDs - can be extended with auth
+  // Forward relay connection state changes to all browsers
+  onStateChange((state) => {
+    for (const conn of connections.values()) {
+      sendToBrowser(conn.ws, { type: 'status', status: state });
+    }
+  });
+
+  // Route incoming relay messages to subscribed browsers
+  onMessage((from, to, body, _threadId, data) => {
+    const isChannelMessage = to.startsWith('#');
+
+    for (const conn of connections.values()) {
+      if (isChannelMessage) {
+        // Channel message — only deliver to browsers subscribed to this channel
+        if (conn.channels.has(to)) {
+          const isUserMessage = from.startsWith('user-') || from.startsWith('anon-');
+          sendToBrowser(conn.ws, {
+            type: 'channel_message',
+            channel: to,
+            from,
+            fromName: from,
+            entityType: isUserMessage ? 'user' : 'agent',
+            body,
+            timestamp: Date.now(),
+            data,
+          });
+        }
+      } else {
+        // Direct message — deliver only to the target user if connected
+        if (conn.userId === to || conn.displayName === to) {
+          const isUserMessage = from.startsWith('user-') || from.startsWith('anon-');
+          sendToBrowser(conn.ws, {
+            type: 'message',
+            from,
+            fromName: from,
+            entityType: isUserMessage ? 'user' : 'agent',
+            body,
+            timestamp: Date.now(),
+            data,
+          });
+        }
+      }
+    }
+  });
+
+  wss.on('connection', (ws: WebSocket, req) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const displayName = url.searchParams.get('name') || 'Anonymous';
     const userId = url.searchParams.get('userId') || generateUserId();
 
-    const mode = getRelayMode();
+    const conn: UserConnection = {
+      ws,
+      userId,
+      displayName,
+      channels: new Set(),
+    };
+    connections.set(ws, conn);
 
-    if (mode !== 'connected') {
-      console.log(`[ws-proxy] User ${displayName} (${userId}) rejected: relay not connected`);
-      sendToBrowser(ws, {
-        type: 'status',
-        status: 'DISCONNECTED' as ClientState,
-        data: { message: 'Relay daemon not available. Start the relay daemon to enable real-time messaging.' },
-      });
-      ws.close(1013, 'Relay daemon not available');
-      return;
-    }
+    // Send initial relay connection status
+    sendToBrowser(ws, { type: 'status', status: isConnected() ? 'connected' : 'disconnected' });
 
-    // Connected mode - create real relay connection
-    try {
-      const conn = await createUserClient(ws, userId, displayName);
-      connections.set(ws, conn);
-
-      // Send initial status
-      sendToBrowser(ws, { type: 'status', status: conn.client.state });
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString()) as BrowserMessage;
-          handleBrowserMessage(conn, message);
-        } catch (error) {
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString()) as BrowserMessage;
+        handleBrowserMessage(conn, message).catch((error) => {
           const msg = error instanceof Error ? error.message : String(error);
-          sendToBrowser(ws, { type: 'error', error: `Invalid message format: ${msg}` });
-        }
-      });
+          sendToBrowser(ws, { type: 'error', error: `Message handling error: ${msg}` });
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        sendToBrowser(ws, { type: 'error', error: `Invalid message format: ${msg}` });
+      }
+    });
 
-      ws.on('close', () => {
-        console.log(`[ws-proxy] User ${displayName} (${userId}) disconnected`);
-        conn.client?.destroy();
-        connections.delete(ws);
-      });
+    ws.on('close', () => {
+      for (const channel of conn.channels) {
+        removeWatcher(channel, conn.userId);
+      }
+      connections.delete(ws);
+      console.log(`[ws-proxy] User ${displayName} (${userId}) disconnected`);
+    });
 
-      ws.on('error', (error) => {
-        console.error(`[ws-proxy] WebSocket error for ${userId}:`, error.message);
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[ws-proxy] Failed to create user connection: ${message}`);
-      sendToBrowser(ws, { type: 'error', error: message });
-      ws.close();
-    }
+    ws.on('error', (error) => {
+      console.error(`[ws-proxy] WebSocket error for ${userId}:`, error.message);
+    });
+
+    console.log(`[ws-proxy] User ${displayName} (${userId}) connected`);
   });
 
   return wss;

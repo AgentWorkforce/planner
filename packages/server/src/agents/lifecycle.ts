@@ -9,7 +9,6 @@ import {
   spawnAgent,
   releaseAgent,
   isAgentSpawned,
-  getSpawnedAgents,
 } from '../relay/client.js';
 import { interviewerPrompt } from './prompts/interviewer.js';
 import { plannerLeadPrompt } from './prompts/planner-lead.js';
@@ -43,7 +42,7 @@ export class AgentLifecycleManager {
     this.mcpServerUrl = options.mcpServerUrl || 'http://localhost:3001';
   }
 
-  async spawnInterviewer(sessionId: string, context?: { goal?: string }): Promise<void> {
+  async spawnInterviewer(sessionId: string, context?: { goal?: string; transcriptSummary?: string }): Promise<void> {
     const name = interviewerName(sessionId);
 
     if (isAgentSpawned(name) || this.spawning.has(name)) {
@@ -56,11 +55,12 @@ export class AgentLifecycleManager {
       const task = interviewerPrompt(sessionId, {
         goal: context?.goal,
         mcpServerUrl: this.mcpServerUrl,
+        transcriptSummary: context?.transcriptSummary,
       });
 
       const channelId = `#ideation-${sessionId.slice(0, 8)}`;
       console.log(`[lifecycle] Spawning Interviewer ${name} for session ${sessionId} (channel: ${channelId})`);
-      const result = await spawnAgent({
+      await spawnAgent({
         name,
         task,
         cli: 'claude',
@@ -68,20 +68,24 @@ export class AgentLifecycleManager {
         channels: [channelId],
       });
 
-      if (result.success) {
-        managedAgents.set(name, {
-          name,
-          type: 'interviewer',
-          entityId: sessionId,
-          spawnedAt: new Date(),
-        });
-        console.log(`[lifecycle] Interviewer ${name} spawned (pid: ${result.pid})`);
-      } else {
-        console.error(`[lifecycle] Failed to spawn Interviewer ${name}: ${result.error}`);
-      }
+      managedAgents.set(name, {
+        name,
+        type: 'interviewer',
+        entityId: sessionId,
+        spawnedAt: new Date(),
+      });
+      console.log(`[lifecycle] Interviewer ${name} spawned`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[lifecycle] Failed to spawn Interviewer ${name}: ${message}`);
     } finally {
       this.spawning.delete(name);
     }
+  }
+
+  async warmInterviewer(sessionId: string, context?: { goal?: string; transcriptSummary?: string }): Promise<void> {
+    console.log(`[lifecycle] Warming Interviewer for session ${sessionId}`);
+    await this.spawnInterviewer(sessionId, context);
   }
 
   async spawnPlannerLead(planId: string, context?: { goal?: string }): Promise<void> {
@@ -100,7 +104,7 @@ export class AgentLifecycleManager {
       });
 
       console.log(`[lifecycle] Spawning PlannerLead ${name} for plan ${planId}`);
-      const result = await spawnAgent({
+      await spawnAgent({
         name,
         task,
         cli: 'claude',
@@ -108,17 +112,16 @@ export class AgentLifecycleManager {
         cwd: process.cwd(),
       });
 
-      if (result.success) {
-        managedAgents.set(name, {
-          name,
-          type: 'planner-lead',
-          entityId: planId,
-          spawnedAt: new Date(),
-        });
-        console.log(`[lifecycle] PlannerLead ${name} spawned (pid: ${result.pid})`);
-      } else {
-        console.error(`[lifecycle] Failed to spawn PlannerLead ${name}: ${result.error}`);
-      }
+      managedAgents.set(name, {
+        name,
+        type: 'planner-lead',
+        entityId: planId,
+        spawnedAt: new Date(),
+      });
+      console.log(`[lifecycle] PlannerLead ${name} spawned`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[lifecycle] Failed to spawn PlannerLead ${name}: ${message}`);
     } finally {
       this.spawning.delete(name);
     }

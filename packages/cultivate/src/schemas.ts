@@ -2,6 +2,7 @@
  * Zod schemas for Cultivate API request/response validation
  */
 import { z } from 'zod';
+import { AdapterTypeSchema } from './domain/types';
 
 /**
  * Nugget metadata - Normalized quality metrics (all 0-1 scale)
@@ -82,7 +83,7 @@ export type InputField = z.infer<typeof InputFieldSchema>;
  */
 export const SourcePresetSchema = z.object({
   name: z.string().describe('Human-readable name of the preset'),
-  adapter_type: z.enum(['poll_api', 'webhook', 'push', 'structured_pull']).describe('Type of adapter this preset is for'),
+  adapter_type: AdapterTypeSchema.describe('Type of adapter this preset is for'),
   description: z.string().describe('Detailed description of the preset and its purpose'),
   required_inputs: z.array(InputFieldSchema).describe('Array of required input fields for configuring this adapter'),
   optional_inputs: z.array(InputFieldSchema).describe('Array of optional input fields with sensible defaults'),

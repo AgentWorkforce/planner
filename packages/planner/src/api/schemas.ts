@@ -16,12 +16,18 @@ export const CreatePlanRequestSchema = z.object({
   initiative_id: z.string().uuid().optional(),
   /** Plan source (manual, ideation, or intake) */
   source: PlanSourceSchema.optional(),
+  /** Explicit source session ID — takes precedence over source.session_id for provenance tracking */
+  source_session_id: z.string().uuid().optional(),
   /** Understanding from ideation session */
   understanding: UnderstandingSchema.optional(),
   /** DOT Framework: Decomposition limits and thresholds */
   decomposition_config: DecompositionConfigSchema.optional(),
   /** Steps to include in the initial version (e.g. from graduated blocks) */
   steps: z.array(StepSchema).optional(),
+  /** Priority level (1-5, default 3) */
+  priority: z.number().int().min(1).max(5).optional(),
+  /** Value score (1-10, default 5) */
+  value_score: z.number().int().min(1).max(10).optional(),
 });
 
 export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;
@@ -67,6 +73,10 @@ export const UpdatePlanRequestSchema = z.object({
   initiative_id: z.string().uuid().optional().nullable(),
   /** DOT Framework: Decomposition limits and thresholds */
   decomposition_config: DecompositionConfigSchema.optional(),
+  /** Priority level (1-5) */
+  priority: z.number().int().min(1).max(5).optional(),
+  /** Value score (1-10) */
+  value_score: z.number().int().min(1).max(10).optional(),
 });
 
 export type UpdatePlanRequest = z.infer<typeof UpdatePlanRequestSchema>;
@@ -83,6 +93,8 @@ export const ListPlansQuerySchema = z.object({
     .optional(),
   /** Filter plans by initiative */
   initiative_id: z.string().uuid().optional(),
+  /** Filter plans by originating ideation session */
+  source_session_id: z.string().optional(),
 });
 
 export type ListPlansQuery = z.infer<typeof ListPlansQuerySchema>;

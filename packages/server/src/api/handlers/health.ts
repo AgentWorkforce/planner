@@ -11,16 +11,20 @@ import { getConnectionMetrics, getConnectionState } from '../../relay/client.js'
 
 export interface RelayHealthResponse {
   status: 'connected' | 'disconnected' | 'error';
-  socketPath: string;
+  cwd: string;
   message?: string;
   metrics?: {
     state: string;
-    connectCount: number;
-    disconnectCount: number;
-    lastConnectedAt: number | null;
-    lastDisconnectedAt: number | null;
-    lastError: string | null;
-    currentStateDurationMs: number;
+    connected: boolean;
+    trackedAgents: number;
+    broker?: {
+      agentCount: number;
+      pendingDeliveries: number;
+    };
+    agents?: Array<{
+      name: string;
+      pid?: number;
+    }>;
   };
 }
 
@@ -48,19 +52,14 @@ export function createHealthHandlers() {
         message = 'Relay daemon not connected';
       }
 
-      const connectionMetrics = getConnectionMetrics();
+      const connectionMetrics = await getConnectionMetrics();
       const response: RelayHealthResponse = {
         status,
-        socketPath: config.socketPath,
+        cwd: config.cwd,
         message,
         metrics: {
           state: getConnectionState(),
-          connectCount: connectionMetrics.connectCount,
-          disconnectCount: connectionMetrics.disconnectCount,
-          lastConnectedAt: connectionMetrics.lastConnectedAt,
-          lastDisconnectedAt: connectionMetrics.lastDisconnectedAt,
-          lastError: connectionMetrics.lastError,
-          currentStateDurationMs: connectionMetrics.currentStateDurationMs,
+          ...connectionMetrics,
         },
       };
       res.json(response);

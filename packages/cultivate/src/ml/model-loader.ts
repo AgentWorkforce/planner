@@ -46,7 +46,10 @@ export async function loadClassificationModel(): Promise<void> {
 
     // Test the model with a simple classification to verify it works
     console.log('[cultivate/ml] Testing model with sample classification...');
-    const testResult = await loadedPipeline('This is a test', ['test', 'production']);
+    const rawTestResult = await loadedPipeline('This is a test', ['test', 'production']);
+
+    // Handle both single result and array
+    const testResult = Array.isArray(rawTestResult) ? rawTestResult[0] : rawTestResult;
 
     if (!testResult || !testResult.labels || !Array.isArray(testResult.labels)) {
       throw new Error('Model test failed - invalid output structure');
@@ -59,9 +62,6 @@ export async function loadClassificationModel(): Promise<void> {
   } catch (error) {
     // Clear any partial state
     classifier = null;
-
-    // Extract error message for diagnostics
-    const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Throw structured startup error
     throw CultivateStartupError.mlModelLoadFailed(

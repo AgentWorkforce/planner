@@ -4,6 +4,16 @@
 
 import { Router } from 'express';
 import type { CultivateContext } from './types.js';
+import { createGreenhouseHandlers } from './api/handlers/greenhouses.js';
+import { createSignalHandlers } from './api/handlers/signals.js';
+import { createClusterHandlers } from './api/handlers/clusters.js';
+import { createSourceHandlers } from './api/handlers/sources.js';
+import { createRecommendationHandlers } from './api/handlers/recommendations.js';
+import { createFilterRuleHandlers } from './api/handlers/filter-rules.js';
+import { createDeadLetterHandlers } from './api/handlers/dead-letter.js';
+import { createIngestionHandlers } from './api/handlers/ingestion.js';
+import { createEventsHandler } from './api/handlers/events.js';
+import { TunerClient } from './tuner/client.js';
 
 /**
  * Create Express router for Cultivate API
@@ -17,7 +27,7 @@ export function createCultivateRouter(context: CultivateContext): Router {
   /**
    * Health check endpoint
    */
-  router.get('/health', (req, res) => {
+  router.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
       service: 'cultivate',
@@ -25,12 +35,78 @@ export function createCultivateRouter(context: CultivateContext): Router {
     });
   });
 
-  // TODO: Add more routes as needed for:
-  // - Greenhouse management
-  // - Signal polling/ingestion
-  // - Document processing
-  // - Clustering and trend detection
-  // - SSE event streaming
+  // ========== Greenhouses ==========
+  const greenhouseHandlers = createGreenhouseHandlers(context.storage);
+  router.post('/greenhouses', greenhouseHandlers.create);
+  router.get('/greenhouses', greenhouseHandlers.list);
+  router.get('/greenhouses/:id', greenhouseHandlers.get);
+  router.patch('/greenhouses/:id', greenhouseHandlers.update);
+  router.delete('/greenhouses/:id', greenhouseHandlers.remove);
+
+  // ========== Signals ==========
+  // Create TunerClient for outcome recording (optional)
+  const tunerClient = context.config.tunerUrl
+    ? new TunerClient(context.config.tunerUrl, context.storage, context.tunerConfig ?? undefined)
+    : undefined;
+
+  const signalHandlers = createSignalHandlers(context.storage, tunerClient);
+  router.get('/signals', signalHandlers.list);
+  router.get('/signals/:id', signalHandlers.get);
+  router.post('/signals/:id/link', signalHandlers.link);
+  router.post('/signals/:id/dismiss', signalHandlers.dismiss);
+
+  // ========== Clusters ==========
+  const clusterHandlers = createClusterHandlers(context.storage);
+  router.get('/clusters', clusterHandlers.list);
+  router.get('/clusters/:id', clusterHandlers.get);
+
+  // ========== Sources ==========
+  const sourceHandlers = createSourceHandlers(context.storage);
+  router.post('/sources', sourceHandlers.create);
+  router.get('/sources', sourceHandlers.list);
+  router.get('/sources/:id', sourceHandlers.get);
+  router.patch('/sources/:id', sourceHandlers.update);
+  router.delete('/sources/:id', sourceHandlers.remove);
+
+  // ========== Source Presets ==========
+  router.get('/presets', sourceHandlers.presets);
+
+  // ========== Filter Rules ==========
+  const filterRuleHandlers = createFilterRuleHandlers(context.storage);
+  router.post('/filter-rules', filterRuleHandlers.create);
+  router.get('/filter-rules', filterRuleHandlers.list);
+  router.get('/filter-rules/:id', filterRuleHandlers.get);
+  router.patch('/filter-rules/:id', filterRuleHandlers.update);
+  router.delete('/filter-rules/:id', filterRuleHandlers.remove);
+
+  // ========== Ingestion ==========
+  const ingestionHandlers = createIngestionHandlers(
+    context.storage,
+    context.queues.ingestDocument
+  );
+  router.post('/ingestion', ingestionHandlers.create);
+  router.get('/ingestion/:id', ingestionHandlers.status);
+
+  // ========== Recommendations ==========
+  const recommendationHandlers = createRecommendationHandlers(
+    context.storage,
+    context.config.anthropicApiKey
+  );
+  router.get('/recommendations', recommendationHandlers.get);
+
+  // ========== Dead Letter Queue ==========
+  const deadLetterHandlers = createDeadLetterHandlers(context.queues.processSignal);
+  router.get('/dead-letter', deadLetterHandlers.list);
+  router.post('/dead-letter/:id/replay', deadLetterHandlers.replay);
+  router.post('/dead-letter/replay-all', deadLetterHandlers.replayAll);
+  router.delete('/dead-letter/:id', deadLetterHandlers.remove);
+
+  // ========== SSE Events ==========
+  const eventsHandler = createEventsHandler(context.sseBroadcaster);
+  router.get('/events', eventsHandler.stream);
+
+  // ========== Config ==========
+  // Config handlers (get, update) to be implemented if needed
 
   return router;
 }

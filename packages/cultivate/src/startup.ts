@@ -11,7 +11,6 @@ import type {
   CultivateQueues,
   CultivateWorkers,
   CultivateConfig,
-  SSEBroadcaster,
 } from './types.js';
 import { CultivateStartupError } from './errors.js';
 import { CultivateStorage } from './storage/index.js';

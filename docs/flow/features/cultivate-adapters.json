@@ -2,7 +2,7 @@
   "feature_id": "cultivate-adapters",
   "title": "Generic Adapter Types + Source Health Policy",
   "type": "feature",
-  "status": "approved",
+  "status": "verified",
   "priority": "critical",
   "dependencies": ["cultivate-domain", "cultivate-auth-encryption"],
   "parent": "cultivate-package",
@@ -18,6 +18,20 @@
       { "id": "ac6", "description": "Source health escalation: 1 fail warn, 3 consecutive unhealthy + SSE source:error, 10 disabled, auth error immediate disable" },
       { "id": "ac7", "description": "createAdapter(sourceConfig) factory returns the correct adapter type based on source configuration" }
     ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/adapters/poll-api-adapter.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/adapters/poll-api-adapter.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/adapters/webhook-adapter.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/adapters/push-adapter.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/adapters/structured-pull-adapter.ts" },
+      { "id": "ac6", "status": "satisfied", "evidence": "src/adapters/health-tracker.ts" },
+      { "id": "ac7", "status": "satisfied", "evidence": "src/adapters/factory.ts" }
+    ],
+    "drift": []
   },
   "plan_implementation": {
     "scopes": ["cultivate"],

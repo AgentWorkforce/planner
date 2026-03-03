@@ -67,6 +67,12 @@ export {
   type StatusAction,
 } from "./StatusBar";
 
+export {
+  ForgeConfigPanel,
+  type ForgeConfigPanelProps,
+  type ForgeConfigStep,
+} from "./ForgeConfigPanel";
+
 // Messaging components
 export {
   DateSeparator,
