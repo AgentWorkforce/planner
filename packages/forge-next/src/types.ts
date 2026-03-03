@@ -135,3 +135,73 @@ export const ForgeNextEventSchema = z.object({
 });
 
 export type ForgeNextEvent = z.infer<typeof ForgeNextEventSchema>;
+
+// ---------------------------------------------------------------------------
+// Run monitoring event payloads
+// ---------------------------------------------------------------------------
+
+export const StepMetricsEventSchema = z.object({
+  type: z.literal('step:metrics'),
+  run_id: z.string(),
+  step_name: z.string(),
+  model: z.string(),
+  duration_ms: z.number(),
+  estimated_cost_usd: z.number(),
+});
+
+export type StepMetricsEvent = z.infer<typeof StepMetricsEventSchema>;
+
+export const RunMetricsEventSchema = z.object({
+  type: z.literal('run:metrics'),
+  run_id: z.string(),
+  total_cost_usd: z.number(),
+  steps_completed: z.number().int(),
+  steps_total: z.number().int(),
+  avg_satisfaction: z.number().min(0).max(100),
+});
+
+export type RunMetricsEvent = z.infer<typeof RunMetricsEventSchema>;
+
+export const StallWarningEventSchema = z.object({
+  type: z.literal('stall:warning'),
+  run_id: z.string(),
+  step_name: z.string(),
+  elapsed_ms: z.number(),
+  threshold_ms: z.number(),
+});
+
+export type StallWarningEvent = z.infer<typeof StallWarningEventSchema>;
+
+export const StepRetryContextEventSchema = z.object({
+  type: z.literal('step:retry-context'),
+  run_id: z.string(),
+  step_name: z.string(),
+  attempt: z.number().int(),
+  previous_failures: z.array(z.string()),
+  total_failure_count: z.number().int(),
+});
+
+export type StepRetryContextEvent = z.infer<typeof StepRetryContextEventSchema>;
+
+export const StepFailedEnrichedEventSchema = z.object({
+  type: z.literal('step:failed-enriched'),
+  run_id: z.string(),
+  step_name: z.string(),
+  error: z.string(),
+  failures: z.array(z.string()),
+  attempt: z.number().int(),
+});
+
+export type StepFailedEnrichedEvent = z.infer<typeof StepFailedEnrichedEventSchema>;
+
+export const StepScoredEventSchema = z.object({
+  type: z.literal('step:scored'),
+  run_id: z.string(),
+  step_name: z.string(),
+  score: z.number().min(0).max(100),
+  reasoning: z.string(),
+  matched_criteria: z.array(z.string()),
+  failed_criteria: z.array(z.string()),
+});
+
+export type StepScoredEvent = z.infer<typeof StepScoredEventSchema>;

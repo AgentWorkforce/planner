@@ -10,6 +10,7 @@ import type { WorkflowRunner } from '@agent-relay/sdk/workflows';
 import type { ForgeNextStorage } from '../storage/interface.js';
 import type { GateManager } from '../gate-manager.js';
 import type { QuestionManager } from '../question-manager.js';
+import type { RunMonitor } from '../run-monitor.js';
 import type { FetchedPlan } from './handlers.js';
 import {
   createRunHandler,
@@ -36,6 +37,7 @@ export interface ForgeNextDeps {
   runner: WorkflowRunner;
   gateManager: GateManager;
   questionManager: QuestionManager;
+  runMonitor: RunMonitor;
   /**
    * Fetches plan metadata and steps from the planner domain.
    * Injected so forge-next has no direct import dependency on @plannr/planner.

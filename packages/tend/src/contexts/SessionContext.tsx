@@ -26,7 +26,7 @@ import {
 } from '@plannr/shared-ui';
 import type { ForgeConfig } from '@plannr/shared-ui';
 import { useBuildMonitor } from '@/hooks/useBuildMonitor';
-import type { RunStatus, StepState, GateState, QuestionState } from '@/hooks/useBuildMonitor';
+import type { RunStatus, StepState, GateState, QuestionState, RunMetrics } from '@/hooks/useBuildMonitor';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -126,6 +126,10 @@ export interface SessionContextValue {
   isBuildMonitoring: boolean;
   pendingGateCount: number;
   pendingQuestionCount: number;
+  /** Run-level aggregate metrics (cost, satisfaction, progress) */
+  buildRunMetrics: RunMetrics | null;
+  /** Step names with active stall warnings */
+  buildStallWarnings: string[];
 
   /** Build control actions */
   pauseBuild: () => Promise<void>;
@@ -573,6 +577,8 @@ export function SessionProvider({ sessionId, children }: SessionProviderProps) {
     isBuildMonitoring: buildMonitor.isMonitoring,
     pendingGateCount: buildMonitor.pendingGateCount,
     pendingQuestionCount: buildMonitor.pendingQuestionCount,
+    buildRunMetrics: buildMonitor.runMetrics,
+    buildStallWarnings: buildMonitor.stallWarnings,
     pauseBuild,
     resumeBuild,
     cancelBuild,

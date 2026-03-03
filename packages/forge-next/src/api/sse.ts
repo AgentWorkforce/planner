@@ -16,6 +16,7 @@ import type { WorkflowRunner, WorkflowEvent } from '@agent-relay/sdk/workflows';
 import type { ForgeNextStorage } from '../storage/interface.js';
 import type { GateManager } from '../gate-manager.js';
 import type { QuestionManager } from '../question-manager.js';
+import type { RunMonitor, StepMetricsPayload, RunMetricsPayload, StallWarningPayload, StepRetryContextPayload, StepFailedEnrichedPayload, StepScoredPayload } from '../run-monitor.js';
 import type { Gate, Question } from '../types.js';
 
 function routeParam(req: Request, key: string): string | null {
@@ -33,6 +34,7 @@ export interface SseDeps {
   runner: WorkflowRunner;
   gateManager: GateManager;
   questionManager: QuestionManager;
+  runMonitor: RunMonitor;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,13 +92,73 @@ interface QuestionAnsweredEvent {
   answer?: string | null;
 }
 
+interface StepMetricsEvent {
+  type: 'step:metrics';
+  run_id: string;
+  step_name: string;
+  model: string;
+  duration_ms: number;
+  estimated_cost_usd: number;
+}
+
+interface RunMetricsEvent {
+  type: 'run:metrics';
+  run_id: string;
+  total_cost_usd: number;
+  steps_completed: number;
+  steps_total: number;
+  avg_satisfaction: number;
+}
+
+interface StallWarningEvent {
+  type: 'stall:warning';
+  run_id: string;
+  step_name: string;
+  elapsed_ms: number;
+  threshold_ms: number;
+}
+
+interface StepRetryContextEvent {
+  type: 'step:retry-context';
+  run_id: string;
+  step_name: string;
+  attempt: number;
+  previous_failures: string[];
+  total_failure_count: number;
+}
+
+interface StepFailedEnrichedEvent {
+  type: 'step:failed-enriched';
+  run_id: string;
+  step_name: string;
+  error: string;
+  failures: string[];
+  attempt: number;
+}
+
+interface StepScoredEvent {
+  type: 'step:scored';
+  run_id: string;
+  step_name: string;
+  score: number;
+  reasoning: string;
+  matched_criteria: string[];
+  failed_criteria: string[];
+}
+
 type SsePayload =
   | RunStatusEvent
   | StepStatusEvent
   | GatePendingEvent
   | GateDecidedEvent
   | QuestionPendingEvent
-  | QuestionAnsweredEvent;
+  | QuestionAnsweredEvent
+  | StepMetricsEvent
+  | RunMetricsEvent
+  | StallWarningEvent
+  | StepRetryContextEvent
+  | StepFailedEnrichedEvent
+  | StepScoredEvent;
 
 // ---------------------------------------------------------------------------
 // SSE utility
@@ -372,6 +434,46 @@ export function runEventsSSEHandler(deps: SseDeps) {
     deps.questionManager.on('question:dismissed', onQuestionDismissed);
 
     // ---------------------------------------------------------------------------
+    // Subscribe: run monitor events
+    // ---------------------------------------------------------------------------
+    const onStepMetrics = (data: StepMetricsPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'step:metrics', ...data });
+    };
+
+    const onRunMetrics = (data: RunMetricsPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'run:metrics', ...data });
+    };
+
+    const onStallWarning = (data: StallWarningPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'stall:warning', ...data });
+    };
+
+    const onStepRetryContext = (data: StepRetryContextPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'step:retry-context', ...data });
+    };
+
+    const onStepFailedEnriched = (data: StepFailedEnrichedPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'step:failed-enriched', ...data });
+    };
+
+    const onStepScored = (data: StepScoredPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'step:scored', ...data });
+    };
+
+    deps.runMonitor.on('step:metrics', onStepMetrics);
+    deps.runMonitor.on('run:metrics', onRunMetrics);
+    deps.runMonitor.on('stall:warning', onStallWarning);
+    deps.runMonitor.on('step:retry-context', onStepRetryContext);
+    deps.runMonitor.on('step:failed-enriched', onStepFailedEnriched);
+    deps.runMonitor.on('step:scored', onStepScored);
+
+    // ---------------------------------------------------------------------------
     // Keepalive ping every 15 seconds to prevent proxy/load-balancer timeouts
     // ---------------------------------------------------------------------------
     const keepalive = setInterval(() => {
@@ -389,6 +491,12 @@ export function runEventsSSEHandler(deps: SseDeps) {
       deps.questionManager.off('question:pending', onQuestionPending);
       deps.questionManager.off('question:answered', onQuestionAnswered);
       deps.questionManager.off('question:dismissed', onQuestionDismissed);
+      deps.runMonitor.off('step:metrics', onStepMetrics);
+      deps.runMonitor.off('run:metrics', onRunMetrics);
+      deps.runMonitor.off('stall:warning', onStallWarning);
+      deps.runMonitor.off('step:retry-context', onStepRetryContext);
+      deps.runMonitor.off('step:failed-enriched', onStepFailedEnriched);
+      deps.runMonitor.off('step:scored', onStepScored);
       clearInterval(keepalive);
     });
   };

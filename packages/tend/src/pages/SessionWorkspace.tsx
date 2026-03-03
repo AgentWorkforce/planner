@@ -39,6 +39,8 @@ function SessionWorkspaceContent() {
     buildSteps,
     isBuildMonitoring,
     cancelBuild,
+    buildRunMetrics,
+    buildStallWarnings,
   } = useSession();
 
   const [searchParams] = useSearchParams();
@@ -246,10 +248,11 @@ function SessionWorkspaceContent() {
     );
   }
 
-  // ── Merge build step statuses into plan steps for display ─────────────────
+  // ── Merge build step statuses and quality data into plan steps for display ──
 
   const stepsWithBuildStatus = steps.map(step => {
-    const buildStep = buildSteps.get(step.step_id);
+    // Match by step_id first, fall back to matching by title (step_name from SSE)
+    const buildStep = buildSteps.get(step.step_id) ?? buildSteps.get(step.title);
     if (!buildStep) return step;
     const statusMap: Record<string, 'pending' | 'running' | 'done' | 'blocked' | 'failed'> = {
       pending: 'pending',
@@ -262,6 +265,17 @@ function SessionWorkspaceContent() {
     return {
       ...step,
       execution_status: statusMap[buildStep.status] ?? step.execution_status,
+      // Quality monitoring fields from build monitor
+      error: buildStep.error,
+      score: buildStep.score,
+      scoreReasoning: buildStep.scoreReasoning,
+      matchedCriteria: buildStep.matchedCriteria,
+      failedCriteria: buildStep.failedCriteria,
+      failures: buildStep.failures,
+      estimatedCostUsd: buildStep.estimatedCostUsd,
+      durationMs: buildStep.durationMs,
+      model: buildStep.model,
+      stallWarning: buildStep.stallWarning,
     };
   });
 
@@ -342,6 +356,8 @@ function SessionWorkspaceContent() {
           onStartBuild={activePlan?.status === 'published' && !isBuildMonitoring ? () => setBuildDialogOpen(true) : undefined}
           buildStatus={isBuildMonitoring ? buildStatus : undefined}
           onCancelBuild={isBuildMonitoring ? handleCancelBuild : undefined}
+          runMetrics={isBuildMonitoring ? buildRunMetrics : undefined}
+          stallWarnings={isBuildMonitoring ? buildStallWarnings : undefined}
         />
       }
       statusBar={

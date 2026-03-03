@@ -5,6 +5,7 @@ import { ProjectTree } from './ProjectTree';
 import { ChangesetTree } from './ChangesetTree';
 import { TreeModeSwitch } from './TreeModeSwitch';
 import type { ProjectTreeProps } from './ProjectTree';
+import type { RunMetrics } from '@/hooks/useBuildMonitor';
 
 const BranchIcon = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="flex-shrink-0 opacity-60">
@@ -32,6 +33,10 @@ interface TreePanelProps extends ProjectTreeProps {
   buildStatus?: 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled' | null;
   /** Cancel the current build */
   onCancelBuild?: () => void;
+  /** Run-level aggregate metrics from forge-next */
+  runMetrics?: RunMetrics | null;
+  /** Step names with active stall warnings */
+  stallWarnings?: string[];
 }
 
 export function TreePanel({
@@ -44,6 +49,8 @@ export function TreePanel({
   planStatus,
   buildStatus,
   onCancelBuild,
+  runMetrics,
+  stallWarnings = [],
 }: TreePanelProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { totalChanges, branch, detachedHead } = useWorkingChanges();
@@ -116,29 +123,54 @@ export function TreePanel({
         {/* Build status banner — shown below the header when a run is active */}
         {buildStatus && (
           <div className={cn(
-            'flex-shrink-0 flex items-center justify-between px-3 py-1.5 text-xs font-medium border-b',
-            buildStatus === 'running' && 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20',
-            buildStatus === 'paused' && 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-            buildStatus === 'completed' && 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-            buildStatus === 'failed' && 'bg-red-500/10 text-red-400 border-red-500/20',
-            buildStatus === 'cancelled' && 'bg-text-muted/10 text-text-muted border-border-subtle',
-            buildStatus === 'pending' && 'bg-text-muted/10 text-text-muted border-border-subtle',
+            'flex-shrink-0 border-b',
+            buildStatus === 'running' && 'bg-accent-cyan/10 border-accent-cyan/20',
+            buildStatus === 'paused' && 'bg-amber-500/10 border-amber-500/20',
+            buildStatus === 'completed' && 'bg-emerald-500/10 border-emerald-500/20',
+            buildStatus === 'failed' && 'bg-red-500/10 border-red-500/20',
+            buildStatus === 'cancelled' && 'bg-text-muted/10 border-border-subtle',
+            buildStatus === 'pending' && 'bg-text-muted/10 border-border-subtle',
           )}>
-            <span className="flex items-center gap-1.5">
-              {buildStatus === 'running' && <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan animate-pulse" />}
-              {buildStatus === 'paused' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-              {buildStatus === 'completed' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-              {buildStatus === 'failed' && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
-              Build {buildStatus}
-            </span>
-            {(buildStatus === 'running' || buildStatus === 'paused') && onCancelBuild && (
-              <button
-                type="button"
-                onClick={onCancelBuild}
-                className="px-2 py-0.5 text-xs text-text-muted hover:text-red-400 transition-colors"
-              >
-                Cancel
-              </button>
+            {/* Status row */}
+            <div className={cn(
+              'flex items-center justify-between px-3 py-1.5 text-xs font-medium',
+              buildStatus === 'running' && 'text-accent-cyan',
+              buildStatus === 'paused' && 'text-amber-400',
+              buildStatus === 'completed' && 'text-emerald-400',
+              buildStatus === 'failed' && 'text-red-400',
+              (buildStatus === 'cancelled' || buildStatus === 'pending') && 'text-text-muted',
+            )}>
+              <span className="flex items-center gap-1.5">
+                {buildStatus === 'running' && <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan animate-pulse" />}
+                {buildStatus === 'paused' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                {buildStatus === 'completed' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                {buildStatus === 'failed' && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
+                Build {buildStatus}
+              </span>
+              {(buildStatus === 'running' || buildStatus === 'paused') && onCancelBuild && (
+                <button
+                  type="button"
+                  onClick={onCancelBuild}
+                  className="px-2 py-0.5 text-xs text-text-muted hover:text-red-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            {/* Run metrics row — shown when aggregate data is available */}
+            {runMetrics && (
+              <div className="flex flex-wrap gap-3 px-3 pb-1.5 text-xs text-text-muted">
+                <span>{runMetrics.stepsCompleted}/{runMetrics.stepsTotal} steps</span>
+                {runMetrics.avgSatisfaction > 0 && (
+                  <span>Satisfaction: {Math.round(runMetrics.avgSatisfaction)}/100</span>
+                )}
+                {runMetrics.totalCostUsd > 0 && (
+                  <span>Cost: ${runMetrics.totalCostUsd.toFixed(3)}</span>
+                )}
+                {stallWarnings.length > 0 && (
+                  <span className="text-amber-400">{stallWarnings.length} stalled</span>
+                )}
+              </div>
             )}
           </div>
         )}

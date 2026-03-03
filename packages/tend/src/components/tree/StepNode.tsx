@@ -23,6 +23,12 @@ const STATUS_MAP: Record<string, { icon: string; className: string }> = {
  * No borders, no backgrounds, no badges.
  * Just: status char + title + dep count (plain text).
  * Selected/focused states use text color, not backgrounds.
+ *
+ * Trailing indicators (right-to-left priority):
+ * 1. Click hint when focused awaiting second click
+ * 2. Stall warning for running steps
+ * 3. Satisfaction score for completed steps
+ * 4. Dependency count otherwise
  */
 export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = false, onClick }: StepNodeProps) {
   const status = step.execution_status || 'pending';
@@ -31,15 +37,38 @@ export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = fa
 
   const trailing = (
     <>
-      {/* Click hint for focused steps */}
+      {/* Click hint for focused steps — takes priority over everything else */}
       {isFocusedAwaitingClick && !isSelected && (
         <span className="flex-shrink-0 text-xs text-text-muted italic">
           click
         </span>
       )}
 
-      {/* Dependency count — plain text */}
-      {hasDependencies && !isFocusedAwaitingClick && (
+      {/* Stall warning for running steps */}
+      {!isFocusedAwaitingClick && step.stallWarning && status === 'running' && (
+        <span
+          className="flex-shrink-0 text-xs text-amber-400 animate-pulse"
+          title="Agent may be stalled"
+        >
+          !
+        </span>
+      )}
+
+      {/* Satisfaction score for completed steps */}
+      {!isFocusedAwaitingClick && step.score !== undefined && status === 'done' && (
+        <span
+          className={cn(
+            'flex-shrink-0 text-xs tabular-nums',
+            step.score >= 80 ? 'text-success' : step.score >= 50 ? 'text-text-muted' : 'text-accent-secondary'
+          )}
+          title={`Satisfaction score: ${step.score}/100`}
+        >
+          {step.score}
+        </span>
+      )}
+
+      {/* Dependency count — only when no other indicator shown */}
+      {hasDependencies && !isFocusedAwaitingClick && step.score === undefined && !step.stallWarning && (
         <span className={cn('flex-shrink-0 text-xs text-text-muted tabular-nums')}>
           {step.dependencies.length}
         </span>

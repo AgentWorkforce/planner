@@ -23,6 +23,23 @@ export interface StepState {
   output?: string;
   error?: string;
   attempt?: number;
+  // Quality monitoring fields
+  score?: number;
+  scoreReasoning?: string;
+  matchedCriteria?: string[];
+  failedCriteria?: string[];
+  failures?: string[];
+  estimatedCostUsd?: number;
+  durationMs?: number;
+  model?: string;
+  stallWarning?: boolean;
+}
+
+export interface RunMetrics {
+  totalCostUsd: number;
+  avgSatisfaction: number;
+  stepsCompleted: number;
+  stepsTotal: number;
 }
 
 export interface GateState {
@@ -61,6 +78,10 @@ export interface UseBuildMonitorReturn {
   pendingGateCount: number;
   /** Count of pending questions */
   pendingQuestionCount: number;
+  /** Run-level aggregate metrics */
+  runMetrics: RunMetrics | null;
+  /** Step names with active stall warnings */
+  stallWarnings: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +114,13 @@ type BuildAction =
       questionId: string;
       status: 'answered' | 'dismissed';
       answer?: string | null;
-    };
+    }
+  | { type: 'STEP_SCORED'; stepName: string; score: number; reasoning: string; matchedCriteria: string[]; failedCriteria: string[] }
+  | { type: 'STEP_METRICS'; stepName: string; model: string; durationMs: number; estimatedCostUsd: number }
+  | { type: 'RUN_METRICS'; totalCostUsd: number; avgSatisfaction: number; stepsCompleted: number; stepsTotal: number }
+  | { type: 'STALL_WARNING'; stepName: string }
+  | { type: 'STEP_FAILED_ENRICHED'; stepName: string; error: string; failures: string[]; attempt: number }
+  | { type: 'STEP_RETRY_CONTEXT'; stepName: string; attempt: number; previousFailures: string[] };
 
 interface BuildState {
   runStatus: RunStatus | null;
@@ -102,6 +129,8 @@ interface BuildState {
   gates: GateState[];
   questions: QuestionState[];
   connected: boolean;
+  runMetrics: RunMetrics | null;
+  stallWarnings: Set<string>;
 }
 
 const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set(['completed', 'failed', 'cancelled']);
@@ -113,12 +142,14 @@ const initialState: BuildState = {
   gates: [],
   questions: [],
   connected: false,
+  runMetrics: null,
+  stallWarnings: new Set(),
 };
 
 function buildReducer(state: BuildState, action: BuildAction): BuildState {
   switch (action.type) {
     case 'RESET':
-      return { ...initialState };
+      return { ...initialState, stallWarnings: new Set() };
 
     case 'SET_CONNECTED':
       return { ...state, connected: action.connected };
@@ -139,6 +170,16 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
         output: action.output ?? existing?.output,
         error: action.error ?? existing?.error,
         attempt: action.attempt ?? existing?.attempt,
+        // Preserve quality fields across status updates
+        score: existing?.score,
+        scoreReasoning: existing?.scoreReasoning,
+        matchedCriteria: existing?.matchedCriteria,
+        failedCriteria: existing?.failedCriteria,
+        failures: existing?.failures,
+        estimatedCostUsd: existing?.estimatedCostUsd,
+        durationMs: existing?.durationMs,
+        model: existing?.model,
+        stallWarning: existing?.stallWarning,
       });
       return { ...state, steps: next };
     }
@@ -193,6 +234,88 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
           : q
       );
       return { ...state, questions };
+    }
+
+    case 'STEP_SCORED': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        steps.set(action.stepName, {
+          ...existing,
+          score: action.score,
+          scoreReasoning: action.reasoning,
+          matchedCriteria: action.matchedCriteria,
+          failedCriteria: action.failedCriteria,
+        });
+      }
+      return { ...state, steps };
+    }
+
+    case 'STEP_METRICS': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        steps.set(action.stepName, {
+          ...existing,
+          model: action.model,
+          durationMs: action.durationMs,
+          estimatedCostUsd: action.estimatedCostUsd,
+          stallWarning: false, // clear stall on metrics (step completed)
+        });
+      }
+      // Also clear from stall warnings
+      const stallWarnings = new Set(state.stallWarnings);
+      stallWarnings.delete(action.stepName);
+      return { ...state, steps, stallWarnings };
+    }
+
+    case 'RUN_METRICS':
+      return {
+        ...state,
+        runMetrics: {
+          totalCostUsd: action.totalCostUsd,
+          avgSatisfaction: action.avgSatisfaction,
+          stepsCompleted: action.stepsCompleted,
+          stepsTotal: action.stepsTotal,
+        },
+      };
+
+    case 'STALL_WARNING': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        steps.set(action.stepName, { ...existing, stallWarning: true });
+      }
+      const stallWarnings = new Set(state.stallWarnings);
+      stallWarnings.add(action.stepName);
+      return { ...state, steps, stallWarnings };
+    }
+
+    case 'STEP_FAILED_ENRICHED': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        steps.set(action.stepName, {
+          ...existing,
+          error: action.error,
+          failures: action.failures,
+          attempt: action.attempt,
+        });
+      }
+      return { ...state, steps };
+    }
+
+    case 'STEP_RETRY_CONTEXT': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        steps.set(action.stepName, {
+          ...existing,
+          failures: action.previousFailures,
+          attempt: action.attempt,
+        });
+      }
+      return { ...state, steps };
     }
 
     default:
@@ -299,6 +422,60 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
               questionId: data.question_id,
               status: data.type === 'question:answered' ? 'answered' : 'dismissed',
               answer: data.answer,
+            });
+            break;
+
+          case 'step:scored':
+            dispatch({
+              type: 'STEP_SCORED',
+              stepName: data.step_name,
+              score: data.score,
+              reasoning: data.reasoning,
+              matchedCriteria: data.matched_criteria,
+              failedCriteria: data.failed_criteria,
+            });
+            break;
+
+          case 'step:metrics':
+            dispatch({
+              type: 'STEP_METRICS',
+              stepName: data.step_name,
+              model: data.model,
+              durationMs: data.duration_ms,
+              estimatedCostUsd: data.estimated_cost_usd,
+            });
+            break;
+
+          case 'run:metrics':
+            dispatch({
+              type: 'RUN_METRICS',
+              totalCostUsd: data.total_cost_usd,
+              avgSatisfaction: data.avg_satisfaction,
+              stepsCompleted: data.steps_completed,
+              stepsTotal: data.steps_total,
+            });
+            break;
+
+          case 'stall:warning':
+            dispatch({ type: 'STALL_WARNING', stepName: data.step_name });
+            break;
+
+          case 'step:failed-enriched':
+            dispatch({
+              type: 'STEP_FAILED_ENRICHED',
+              stepName: data.step_name,
+              error: data.error,
+              failures: data.failures,
+              attempt: data.attempt,
+            });
+            break;
+
+          case 'step:retry-context':
+            dispatch({
+              type: 'STEP_RETRY_CONTEXT',
+              stepName: data.step_name,
+              attempt: data.attempt,
+              previousFailures: data.previous_failures,
             });
             break;
 
@@ -444,6 +621,12 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
     [state.questions]
   );
 
+  const stallWarnings = useMemo(
+    () => [...state.stallWarnings],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.stallWarnings]
+  );
+
   const isMonitoring =
     runId !== null && state.runStatus !== null && !TERMINAL_STATUSES.has(state.runStatus);
 
@@ -457,5 +640,7 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
     isMonitoring,
     pendingGateCount,
     pendingQuestionCount,
+    runMetrics: state.runMetrics,
+    stallWarnings,
   };
 }

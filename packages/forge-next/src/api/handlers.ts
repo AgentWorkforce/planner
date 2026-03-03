@@ -11,6 +11,7 @@ import type { WorkflowRunner } from '@agent-relay/sdk/workflows';
 import type { ForgeNextStorage } from '../storage/interface.js';
 import type { GateManager } from '../gate-manager.js';
 import type { QuestionManager } from '../question-manager.js';
+import type { RunMonitor } from '../run-monitor.js';
 import type { PlanStep, PlanMeta } from '../compiler.js';
 import { compilePlan } from '../compiler.js';
 import { ModelSelector } from '../model-selector.js';
@@ -50,6 +51,7 @@ export interface RunHandlerDeps {
   runner: WorkflowRunner;
   gateManager: GateManager;
   questionManager: QuestionManager;
+  runMonitor: RunMonitor;
   fetchPlan: (planId: string, version?: number) => Promise<FetchedPlan | null>;
 }
 
@@ -145,13 +147,15 @@ export function createRunHandler(deps: RunHandlerDeps) {
 
     // Compile plan → WorkflowConfig
     let workflowConfig;
+    let compilation;
     try {
-      workflowConfig = compilePlan(
+      compilation = compilePlan(
         plan,
         steps,
         compilerConfig as ForgeConfig,
         new ModelSelector(),
       );
+      workflowConfig = compilation.config;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[forge-next] compilePlan error:', msg);
@@ -200,6 +204,13 @@ export function createRunHandler(deps: RunHandlerDeps) {
     // Set up QuestionManager for this run
     deps.questionManager.reset();
     deps.questionManager.setRun(runId);
+
+    // Set up RunMonitor for this run
+    deps.runMonitor.reset();
+    deps.runMonitor.setForgeRunId(runId);
+    deps.runMonitor.setWorkflowConfig(workflowConfig);
+    deps.runMonitor.setStepCriteria(compilation.stepCriteria);
+    deps.runMonitor.bind(deps.runner);
 
     // Subscribe to runner events to:
     //  1. Map the relay run ID (needed for SSE correlation)

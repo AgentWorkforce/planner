@@ -17,7 +17,7 @@ import type { ModelSelector } from './model-selector.js';
 // this module stays decoupled from the planner package at import time. If/when
 // @plannr/planner exports these cleanly, import them directly instead.
 
-interface AcceptanceCriterion {
+export interface AcceptanceCriterion {
   id: string;
   description: string;
   type?: string;
@@ -72,6 +72,16 @@ interface ForgeConfig {
 }
 
 // ============================================
+// CompilationResult
+// ============================================
+
+export interface CompilationResult {
+  config: RelayYamlConfig;
+  /** Acceptance criteria per step_id, for post-execution scoring */
+  stepCriteria: Map<string, AcceptanceCriterion[]>;
+}
+
+// ============================================
 // Compiler
 // ============================================
 
@@ -82,14 +92,14 @@ interface ForgeConfig {
  * @param steps - Steps from the plan version
  * @param config - Forge execution configuration (overrides, policy)
  * @param modelSelector - ModelSelector instance for per-step model routing
- * @returns A RelayYamlConfig ready for dispatch to WorkflowRunner
+ * @returns A CompilationResult containing the RelayYamlConfig and a map of step acceptance criteria
  */
 export function compilePlan(
   plan: PlanMeta,
   steps: PlanStep[],
   config: ForgeConfig,
   modelSelector: ModelSelector
-): RelayYamlConfig {
+): CompilationResult {
   // Build a set of skipped step_ids upfront for O(1) lookups
   const skippedIds = buildSkippedSet(config.step_overrides ?? []);
 
@@ -101,7 +111,7 @@ export function compilePlan(
 
   const maxConcurrency = config.execution_policy?.max_concurrent_tasks ?? 5;
 
-  return {
+  const relayYamlConfig: RelayYamlConfig = {
     version: '1.0',
     name: `plan-${plan.plan_id}-v${plan.version}`,
     description: plan.summary?.goal ?? 'Plan execution',
@@ -118,6 +128,16 @@ export function compilePlan(
       },
     ],
   };
+
+  // Build criteria map for post-execution satisfaction scoring
+  const stepCriteria = new Map<string, AcceptanceCriterion[]>();
+  for (const step of activeSteps) {
+    if (step.acceptance_criteria && step.acceptance_criteria.length > 0) {
+      stepCriteria.set(step.step_id, step.acceptance_criteria);
+    }
+  }
+
+  return { config: relayYamlConfig, stepCriteria };
 }
 
 // ============================================
@@ -189,11 +209,13 @@ function buildWorkflowSteps(
   const timeoutMs = config.execution_policy?.max_timeout_ms;
   const retries = config.execution_policy?.retry_count;
 
+  const contextSteps = activeSteps.length > 15 ? activeSteps : undefined;
+
   return activeSteps.map(step => {
     const workflowStep: WorkflowStep = {
       name: step.step_id,
       agent: resolveAgentName(step.owner_role),
-      task: composeTask(step),
+      task: composeTask(step, contextSteps),
       dependsOn: step.dependencies.filter(depId => !skippedIds.has(depId)),
     };
 
@@ -249,9 +271,11 @@ function resolveModel(
 
 /**
  * Composes the task string for an agent step from title, description, and
- * acceptance criteria.
+ * acceptance criteria. For large plans (>15 steps), appends a Plan Context
+ * section using a pyramid summarization strategy: direct dependencies with
+ * acceptance criteria, then other steps grouped by scope.
  */
-function composeTask(step: PlanStep): string {
+function composeTask(step: PlanStep, allSteps?: PlanStep[]): string {
   const parts: string[] = [`## ${step.title}`];
 
   if (step.description) {
@@ -265,7 +289,81 @@ function composeTask(step: PlanStep): string {
     }
   }
 
+  if (allSteps !== undefined && allSteps.length > 15) {
+    parts.push(composePlanContext(step, allSteps));
+  }
+
   return parts.join('\n\n');
+}
+
+/**
+ * Builds the Plan Context section for a step in a large plan.
+ *
+ * Pyramid strategy:
+ * 1. Direct dependencies: title + first acceptance criterion
+ * 2. All other steps (not current, not deps): grouped by scope, titles only
+ *
+ * Enforces an 8000 character budget. If exceeded, drops the "Other steps"
+ * section and keeps only dependencies.
+ */
+function composePlanContext(step: PlanStep, allSteps: PlanStep[]): string {
+  const depIdSet = new Set(step.dependencies);
+
+  // Direct dependencies (steps this step depends on)
+  const depSteps = allSteps.filter(s => depIdSet.has(s.step_id));
+
+  // All other steps excluding the current step and its dependencies
+  const otherSteps = allSteps.filter(
+    s => s.step_id !== step.step_id && !depIdSet.has(s.step_id)
+  );
+
+  const headerLine = `### Plan Context\n\nThis step is part of a larger plan with ${allSteps.length} total steps.`;
+
+  // Build the dependencies block
+  let depsBlock = '';
+  if (depSteps.length > 0) {
+    const depLines = depSteps.map(dep => {
+      const firstCriterion = dep.acceptance_criteria?.[0]?.description;
+      return firstCriterion
+        ? `- ${dep.title}: ${firstCriterion}`
+        : `- ${dep.title}`;
+    });
+    depsBlock = `\n\n**Direct dependencies** (steps this depends on):\n${depLines.join('\n')}`;
+  }
+
+  // Build the "other steps by scope" block
+  let otherBlock = '';
+  if (otherSteps.length > 0) {
+    const byScope = new Map<string, string[]>();
+    for (const s of otherSteps) {
+      const scope = s.scope ?? 'general';
+      const existing = byScope.get(scope);
+      if (existing) {
+        existing.push(s.title);
+      } else {
+        byScope.set(scope, [s.title]);
+      }
+    }
+
+    const scopeLines: string[] = ['\n\n**Other steps by scope:**'];
+    for (const [scope, titles] of byScope) {
+      scopeLines.push(`${scope}:`);
+      for (const title of titles) {
+        scopeLines.push(`  - ${title}`);
+      }
+    }
+    otherBlock = scopeLines.join('\n');
+  }
+
+  const CONTEXT_BUDGET = 8000;
+  const fullContext = headerLine + depsBlock + otherBlock;
+
+  if (fullContext.length <= CONTEXT_BUDGET) {
+    return fullContext;
+  }
+
+  // Exceeds budget: drop other steps, keep only dependencies
+  return headerLine + depsBlock;
 }
 
 /**
