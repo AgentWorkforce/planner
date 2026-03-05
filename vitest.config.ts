@@ -17,6 +17,7 @@ export default defineConfig({
       'packages/forge-core/src/**/*.test.ts',
       'packages/mull/src/**/*.test.ts',
       'packages/cultivate/src/**/*.test.ts',
+      'packages/forge-next/src/**/*.test.ts',
     ],
     exclude: ['node_modules/**'],
   },

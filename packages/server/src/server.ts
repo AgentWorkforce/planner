@@ -16,6 +16,14 @@ import { createIdeationService, type IdeationService } from '../../ideation/src/
 import { createSpecialistSpawner } from '../../ideation/src/relay/spawner.js';
 import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
 import {
+  createForgeNextRouter,
+  SqliteForgeNextStorage,
+  GateManager,
+  QuestionManager,
+  RunMonitor,
+} from '../../forge-next/src/index.js';
+import { WorkflowRunner } from '@agent-relay/sdk/workflows';
+import {
   createMullService,
   TriggerManager,
   registerMullTriggers,
@@ -101,6 +109,7 @@ const PORT = serverConfig.port;
 const DB_PATH = serverConfig.dbPath;
 const IDEATION_DB_PATH = serverConfig.ideationDbPath;
 const FORGE_DB_PATH = serverConfig.forgeDbPath;
+const FORGE_NEXT_DB_PATH = serverConfig.forgeNextDbPath;
 const MULL_MEMORY_DIR = serverConfig.mullMemoryDir;
 
 // =============================================================================
@@ -110,6 +119,7 @@ const MULL_MEMORY_DIR = serverConfig.mullMemoryDir;
 let plannerService: PlannerService;
 let ideationService: IdeationService;
 let forgeService: ForgeService;
+let forgeNextStorage: InstanceType<typeof SqliteForgeNextStorage>;
 let mullService: MullService;
 let cultivateService: CultivateService | undefined;
 let portfolioService: PortfolioService;
@@ -194,6 +204,46 @@ async function start(): Promise<void> {
   await forgeService.initialize();
   app.use('/api/forge', forgeService.router);
   console.log(`[forge] Initialized (database: ${FORGE_DB_PATH}, mode: ${forgeMode})`);
+
+  // Initialize forge-next (thin execution layer on relay SDK workflows)
+  // BaseSqliteStorage runs schema init in the constructor — no separate initialize() call needed.
+  forgeNextStorage = new SqliteForgeNextStorage(FORGE_NEXT_DB_PATH);
+
+  const workflowRunner = new WorkflowRunner();
+  const gateManager = new GateManager(forgeNextStorage);
+  const questionManager = new QuestionManager(forgeNextStorage);
+  const forgeNextRunMonitor = new RunMonitor();
+
+  // Bridge planner storage → forge-next FetchedPlan interface
+  const fetchPlan = async (planId: string, version?: number) => {
+    const pv = version
+      ? storage.getVersion(planId, version)
+      : storage.getLatestVersion(planId);
+    if (!pv) return null;
+    return {
+      plan: { plan_id: pv.plan_id, version: pv.version, summary: pv.summary },
+      steps: pv.steps.map((s: any) => ({
+        step_id: s.step_id,
+        title: s.title,
+        description: s.description,
+        dependencies: s.dependencies,
+        owner_role: s.owner_role,
+        scope: s.scope,
+        acceptance_criteria: s.acceptance_criteria,
+        gate: s.gate,
+      })),
+    };
+  };
+
+  app.use('/api/forge-next', createForgeNextRouter({
+    storage: forgeNextStorage,
+    runner: workflowRunner,
+    gateManager,
+    questionManager,
+    runMonitor: forgeNextRunMonitor,
+    fetchPlan,
+  }));
+  console.log(`[forge-next] Initialized (database: ${FORGE_NEXT_DB_PATH})`);
 
   // Initialize cultivate service (after existing services)
   if (serverConfig.cultivate.secret) {
@@ -410,6 +460,15 @@ async function start(): Promise<void> {
     console.log('  POST   /api/forge/runs');
     console.log('  GET    /api/forge/runs/:id');
     console.log('  GET    /api/forge/runs/:id/events (SSE)');
+    console.log('');
+    console.log('Forge-next endpoints:');
+    console.log('  GET    /api/forge-next/runs');
+    console.log('  POST   /api/forge-next/runs');
+    console.log('  GET    /api/forge-next/runs/:id');
+    console.log('  GET    /api/forge-next/runs/:id/events (SSE)');
+    console.log('  POST   /api/forge-next/runs/:id/pause');
+    console.log('  POST   /api/forge-next/runs/:id/resume');
+    console.log('  POST   /api/forge-next/runs/:id/cancel');
     console.log('');
     console.log('Mull endpoints:');
     console.log('  GET    /api/mull/status');

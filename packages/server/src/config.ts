@@ -14,6 +14,7 @@ export interface ServerConfig {
   dbPath: string;
   ideationDbPath: string;
   forgeDbPath: string;
+  forgeNextDbPath: string;
   mullMemoryDir: string;
   cultivate: CultivateConfig;
   cultivateRequired: boolean;
@@ -48,6 +49,7 @@ export function getServerConfig(): ServerConfig {
   const dbPath = process.env.DB_PATH || path.resolve(__dirname, '../../../planner.db');
   const ideationDbPath = process.env.IDEATION_DB_PATH || path.resolve(__dirname, '../../../ideation.db');
   const forgeDbPath = process.env.FORGE_DB_PATH || path.resolve(__dirname, '../../../forge.db');
+  const forgeNextDbPath = process.env.FORGE_NEXT_DB_PATH || path.resolve(__dirname, '../../../forge-next.db');
   const mullMemoryDir = process.env.MULL_MEMORY_DIR || path.resolve(__dirname, '../../../memory');
 
   const cultivateDbPath = process.env.CULTIVATE_DB_PATH || './cultivate.db';
@@ -60,6 +62,7 @@ export function getServerConfig(): ServerConfig {
     dbPath,
     ideationDbPath,
     forgeDbPath,
+    forgeNextDbPath,
     mullMemoryDir,
     cultivateRequired,
     cultivate: {

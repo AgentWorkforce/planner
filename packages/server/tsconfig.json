@@ -10,6 +10,7 @@
     { "path": "../planner" },
     { "path": "../ideation" },
     { "path": "../forge-core" },
+    { "path": "../forge-next" },
     { "path": "../mull" }
   ],
   "include": ["src/**/*"],

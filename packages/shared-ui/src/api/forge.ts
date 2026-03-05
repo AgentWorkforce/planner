@@ -10,14 +10,9 @@ export interface ForgeConfig {
   workspace_path?: string;
   step_overrides: StepOverride[];
   execution_policy: {
-    parallelism?: {
-      max_concurrent_tasks?: number;
-      max_concurrent_per_scope?: number;
-      prefer_sequential_in_scope?: boolean;
-    };
-    budgets?: {
-      total_cost_limit_usd?: number;
-    };
+    max_concurrent_tasks?: number;
+    max_timeout_ms?: number;
+    retry_count?: number;
   };
 }
 

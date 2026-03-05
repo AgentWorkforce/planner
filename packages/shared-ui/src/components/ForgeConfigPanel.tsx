@@ -32,10 +32,9 @@ function buildStepRows(steps: ForgeConfigStep[]): StepRow[] {
 function assembleConfig(
   rows: StepRow[],
   workspacePath: string,
-  budget: string,
   maxConcurrentTasks: string,
-  maxConcurrentPerScope: string,
-  sequentialInScope: boolean,
+  maxTimeoutMs: string,
+  retryCount: string,
 ): ForgeConfig {
   const step_overrides: StepOverride[] = rows
     .filter((r) => !r.included || r.model !== 'auto')
@@ -46,22 +45,17 @@ function assembleConfig(
       return override;
     });
 
-  const totalCost = parseFloat(budget);
   const maxTasks = parseInt(maxConcurrentTasks, 10);
-  const maxPerScope = parseInt(maxConcurrentPerScope, 10);
+  const timeoutMs = parseInt(maxTimeoutMs, 10);
+  const retries = parseInt(retryCount, 10);
 
   return {
     workspace_path: workspacePath || undefined,
     step_overrides,
     execution_policy: {
-      parallelism: {
-        max_concurrent_tasks: isNaN(maxTasks) ? undefined : maxTasks,
-        max_concurrent_per_scope: isNaN(maxPerScope) ? undefined : maxPerScope,
-        prefer_sequential_in_scope: sequentialInScope,
-      },
-      budgets: {
-        total_cost_limit_usd: isNaN(totalCost) ? undefined : totalCost,
-      },
+      max_concurrent_tasks: isNaN(maxTasks) ? undefined : maxTasks,
+      max_timeout_ms: isNaN(timeoutMs) ? undefined : timeoutMs,
+      retry_count: isNaN(retries) ? undefined : retries,
     },
   };
 }
@@ -96,10 +90,9 @@ export function ForgeConfigPanel({
 }: ForgeConfigPanelProps) {
   const [rows, setRows] = useState<StepRow[]>(() => buildStepRows(steps));
   const [workspacePath, setWorkspacePath] = useState(defaultWorkspacePath);
-  const [budget, setBudget] = useState('10');
   const [maxConcurrentTasks, setMaxConcurrentTasks] = useState('3');
-  const [maxConcurrentPerScope, setMaxConcurrentPerScope] = useState('2');
-  const [sequentialInScope, setSequentialInScope] = useState(true);
+  const [maxTimeoutMs, setMaxTimeoutMs] = useState('');
+  const [retryCount, setRetryCount] = useState('1');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -123,10 +116,9 @@ export function ForgeConfigPanel({
       const config = assembleConfig(
         rows,
         workspacePath,
-        budget,
         maxConcurrentTasks,
-        maxConcurrentPerScope,
-        sequentialInScope,
+        maxTimeoutMs,
+        retryCount,
       );
       await onStart(config);
     } finally {
@@ -211,21 +203,6 @@ export function ForgeConfigPanel({
         />
       </div>
 
-      {/* Budget */}
-      <div>
-        <label className={cn(labelClass, "block mb-1.5")}>
-          Budget ($)
-        </label>
-        <input
-          type="number"
-          value={budget}
-          onChange={(e) => setBudget(e.target.value)}
-          min={0}
-          step={1}
-          className={cn(inputClass, "max-w-[140px]")}
-        />
-      </div>
-
       {/* Advanced section */}
       <div>
         <button
@@ -262,29 +239,30 @@ export function ForgeConfigPanel({
 
               <div>
                 <label className={cn(labelClass, "block mb-1.5")}>
-                  Max concurrent per scope
+                  Retry count
                 </label>
                 <input
                   type="number"
-                  value={maxConcurrentPerScope}
-                  onChange={(e) => setMaxConcurrentPerScope(e.target.value)}
-                  min={1}
+                  value={retryCount}
+                  onChange={(e) => setRetryCount(e.target.value)}
+                  min={0}
                   className={cn(inputClass)}
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <input
-                type="checkbox"
-                id="sequential-in-scope"
-                checked={sequentialInScope}
-                onChange={(e) => setSequentialInScope(e.target.checked)}
-                className="accent-[var(--color-accent-cyan)] w-4 h-4 cursor-pointer"
-              />
-              <label htmlFor="sequential-in-scope" className={cn(labelClass, "cursor-pointer")}>
-                Sequential within scope
+            <div>
+              <label className={cn(labelClass, "block mb-1.5")}>
+                Timeout (ms, leave blank for no limit)
               </label>
+              <input
+                type="number"
+                value={maxTimeoutMs}
+                onChange={(e) => setMaxTimeoutMs(e.target.value)}
+                min={1}
+                placeholder="e.g. 300000"
+                className={cn(inputClass, "max-w-[200px]")}
+              />
             </div>
           </div>
         )}
