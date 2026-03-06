@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -72,6 +72,18 @@ export function ClusterDetailDrawer({
   };
 
   const trendInfo = cluster?.trend ? TREND_STYLES[cluster.trend] ?? null : null;
+
+  // Aggregate unique authors from cluster signals, sorted by signal count
+  const uniqueAuthors = useMemo(() => {
+    if (!cluster?.signals) return [];
+    const counts = new Map<string, number>();
+    for (const s of cluster.signals) {
+      counts.set(s.author, (counts.get(s.author) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [cluster?.signals]);
 
   return (
     <>
@@ -178,6 +190,23 @@ export function ClusterDetailDrawer({
                     ))}
                   </div>
                 </div>
+
+                {/* Who's asking — profile segments */}
+                {uniqueAuthors.length > 0 && (
+                  <div>
+                    <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-2">
+                      Who's asking
+                    </p>
+                    <div className="space-y-1.5">
+                      {uniqueAuthors.slice(0, 3).map((author) => (
+                        <div key={author.name} className="flex items-center gap-2 px-2 py-1.5 bg-bg-secondary rounded-lg">
+                          <span className="text-sm text-text-primary flex-1 truncate">{author.name}</span>
+                          <span className="text-xs text-text-muted">{author.count} signal{author.count !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>

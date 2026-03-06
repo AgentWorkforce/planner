@@ -16,7 +16,9 @@ import type {
   AdapterType,
   ScoringFactors,
   StepProvenance,
+  ExtractionResult,
 } from '../domain/types';
+import type { Profile, IcpSegment } from '../domain/profile-types';
 import type {
   CultivateStorage,
   SignalQueryFilters,
@@ -34,6 +36,9 @@ import type {
   UpdateFilterEffectivenessInput,
   CreateIngestionJobInput,
   UpdateIngestionJobInput,
+  UpsertProfileInput,
+  ProfileQueryFilters,
+  CreateSegmentInput,
 } from './interface';
 
 /**
@@ -204,6 +209,46 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       // Column already exists - safe to ignore
     }
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_signals_intent ON signals(intent)`);
+
+    // Profiles table - aggregates per-author statistics from signals
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id TEXT PRIMARY KEY,
+        greenhouse_id TEXT NOT NULL,
+        author TEXT NOT NULL,
+        author_type TEXT NOT NULL,
+        signal_count INTEGER NOT NULL DEFAULT 0,
+        top_intents TEXT NOT NULL DEFAULT '[]',
+        top_clusters TEXT NOT NULL DEFAULT '[]',
+        source_distribution TEXT NOT NULL DEFAULT '{}',
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        segment TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(greenhouse_id, author)
+      )
+    `);
+
+    // ICP segments table - customer segmentation definitions
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS icp_segments (
+        id TEXT PRIMARY KEY,
+        greenhouse_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        description TEXT,
+        criteria TEXT NOT NULL DEFAULT '{}',
+        profile_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(greenhouse_id, label)
+      )
+    `);
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_profiles_greenhouse_id ON profiles(greenhouse_id);
+      CREATE INDEX IF NOT EXISTS idx_profiles_segment ON profiles(segment);
+    `);
 
     // Ensure default greenhouse exists
     this.ensureDefaultGreenhouse();
@@ -1143,6 +1188,177 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       specificity: row.specificity,
       emotional_intensity: row.emotional_intensity,
       actionability: row.actionability,
+    };
+  }
+
+  // ========== Profile Operations ==========
+
+  async upsertProfile(input: UpsertProfileInput): Promise<Profile> {
+    const now = new Date().toISOString();
+
+    // Check if profile exists for this greenhouse + author
+    const existing = this.db.prepare(
+      'SELECT * FROM profiles WHERE greenhouse_id = ? AND author = ?'
+    ).get(input.greenhouse_id, input.author) as any;
+
+    if (existing) {
+      // Update existing profile
+      const topIntents = this.safeJsonParse<string[]>(existing.top_intents, []);
+      const topClusters = this.safeJsonParse<string[]>(existing.top_clusters, []);
+      const sourceDist = this.safeJsonParse<Record<string, number>>(existing.source_distribution, {});
+
+      // Update intent tracking (keep top 5, avoid duplicates)
+      if (input.intent && input.intent !== 'unclassified') {
+        if (!topIntents.includes(input.intent)) topIntents.push(input.intent);
+        if (topIntents.length > 5) topIntents.shift();
+      }
+
+      // Update cluster tracking (keep top 5, avoid duplicates)
+      if (input.cluster_id) {
+        if (!topClusters.includes(input.cluster_id)) topClusters.push(input.cluster_id);
+        if (topClusters.length > 5) topClusters.shift();
+      }
+
+      // Update source distribution
+      sourceDist[input.source_type] = (sourceDist[input.source_type] || 0) + 1;
+
+      this.db.prepare(`
+        UPDATE profiles SET
+          signal_count = signal_count + 1,
+          top_intents = ?,
+          top_clusters = ?,
+          source_distribution = ?,
+          last_seen_at = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).run(
+        JSON.stringify(topIntents),
+        JSON.stringify(topClusters),
+        JSON.stringify(sourceDist),
+        now,
+        now,
+        existing.id
+      );
+
+      return this.getProfileById(existing.id) as Promise<Profile>;
+    } else {
+      // Create new profile
+      const id = randomUUID();
+      const topIntents = input.intent && input.intent !== 'unclassified' ? [input.intent] : [];
+      const topClusters = input.cluster_id ? [input.cluster_id] : [];
+      const sourceDist = { [input.source_type]: 1 };
+
+      this.db.prepare(`
+        INSERT INTO profiles (id, greenhouse_id, author, author_type, signal_count, top_intents, top_clusters, source_distribution, first_seen_at, last_seen_at, segment, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?)
+      `).run(
+        id, input.greenhouse_id, input.author, input.author_type,
+        JSON.stringify(topIntents), JSON.stringify(topClusters), JSON.stringify(sourceDist),
+        now, now, now, now
+      );
+
+      return this.getProfileById(id) as Promise<Profile>;
+    }
+  }
+
+  async listProfiles(filters: ProfileQueryFilters): Promise<Profile[]> {
+    const conditions: string[] = ['greenhouse_id = ?'];
+    const values: any[] = [filters.greenhouse_id];
+
+    if (filters.segment) {
+      conditions.push('segment = ?');
+      values.push(filters.segment);
+    }
+
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+    values.push(limit, offset);
+
+    const rows = this.db
+      .prepare(`SELECT * FROM profiles WHERE ${conditions.join(' AND ')} ORDER BY signal_count DESC LIMIT ? OFFSET ?`)
+      .all(...values) as any[];
+
+    return rows.map((row) => this.mapRowToProfile(row));
+  }
+
+  async getProfileById(id: string): Promise<Profile | null> {
+    const row = this.db.prepare('SELECT * FROM profiles WHERE id = ?').get(id) as any;
+    if (!row) return null;
+    return this.mapRowToProfile(row);
+  }
+
+  private mapRowToProfile(row: any): Profile {
+    return {
+      id: row.id,
+      greenhouse_id: row.greenhouse_id,
+      author: row.author,
+      author_type: row.author_type,
+      signal_count: row.signal_count,
+      top_intents: this.safeJsonParse(row.top_intents, []),
+      top_clusters: this.safeJsonParse(row.top_clusters, []),
+      source_distribution: this.safeJsonParse(row.source_distribution, {}),
+      first_seen_at: row.first_seen_at,
+      last_seen_at: row.last_seen_at,
+      segment: row.segment ?? null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  }
+
+  // ========== ICP Segment Operations ==========
+
+  async createSegment(input: CreateSegmentInput): Promise<IcpSegment> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    this.db.prepare(`
+      INSERT INTO icp_segments (id, greenhouse_id, label, description, criteria, profile_count, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+    `).run(
+      id, input.greenhouse_id, input.label, input.description ?? null,
+      JSON.stringify(input.criteria), now, now
+    );
+
+    return {
+      id,
+      greenhouse_id: input.greenhouse_id,
+      label: input.label,
+      description: input.description ?? null,
+      criteria: input.criteria,
+      profile_count: 0,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
+  async listSegments(greenhouse_id: string): Promise<IcpSegment[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM icp_segments WHERE greenhouse_id = ? ORDER BY profile_count DESC')
+      .all(greenhouse_id) as any[];
+
+    return rows.map((row) => this.mapRowToSegment(row));
+  }
+
+  async assignProfileSegment(profile_id: string, segment: string | null): Promise<void> {
+    this.db.prepare('UPDATE profiles SET segment = ?, updated_at = ? WHERE id = ?')
+      .run(segment, new Date().toISOString(), profile_id);
+  }
+
+  async updateSegmentCount(segment_id: string, count: number): Promise<void> {
+    this.db.prepare('UPDATE icp_segments SET profile_count = ?, updated_at = ? WHERE id = ?')
+      .run(count, new Date().toISOString(), segment_id);
+  }
+
+  private mapRowToSegment(row: any): IcpSegment {
+    return {
+      id: row.id,
+      greenhouse_id: row.greenhouse_id,
+      label: row.label,
+      description: row.description ?? null,
+      criteria: this.safeJsonParse(row.criteria, {}),
+      profile_count: row.profile_count,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
     };
   }
 }

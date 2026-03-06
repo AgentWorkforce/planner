@@ -4,6 +4,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/Button';
 import { useRelayConnection } from '@/hooks/useRelayConnection';
+import { useCultivateGreenhouses } from '@/hooks/useCultivateGreenhouses';
 import { useEffect } from 'react';
 
 /**
@@ -27,6 +28,8 @@ export function SettingsPage() {
     updateBubbleTiming,
     updateExecutionDefaults,
   } = useSettings();
+
+  const { greenhouses, loading: greenhousesLoading } = useCultivateGreenhouses();
 
   // Sync theme from settings to useTheme hook
   useEffect(() => {
@@ -266,6 +269,36 @@ export function SettingsPage() {
                 )}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Signal Sources Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Signal Sources</h2>
+          <div className="bg-bg-card rounded-lg border border-border-subtle p-6">
+            {greenhousesLoading ? (
+              <p className="text-sm text-text-muted">Loading...</p>
+            ) : greenhouses.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                No greenhouses configured. Use Quick Start from the dashboard to set up signal intake.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {greenhouses.map((gh) => (
+                  <div
+                    key={gh.id}
+                    className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{gh.name}</p>
+                      <p className="text-xs text-text-muted">
+                        {gh.source_ids.length} source{gh.source_ids.length !== 1 ? 's' : ''} · {gh.mode}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

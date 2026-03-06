@@ -54,6 +54,7 @@ export interface CultivateStorageReader {
   >;
   listGreenhouses(): Promise<Array<{ id: string }>>;
   getExtractionBySignalId?(signalId: string): Promise<{ quotes: string[] } | null>;
+  listProfiles?(filters: { greenhouse_id: string; limit?: number; offset?: number }): Promise<Array<{ segment: string | null; author: string }>>;
 }
 
 /**
@@ -656,6 +657,33 @@ export class SuggestionEngine {
           }
         }
 
+        // Determine dominant segment from greenhouse profiles (optional)
+        let topSegment: string | undefined;
+        if (this.cultivateStorage!.listProfiles) {
+          try {
+            const profiles = await this.cultivateStorage!.listProfiles({
+              greenhouse_id: greenhouse.id,
+              limit: 200,
+            });
+            // Find the most common segment across profiles
+            const segmentCounts = new Map<string, number>();
+            for (const profile of profiles) {
+              if (profile.segment) {
+                segmentCounts.set(profile.segment, (segmentCounts.get(profile.segment) || 0) + 1);
+              }
+            }
+            let maxCount = 0;
+            for (const [seg, count] of segmentCounts) {
+              if (count > maxCount) {
+                maxCount = count;
+                topSegment = seg;
+              }
+            }
+          } catch {
+            // Non-critical, skip silently
+          }
+        }
+
         clusters.push({
           cluster_id: cluster.id,
           label: cluster.label,
@@ -664,6 +692,7 @@ export class SuggestionEngine {
           avg_signal_score: avgScore,
           has_linked_plan: hasLinkedPlan,
           top_quote: topQuote,
+          top_segment: topSegment,
         });
 
         // Track linked signals per plan

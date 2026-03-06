@@ -58,6 +58,7 @@ export const SuggestionSchema = z.object({
   signal_count: z.number().int().default(0),
   top_quote: z.string().optional(),
   intent_breakdown: z.record(z.number()).optional(),
+  top_segment: z.string().optional(),
 });
 
 export type Suggestion = z.infer<typeof SuggestionSchema>;

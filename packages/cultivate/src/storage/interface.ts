@@ -16,6 +16,7 @@ import type {
   AdapterType,
   ExtractionResult,
 } from '../domain/types';
+import type { Profile, IcpSegment } from '../domain/profile-types';
 
 /**
  * Query filters for signal listing with pagination
@@ -211,6 +212,38 @@ export interface CreateIngestionJobInput {
 export interface UpdateIngestionJobInput {
   status?: 'pending' | 'chunking' | 'processing' | 'complete' | 'failed';
   processed_chunks?: number;
+}
+
+/**
+ * Input for upserting an author profile
+ */
+export interface UpsertProfileInput {
+  greenhouse_id: string;
+  author: string;
+  author_type: string;
+  source_type: string;
+  intent?: string;
+  cluster_id?: string;
+}
+
+/**
+ * Query filters for profile listing
+ */
+export interface ProfileQueryFilters {
+  greenhouse_id: string;
+  segment?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Input for creating an ICP segment
+ */
+export interface CreateSegmentInput {
+  greenhouse_id: string;
+  label: string;
+  description?: string;
+  criteria: Record<string, unknown>;
 }
 
 /**
@@ -448,4 +481,44 @@ export interface CultivateStorage {
    * @returns Extraction result if found, null otherwise
    */
   getExtractionBySignalId(signal_id: string): Promise<ExtractionResult | null>;
+
+  // ========== Profile Operations ==========
+
+  /**
+   * Upsert a profile for an author in a greenhouse
+   * Creates if not exists, updates signal_count and metadata if exists
+   */
+  upsertProfile(input: UpsertProfileInput): Promise<Profile>;
+
+  /**
+   * List profiles with optional filtering
+   */
+  listProfiles(filters: ProfileQueryFilters): Promise<Profile[]>;
+
+  /**
+   * Get a profile by ID
+   */
+  getProfileById(id: string): Promise<Profile | null>;
+
+  // ========== ICP Segment Operations ==========
+
+  /**
+   * Create a new ICP segment
+   */
+  createSegment(input: CreateSegmentInput): Promise<IcpSegment>;
+
+  /**
+   * List segments for a greenhouse
+   */
+  listSegments(greenhouse_id: string): Promise<IcpSegment[]>;
+
+  /**
+   * Assign a segment to a profile
+   */
+  assignProfileSegment(profile_id: string, segment: string | null): Promise<void>;
+
+  /**
+   * Update segment profile count
+   */
+  updateSegmentCount(segment_id: string, count: number): Promise<void>;
 }

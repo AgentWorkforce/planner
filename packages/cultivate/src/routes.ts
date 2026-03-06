@@ -14,6 +14,7 @@ import { createFilterRuleHandlers } from './api/handlers/filter-rules.js';
 import { createDeadLetterHandlers } from './api/handlers/dead-letter.js';
 import { createIngestionHandlers } from './api/handlers/ingestion.js';
 import { createEventsHandler } from './api/handlers/events.js';
+import { createProfileHandlers } from './api/handlers/profiles.js';
 import { TunerClient } from './tuner/client.js';
 
 /**
@@ -107,6 +108,13 @@ export function createCultivateRouter(context: CultivateContext): Router {
   router.post('/dead-letter/:id/replay', deadLetterHandlers.replay);
   router.post('/dead-letter/replay-all', deadLetterHandlers.replayAll);
   router.delete('/dead-letter/:id', deadLetterHandlers.remove);
+
+  // ========== Profiles & ICP Segments ==========
+  const profileHandlers = createProfileHandlers(context.storage);
+  router.get('/profiles', profileHandlers.list);
+  // Segment routes must be mounted before any parameterized /profiles/:id
+  router.get('/profiles/segments', profileHandlers.listSegments);
+  router.post('/profiles/segments/generate', profileHandlers.generateSegments);
 
   // ========== SSE Events ==========
   const eventsHandler = createEventsHandler(context.sseBroadcaster);

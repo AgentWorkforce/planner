@@ -13,6 +13,9 @@ import { useSuggestions } from '@/hooks/useSuggestions';
 import { useInitiativeHealth } from '@/hooks/useInitiativeHealth';
 import { useInitiatives } from '@/hooks/useInitiatives';
 import { ClusterDetailDrawer } from '@/components/cultivate/ClusterDetailDrawer';
+import { OnboardingPrompt } from '@/components/cultivate/OnboardingPrompt';
+import { OnboardingWizard } from '@/components/cultivate/OnboardingWizard';
+import { useCultivateGreenhouses } from '@/hooks/useCultivateGreenhouses';
 import { cn } from '@/lib/utils';
 import type { Suggestion } from '@/hooks/useSuggestions';
 
@@ -52,6 +55,11 @@ export function DashboardPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [drawerClusterId, setDrawerClusterId] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Cultivate greenhouse detection
+  const { greenhouses, loading: greenhousesLoading, refetch: refetchGreenhouses } = useCultivateGreenhouses();
+  const hasGreenhouses = greenhouses.length > 0;
 
   // Portfolio hooks
   const { overview, loading: overviewLoading } = usePortfolioOverview();
@@ -264,18 +272,22 @@ export function DashboardPage() {
   // ─── Center: greeting first, then portfolio intelligence ───
   const center = (
     <div className="flex flex-col h-full overflow-y-auto px-6 py-4 space-y-5">
-      {/* Contextual greeting — personal, comes first */}
+      {/* Contextual greeting or onboarding */}
       <div className="max-w-lg">
-        <div className="bg-bg-secondary rounded-2xl px-5 py-4 shadow-sm">
-          <p className="text-text-primary text-sm leading-relaxed">
-            {greeting.main}
-          </p>
-          {greeting.sub && (
-            <p className="text-text-secondary text-sm leading-relaxed mt-1.5">
-              {greeting.sub}
+        {!greenhousesLoading && !hasGreenhouses ? (
+          <OnboardingPrompt onQuickStart={() => setWizardOpen(true)} />
+        ) : (
+          <div className="bg-bg-secondary rounded-2xl px-5 py-4 shadow-sm">
+            <p className="text-text-primary text-sm leading-relaxed">
+              {greeting.main}
             </p>
-          )}
-        </div>
+            {greeting.sub && (
+              <p className="text-text-secondary text-sm leading-relaxed mt-1.5">
+                {greeting.sub}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Portfolio summary */}
@@ -375,6 +387,11 @@ export function DashboardPage() {
         open={drawerClusterId !== null}
         onOpenChange={(open) => { if (!open) setDrawerClusterId(null); }}
         clusterId={drawerClusterId}
+      />
+      <OnboardingWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onComplete={refetchGreenhouses}
       />
     </>
   );
