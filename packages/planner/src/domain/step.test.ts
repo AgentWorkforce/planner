@@ -115,6 +115,46 @@ describe('Step', () => {
       })
     ).toThrow();
   });
+
+  it('should validate step with retry_hints', () => {
+    const result = StepSchema.parse({
+      step_id: 'step1',
+      title: 'Test step',
+      retry_hints: ['check lock file', 'try npm ci instead'],
+    });
+    expect(result.retry_hints).toEqual(['check lock file', 'try npm ci instead']);
+  });
+
+  it('should accept empty retry_hints array', () => {
+    const result = StepSchema.parse({
+      step_id: 'step1',
+      title: 'Test step',
+      retry_hints: [],
+    });
+    expect(result.retry_hints).toEqual([]);
+  });
+
+  it('should validate step with merge_strategy', () => {
+    const strategies = ['squash', 'rebase', 'merge', 'cherry-pick', 'none'] as const;
+    for (const strategy of strategies) {
+      const result = StepSchema.parse({
+        step_id: 'step1',
+        title: 'Test step',
+        merge_strategy: strategy,
+      });
+      expect(result.merge_strategy).toBe(strategy);
+    }
+  });
+
+  it('should reject invalid merge_strategy', () => {
+    expect(() =>
+      StepSchema.parse({
+        step_id: 'step1',
+        title: 'Test step',
+        merge_strategy: 'fast-forward',
+      })
+    ).toThrow();
+  });
 });
 
 describe('createStep', () => {
@@ -148,6 +188,20 @@ describe('createStep', () => {
     const step1 = createStep('Step 1');
     const step2 = createStep('Step 2');
     expect(step1.step_id).not.toBe(step2.step_id);
+  });
+
+  it('should create step with retry_hints', () => {
+    const step = createStep('Test step', {
+      retry_hints: ['clear cache', 'restart service'],
+    });
+    expect(step.retry_hints).toEqual(['clear cache', 'restart service']);
+  });
+
+  it('should create step with merge_strategy', () => {
+    const step = createStep('Test step', {
+      merge_strategy: 'squash',
+    });
+    expect(step.merge_strategy).toBe('squash');
   });
 
   it('should pass schema validation', () => {

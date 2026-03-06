@@ -12,6 +12,7 @@ import { usePortfolioOverview } from '@/hooks/usePortfolioOverview';
 import { useSuggestions } from '@/hooks/useSuggestions';
 import { useInitiativeHealth } from '@/hooks/useInitiativeHealth';
 import { useInitiatives } from '@/hooks/useInitiatives';
+import { ClusterDetailDrawer } from '@/components/cultivate/ClusterDetailDrawer';
 import { cn } from '@/lib/utils';
 import type { Suggestion } from '@/hooks/useSuggestions';
 
@@ -50,6 +51,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
+  const [drawerClusterId, setDrawerClusterId] = useState<string | null>(null);
 
   // Portfolio hooks
   const { overview, loading: overviewLoading } = usePortfolioOverview();
@@ -102,6 +104,10 @@ export function DashboardPage() {
   });
 
   const handleSuggestionOpen = (suggestion: Suggestion) => {
+    if (suggestion.type === 'opportunity' && suggestion.cluster_id) {
+      setDrawerClusterId(suggestion.cluster_id);
+      return;
+    }
     if (suggestion.plan_id) {
       const sessionId = sessionByPlanId.get(suggestion.plan_id);
       if (sessionId) {
@@ -109,7 +115,6 @@ export function DashboardPage() {
         return;
       }
     }
-    // Fallback: if there's a project_id on old data, ignore (no /projects route)
   };
 
   const handlePlanSelect = (planId: string) => {
@@ -365,6 +370,11 @@ export function DashboardPage() {
       <NewConversationModal
         open={isNewConversationOpen}
         onOpenChange={setIsNewConversationOpen}
+      />
+      <ClusterDetailDrawer
+        open={drawerClusterId !== null}
+        onOpenChange={(open) => { if (!open) setDrawerClusterId(null); }}
+        clusterId={drawerClusterId}
       />
     </>
   );

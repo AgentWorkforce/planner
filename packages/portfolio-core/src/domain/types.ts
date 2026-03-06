@@ -56,6 +56,8 @@ export const SuggestionSchema = z.object({
   cluster_id: z.string().nullable(),
   cluster_label: z.string().nullable(),
   signal_count: z.number().int().default(0),
+  top_quote: z.string().optional(),
+  intent_breakdown: z.record(z.number()).optional(),
 });
 
 export type Suggestion = z.infer<typeof SuggestionSchema>;

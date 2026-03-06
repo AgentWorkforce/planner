@@ -77,3 +77,15 @@ export type { StatusContent, MessageLevel, UseStatusLineReturn, WipeSignal } fro
 
 // Frame player (animation system)
 export { useFramePlayer } from './useFramePlayer';
+
+// Cultivate (cluster drill-down, PRD generation)
+export { useCultivateCluster } from './useCultivateCluster';
+export type { ClusterDetail, SignalWithExtraction, ExtractionResult, UseCultivateClusterResult } from './useCultivateCluster';
+export { usePrdGenerator } from './usePrdGenerator';
+export type { UsePrdGeneratorResult } from './usePrdGenerator';
+
+// Cultivate (greenhouses, presets)
+export { useCultivateGreenhouses } from './useCultivateGreenhouses';
+export type { Greenhouse, UseCultivateGreenhousesResult } from './useCultivateGreenhouses';
+export { useCultivatePresets } from './useCultivatePresets';
+export type { SourcePreset, PresetEntry, UseCultivatePresetsResult } from './useCultivatePresets';

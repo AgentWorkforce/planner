@@ -210,6 +210,9 @@ export function createRunHandler(deps: RunHandlerDeps) {
     deps.runMonitor.setForgeRunId(runId);
     deps.runMonitor.setWorkflowConfig(workflowConfig);
     deps.runMonitor.setStepCriteria(compilation.stepCriteria);
+    deps.runMonitor.setStepRetryHints(compilation.stepRetryHints);
+    deps.runMonitor.setStepMergeStrategies(compilation.stepMergeStrategies);
+    deps.runMonitor.setRetryLimit(body.execution_policy?.retry_count ?? 0);
     deps.runMonitor.bind(deps.runner);
 
     // Subscribe to runner events to:
@@ -471,6 +474,68 @@ export function cancelRunHandler(deps: RunHandlerDeps) {
     }
 
     res.status(200).json({ run_id: runId, status: 'cancelled' });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// POST /runs/:runId/steps/:stepName/retry — stub (needs relay SDK per-step retry)
+// ---------------------------------------------------------------------------
+
+export function retryStepHandler(_deps: RunHandlerDeps) {
+  return (req: Request, res: Response): void => {
+    const runId = routeParam(req, 'runId');
+    const stepName = routeParam(req, 'stepName');
+    if (!runId || !stepName) {
+      res.status(400).json({ error: 'Run ID and step name are required' });
+      return;
+    }
+
+    const run = _deps.storage.getRun(runId);
+    if (!run) {
+      res.status(404).json({ error: `Run not found: ${runId}` });
+      return;
+    }
+
+    // The relay SDK WorkflowRunner does not expose per-step retry.
+    // Retries are handled internally via the `retries` config on each WorkflowStep.
+    // This endpoint is reserved for future relay SDK enhancement (see relay issue #498).
+    res.status(501).json({
+      error: 'Per-step retry is not yet supported by the relay SDK',
+      detail: 'The WorkflowRunner handles retries internally. Per-step retry requires relay SDK enhancement (issue #498).',
+      run_id: runId,
+      step_name: stepName,
+    });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// POST /runs/:runId/steps/:stepName/skip — stub (needs relay SDK per-step skip)
+// ---------------------------------------------------------------------------
+
+export function skipStepHandler(_deps: RunHandlerDeps) {
+  return (req: Request, res: Response): void => {
+    const runId = routeParam(req, 'runId');
+    const stepName = routeParam(req, 'stepName');
+    if (!runId || !stepName) {
+      res.status(400).json({ error: 'Run ID and step name are required' });
+      return;
+    }
+
+    const run = _deps.storage.getRun(runId);
+    if (!run) {
+      res.status(404).json({ error: `Run not found: ${runId}` });
+      return;
+    }
+
+    // The relay SDK WorkflowRunner has markDownstreamSkipped (private) but no
+    // public per-step skip. This endpoint is reserved for future relay SDK
+    // enhancement (see relay issue #498).
+    res.status(501).json({
+      error: 'Per-step skip is not yet supported by the relay SDK',
+      detail: 'The WorkflowRunner skips downstream steps on failure but does not support manual per-step skip. Requires relay SDK enhancement (issue #498).',
+      run_id: runId,
+      step_name: stepName,
+    });
   };
 }
 

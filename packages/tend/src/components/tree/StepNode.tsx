@@ -44,8 +44,21 @@ export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = fa
         </span>
       )}
 
+      {/* Escalation indicator — needs attention */}
+      {!isFocusedAwaitingClick && step.escalation && (
+        <span
+          className={cn(
+            'flex-shrink-0 text-xs text-amber-400',
+            (step.escalation.type === 'gate' || step.escalation.type === 'question') && 'animate-pulse'
+          )}
+          title={step.escalation.detail}
+        >
+          ⚡
+        </span>
+      )}
+
       {/* Stall warning for running steps */}
-      {!isFocusedAwaitingClick && step.stallWarning && status === 'running' && (
+      {!isFocusedAwaitingClick && !step.escalation && step.stallWarning && status === 'running' && (
         <span
           className="flex-shrink-0 text-xs text-amber-400 animate-pulse"
           title="Agent may be stalled"
@@ -55,7 +68,7 @@ export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = fa
       )}
 
       {/* Satisfaction score for completed steps */}
-      {!isFocusedAwaitingClick && step.score !== undefined && status === 'done' && (
+      {!isFocusedAwaitingClick && !step.escalation && step.score !== undefined && status === 'done' && (
         <span
           className={cn(
             'flex-shrink-0 text-xs tabular-nums',
@@ -67,8 +80,27 @@ export function StepNode({ step, isSelected = false, isFocusedAwaitingClick = fa
         </span>
       )}
 
+      {/* Merge status for completed steps */}
+      {!isFocusedAwaitingClick && !step.escalation && step.mergeStatus && status === 'done' && step.score === undefined && (
+        <span
+          className={cn(
+            'flex-shrink-0 text-xs',
+            step.mergeStatus === 'merged' ? 'text-success' :
+            step.mergeStatus === 'failed' ? 'text-accent-secondary' :
+            step.mergeStatus === 'merging' ? 'text-accent-primary animate-pulse' :
+            'text-text-muted'
+          )}
+          title={`Merge: ${step.mergeStatus}${step.mergeBranch ? ` (${step.mergeBranch})` : ''}`}
+        >
+          {step.mergeStatus === 'merged' ? '↑✓' :
+           step.mergeStatus === 'failed' ? '↑✗' :
+           step.mergeStatus === 'merging' ? '↑' :
+           step.mergeStatus === 'skipped' ? '—' : '↑'}
+        </span>
+      )}
+
       {/* Dependency count — only when no other indicator shown */}
-      {hasDependencies && !isFocusedAwaitingClick && step.score === undefined && !step.stallWarning && (
+      {hasDependencies && !isFocusedAwaitingClick && !step.escalation && step.score === undefined && !step.stallWarning && !step.mergeStatus && (
         <span className={cn('flex-shrink-0 text-xs text-text-muted tabular-nums')}>
           {step.dependencies.length}
         </span>

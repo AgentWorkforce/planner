@@ -110,6 +110,7 @@ const createMockStorage = (): CultivateStorage => {
     listSignals: vi.fn(async (filters) => {
       return signals.filter(s => s.cluster_id === filters.cluster_id);
     }),
+    getExtractionBySignalId: vi.fn(async () => null),
   } as any;
 };
 
@@ -234,6 +235,7 @@ describe('RecommendationEngine', () => {
     const emptyStorage: CultivateStorage = {
       listClustersByGreenhouse: vi.fn(async () => []),
       listSignals: vi.fn(async () => []),
+      getExtractionBySignalId: vi.fn(async () => null),
     } as any;
 
     engine = new RecommendationEngine(emptyStorage, 'fake-key');

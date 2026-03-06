@@ -174,6 +174,26 @@ export function TreePanel({
             )}
           </div>
         )}
+        {/* Escalation summary banner — shown when any step needs attention */}
+        {steps.some((s) => s.escalation) && (
+          <div className="flex-shrink-0 px-3 py-2 bg-amber-500/10 border-b border-amber-500/20">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-amber-400 text-xs">⚡</span>
+              <span className="text-xs font-medium text-amber-400">
+                {steps.filter((s) => s.escalation).length} step{steps.filter((s) => s.escalation).length !== 1 ? 's' : ''} need attention
+              </span>
+            </div>
+            <ul className="space-y-0.5">
+              {steps.filter((s) => s.escalation).map((s) => (
+                <li key={s.step_id} className="text-xs text-text-muted flex items-center gap-1.5">
+                  <span className="flex-shrink-0 text-amber-400/60">·</span>
+                  <span className="truncate">{s.title}</span>
+                  <span className="flex-shrink-0 text-amber-400/60">({s.escalation!.type})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <ProjectTree
           steps={steps}
           projectName={projectName}

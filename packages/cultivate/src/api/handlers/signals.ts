@@ -38,6 +38,7 @@ export function createSignalHandlers(
         greenhouse_id: query.greenhouse_id,
         status: query.status,
         cluster_id: query.cluster_id,
+        intent: query.intent,
         limit: query.limit,
         offset: query.offset,
       };
@@ -65,7 +66,10 @@ export function createSignalHandlers(
         throw notFound('Signal');
       }
 
-      res.json({ data: signal });
+      // Load extraction data for this signal
+      const extraction = await storage.getExtractionBySignalId(id);
+
+      res.json({ data: { ...signal, extraction } });
     } catch (err) {
       next(err);
     }

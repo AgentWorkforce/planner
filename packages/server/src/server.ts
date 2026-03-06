@@ -231,6 +231,8 @@ async function start(): Promise<void> {
         scope: s.scope,
         acceptance_criteria: s.acceptance_criteria,
         gate: s.gate,
+        retry_hints: s.retry_hints,
+        merge_strategy: s.merge_strategy,
       })),
     };
   };

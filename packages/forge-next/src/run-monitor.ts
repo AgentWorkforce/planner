@@ -71,6 +71,8 @@ export interface StepMetricsPayload {
   model: string;
   duration_ms: number;
   estimated_cost_usd: number;
+  /** Merge strategy for this step's git changes, if specified in the plan */
+  merge_strategy?: string;
 }
 
 export interface RunMetricsPayload {
@@ -97,6 +99,8 @@ export interface StepRetryContextPayload {
   previous_failures: string[];
   /** Total number of failures across all attempts */
   total_failure_count: number;
+  /** Static recovery hints from the plan author */
+  retry_hints?: string[];
 }
 
 export interface StepFailedEnrichedPayload {
@@ -119,6 +123,23 @@ export interface StepScoredPayload {
   failed_criteria: string[];
 }
 
+export interface StepRetriesExhaustedPayload {
+  run_id: string;
+  step_name: string;
+  attempt: number;
+  max_retries: number;
+  failures: string[];
+}
+
+export interface StepMergeStatusPayload {
+  run_id: string;
+  step_name: string;
+  status: 'pending' | 'merging' | 'merged' | 'failed' | 'skipped';
+  branch?: string;
+  target_branch?: string;
+  error?: string;
+}
+
 // ---------------------------------------------------------------------------
 // EventEmitter map
 // ---------------------------------------------------------------------------
@@ -130,6 +151,8 @@ interface RunMonitorEvents {
   'step:retry-context': [payload: StepRetryContextPayload];
   'step:failed-enriched': [payload: StepFailedEnrichedPayload];
   'step:scored': [payload: StepScoredPayload];
+  'step:retries-exhausted': [payload: StepRetriesExhaustedPayload];
+  'step:merge-status': [payload: StepMergeStatusPayload];
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +173,15 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
   /** Acceptance criteria per step_id, used for post-execution satisfaction scoring. */
   private stepCriteria = new Map<string, AcceptanceCriterion[]>();
 
+  /** Static recovery hints per step_id, included in retry context events. */
+  private stepRetryHints = new Map<string, string[]>();
+
+  /** Merge strategy per step_id, included in step completion events. */
+  private stepMergeStrategies = new Map<string, string>();
+
+  /** Max retry attempts per step. 0 means no retries configured. */
+  private retryLimit = 0;
+
   /**
    * Set the forge run ID. Must be called before bind().
    */
@@ -163,6 +195,30 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
    */
   setStepCriteria(criteria: Map<string, AcceptanceCriterion[]>): void {
     this.stepCriteria = new Map(criteria);
+  }
+
+  /**
+   * Provide static retry hints per step_id for enriching retry context events.
+   * Call after compilePlan() and before bind().
+   */
+  setStepRetryHints(hints: Map<string, string[]>): void {
+    this.stepRetryHints = new Map(hints);
+  }
+
+  /**
+   * Provide merge strategies per step_id for enriching step completion events.
+   * Call after compilePlan() and before bind().
+   */
+  setStepMergeStrategies(strategies: Map<string, string>): void {
+    this.stepMergeStrategies = new Map(strategies);
+  }
+
+  /**
+   * Set the maximum retry count. When a step's attempt reaches this limit
+   * on failure, a step:retries-exhausted event is emitted.
+   */
+  setRetryLimit(limit: number): void {
+    this.retryLimit = limit;
   }
 
   /**
@@ -226,6 +282,9 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
     this.steps.clear();
     this.stepToModel.clear();
     this.stepCriteria.clear();
+    this.stepRetryHints.clear();
+    this.stepMergeStrategies.clear();
+    this.retryLimit = 0;
     this.totalSteps = 0;
   }
 
@@ -273,13 +332,20 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
         const multiplier = MODEL_COST_MULTIPLIERS[tracking.model] ?? 1.0;
         tracking.estimatedCostUsd = durationMin * BASE_COST_PER_MIN_USD * multiplier;
 
-        this.emit('step:metrics', {
+        const metricsPayload: StepMetricsPayload = {
           run_id: this.forgeRunId,
           step_name: event.stepName,
           model: tracking.model,
           duration_ms: tracking.durationMs,
           estimated_cost_usd: Math.round(tracking.estimatedCostUsd * 1000) / 1000,
-        });
+        };
+
+        const mergeStrategy = this.stepMergeStrategies.get(event.stepName);
+        if (mergeStrategy) {
+          metricsPayload.merge_strategy = mergeStrategy;
+        }
+
+        this.emit('step:metrics', metricsPayload);
 
         // Score step output against acceptance criteria
         const criteria = this.stepCriteria.get(event.stepName);
@@ -320,6 +386,17 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
           failures: dedupedFailures,
           attempt: tracking.attempt,
         });
+
+        // Check if retries are exhausted (retryLimit > 0 means retries were configured)
+        if (this.retryLimit > 0 && tracking.attempt >= this.retryLimit) {
+          this.emit('step:retries-exhausted', {
+            run_id: this.forgeRunId,
+            step_name: event.stepName,
+            attempt: tracking.attempt,
+            max_retries: this.retryLimit,
+            failures: dedupedFailures,
+          });
+        }
         break;
       }
 
@@ -333,13 +410,21 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
           const dedupedFailures = [...new Set(tracking.failures)];
           const lastThree = dedupedFailures.slice(-3);
 
-          this.emit('step:retry-context', {
+          const retryPayload: StepRetryContextPayload = {
             run_id: this.forgeRunId,
             step_name: event.stepName,
             attempt: event.attempt ?? (tracking.attempt + 1),
             previous_failures: lastThree,
             total_failure_count: tracking.failures.length,
-          });
+          };
+
+          // Include retry hints if the plan author provided them
+          const hints = this.stepRetryHints.get(event.stepName);
+          if (hints && hints.length > 0) {
+            retryPayload.retry_hints = hints;
+          }
+
+          this.emit('step:retry-context', retryPayload);
         }
         break;
       }

@@ -13,6 +13,8 @@ export interface Suggestion {
   cluster_id: string | null;
   cluster_label: string | null;
   signal_count: number;
+  top_quote?: string;
+  intent_breakdown?: Record<string, number>;
 }
 
 export interface UseSuggestionsResult {

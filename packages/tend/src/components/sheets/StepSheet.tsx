@@ -123,6 +123,139 @@ export function StepSheet({ step, onUpdate, onSendMessage, disabled = false }: S
         {saving && <span className="text-xs text-accent-primary animate-pulse">Saving...</span>}
       </div>
 
+      {/* Attention Required — escalation panel */}
+      {step.escalation && (
+        <div className="px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-sm">⚡</span>
+            <h4 className="text-sm font-semibold text-amber-400">Attention Required</h4>
+          </div>
+          <p className="text-sm text-text-primary">{step.escalation.detail}</p>
+
+          {/* Gate actions */}
+          {step.escalation.type === 'gate' && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs font-medium bg-success/20 text-success rounded hover:bg-success/30 transition-colors"
+                onClick={() => {}}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs font-medium bg-accent-secondary/20 text-accent-secondary rounded hover:bg-accent-secondary/30 transition-colors"
+                onClick={() => {}}
+              >
+                Reject
+              </button>
+            </div>
+          )}
+
+          {/* Question actions */}
+          {step.escalation.type === 'question' && (
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Type your answer..."
+                className="w-full px-3 py-1.5 text-sm bg-bg-secondary border border-border-subtle rounded text-text-primary placeholder:text-text-muted focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/50 outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-xs font-medium bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors"
+                  onClick={() => {}}
+                >
+                  Answer
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-xs font-medium bg-bg-tertiary text-text-muted rounded hover:bg-bg-elevated transition-colors"
+                  onClick={() => {}}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Stall actions */}
+          {step.escalation.type === 'stall' && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs font-medium bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors"
+                onClick={() => {}}
+              >
+                Cancel &amp; Retry
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs font-medium bg-bg-tertiary text-text-muted rounded hover:bg-bg-elevated transition-colors"
+                onClick={() => {}}
+              >
+                Skip Step
+              </button>
+            </div>
+          )}
+
+          {/* Retries exhausted actions */}
+          {step.escalation.type === 'retries_exhausted' && (
+            <div className="space-y-2">
+              {step.retryHints && step.retryHints.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-text-secondary mb-1">Recovery Guidance</p>
+                  <ul className="space-y-0.5">
+                    {step.retryHints.map((hint, i) => (
+                      <li key={i} className="text-xs text-text-muted flex items-start gap-1.5">
+                        <span className="flex-shrink-0 mt-0.5">→</span>
+                        <span>{hint}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-xs font-medium bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors"
+                  onClick={() => {}}
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-xs font-medium bg-bg-tertiary text-text-muted rounded hover:bg-bg-elevated transition-colors"
+                  onClick={() => {}}
+                >
+                  Skip Step
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Low quality actions */}
+          {step.escalation.type === 'low_quality' && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs font-medium bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors"
+                onClick={() => {}}
+              >
+                Retry Step
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs font-medium bg-bg-tertiary text-text-muted rounded hover:bg-bg-elevated transition-colors"
+                onClick={() => {}}
+              >
+                Accept Anyway
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Scope & Owner Role - side by side */}
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -315,6 +448,33 @@ export function StepSheet({ step, onUpdate, onSendMessage, disabled = false }: S
         </div>
       )}
 
+      {/* Merge — shown for completed steps with merge info */}
+      {(step.mergeStrategy || step.mergeStatus) && (
+        <div className="space-y-1">
+          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Merge</h4>
+          <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
+            {step.mergeStrategy && <span>Strategy: {step.mergeStrategy}</span>}
+            {step.mergeStatus && (
+              <span className={cn(
+                step.mergeStatus === 'merged' ? 'text-success' :
+                step.mergeStatus === 'failed' ? 'text-accent-secondary' :
+                step.mergeStatus === 'merging' ? 'text-accent-primary' :
+                'text-text-muted'
+              )}>
+                Status: {step.mergeStatus}
+              </span>
+            )}
+            {step.mergeBranch && <span>Branch: {step.mergeBranch}</span>}
+            {step.mergeTargetBranch && <span>Target: {step.mergeTargetBranch}</span>}
+          </div>
+          {step.mergeError && (
+            <div className="mt-1 px-2 py-1 bg-accent-secondary/10 border border-accent-secondary/20 rounded text-xs text-accent-secondary font-mono">
+              {step.mergeError}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Failure History — shown when step has accumulated failures */}
       {step.failures && step.failures.length > 0 && (
         <div className="space-y-1">
@@ -331,6 +491,19 @@ export function StepSheet({ step, onUpdate, onSendMessage, disabled = false }: S
               </li>
             ))}
           </ul>
+          {step.retryHints && step.retryHints.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border-subtle">
+              <p className="text-xs font-medium text-text-secondary mb-1">Recovery Guidance</p>
+              <ul className="space-y-0.5">
+                {step.retryHints.map((hint, i) => (
+                  <li key={i} className="text-xs text-text-muted flex items-start gap-1.5">
+                    <span className="flex-shrink-0 mt-0.5">→</span>
+                    <span>{hint}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

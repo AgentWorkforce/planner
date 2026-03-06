@@ -1,19 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-
-export interface Suggestion {
-  type: 'plan' | 'opportunity';
-  plan_id: string | null;
-  plan_goal: string;
-  initiative_id: string | null;
-  initiative_name: string | null;
-  score: number;
-  reasons: string[];
-  project_id: string | null;
-  phase: 'ideating' | 'planning' | 'forging' | null;
-  cluster_id: string | null;
-  cluster_label: string | null;
-  signal_count: number;
-}
+import type { Suggestion } from './useSuggestions';
 
 export interface PortfolioOverview {
   initiative_count: number;

@@ -87,4 +87,7 @@ export interface ProcessSignalContext {
 
   /** ID of the stored signal (after successful storage) */
   storedSignalId?: string;
+
+  /** Intent classification from Tier 2 filter (or 'unclassified' if tier2 disabled) */
+  intent?: string;
 }

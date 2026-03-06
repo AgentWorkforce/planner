@@ -27,6 +27,8 @@ export interface SignalQueryFilters {
   status?: SignalStatus;
   /** Filter by cluster ID */
   cluster_id?: string;
+  /** Filter by intent classification */
+  intent?: string;
   /** Maximum number of results to return */
   limit: number;
   /** Number of results to skip */
@@ -49,6 +51,7 @@ export interface CreateSignalInput {
   scoring_factors: Record<string, number>;
   status: SignalStatus;
   tags?: string[];
+  intent?: string;
 }
 
 /**
@@ -61,6 +64,7 @@ export interface UpdateSignalInput {
   status?: SignalStatus;
   tags?: string[];
   linked_plan_id?: string;
+  intent?: string;
   provenance?: Array<{
     step: string;
     timestamp: string;

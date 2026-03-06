@@ -45,6 +45,7 @@ export const ListSignalsQuerySchema = z.object({
   greenhouse_id: z.string().optional(),
   status: SignalStatusSchema.optional(),
   cluster_id: z.string().optional(),
+  intent: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -131,6 +132,15 @@ export const UpdateFilterRuleSchema = z.object({
 
 export type UpdateFilterRuleRequest = z.infer<typeof UpdateFilterRuleSchema>;
 
+// ========== Quick Start Schema ==========
+
+export const QuickStartSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  preset_ids: z.array(z.string()).min(1, 'At least one source preset required'),
+});
+
+export type QuickStartRequest = z.infer<typeof QuickStartSchema>;
+
 // ========== Ingestion Job Schemas ==========
 
 export const CreateIngestionJobSchema = z.object({
@@ -146,3 +156,12 @@ export const ListIngestionJobsQuerySchema = z.object({
 });
 
 export type ListIngestionJobsQuery = z.infer<typeof ListIngestionJobsQuerySchema>;
+
+// ========== PRD Generation Schema ==========
+
+export const GeneratePrdSchema = z.object({
+  cluster_id: z.string().min(1, 'Cluster ID is required'),
+  greenhouse_id: z.string().min(1, 'Greenhouse ID is required'),
+});
+
+export type GeneratePrdRequest = z.infer<typeof GeneratePrdSchema>;

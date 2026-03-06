@@ -16,7 +16,7 @@ import type { WorkflowRunner, WorkflowEvent } from '@agent-relay/sdk/workflows';
 import type { ForgeNextStorage } from '../storage/interface.js';
 import type { GateManager } from '../gate-manager.js';
 import type { QuestionManager } from '../question-manager.js';
-import type { RunMonitor, StepMetricsPayload, RunMetricsPayload, StallWarningPayload, StepRetryContextPayload, StepFailedEnrichedPayload, StepScoredPayload } from '../run-monitor.js';
+import type { RunMonitor, StepMetricsPayload, RunMetricsPayload, StallWarningPayload, StepRetryContextPayload, StepFailedEnrichedPayload, StepScoredPayload, StepRetriesExhaustedPayload, StepMergeStatusPayload } from '../run-monitor.js';
 import type { Gate, Question } from '../types.js';
 
 function routeParam(req: Request, key: string): string | null {
@@ -99,6 +99,7 @@ interface StepMetricsEvent {
   model: string;
   duration_ms: number;
   estimated_cost_usd: number;
+  merge_strategy?: string;
 }
 
 interface RunMetricsEvent {
@@ -125,6 +126,7 @@ interface StepRetryContextEvent {
   attempt: number;
   previous_failures: string[];
   total_failure_count: number;
+  retry_hints?: string[];
 }
 
 interface StepFailedEnrichedEvent {
@@ -146,6 +148,24 @@ interface StepScoredEvent {
   failed_criteria: string[];
 }
 
+interface StepRetriesExhaustedEvent {
+  type: 'step:retries-exhausted';
+  run_id: string;
+  step_name: string;
+  attempt: number;
+  max_retries: number;
+  failures: string[];
+}
+
+interface StepMergeStatusEvent {
+  type: 'step:merge-status';
+  step_name: string;
+  status: string;
+  branch?: string;
+  target_branch?: string;
+  error?: string;
+}
+
 type SsePayload =
   | RunStatusEvent
   | StepStatusEvent
@@ -158,7 +178,9 @@ type SsePayload =
   | StallWarningEvent
   | StepRetryContextEvent
   | StepFailedEnrichedEvent
-  | StepScoredEvent;
+  | StepScoredEvent
+  | StepRetriesExhaustedEvent
+  | StepMergeStatusEvent;
 
 // ---------------------------------------------------------------------------
 // SSE utility
@@ -466,12 +488,31 @@ export function runEventsSSEHandler(deps: SseDeps) {
       emitAndPersist({ type: 'step:scored', ...data });
     };
 
+    const onStepRetriesExhausted = (data: StepRetriesExhaustedPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'step:retries-exhausted', ...data });
+    };
+
+    const onStepMergeStatus = (payload: StepMergeStatusPayload): void => {
+      if (payload.run_id !== runId) return;
+      emitAndPersist({
+        type: 'step:merge-status',
+        step_name: payload.step_name,
+        status: payload.status,
+        branch: payload.branch,
+        target_branch: payload.target_branch,
+        error: payload.error,
+      });
+    };
+
     deps.runMonitor.on('step:metrics', onStepMetrics);
     deps.runMonitor.on('run:metrics', onRunMetrics);
     deps.runMonitor.on('stall:warning', onStallWarning);
     deps.runMonitor.on('step:retry-context', onStepRetryContext);
     deps.runMonitor.on('step:failed-enriched', onStepFailedEnriched);
     deps.runMonitor.on('step:scored', onStepScored);
+    deps.runMonitor.on('step:retries-exhausted', onStepRetriesExhausted);
+    deps.runMonitor.on('step:merge-status', onStepMergeStatus);
 
     // ---------------------------------------------------------------------------
     // Keepalive ping every 15 seconds to prevent proxy/load-balancer timeouts
@@ -497,6 +538,8 @@ export function runEventsSSEHandler(deps: SseDeps) {
       deps.runMonitor.off('step:retry-context', onStepRetryContext);
       deps.runMonitor.off('step:failed-enriched', onStepFailedEnriched);
       deps.runMonitor.off('step:scored', onStepScored);
+      deps.runMonitor.off('step:retries-exhausted', onStepRetriesExhausted);
+      deps.runMonitor.off('step:merge-status', onStepMergeStatus);
       clearInterval(keepalive);
     });
   };

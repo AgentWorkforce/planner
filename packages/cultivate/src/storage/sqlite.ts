@@ -197,6 +197,14 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       CREATE UNIQUE INDEX IF NOT EXISTS idx_extractions_signal_id ON extractions(signal_id);
     `);
 
+    // Migration: add intent column to signals table
+    try {
+      this.db.exec(`ALTER TABLE signals ADD COLUMN intent TEXT`);
+    } catch (_) {
+      // Column already exists - safe to ignore
+    }
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_signals_intent ON signals(intent)`);
+
     // Ensure default greenhouse exists
     this.ensureDefaultGreenhouse();
   }
@@ -256,6 +264,7 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       created_at: now,
       updated_at: now,
       linked_plan_id: undefined,
+      intent: input.intent as Signal['intent'],
     };
 
     this.db
@@ -263,8 +272,8 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
         `INSERT INTO signals (
           id, greenhouse_id, source_type, external_id, title, body, author, author_type,
           url, score, scoring_factors, cluster_id, status, provenance, tags,
-          created_at, updated_at, linked_plan_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          created_at, updated_at, linked_plan_id, intent
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         signal.id,
@@ -284,7 +293,8 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
         JSON.stringify(signal.tags),
         signal.created_at,
         signal.updated_at,
-        signal.linked_plan_id || null
+        signal.linked_plan_id || null,
+        signal.intent || null
       );
 
     return signal;
@@ -346,6 +356,10 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       updates.push('linked_plan_id = ?');
       values.push(input.linked_plan_id);
     }
+    if (input.intent !== undefined) {
+      updates.push('intent = ?');
+      values.push(input.intent);
+    }
     if (input.provenance !== undefined) {
       updates.push('provenance = ?');
       values.push(JSON.stringify(input.provenance));
@@ -378,6 +392,10 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     if (filters.cluster_id) {
       conditions.push('cluster_id = ?');
       values.push(filters.cluster_id);
+    }
+    if (filters.intent) {
+      conditions.push('intent = ?');
+      values.push(filters.intent);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -995,6 +1013,7 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       created_at: row.created_at,
       updated_at: row.updated_at,
       linked_plan_id: row.linked_plan_id || undefined,
+      intent: row.intent || undefined,
     };
   }
 

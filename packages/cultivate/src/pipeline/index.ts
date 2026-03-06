@@ -71,6 +71,7 @@ export async function processSignal(ctx: ProcessSignalContext): Promise<ProcessS
     };
 
     ctx.filterResult = filterResult;
+    ctx.intent = filterResult.tier2_category || 'unclassified';
     ctx.provenance.push(filterProvenance);
   } catch (err) {
     // SignalFilteredError is the expected path for rejection
@@ -369,6 +370,7 @@ export async function processSignal(ctx: ProcessSignalContext): Promise<ProcessS
       scoring_factors: scoringFactors,
       status: 'clustered',
       tags: [],
+      intent: ctx.intent,
     });
 
     // Update signal with cluster_id and provenance

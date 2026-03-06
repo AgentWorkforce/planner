@@ -6,14 +6,25 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { CultivateStorage } from '../storage/interface.js';
-import type { Cluster, Signal } from '../domain/types.js';
+import type { Cluster, Signal, ExtractionResult } from '../domain/types.js';
+
+export interface EvidenceItem {
+  signal_id: string;
+  signal_title: string;
+  quote?: string;
+  source_type: string;
+  author: string;
+  author_type: string;
+  score: number;
+}
 
 export interface Recommendation {
   cluster_id: string;
   label: string;
   rank: number;
   summary: string;
-  evidence: string[];     // key signal titles/excerpts supporting this recommendation
+  evidence: EvidenceItem[];
+  signal_ids: string[];
   confidence: number;     // 0-1
   action_hint?: string;   // suggested next action
 }
@@ -101,8 +112,9 @@ export class RecommendationEngine {
     // Step 4: Take top 15 clusters
     const topClusters = rankedClusters.slice(0, 15);
 
-    // Step 5: Load sample signals (top 3 per cluster by score)
+    // Step 5: Load sample signals (top 3 per cluster by score) and their extractions
     const clusterSignalMap = new Map<string, Signal[]>();
+    const signalExtractionMap = new Map<string, ExtractionResult>();
 
     for (const cluster of topClusters) {
       const signals = await this.storage.listSignals({
@@ -115,12 +127,21 @@ export class RecommendationEngine {
       // Sort by score descending
       const sortedSignals = signals.sort((a, b) => b.score - a.score);
       clusterSignalMap.set(cluster.id, sortedSignals);
+
+      // Load extractions for each signal
+      for (const signal of sortedSignals) {
+        const extraction = await this.storage.getExtractionBySignalId(signal.id);
+        if (extraction) {
+          signalExtractionMap.set(signal.id, extraction);
+        }
+      }
     }
 
     // Step 6: Call Sonnet to produce recommendations
     const recommendations = await this.callSonnetForRecommendations(
       topClusters,
-      clusterSignalMap
+      clusterSignalMap,
+      signalExtractionMap,
     );
 
     // Step 7: Cache result
@@ -151,17 +172,39 @@ export class RecommendationEngine {
   }
 
   /**
-   * Call Sonnet to generate recommendations from clusters and signals
+   * Build EvidenceItem objects from loaded signals and their extractions
+   */
+  private buildEvidenceItems(
+    signals: Signal[],
+    extractionMap: Map<string, ExtractionResult>,
+  ): EvidenceItem[] {
+    return signals.map(signal => {
+      const extraction = extractionMap.get(signal.id);
+      return {
+        signal_id: signal.id,
+        signal_title: signal.title,
+        quote: extraction?.quotes?.[0],
+        source_type: signal.source_type,
+        author: signal.author,
+        author_type: signal.author_type,
+        score: signal.score,
+      };
+    });
+  }
+
+  /**
+   * Call Sonnet to generate recommendations from clusters, signals, and extractions
    */
   private async callSonnetForRecommendations(
     clusters: Cluster[],
-    signalMap: Map<string, Signal[]>
+    signalMap: Map<string, Signal[]>,
+    extractionMap: Map<string, ExtractionResult>,
   ): Promise<Recommendation[]> {
     const anthropic = new Anthropic({
       apiKey: this.anthropicApiKey,
     });
 
-    // Build prompt with cluster summaries and sample signals
+    // Build prompt with cluster summaries, sample signals, and user quotes
     let prompt = 'Given these signal clusters from user feedback:\n\n';
 
     clusters.forEach((cluster, index) => {
@@ -175,7 +218,12 @@ export class RecommendationEngine {
       if (signals.length > 0) {
         prompt += 'Sample signals:\n';
         signals.forEach(signal => {
-          prompt += `  - "${signal.title}" (score ${signal.score.toFixed(2)})\n`;
+          prompt += `  - "${signal.title}" (score ${signal.score.toFixed(2)})`;
+          const extraction = extractionMap.get(signal.id);
+          if (extraction?.quotes?.[0]) {
+            prompt += `\n    User said: "${extraction.quotes[0]}"`;
+          }
+          prompt += '\n';
         });
       }
 
@@ -185,8 +233,7 @@ export class RecommendationEngine {
     prompt += `
 Generate exactly 5 ranked recommendations. For each:
 - cluster_id: which cluster this recommendation is about
-- summary: 2-3 sentence actionable recommendation
-- evidence: array of key signal titles/excerpts supporting this
+- summary: 2-3 sentence actionable recommendation referencing user language where relevant
 - confidence: 0-1 how confident this is worth acting on
 - action_hint: suggested next step
 
@@ -216,13 +263,17 @@ Output JSON array only, no markdown formatting.`;
         .map((rec: any, index: number) => {
           // Find cluster to get label
           const cluster = clusters.find(c => c.id === rec.cluster_id);
+          // Build evidence from the actual loaded signals (not LLM output)
+          const clusterSignals = cluster ? (signalMap.get(cluster.id) || []) : [];
+          const evidence = this.buildEvidenceItems(clusterSignals, extractionMap);
 
           return {
             cluster_id: rec.cluster_id,
             label: cluster?.label || 'Unknown',
             rank: index + 1,
             summary: rec.summary || '',
-            evidence: Array.isArray(rec.evidence) ? rec.evidence : [],
+            evidence,
+            signal_ids: clusterSignals.map(s => s.id),
             confidence: typeof rec.confidence === 'number' ? rec.confidence : 0.5,
             action_hint: rec.action_hint,
           };

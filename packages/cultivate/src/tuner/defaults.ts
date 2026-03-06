@@ -39,9 +39,9 @@ export const DEFAULT_CULTIVATE_CONFIG: CultivateConfig = {
 
   /**
    * Whether to use Tier 2 ML classification
-   * Disabled by default for faster processing
+   * Enabled by default for intent classification
    */
-  tier2_enabled: false,
+  tier2_enabled: true,
 
   /**
    * Tier 2 feedback score threshold (0-1)

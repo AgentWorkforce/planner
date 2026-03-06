@@ -19,6 +19,8 @@ import {
   pauseRunHandler,
   resumeRunHandler,
   cancelRunHandler,
+  retryStepHandler,
+  skipStepHandler,
 } from './handlers.js';
 import { listGatesHandler, approveGateHandler, rejectGateHandler } from './gate-handlers.js';
 import {
@@ -60,6 +62,10 @@ export function createForgeNextRouter(deps: ForgeNextDeps): Router {
   router.post('/runs/:id/pause', pauseRunHandler(deps));
   router.post('/runs/:id/resume', resumeRunHandler(deps));
   router.post('/runs/:id/cancel', cancelRunHandler(deps));
+
+  // Per-step operations (stubs — needs relay SDK per-step support)
+  router.post('/runs/:runId/steps/:stepName/retry', retryStepHandler(deps));
+  router.post('/runs/:runId/steps/:stepName/skip', skipStepHandler(deps));
 
   // Gate management (nested under runs for listing, top-level for decisions)
   router.get('/runs/:runId/gates', listGatesHandler(deps));

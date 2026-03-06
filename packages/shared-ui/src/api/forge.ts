@@ -145,6 +145,53 @@ export async function cancelRun(runId: string): Promise<{ run_id: string; status
   return response.json() as Promise<{ run_id: string; status: string }>;
 }
 
+// -- Step operations (stubs — returns 501 until relay SDK supports per-step control) --
+
+export async function retryStep(
+  runId: string,
+  stepName: string,
+  options?: { model?: string }
+): Promise<void> {
+  const response = await fetch(`${FORGE_API}/runs/${runId}/steps/${encodeURIComponent(stepName)}/retry`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: options ? JSON.stringify(options) : undefined,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error((error as { error?: string }).error || `Failed to retry step: ${response.status}`);
+  }
+}
+
+export async function skipStep(runId: string, stepName: string): Promise<void> {
+  const response = await fetch(`${FORGE_API}/runs/${runId}/steps/${encodeURIComponent(stepName)}/skip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error((error as { error?: string }).error || `Failed to skip step: ${response.status}`);
+  }
+}
+
+export async function retryMerge(runId: string, stepName: string): Promise<void> {
+  const res = await fetch(`${FORGE_API}/runs/${runId}/steps/${encodeURIComponent(stepName)}/retry-merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`retryMerge failed: ${res.status}`);
+}
+
+export async function skipMerge(runId: string, stepName: string): Promise<void> {
+  const res = await fetch(`${FORGE_API}/runs/${runId}/steps/${encodeURIComponent(stepName)}/skip-merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`skipMerge failed: ${res.status}`);
+}
+
 // -- Gates --
 
 export async function listGates(runId: string): Promise<Gate[]> {

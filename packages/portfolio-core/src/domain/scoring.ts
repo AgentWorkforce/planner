@@ -41,6 +41,7 @@ export interface ClusterData {
   velocity_weekly: number;
   avg_signal_score: number;
   has_linked_plan: boolean;
+  top_quote?: string;
 }
 
 /**
@@ -148,6 +149,7 @@ export function scorePlan(
 export function scoreOpportunity(cluster: ClusterData): {
   score: number;
   reasons: string[];
+  top_quote?: string;
 } | null {
   if (cluster.has_linked_plan || cluster.signal_count < 3) {
     return null;
@@ -158,7 +160,7 @@ export function scoreOpportunity(cluster: ClusterData): {
     `Rising trend: '${cluster.label}' — ${cluster.signal_count} signals, no plan yet`,
   ];
 
-  return { score, reasons };
+  return { score, reasons, top_quote: cluster.top_quote };
 }
 
 /**
@@ -218,6 +220,7 @@ export function generateSuggestions(
           cluster_id: cluster.cluster_id,
           cluster_label: cluster.label,
           signal_count: cluster.signal_count,
+          top_quote: result.top_quote,
         });
       }
     }

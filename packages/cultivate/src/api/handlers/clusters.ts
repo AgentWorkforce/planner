@@ -69,11 +69,19 @@ export function createClusterHandlers(storage: CultivateStorage) {
         offset: 0,
       });
 
-      // Return cluster with embedded signals
+      // Load extractions for each signal
+      const signalsWithExtractions = await Promise.all(
+        signals.map(async (signal) => {
+          const extraction = await storage.getExtractionBySignalId(signal.id);
+          return { ...signal, extraction };
+        })
+      );
+
+      // Return cluster with embedded signals and their extractions
       res.json({
         data: {
           ...cluster,
-          signals,
+          signals: signalsWithExtractions,
         },
       });
     } catch (err) {

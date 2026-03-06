@@ -17,6 +17,15 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 export type RunStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
+export type EscalationType = 'gate' | 'question' | 'stall' | 'retries_exhausted' | 'low_quality' | 'merge_failed';
+
+export interface StepEscalation {
+  type: EscalationType;
+  detail: string;
+  gateId?: string;
+  questionId?: string;
+}
+
 export interface StepState {
   stepName: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'retrying';
@@ -33,6 +42,16 @@ export interface StepState {
   durationMs?: number;
   model?: string;
   stallWarning?: boolean;
+  // Escalation fields
+  escalation?: StepEscalation;
+  retryHints?: string[];
+  mergeStrategy?: string;
+  retriesExhausted?: boolean;
+  maxRetries?: number;
+  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed' | 'skipped';
+  mergeBranch?: string;
+  mergeTargetBranch?: string;
+  mergeError?: string;
 }
 
 export interface RunMetrics {
@@ -120,7 +139,10 @@ type BuildAction =
   | { type: 'RUN_METRICS'; totalCostUsd: number; avgSatisfaction: number; stepsCompleted: number; stepsTotal: number }
   | { type: 'STALL_WARNING'; stepName: string }
   | { type: 'STEP_FAILED_ENRICHED'; stepName: string; error: string; failures: string[]; attempt: number }
-  | { type: 'STEP_RETRY_CONTEXT'; stepName: string; attempt: number; previousFailures: string[] };
+  | { type: 'STEP_RETRY_CONTEXT'; stepName: string; attempt: number; previousFailures: string[]; retryHints?: string[] }
+  | { type: 'STEP_RETRIES_EXHAUSTED'; stepName: string; attempt: number; maxRetries: number; failures: string[] }
+  | { type: 'STEP_METRICS_MERGE'; stepName: string; mergeStrategy: string }
+  | { type: 'STEP_MERGE_STATUS'; stepName: string; status: 'pending' | 'merging' | 'merged' | 'failed' | 'skipped'; branch?: string; targetBranch?: string; error?: string };
 
 interface BuildState {
   runStatus: RunStatus | null;
@@ -134,6 +156,50 @@ interface BuildState {
 }
 
 const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set(['completed', 'failed', 'cancelled']);
+
+/**
+ * Derive escalation for a step from its state and related gates/questions.
+ * Priority: gate > question > retries_exhausted > stall > low_quality
+ */
+function deriveEscalation(
+  step: StepState,
+  gates: GateState[],
+  questions: QuestionState[],
+): StepEscalation | undefined {
+  // Gate pending for this step
+  const pendingGate = gates.find(g => g.status === 'pending' && g.stepName === step.stepName);
+  if (pendingGate) {
+    return { type: 'gate', detail: `Awaiting approval for ${step.stepName}`, gateId: pendingGate.gateId };
+  }
+
+  // Question pending for this step (match by stepId which is step_name in our SSE)
+  const pendingQuestion = questions.find(q => q.status === 'pending' && q.stepId === step.stepName);
+  if (pendingQuestion) {
+    return { type: 'question', detail: pendingQuestion.question, questionId: pendingQuestion.questionId };
+  }
+
+  // Retries exhausted
+  if (step.retriesExhausted) {
+    return { type: 'retries_exhausted', detail: `Failed ${step.attempt ?? 0}/${step.maxRetries ?? 0} attempts` };
+  }
+
+  // Merge failed
+  if (step.mergeStatus === 'failed') {
+    return { type: 'merge_failed', detail: step.mergeError ?? 'Merge failed' };
+  }
+
+  // Stall warning
+  if (step.stallWarning) {
+    return { type: 'stall', detail: `Step running longer than expected` };
+  }
+
+  // Low quality score
+  if (step.status === 'completed' && step.score !== undefined && step.score < 40) {
+    return { type: 'low_quality', detail: `Score ${step.score}/100` };
+  }
+
+  return undefined;
+}
 
 const initialState: BuildState = {
   runStatus: null,
@@ -164,7 +230,7 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
     case 'STEP_STATUS': {
       const next = new Map(state.steps);
       const existing = next.get(action.stepName);
-      next.set(action.stepName, {
+      const updated: StepState = {
         stepName: action.stepName,
         status: action.status,
         output: action.output ?? existing?.output,
@@ -180,7 +246,17 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
         durationMs: existing?.durationMs,
         model: existing?.model,
         stallWarning: existing?.stallWarning,
-      });
+        retryHints: existing?.retryHints,
+        mergeStrategy: existing?.mergeStrategy,
+        retriesExhausted: existing?.retriesExhausted,
+        maxRetries: existing?.maxRetries,
+        mergeStatus: existing?.mergeStatus,
+        mergeBranch: existing?.mergeBranch,
+        mergeTargetBranch: existing?.mergeTargetBranch,
+        mergeError: existing?.mergeError,
+      };
+      updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+      next.set(action.stepName, updated);
       return { ...state, steps: next };
     }
 
@@ -194,7 +270,16 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
         stepName: action.stepName,
         status: 'pending',
       };
-      return { ...state, gates: [...state.gates, newGate] };
+      const newGates = [...state.gates, newGate];
+      // Re-derive escalation for the affected step
+      const steps = new Map(state.steps);
+      const gateStep = steps.get(action.stepName);
+      if (gateStep) {
+        const updated = { ...gateStep };
+        updated.escalation = deriveEscalation(updated, newGates, state.questions);
+        steps.set(action.stepName, updated);
+      }
+      return { ...state, gates: newGates, steps };
     }
 
     case 'GATE_DECIDED': {
@@ -208,7 +293,18 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
             }
           : g
       );
-      return { ...state, gates };
+      // Re-derive escalation for the step whose gate was decided
+      const decidedGate = state.gates.find(g => g.gateId === action.gateId);
+      const steps = new Map(state.steps);
+      if (decidedGate) {
+        const gateStep = steps.get(decidedGate.stepName);
+        if (gateStep) {
+          const updated = { ...gateStep };
+          updated.escalation = deriveEscalation(updated, gates, state.questions);
+          steps.set(decidedGate.stepName, updated);
+        }
+      }
+      return { ...state, gates, steps };
     }
 
     case 'QUESTION_PENDING': {
@@ -220,7 +316,16 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
         question: action.question,
         status: 'pending',
       };
-      return { ...state, questions: [...state.questions, newQuestion] };
+      const newQuestions = [...state.questions, newQuestion];
+      // Re-derive escalation for the affected step
+      const steps = new Map(state.steps);
+      const qStep = steps.get(action.stepId);
+      if (qStep) {
+        const updated = { ...qStep };
+        updated.escalation = deriveEscalation(updated, state.gates, newQuestions);
+        steps.set(action.stepId, updated);
+      }
+      return { ...state, questions: newQuestions, steps };
     }
 
     case 'QUESTION_RESOLVED': {
@@ -233,20 +338,33 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
             }
           : q
       );
-      return { ...state, questions };
+      // Re-derive escalation for the step whose question was resolved
+      const resolvedQ = state.questions.find(q => q.questionId === action.questionId);
+      const steps = new Map(state.steps);
+      if (resolvedQ) {
+        const qStep = steps.get(resolvedQ.stepId);
+        if (qStep) {
+          const updated = { ...qStep };
+          updated.escalation = deriveEscalation(updated, state.gates, questions);
+          steps.set(resolvedQ.stepId, updated);
+        }
+      }
+      return { ...state, questions, steps };
     }
 
     case 'STEP_SCORED': {
       const steps = new Map(state.steps);
       const existing = steps.get(action.stepName);
       if (existing) {
-        steps.set(action.stepName, {
+        const updated = {
           ...existing,
           score: action.score,
           scoreReasoning: action.reasoning,
           matchedCriteria: action.matchedCriteria,
           failedCriteria: action.failedCriteria,
-        });
+        };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
       }
       return { ...state, steps };
     }
@@ -255,13 +373,15 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
       const steps = new Map(state.steps);
       const existing = steps.get(action.stepName);
       if (existing) {
-        steps.set(action.stepName, {
+        const updated = {
           ...existing,
           model: action.model,
           durationMs: action.durationMs,
           estimatedCostUsd: action.estimatedCostUsd,
           stallWarning: false, // clear stall on metrics (step completed)
-        });
+        };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
       }
       // Also clear from stall warnings
       const stallWarnings = new Set(state.stallWarnings);
@@ -284,7 +404,9 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
       const steps = new Map(state.steps);
       const existing = steps.get(action.stepName);
       if (existing) {
-        steps.set(action.stepName, { ...existing, stallWarning: true });
+        const updated = { ...existing, stallWarning: true };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
       }
       const stallWarnings = new Set(state.stallWarnings);
       stallWarnings.add(action.stepName);
@@ -295,12 +417,14 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
       const steps = new Map(state.steps);
       const existing = steps.get(action.stepName);
       if (existing) {
-        steps.set(action.stepName, {
+        const updated = {
           ...existing,
           error: action.error,
           failures: action.failures,
           attempt: action.attempt,
-        });
+        };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
       }
       return { ...state, steps };
     }
@@ -309,11 +433,57 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
       const steps = new Map(state.steps);
       const existing = steps.get(action.stepName);
       if (existing) {
-        steps.set(action.stepName, {
+        const updated = {
           ...existing,
           failures: action.previousFailures,
           attempt: action.attempt,
-        });
+          retryHints: action.retryHints ?? existing.retryHints,
+        };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
+      }
+      return { ...state, steps };
+    }
+
+    case 'STEP_RETRIES_EXHAUSTED': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        const updated = {
+          ...existing,
+          retriesExhausted: true,
+          maxRetries: action.maxRetries,
+          attempt: action.attempt,
+          failures: action.failures,
+        };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
+      }
+      return { ...state, steps };
+    }
+
+    case 'STEP_METRICS_MERGE': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        steps.set(action.stepName, { ...existing, mergeStrategy: action.mergeStrategy });
+      }
+      return { ...state, steps };
+    }
+
+    case 'STEP_MERGE_STATUS': {
+      const steps = new Map(state.steps);
+      const existing = steps.get(action.stepName);
+      if (existing) {
+        const updated = {
+          ...existing,
+          mergeStatus: action.status,
+          mergeBranch: action.branch ?? existing.mergeBranch,
+          mergeTargetBranch: action.targetBranch ?? existing.mergeTargetBranch,
+          mergeError: action.error ?? existing.mergeError,
+        };
+        updated.escalation = deriveEscalation(updated, state.gates, state.questions);
+        steps.set(action.stepName, updated);
       }
       return { ...state, steps };
     }
@@ -444,6 +614,13 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
               durationMs: data.duration_ms,
               estimatedCostUsd: data.estimated_cost_usd,
             });
+            if (data.merge_strategy) {
+              dispatch({
+                type: 'STEP_METRICS_MERGE',
+                stepName: data.step_name,
+                mergeStrategy: data.merge_strategy,
+              });
+            }
             break;
 
           case 'run:metrics':
@@ -476,6 +653,28 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
               stepName: data.step_name,
               attempt: data.attempt,
               previousFailures: data.previous_failures,
+              retryHints: data.retry_hints,
+            });
+            break;
+
+          case 'step:retries-exhausted':
+            dispatch({
+              type: 'STEP_RETRIES_EXHAUSTED',
+              stepName: data.step_name,
+              attempt: data.attempt,
+              maxRetries: data.max_retries,
+              failures: data.failures,
+            });
+            break;
+
+          case 'step:merge-status':
+            dispatch({
+              type: 'STEP_MERGE_STATUS',
+              stepName: data.step_name,
+              status: data.status,
+              branch: data.branch,
+              targetBranch: data.target_branch,
+              error: data.error,
             });
             break;
 

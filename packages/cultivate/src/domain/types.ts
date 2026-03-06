@@ -61,6 +61,16 @@ export const AuthorTypeSchema = z.enum([
 ]);
 export type AuthorType = z.infer<typeof AuthorTypeSchema>;
 
+export const IntentSchema = z.enum([
+  'product_feedback',
+  'bug_report',
+  'feature_request',
+  'question',
+  'noise',
+  'unclassified',
+]);
+export type IntentType = z.infer<typeof IntentSchema>;
+
 /**
  * Authentication mechanism type
  */
@@ -355,6 +365,7 @@ export const SignalSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   linked_plan_id: z.string().optional(),
+  intent: IntentSchema.optional(),
 });
 export type Signal = z.infer<typeof SignalSchema>;
 

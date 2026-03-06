@@ -38,6 +38,10 @@ export interface PlanStep {
   scope?: string;
   acceptance_criteria?: AcceptanceCriterion[];
   gate?: Gate;
+  /** Static recovery guidance for retry attempts */
+  retry_hints?: string[];
+  /** How git changes from this step should be merged back */
+  merge_strategy?: string;
 }
 
 /** Minimal plan metadata shape the compiler needs. */
@@ -79,6 +83,10 @@ export interface CompilationResult {
   config: RelayYamlConfig;
   /** Acceptance criteria per step_id, for post-execution scoring */
   stepCriteria: Map<string, AcceptanceCriterion[]>;
+  /** Static recovery hints per step_id, for retry context */
+  stepRetryHints: Map<string, string[]>;
+  /** Merge strategy per step_id, for orchestration metadata */
+  stepMergeStrategies: Map<string, string>;
 }
 
 // ============================================
@@ -131,13 +139,24 @@ export function compilePlan(
 
   // Build criteria map for post-execution satisfaction scoring
   const stepCriteria = new Map<string, AcceptanceCriterion[]>();
+  // Build retry hints map for retry context enrichment
+  const stepRetryHints = new Map<string, string[]>();
+  // Build merge strategy map for orchestration metadata
+  const stepMergeStrategies = new Map<string, string>();
+
   for (const step of activeSteps) {
     if (step.acceptance_criteria && step.acceptance_criteria.length > 0) {
       stepCriteria.set(step.step_id, step.acceptance_criteria);
     }
+    if (step.retry_hints && step.retry_hints.length > 0) {
+      stepRetryHints.set(step.step_id, step.retry_hints);
+    }
+    if (step.merge_strategy) {
+      stepMergeStrategies.set(step.step_id, step.merge_strategy);
+    }
   }
 
-  return { config: relayYamlConfig, stepCriteria };
+  return { config: relayYamlConfig, stepCriteria, stepRetryHints, stepMergeStrategies };
 }
 
 // ============================================
@@ -286,6 +305,13 @@ function composeTask(step: PlanStep, allSteps?: PlanStep[]): string {
     parts.push('\n### Acceptance Criteria');
     for (const criterion of step.acceptance_criteria) {
       parts.push(`- ${criterion.description}`);
+    }
+  }
+
+  if (step.retry_hints && step.retry_hints.length > 0) {
+    parts.push('### Recovery Guidance (if retrying)');
+    for (const hint of step.retry_hints) {
+      parts.push(`- ${hint}`);
     }
   }
 

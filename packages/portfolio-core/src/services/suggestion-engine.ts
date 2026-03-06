@@ -53,6 +53,7 @@ export interface CultivateStorageReader {
     }>
   >;
   listGreenhouses(): Promise<Array<{ id: string }>>;
+  getExtractionBySignalId?(signalId: string): Promise<{ quotes: string[] } | null>;
 }
 
 /**
@@ -641,6 +642,20 @@ export class SuggestionEngine {
         );
         const hasLinkedPlan = linkedPlanIds.size > 0;
 
+        // Load top quote from highest-scored signal's extraction
+        let topQuote: string | undefined;
+        if (signals.length > 0 && this.cultivateStorage.getExtractionBySignalId) {
+          const topSignal = [...signals].sort((a, b) => b.score - a.score)[0];
+          try {
+            const extraction = await this.cultivateStorage.getExtractionBySignalId(topSignal.id);
+            if (extraction?.quotes?.[0]) {
+              topQuote = extraction.quotes[0];
+            }
+          } catch (err) {
+            // Non-critical, skip silently
+          }
+        }
+
         clusters.push({
           cluster_id: cluster.id,
           label: cluster.label,
@@ -648,6 +663,7 @@ export class SuggestionEngine {
           velocity_weekly: cluster.velocity_weekly,
           avg_signal_score: avgScore,
           has_linked_plan: hasLinkedPlan,
+          top_quote: topQuote,
         });
 
         // Track linked signals per plan

@@ -9,6 +9,7 @@ import { createSignalHandlers } from './api/handlers/signals.js';
 import { createClusterHandlers } from './api/handlers/clusters.js';
 import { createSourceHandlers } from './api/handlers/sources.js';
 import { createRecommendationHandlers } from './api/handlers/recommendations.js';
+import { createPrdHandlers } from './api/handlers/prd.js';
 import { createFilterRuleHandlers } from './api/handlers/filter-rules.js';
 import { createDeadLetterHandlers } from './api/handlers/dead-letter.js';
 import { createIngestionHandlers } from './api/handlers/ingestion.js';
@@ -37,6 +38,8 @@ export function createCultivateRouter(context: CultivateContext): Router {
 
   // ========== Greenhouses ==========
   const greenhouseHandlers = createGreenhouseHandlers(context.storage);
+  // Quick-start must be mounted before parameterized :id routes to avoid conflicts
+  router.post('/greenhouses/quick-start', greenhouseHandlers.quickStart);
   router.post('/greenhouses', greenhouseHandlers.create);
   router.get('/greenhouses', greenhouseHandlers.list);
   router.get('/greenhouses/:id', greenhouseHandlers.get);
@@ -93,6 +96,10 @@ export function createCultivateRouter(context: CultivateContext): Router {
     context.config.anthropicApiKey
   );
   router.get('/recommendations', recommendationHandlers.get);
+
+  // ========== PRD Generation ==========
+  const prdHandlers = createPrdHandlers(context.storage, context.config.anthropicApiKey);
+  router.post('/prd/generate', prdHandlers.generate);
 
   // ========== Dead Letter Queue ==========
   const deadLetterHandlers = createDeadLetterHandlers(context.queues.processSignal);

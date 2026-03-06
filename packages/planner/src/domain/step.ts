@@ -38,6 +38,10 @@ export const StepSchema = z.object({
   contract: TaskContractSchema.optional(),
   /** Implementation specification — target files, patterns, architecture notes */
   specification: z.record(z.string(), z.unknown()).optional(),
+  /** Static recovery guidance for retry attempts */
+  retry_hints: z.array(z.string()).optional(),
+  /** How git changes from this step should be merged back */
+  merge_strategy: z.enum(['squash', 'rebase', 'merge', 'cherry-pick', 'none']).optional(),
 });
 
 export type Step = z.infer<typeof StepSchema>;
@@ -56,6 +60,10 @@ export interface CreateStepOptions {
   language_tier?: LanguageTier;
   /** DOT Framework: Task contract */
   contract?: TaskContract;
+  /** Static recovery guidance for retry attempts */
+  retry_hints?: string[];
+  /** How git changes from this step should be merged back */
+  merge_strategy?: 'squash' | 'rebase' | 'merge' | 'cherry-pick' | 'none';
 }
 
 /**
@@ -82,6 +90,8 @@ export function createStep(title: string, options: CreateStepOptions = {}): Step
   }
   if (options.language_tier !== undefined) step.language_tier = options.language_tier;
   if (options.contract !== undefined) step.contract = options.contract;
+  if (options.retry_hints !== undefined) step.retry_hints = options.retry_hints;
+  if (options.merge_strategy !== undefined) step.merge_strategy = options.merge_strategy;
 
   return StepSchema.parse(step);
 }

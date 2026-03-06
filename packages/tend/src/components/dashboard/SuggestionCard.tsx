@@ -1,27 +1,36 @@
 import { cn } from '@/lib/utils';
-
-interface Suggestion {
-  type: 'plan' | 'opportunity';
-  plan_id: string | null;
-  plan_goal: string;
-  initiative_id: string | null;
-  initiative_name: string | null;
-  score: number;
-  reasons: string[];
-  project_id: string | null;
-  phase: 'ideating' | 'planning' | 'forging' | null;
-  cluster_id: string | null;
-  cluster_label: string | null;
-  signal_count: number;
-}
+import type { Suggestion } from '@/hooks/useSuggestions';
 
 interface SuggestionCardProps {
   suggestion: Suggestion;
   onOpen?: (suggestion: Suggestion) => void;
 }
 
+/** For opportunity cards, find the dominant intent from the breakdown */
+function getDominantIntent(breakdown?: Record<string, number>): string | null {
+  if (!breakdown) return null;
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [intent, count] of Object.entries(breakdown)) {
+    if (count > bestCount) {
+      best = intent;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+const INTENT_DOT_COLORS: Record<string, string> = {
+  bug_report: 'bg-red-400',
+  feature_request: 'bg-emerald-400',
+  product_feedback: 'bg-blue-400',
+  question: 'bg-amber-400',
+};
+
 export function SuggestionCard({ suggestion, onOpen }: SuggestionCardProps) {
   const topReason = suggestion.reasons[0] || null;
+  const isOpportunity = suggestion.type === 'opportunity';
+  const dominantIntent = isOpportunity ? getDominantIntent(suggestion.intent_breakdown) : null;
 
   return (
     <button
@@ -45,12 +54,27 @@ export function SuggestionCard({ suggestion, onOpen }: SuggestionCardProps) {
               {suggestion.phase}
             </span>
           )}
+          {isOpportunity && suggestion.signal_count > 0 && (
+            <span className="text-[10px] text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded shrink-0">
+              {suggestion.signal_count} signal{suggestion.signal_count !== 1 ? 's' : ''}
+            </span>
+          )}
+          {dominantIntent && INTENT_DOT_COLORS[dominantIntent] && (
+            <span
+              className={cn('w-1.5 h-1.5 rounded-full shrink-0', INTENT_DOT_COLORS[dominantIntent])}
+              title={dominantIntent.replace(/_/g, ' ')}
+            />
+          )}
         </div>
-        {topReason && (
+        {isOpportunity && suggestion.top_quote ? (
+          <p className="text-xs text-text-muted mt-0.5 truncate italic">
+            &ldquo;{suggestion.top_quote}&rdquo;
+          </p>
+        ) : topReason ? (
           <p className="text-xs text-text-muted mt-0.5 truncate">
             {topReason}
           </p>
-        )}
+        ) : null}
       </div>
 
       {/* Arrow */}

@@ -37,8 +37,22 @@ export interface TreeStep {
   durationMs?: number;
   model?: string;
   stallWarning?: boolean;
+  /** Derived escalation requiring user attention */
+  escalation?: { type: string; detail: string; gateId?: string; questionId?: string };
+  /** Static recovery hints from plan author */
+  retryHints?: string[];
+  /** Git merge strategy for this step */
+  mergeStrategy?: string;
+  /** Whether all retry attempts have been used */
+  retriesExhausted?: boolean;
+  /** Maximum retry attempts configured */
+  maxRetries?: number;
   /** Runtime error message for failed steps */
   error?: string;
+  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed' | 'skipped';
+  mergeBranch?: string;
+  mergeTargetBranch?: string;
+  mergeError?: string;
 }
 
 /**
