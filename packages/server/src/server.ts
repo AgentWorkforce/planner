@@ -82,6 +82,10 @@ import {
 // Forge spawner
 import { spawnForgeTask, terminateForgeAgent, spawnGateAgent } from './relay/forge-spawner.js';
 
+// Global events (cross-session notifications)
+import { createGlobalSseRouter } from './events/global-sse.js';
+import { wireGlobalEvents } from './events/event-wiring.js';
+
 // Agent lifecycle
 import { AgentLifecycleManager } from './agents/lifecycle.js';
 
@@ -124,6 +128,7 @@ let mullService: MullService;
 let cultivateService: CultivateService | undefined;
 let portfolioService: PortfolioService;
 let mullTriggerCleanup: TriggerCleanupFn | null = null;
+let globalEventCleanup: (() => void) | null = null;
 
 // =============================================================================
 // Main
@@ -221,7 +226,12 @@ async function start(): Promise<void> {
       : storage.getLatestVersion(planId);
     if (!pv) return null;
     return {
-      plan: { plan_id: pv.plan_id, version: pv.version, summary: pv.summary },
+      plan: {
+        plan_id: pv.plan_id,
+        version: pv.version,
+        summary: pv.summary,
+        execution_config: pv.execution_config,
+      },
       steps: pv.steps.map((s: any) => ({
         step_id: s.step_id,
         title: s.title,
@@ -233,6 +243,8 @@ async function start(): Promise<void> {
         gate: s.gate,
         retry_hints: s.retry_hints,
         merge_strategy: s.merge_strategy,
+        hooks: s.hooks,
+        complexity_score: s.complexity_estimate?.score,
       })),
     };
   };
@@ -246,6 +258,19 @@ async function start(): Promise<void> {
     fetchPlan,
   }));
   console.log(`[forge-next] Initialized (database: ${FORGE_NEXT_DB_PATH})`);
+
+  // Mount global events SSE endpoint (cross-session notifications)
+  app.use('/api/events', createGlobalSseRouter());
+
+  // Wire forge-next events → global event bus
+  globalEventCleanup = wireGlobalEvents({
+    runner: workflowRunner,
+    runMonitor: forgeNextRunMonitor,
+    gateManager,
+    questionManager,
+    forgeNextStorage,
+    plannerStorage: storage,
+  });
 
   // Initialize cultivate service (after existing services)
   if (serverConfig.cultivate.secret) {
@@ -495,6 +520,11 @@ async function start(): Promise<void> {
 
     // Stop session timeout service
     sessionTimeoutService.stop();
+
+    // Clean up global event wiring
+    if (globalEventCleanup) {
+      globalEventCleanup();
+    }
 
     // Clean up mull triggers
     if (mullTriggerCleanup) {

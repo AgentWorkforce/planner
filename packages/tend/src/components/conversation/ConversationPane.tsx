@@ -6,8 +6,10 @@ import { LoadingSpinner } from '@/components/ui';
 import { MessageSquare, X } from 'lucide-react';
 import { ReplyBar, PendingItem } from '../status/ReplyBar';
 import { ChannelView } from './ChannelView';
+import { ForgeLogView } from './ForgeLogView';
 import { usePlanChannel } from '@/hooks/usePlanChannel';
 import { useSessionChannel } from '@/hooks/useSessionChannel';
+import type { BuildEvent, RunStatus, RunMetrics, StepState, GateState, QuestionState } from '@/hooks/useBuildMonitor';
 
 interface ConversationPaneProps {
   sessionId: string;
@@ -37,6 +39,24 @@ interface ConversationPaneProps {
   planId?: string;
   /** Reply context to pre-fill input */
   replyContext?: string | null;
+  /** Forge run ID (truthy when build exists) */
+  forgeRunId?: string | null;
+  /** Build event log for Forge tab */
+  buildEventLog?: BuildEvent[];
+  /** Build run status */
+  buildRunStatus?: RunStatus | null;
+  /** Build run metrics */
+  buildRunMetrics?: RunMetrics | null;
+  /** Build step states */
+  buildSteps?: Map<string, StepState>;
+  /** Build gates */
+  buildGates?: GateState[];
+  /** Build questions */
+  buildQuestions?: QuestionState[];
+  /** Step name to highlight and scroll to in ForgeLogView */
+  focusedStepName?: string | null;
+  /** Called when a step is clicked in ForgeLogView — source is always 'forge' */
+  onStepFocus?: (stepName: string, source: 'forge') => void;
 }
 
 export function ConversationPane({
@@ -49,6 +69,15 @@ export function ConversationPane({
   onDismissItem,
   planId,
   replyContext,
+  forgeRunId,
+  buildEventLog,
+  buildRunStatus,
+  buildRunMetrics,
+  buildSteps,
+  buildGates,
+  buildQuestions,
+  focusedStepName,
+  onStepFocus,
 }: ConversationPaneProps) {
   const { session, loading, error, refetch } = useSession(sessionId);
   const [, setSearchParams] = useSearchParams();
@@ -58,6 +87,41 @@ export function ConversationPane({
 
   // Tab management
   const [activeChannelId, setActiveChannelId] = useState<string>('main');
+
+  // Auto-switch to forge tab when a build starts
+  const prevForgeRunIdRef = useRef(forgeRunId);
+  useEffect(() => {
+    if (forgeRunId && !prevForgeRunIdRef.current) {
+      setActiveChannelId('forge');
+    }
+    prevForgeRunIdRef.current = forgeRunId;
+  }, [forgeRunId]);
+
+  // Auto-switch to forge tab when a step focus arrives from the tree
+  const prevFocusedStepNameRef = useRef(focusedStepName);
+  useEffect(() => {
+    if (focusedStepName && focusedStepName !== prevFocusedStepNameRef.current && forgeRunId) {
+      setActiveChannelId('forge');
+    }
+    prevFocusedStepNameRef.current = focusedStepName;
+  }, [focusedStepName, forgeRunId]);
+
+  // Forge unread tracking: count events arriving while not on forge tab
+  const [forgeUnreadCount, setForgeUnreadCount] = useState(0);
+  const forgeEventCountRef = useRef(buildEventLog?.length ?? 0);
+
+  useEffect(() => {
+    const currentLen = buildEventLog?.length ?? 0;
+    if (activeChannelId === 'forge') {
+      // User is viewing forge tab — mark as read
+      setForgeUnreadCount(0);
+      forgeEventCountRef.current = currentLen;
+    } else if (currentLen > forgeEventCountRef.current) {
+      // New events arrived while on a different tab
+      setForgeUnreadCount(prev => prev + (currentLen - forgeEventCountRef.current));
+      forgeEventCountRef.current = currentLen;
+    }
+  }, [activeChannelId, buildEventLog?.length]);
 
   // Channel hooks for unread tracking
   const sessionChannel = useSessionChannel(sessionId);
@@ -202,14 +266,9 @@ export function ConversationPane({
 
       {/* Channel Content — tab bar is sticky inside the scroll area */}
       <div className="flex-1 min-h-0">
-        {activeChannelId === 'planning' && planChannelId ? (
-          <ChannelView
-            channelId={planChannelId}
-            placeholder="Message PlannerLead..."
-            emptyMessage="Planning hasn't started yet"
-            emptyDescription="Messages from PlannerLead and agents will appear here"
-            replyContext={replyContext}
-            stickyHeader={agents.length > 0 ? (
+        {activeChannelId === 'forge' && forgeRunId ? (
+          <div className="flex flex-col h-full">
+            {(agents.length > 0 || forgeRunId) && (
               <AgentTabBar
                 activeChannelId={activeChannelId}
                 onSelectChannel={setActiveChannelId}
@@ -217,6 +276,40 @@ export function ConversationPane({
                 mainUnreadCount={sessionChannel.unreadCount}
                 planChannelId={planChannelId}
                 planUnreadCount={planChannel.unreadCount}
+                forgeRunId={forgeRunId}
+                forgeUnreadCount={forgeUnreadCount}
+              />
+            )}
+            <div className="flex-1 min-h-0">
+              <ForgeLogView
+                eventLog={buildEventLog ?? []}
+                runStatus={buildRunStatus ?? null}
+                runMetrics={buildRunMetrics ?? null}
+                steps={buildSteps ?? new Map()}
+                gates={buildGates ?? []}
+                questions={buildQuestions ?? []}
+                focusedStepName={focusedStepName}
+                onStepClick={(stepName) => onStepFocus?.(stepName, 'forge')}
+              />
+            </div>
+          </div>
+        ) : activeChannelId === 'planning' && planChannelId ? (
+          <ChannelView
+            channelId={planChannelId}
+            placeholder="Message PlannerLead..."
+            emptyMessage="Planning hasn't started yet"
+            emptyDescription="Messages from PlannerLead and agents will appear here"
+            replyContext={replyContext}
+            stickyHeader={agents.length > 0 || forgeRunId ? (
+              <AgentTabBar
+                activeChannelId={activeChannelId}
+                onSelectChannel={setActiveChannelId}
+                agents={agents}
+                mainUnreadCount={sessionChannel.unreadCount}
+                planChannelId={planChannelId}
+                planUnreadCount={planChannel.unreadCount}
+                forgeRunId={forgeRunId}
+                forgeUnreadCount={forgeUnreadCount}
               />
             ) : undefined}
           />
@@ -229,7 +322,7 @@ export function ConversationPane({
             emptyMessage="No messages yet"
             emptyDescription="The Interviewer agent will join this session shortly"
             replyContext={replyContext}
-            stickyHeader={agents.length > 0 ? (
+            stickyHeader={agents.length > 0 || forgeRunId ? (
               <AgentTabBar
                 activeChannelId={activeChannelId}
                 onSelectChannel={setActiveChannelId}
@@ -237,6 +330,8 @@ export function ConversationPane({
                 mainUnreadCount={sessionChannel.unreadCount}
                 planChannelId={planChannelId}
                 planUnreadCount={planChannel.unreadCount}
+                forgeRunId={forgeRunId}
+                forgeUnreadCount={forgeUnreadCount}
               />
             ) : undefined}
           />

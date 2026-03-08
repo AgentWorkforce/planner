@@ -17,6 +17,7 @@ import { usePlanSteps } from '@/hooks/usePlanSteps';
 import { useAgentOrchestration } from '@/hooks/useAgentOrchestration';
 import { useQuestionNotifications } from '@/hooks/useQuestionNotifications';
 import { useStatusLine } from '@/hooks/useStatusLine';
+import { useGlobalEvents } from '@/hooks/useGlobalEvents';
 
 import type { PendingItem } from '@/components/status/ReplyBar';
 
@@ -41,6 +42,10 @@ function SessionWorkspaceContent() {
     cancelBuild,
     buildRunMetrics,
     buildStallWarnings,
+    activeRunId,
+    buildEventLog,
+    buildGates,
+    buildQuestions,
   } = useSession();
 
   const [searchParams] = useSearchParams();
@@ -97,6 +102,21 @@ function SessionWorkspaceContent() {
   // ── Plan steps (for tree panel) ───────────────────────────────────────────
 
   const { steps } = usePlanSteps(activePlan?.plan_id, planRefreshKey);
+
+  // ── Cross-panel step focus (Forge <-> Tree linking) ───────────────────────
+
+  const [focusedStepName, setFocusedStepName] = useState<string | null>(null);
+
+  // Auto-clear the highlight after 3s so it's a momentary pulse, not permanent
+  useEffect(() => {
+    if (!focusedStepName) return;
+    const timer = setTimeout(() => setFocusedStepName(null), 3000);
+    return () => clearTimeout(timer);
+  }, [focusedStepName]);
+
+  const handleStepFocus = useCallback((stepName: string) => {
+    setFocusedStepName(stepName);
+  }, []);
 
   // ── Build dialog ──────────────────────────────────────────────────────────
 
@@ -165,6 +185,10 @@ function SessionWorkspaceContent() {
     });
   }, [questions, addToQueue]);
 
+  // ── Cross-session global notifications ────────────────────────────────────
+
+  useGlobalEvents(session?.id ?? null, statusLine);
+
   // ── Connection status ─────────────────────────────────────────────────────
 
   const connectionStatus = isConnected ? 'connected' : 'disconnected';
@@ -193,10 +217,7 @@ function SessionWorkspaceContent() {
   };
 
   const handleDismissItem = (itemId: string) => {
-    const notification = queue.find((n) => n.question.question_id === itemId);
-    if (notification) {
-      dismiss();
-    }
+    dismiss(itemId);
   };
 
   // ── Mapped agents for ConversationPane ────────────────────────────────────
@@ -332,6 +353,15 @@ function SessionWorkspaceContent() {
               }}
               planId={activePlan?.plan_id}
               replyContext={replyContext}
+              forgeRunId={activeRunId}
+              buildEventLog={buildEventLog}
+              buildRunStatus={buildStatus}
+              buildRunMetrics={buildRunMetrics}
+              buildSteps={buildSteps}
+              buildGates={buildGates}
+              buildQuestions={buildQuestions}
+              focusedStepName={focusedStepName}
+              onStepFocus={(stepName) => handleStepFocus(stepName)}
             />
           </FocusMode>
         ) : (
@@ -345,6 +375,15 @@ function SessionWorkspaceContent() {
             focusedBlock={focusedStep}
             planId={activePlan?.plan_id}
             replyContext={replyContext}
+            forgeRunId={activeRunId}
+            buildEventLog={buildEventLog}
+            buildRunStatus={buildStatus}
+            buildRunMetrics={buildRunMetrics}
+            buildSteps={buildSteps}
+            buildGates={buildGates}
+            buildQuestions={buildQuestions}
+            focusedStepName={focusedStepName}
+            onStepFocus={(stepName) => handleStepFocus(stepName)}
           />
         )
       }
@@ -358,6 +397,8 @@ function SessionWorkspaceContent() {
           onCancelBuild={isBuildMonitoring ? handleCancelBuild : undefined}
           runMetrics={isBuildMonitoring ? buildRunMetrics : undefined}
           stallWarnings={isBuildMonitoring ? buildStallWarnings : undefined}
+          focusedStepName={focusedStepName}
+          onStepFocus={(stepName) => handleStepFocus(stepName)}
         />
       }
       statusBar={

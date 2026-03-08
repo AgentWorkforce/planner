@@ -213,6 +213,9 @@ export function createRunHandler(deps: RunHandlerDeps) {
     deps.runMonitor.setStepRetryHints(compilation.stepRetryHints);
     deps.runMonitor.setStepMergeStrategies(compilation.stepMergeStrategies);
     deps.runMonitor.setRetryLimit(body.execution_policy?.retry_count ?? 0);
+    if (body.workspace_path) {
+      deps.runMonitor.setWorkspacePath(body.workspace_path);
+    }
     deps.runMonitor.bind(deps.runner);
 
     // Subscribe to runner events to:

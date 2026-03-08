@@ -42,6 +42,18 @@ export interface PlanStep {
   retry_hints?: string[];
   /** How git changes from this step should be merged back */
   merge_strategy?: string;
+  /** Shell commands to run before/after the agent step ($0 LLM cost) */
+  hooks?: { before_run?: string; after_run?: string };
+  /** Complexity score 0-100 from planner's DOT Framework estimator */
+  complexity_score?: number;
+}
+
+/** Plan-embedded execution config defaults (authored during planning). */
+export interface PlanExecutionConfig {
+  max_concurrent?: number;
+  timeout_minutes?: number;
+  retry_count?: number;
+  step_overrides?: Record<string, { model?: string; skip?: boolean }>;
 }
 
 /** Minimal plan metadata shape the compiler needs. */
@@ -49,6 +61,7 @@ export interface PlanMeta {
   plan_id: string;
   version: number;
   summary?: { goal?: string; context?: string };
+  execution_config?: PlanExecutionConfig;
 }
 
 // ============================================
@@ -108,16 +121,24 @@ export function compilePlan(
   config: ForgeConfig,
   modelSelector: ModelSelector
 ): CompilationResult {
+  // Merge plan-embedded execution defaults into config (explicit config wins)
+  const mergedConfig = applyPlanDefaults(config, plan.execution_config);
+
   // Build a set of skipped step_ids upfront for O(1) lookups
-  const skippedIds = buildSkippedSet(config.step_overrides ?? []);
+  const skippedIds = buildSkippedSet(mergedConfig.step_overrides ?? []);
 
   // Only compile steps that are not skipped
   const activeSteps = steps.filter(s => !skippedIds.has(s.step_id));
 
-  const agentDefinitions = buildAgentDefinitions(activeSteps, config, modelSelector);
-  const workflowSteps = buildWorkflowSteps(activeSteps, config, skippedIds);
+  const agentDefinitions = buildAgentDefinitions(activeSteps, mergedConfig, modelSelector);
+  const workflowSteps = buildWorkflowSteps(activeSteps, mergedConfig, skippedIds);
 
-  const maxConcurrency = config.execution_policy?.max_concurrent_tasks ?? 5;
+  // Adaptive concurrency: if the user didn't explicitly set a value, derive from
+  // plan complexity profile. Research (arXiv:2512.08296) shows that complex/
+  // interdependent plans suffer from high parallelism due to error amplification,
+  // while simple parallelizable plans benefit from more concurrency.
+  const maxConcurrency = mergedConfig.execution_policy?.max_concurrent_tasks
+    ?? inferMaxConcurrency(activeSteps);
 
   const relayYamlConfig: RelayYamlConfig = {
     version: '1.0',
@@ -230,12 +251,44 @@ function buildWorkflowSteps(
 
   const contextSteps = activeSteps.length > 15 ? activeSteps : undefined;
 
-  return activeSteps.map(step => {
+  // Collect step IDs that have :post hooks so downstream deps can be re-wired
+  const hasPostHook = new Set<string>();
+  for (const step of activeSteps) {
+    if (step.hooks?.after_run) {
+      hasPostHook.add(step.step_id);
+    }
+  }
+
+  const result: WorkflowStep[] = [];
+
+  for (const step of activeSteps) {
+    const baseDeps = step.dependencies.filter(depId => !skippedIds.has(depId));
+
+    // Re-wire: if a dependency has a :post hook, depend on that instead
+    const resolvedDeps = baseDeps.map(depId =>
+      hasPostHook.has(depId) ? `${depId}:post` : depId,
+    );
+
+    // before_run hook → deterministic pre-step
+    if (step.hooks?.before_run) {
+      result.push({
+        name: `${step.step_id}:pre`,
+        type: 'deterministic',
+        command: step.hooks.before_run,
+        dependsOn: resolvedDeps,
+      } as WorkflowStep);
+    }
+
+    // Main agent step
+    const mainDeps = step.hooks?.before_run
+      ? [`${step.step_id}:pre`]
+      : resolvedDeps;
+
     const workflowStep: WorkflowStep = {
       name: step.step_id,
       agent: resolveAgentName(step.owner_role),
       task: composeTask(step, contextSteps),
-      dependsOn: step.dependencies.filter(depId => !skippedIds.has(depId)),
+      dependsOn: mainDeps,
     };
 
     if (timeoutMs != null) workflowStep.timeoutMs = timeoutMs;
@@ -244,13 +297,108 @@ function buildWorkflowSteps(
     const verification = buildVerification(step);
     if (verification) workflowStep.verification = verification;
 
-    return workflowStep;
-  });
+    result.push(workflowStep);
+
+    // after_run hook → deterministic post-step
+    if (step.hooks?.after_run) {
+      result.push({
+        name: `${step.step_id}:post`,
+        type: 'deterministic',
+        command: step.hooks.after_run,
+        dependsOn: [step.step_id],
+      } as WorkflowStep);
+    }
+  }
+
+  return result;
 }
 
 // ============================================
 // Helpers
 // ============================================
+
+/**
+ * Merges plan-embedded execution defaults into the explicit ForgeConfig.
+ * Explicit config values always take priority over plan defaults.
+ */
+function applyPlanDefaults(
+  config: ForgeConfig,
+  planDefaults?: PlanExecutionConfig,
+): ForgeConfig {
+  if (!planDefaults) return config;
+
+  const policy: ExecutionPolicy = { ...config.execution_policy };
+  if (policy.max_concurrent_tasks == null && planDefaults.max_concurrent != null) {
+    policy.max_concurrent_tasks = planDefaults.max_concurrent;
+  }
+  if (policy.max_timeout_ms == null && planDefaults.timeout_minutes != null) {
+    policy.max_timeout_ms = planDefaults.timeout_minutes * 60_000;
+  }
+  if (policy.retry_count == null && planDefaults.retry_count != null) {
+    policy.retry_count = planDefaults.retry_count;
+  }
+
+  // Merge plan step overrides as fallback (explicit overrides win)
+  let overrides = config.step_overrides ?? [];
+  if (planDefaults.step_overrides) {
+    const explicitIds = new Set(overrides.map(o => o.step_id));
+    for (const [stepId, planOverride] of Object.entries(planDefaults.step_overrides)) {
+      if (!explicitIds.has(stepId)) {
+        overrides = [...overrides, {
+          step_id: stepId,
+          skip: planOverride.skip,
+          model_override: planOverride.model,
+        }];
+      }
+    }
+  }
+
+  return {
+    ...config,
+    execution_policy: policy,
+    step_overrides: overrides,
+  };
+}
+
+/**
+ * Infers max concurrency from the plan's complexity profile.
+ *
+ * Research basis (arXiv:2512.08296 — "Scaling Agent Systems"):
+ * - High-complexity plans amplify errors under high parallelism (17x vs 4x)
+ * - Tightly-coupled plans (high dep density) degrade with more concurrency
+ * - Simple, independent plans benefit from aggressive parallelism
+ *
+ * Strategy:
+ * - avgComplexity >= 60: cap at 2 (complex, error-prone — serialize more)
+ * - avgComplexity >= 40: cap at 3 (moderate — balanced)
+ * - depDensity >= 0.5: cap at 2 (tightly coupled — sequential reasoning penalty)
+ * - else: 5 (simple/independent — maximize throughput)
+ */
+function inferMaxConcurrency(steps: PlanStep[]): number {
+  if (steps.length <= 1) return 1;
+
+  // Average complexity score (default 30 if no scores available)
+  const scores = steps
+    .map(s => s.complexity_score)
+    .filter((s): s is number => s != null);
+  const avgComplexity = scores.length > 0
+    ? scores.reduce((a, b) => a + b, 0) / scores.length
+    : 30;
+
+  // Dependency density: ratio of total dep edges to possible edges
+  const totalDeps = steps.reduce((sum, s) => sum + s.dependencies.length, 0);
+  const maxPossibleDeps = steps.length * (steps.length - 1) / 2;
+  const depDensity = maxPossibleDeps > 0 ? totalDeps / maxPossibleDeps : 0;
+
+  // Tightly coupled plans should serialize more
+  if (depDensity >= 0.5) return 2;
+
+  // Complex plans: fewer concurrent agents to reduce error amplification
+  if (avgComplexity >= 60) return 2;
+  if (avgComplexity >= 40) return 3;
+
+  return 5;
+}
 
 /**
  * Builds the Set of step_ids to skip from StepOverride configuration.
@@ -283,6 +431,7 @@ function resolveModel(
     description: step.description,
     scope: step.scope,
     owner_role: step.owner_role,
+    complexity_score: step.complexity_score,
   });
 
   return model;
@@ -318,6 +467,14 @@ function composeTask(step: PlanStep, allSteps?: PlanStep[]): string {
   if (allSteps !== undefined && allSteps.length > 15) {
     parts.push(composePlanContext(step, allSteps));
   }
+
+  // Retry-awareness: tell agent to check for prior failure context on disk
+  parts.push(
+    `### Retry Awareness\n\n` +
+    `Before starting work, check if \`.forge/retry-context/${step.step_id}.md\` exists. ` +
+    `If it does, a previous attempt at this task failed. Read the file to understand ` +
+    `what went wrong and adjust your approach accordingly.`,
+  );
 
   return parts.join('\n\n');
 }

@@ -42,6 +42,11 @@ export const StepSchema = z.object({
   retry_hints: z.array(z.string()).optional(),
   /** How git changes from this step should be merged back */
   merge_strategy: z.enum(['squash', 'rebase', 'merge', 'cherry-pick', 'none']).optional(),
+  /** Shell commands to run before/after the agent step ($0 LLM cost) */
+  hooks: z.object({
+    before_run: z.string().optional(),
+    after_run: z.string().optional(),
+  }).optional(),
 });
 
 export type Step = z.infer<typeof StepSchema>;

@@ -10,6 +10,8 @@ export { ModelSelector } from './model-selector.js';
 export { GateManager } from './gate-manager.js';
 export { QuestionManager } from './question-manager.js';
 export { RunMonitor } from './run-monitor.js';
+export { ReconciliationLoop } from './reconciliation.js';
+export type { PlanReader, RunStateAccessor } from './reconciliation.js';
 export { createForgeNextRouter } from './api/routes.js';
 
 // Re-export domain types
@@ -28,6 +30,9 @@ export type {
   StepRetryContextEvent,
   StepFailedEnrichedEvent,
   StepScoredEvent,
+  ReconciliationPlanRetractedEvent,
+  ReconciliationStallDetectedEvent,
+  ReconciliationVersionDriftEvent,
 } from './types.js';
 
 // Re-export storage interface

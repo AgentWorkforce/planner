@@ -38,6 +38,12 @@ interface AgentTabBarProps {
 
   /** Unread message count for plan channel */
   planUnreadCount?: number;
+
+  /** Forge run ID (truthy when build exists — active or completed) */
+  forgeRunId?: string | null;
+
+  /** Unread event count for forge tab */
+  forgeUnreadCount?: number;
 }
 
 export function AgentTabBar({
@@ -47,6 +53,8 @@ export function AgentTabBar({
   mainUnreadCount = 0,
   planChannelId,
   planUnreadCount = 0,
+  forgeRunId,
+  forgeUnreadCount = 0,
 }: AgentTabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
@@ -119,6 +127,30 @@ export function AgentTabBar({
               {planUnreadCount > 0 && (
                 <span className="px-1.5 py-0.5 text-xs rounded-full bg-accent-primary/20 text-accent-primary">
                   {planUnreadCount}
+                </span>
+              )}
+            </div>
+          </button>
+        )}
+
+        {/* Forge tab - shows when build exists */}
+        {forgeRunId && (
+          <button
+            onClick={() => onSelectChannel('forge')}
+            className={`
+              relative flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors
+              ${activeChannelId === 'forge'
+                ? 'text-accent-secondary border-b-2 !border-accent-secondary'
+                : 'text-text-secondary hover:text-text-primary border-b-2 !border-transparent'
+              }
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs">▸</span>
+              <span>Forge</span>
+              {forgeUnreadCount > 0 && (
+                <span className="px-1.5 py-0.5 text-xs rounded-full bg-accent-secondary/20 text-accent-secondary">
+                  {forgeUnreadCount}
                 </span>
               )}
             </div>

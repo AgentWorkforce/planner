@@ -205,3 +205,34 @@ export const StepScoredEventSchema = z.object({
 });
 
 export type StepScoredEvent = z.infer<typeof StepScoredEventSchema>;
+
+// ---------------------------------------------------------------------------
+// Reconciliation event payloads
+// ---------------------------------------------------------------------------
+
+export const ReconciliationPlanRetractedEventSchema = z.object({
+  type: z.literal('reconciliation:plan-retracted'),
+  run_id: z.string(),
+  plan_id: z.string(),
+  reason: z.string(),
+});
+
+export type ReconciliationPlanRetractedEvent = z.infer<typeof ReconciliationPlanRetractedEventSchema>;
+
+export const ReconciliationStallDetectedEventSchema = z.object({
+  type: z.literal('reconciliation:stall-detected'),
+  run_id: z.string(),
+  elapsed_ms: z.number(),
+});
+
+export type ReconciliationStallDetectedEvent = z.infer<typeof ReconciliationStallDetectedEventSchema>;
+
+export const ReconciliationVersionDriftEventSchema = z.object({
+  type: z.literal('reconciliation:version-drift'),
+  run_id: z.string(),
+  plan_id: z.string(),
+  current_version: z.number().int(),
+  latest_version: z.number().int(),
+});
+
+export type ReconciliationVersionDriftEvent = z.infer<typeof ReconciliationVersionDriftEventSchema>;

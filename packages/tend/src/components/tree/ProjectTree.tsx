@@ -70,6 +70,10 @@ export interface ProjectTreeProps {
   className?: string;
   onStepUpdate?: (stepId: string, updates: Partial<TreeStep>) => Promise<void>;
   onSendMessage?: (message: string, stepContext: { step_id: string; title: string }) => void;
+  /** Step title to highlight (from ForgeLogView cross-link) */
+  focusedStepName?: string | null;
+  /** Called when a step card is clicked — source is always 'tree' */
+  onStepFocus?: (stepName: string, source: 'tree') => void;
 }
 
 /**
@@ -90,7 +94,7 @@ export interface ProjectTreeProps {
  * - Compact step nodes with status indicators
  * - Click handlers for zoom transitions
  */
-export function ProjectTree({ steps, projectName = 'Project', className, onStepUpdate, onSendMessage }: ProjectTreeProps) {
+export function ProjectTree({ steps, projectName = 'Project', className, onStepUpdate, onSendMessage, focusedStepName, onStepFocus }: ProjectTreeProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -162,8 +166,16 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
         // First click - just zoom to step
         handleZoomChange('step', focusKey);
       }
+
+      // Notify parent of step focus for cross-panel linking
+      if (onStepFocus) {
+        const step = steps.find((s) => s.step_id === stepId);
+        if (step) {
+          onStepFocus(step.title, 'tree');
+        }
+      }
     },
-    [handleZoomChange, searchParams]
+    [handleZoomChange, searchParams, onStepFocus, steps]
   );
 
   const handleCloseSheet = useCallback(() => {
@@ -228,6 +240,7 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
                   steps={orderedScopedSteps[scope] || []}
                   isExpanded={false}
                   workspacePath={getScopeWorkspacePath(scope)}
+                  crossFocusedStepName={focusedStepName}
                   onScopeClick={() => handleScopeClick(scope)}
                   onStepClick={(stepId) => handleStepClick(scope, stepId)}
                 />
@@ -243,6 +256,7 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
                 isExpanded={true}
                 hideHeader
                 workspacePath={getScopeWorkspacePath(focusedScope)}
+                crossFocusedStepName={focusedStepName}
                 onScopeClick={() => handleScopeClick(focusedScope)}
                 onStepClick={(stepId) => handleStepClick(focusedScope, stepId)}
               />
@@ -260,6 +274,7 @@ export function ProjectTree({ steps, projectName = 'Project', className, onStepU
                 selectedStepId={focusedStep}
                 focusedStepId={focusedStep}
                 sheetOpen={sheetOpen}
+                crossFocusedStepName={focusedStepName}
                 onScopeClick={() => handleScopeClick(focusedScope)}
                 onStepClick={(stepId) => handleStepClick(focusedScope, stepId)}
               />

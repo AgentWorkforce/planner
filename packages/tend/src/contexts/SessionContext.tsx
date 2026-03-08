@@ -26,7 +26,7 @@ import {
 } from '@plannr/shared-ui';
 import type { ForgeConfig } from '@plannr/shared-ui';
 import { useBuildMonitor } from '@/hooks/useBuildMonitor';
-import type { RunStatus, StepState, GateState, QuestionState, RunMetrics } from '@/hooks/useBuildMonitor';
+import type { RunStatus, StepState, GateState, QuestionState, RunMetrics, BuildEvent } from '@/hooks/useBuildMonitor';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -130,6 +130,8 @@ export interface SessionContextValue {
   buildRunMetrics: RunMetrics | null;
   /** Step names with active stall warnings */
   buildStallWarnings: string[];
+  /** Raw event log from build SSE stream */
+  buildEventLog: BuildEvent[];
 
   /** Build control actions */
   pauseBuild: () => Promise<void>;
@@ -579,6 +581,7 @@ export function SessionProvider({ sessionId, children }: SessionProviderProps) {
     pendingQuestionCount: buildMonitor.pendingQuestionCount,
     buildRunMetrics: buildMonitor.runMetrics,
     buildStallWarnings: buildMonitor.stallWarnings,
+    buildEventLog: buildMonitor.eventLog,
     pauseBuild,
     resumeBuild,
     cancelBuild,

@@ -71,6 +71,7 @@ export {
   ForgeConfigPanel,
   type ForgeConfigPanelProps,
   type ForgeConfigStep,
+  type PlanExecutionDefaults,
 } from "./ForgeConfigPanel";
 
 // Messaging components

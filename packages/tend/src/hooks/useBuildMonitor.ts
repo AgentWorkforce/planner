@@ -78,6 +78,14 @@ export interface QuestionState {
   answer?: string | null;
 }
 
+export interface BuildEvent {
+  id: number;
+  timestamp: string;
+  type: string;
+  stepName?: string;
+  data: Record<string, unknown>;
+}
+
 export interface UseBuildMonitorReturn {
   /** Current run status */
   runStatus: RunStatus | null;
@@ -101,6 +109,8 @@ export interface UseBuildMonitorReturn {
   runMetrics: RunMetrics | null;
   /** Step names with active stall warnings */
   stallWarnings: string[];
+  /** Raw event log accumulated from SSE */
+  eventLog: BuildEvent[];
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +152,8 @@ type BuildAction =
   | { type: 'STEP_RETRY_CONTEXT'; stepName: string; attempt: number; previousFailures: string[]; retryHints?: string[] }
   | { type: 'STEP_RETRIES_EXHAUSTED'; stepName: string; attempt: number; maxRetries: number; failures: string[] }
   | { type: 'STEP_METRICS_MERGE'; stepName: string; mergeStrategy: string }
-  | { type: 'STEP_MERGE_STATUS'; stepName: string; status: 'pending' | 'merging' | 'merged' | 'failed' | 'skipped'; branch?: string; targetBranch?: string; error?: string };
+  | { type: 'STEP_MERGE_STATUS'; stepName: string; status: 'pending' | 'merging' | 'merged' | 'failed' | 'skipped'; branch?: string; targetBranch?: string; error?: string }
+  | { type: 'APPEND_EVENT'; event: BuildEvent };
 
 interface BuildState {
   runStatus: RunStatus | null;
@@ -153,6 +164,7 @@ interface BuildState {
   connected: boolean;
   runMetrics: RunMetrics | null;
   stallWarnings: Set<string>;
+  eventLog: BuildEvent[];
 }
 
 const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set(['completed', 'failed', 'cancelled']);
@@ -194,8 +206,8 @@ function deriveEscalation(
   }
 
   // Low quality score
-  if (step.status === 'completed' && step.score !== undefined && step.score < 40) {
-    return { type: 'low_quality', detail: `Score ${step.score}/100` };
+  if (step.status === 'completed' && step.score !== undefined && step.score < 0.4) {
+    return { type: 'low_quality', detail: `Score ${step.score.toFixed(2)}` };
   }
 
   return undefined;
@@ -210,12 +222,13 @@ const initialState: BuildState = {
   connected: false,
   runMetrics: null,
   stallWarnings: new Set(),
+  eventLog: [],
 };
 
 function buildReducer(state: BuildState, action: BuildAction): BuildState {
   switch (action.type) {
     case 'RESET':
-      return { ...initialState, stallWarnings: new Set() };
+      return { ...initialState, stallWarnings: new Set(), eventLog: [] };
 
     case 'SET_CONNECTED':
       return { ...state, connected: action.connected };
@@ -488,6 +501,9 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
       return { ...state, steps };
     }
 
+    case 'APPEND_EVENT':
+      return { ...state, eventLog: [...state.eventLog, action.event] };
+
     default:
       return state;
   }
@@ -503,6 +519,7 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const reconnectAttemptsRef = useRef(0);
+  const eventCounterRef = useRef(0);
   // Stable ref so the connect callback never becomes stale while capturing runId
   const runIdRef = useRef(runId);
 
@@ -536,6 +553,20 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
       try {
         const data = JSON.parse(event.data as string);
         console.log(`[useBuildMonitor] SSE event: ${data.type}`);
+
+        // Accumulate raw events for the event log (skip pings)
+        if (data.type !== 'ping') {
+          dispatch({
+            type: 'APPEND_EVENT',
+            event: {
+              id: eventCounterRef.current++,
+              timestamp: (data.timestamp as string) ?? new Date().toISOString(),
+              type: data.type,
+              stepName: data.step_name,
+              data,
+            },
+          });
+        }
 
         switch (data.type) {
           case 'ping':
@@ -699,6 +730,7 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
         console.log(
           `[useBuildMonitor] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`
         );
+        clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, delay);
@@ -841,5 +873,6 @@ export function useBuildMonitor(runId: string | null): UseBuildMonitorReturn {
     pendingQuestionCount,
     runMetrics: state.runMetrics,
     stallWarnings,
+    eventLog: state.eventLog,
   };
 }

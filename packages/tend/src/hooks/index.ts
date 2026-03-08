@@ -75,6 +75,9 @@ export { usePlanChannel } from './usePlanChannel';
 export { useStatusLine } from './useStatusLine';
 export type { StatusContent, MessageLevel, UseStatusLineReturn, WipeSignal } from './useStatusLine';
 
+// Global cross-session events
+export { useGlobalEvents } from './useGlobalEvents';
+
 // Frame player (animation system)
 export { useFramePlayer } from './useFramePlayer';
 

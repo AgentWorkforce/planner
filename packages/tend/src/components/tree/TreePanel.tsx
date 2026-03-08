@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useWorkingChanges } from '@/hooks/useWorkingChanges';
@@ -37,6 +38,10 @@ interface TreePanelProps extends ProjectTreeProps {
   runMetrics?: RunMetrics | null;
   /** Step names with active stall warnings */
   stallWarnings?: string[];
+  /** Step title to scroll to and highlight (from ForgeLogView click) */
+  focusedStepName?: string | null;
+  /** Called when a step card is clicked in the tree */
+  onStepFocus?: (stepName: string, source: 'tree') => void;
 }
 
 export function TreePanel({
@@ -51,10 +56,24 @@ export function TreePanel({
   onCancelBuild,
   runMetrics,
   stallWarnings = [],
+  focusedStepName,
+  onStepFocus,
 }: TreePanelProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { totalChanges, branch, detachedHead } = useWorkingChanges();
   const branchLabel = branch ?? detachedHead ?? null;
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to and highlight the matching step card when focusedStepName arrives from forge
+  useEffect(() => {
+    if (!focusedStepName || !treeContainerRef.current) return;
+    const el = treeContainerRef.current.querySelector<HTMLElement>(
+      `[data-step-title="${CSS.escape(focusedStepName)}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [focusedStepName]);
 
   const planAvailable = steps.length > 0;
   const autoMode: 'plan' | 'changes' = planAvailable ? 'plan' : 'changes';
@@ -101,7 +120,7 @@ export function TreePanel({
   // through and overlay the mode toggle in its header bar.
   if (effectiveMode === 'plan') {
     return (
-      <div className={cn('relative flex flex-col h-full', className)}>
+      <div ref={treeContainerRef} className={cn('relative flex flex-col h-full', className)}>
         {/* Controls floated into ProjectTree's header area */}
         <div className="absolute top-0 right-3 h-9 flex items-center gap-2 z-10">
           {planStatus === 'published' && onStartBuild && (
@@ -199,6 +218,8 @@ export function TreePanel({
           projectName={projectName}
           onStepUpdate={onStepUpdate}
           onSendMessage={onSendMessage}
+          focusedStepName={focusedStepName}
+          onStepFocus={onStepFocus}
         />
       </div>
     );

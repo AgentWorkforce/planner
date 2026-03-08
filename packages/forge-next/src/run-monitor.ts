@@ -9,6 +9,8 @@
  */
 
 import { EventEmitter } from 'node:events';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { WorkflowRunner, WorkflowEvent } from '@agent-relay/sdk/workflows';
 import type { RelayYamlConfig } from '@agent-relay/sdk/workflows';
 import { scoreStepOutput } from './satisfaction-scorer.js';
@@ -182,11 +184,23 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
   /** Max retry attempts per step. 0 means no retries configured. */
   private retryLimit = 0;
 
+  /** Workspace path for writing retry context files. */
+  private workspacePath: string | null = null;
+
   /**
    * Set the forge run ID. Must be called before bind().
    */
   setForgeRunId(runId: string): void {
     this.forgeRunId = runId;
+  }
+
+  /**
+   * Set the workspace path for writing retry context files.
+   * When set, the monitor writes `.forge/retry-context/{stepName}.md` on retries
+   * so the retried agent can read prior failure context from the filesystem.
+   */
+  setWorkspacePath(path: string): void {
+    this.workspacePath = path;
   }
 
   /**
@@ -239,8 +253,8 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
     this.totalSteps = 0;
     for (const workflow of config.workflows ?? []) {
       for (const step of workflow.steps ?? []) {
-        const agentName = step.agent ?? '';
-        const agentModel = agentModels.get(agentName) ?? 'sonnet';
+        if (!step.agent) continue; // Skip deterministic hook steps (:pre/:post)
+        const agentModel = agentModels.get(step.agent) ?? 'sonnet';
         this.stepToModel.set(step.name, agentModel);
         this.totalSteps++;
       }
@@ -286,6 +300,7 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
     this.stepMergeStrategies.clear();
     this.retryLimit = 0;
     this.totalSteps = 0;
+    this.workspacePath = null;
   }
 
   /**
@@ -425,6 +440,14 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
           }
 
           this.emit('step:retry-context', retryPayload);
+
+          // Write retry context file to workspace so the retried agent can read it
+          this._writeRetryContextFile(
+            event.stepName,
+            retryPayload.attempt,
+            dedupedFailures,
+            hints,
+          );
         }
         break;
       }
@@ -502,6 +525,56 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
           });
         }
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Retry context file persistence
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Write a retry context file to the workspace so the retried agent can
+   * read prior failure context from the filesystem.
+   *
+   * Uses synchronous I/O to guarantee the file exists before the relay SDK
+   * spawns the retry agent (step:retrying fires right before step:started).
+   */
+  private _writeRetryContextFile(
+    stepName: string,
+    attempt: number,
+    failures: string[],
+    hints?: string[],
+  ): void {
+    if (!this.workspacePath) return;
+
+    // Sanitize stepName to prevent path traversal (step_ids are UUIDs but be safe)
+    const safeStepName = stepName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filePath = join(this.workspacePath, '.forge', 'retry-context', `${safeStepName}.md`);
+
+    const lines: string[] = [`# Retry Context for step: ${stepName}\n`];
+
+    for (let i = 0; i < failures.length; i++) {
+      lines.push(`## Previous failure ${i + 1}`);
+      lines.push(`**Error**: ${failures[i]}\n`);
+    }
+
+    if (hints && hints.length > 0) {
+      lines.push('## Recovery Guidance');
+      for (const hint of hints) {
+        lines.push(`- ${hint}`);
+      }
+      lines.push('');
+    }
+
+    lines.push(`_Next attempt: ${attempt}_\n`);
+
+    const content = lines.join('\n');
+
+    try {
+      mkdirSync(dirname(filePath), { recursive: true });
+      writeFileSync(filePath, content, 'utf-8');
+    } catch (err) {
+      console.error(`[RunMonitor] Failed to write retry context for ${stepName}:`, err);
     }
   }
 }

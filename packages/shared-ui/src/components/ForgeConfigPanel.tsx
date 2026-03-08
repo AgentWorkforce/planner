@@ -9,12 +9,22 @@ export interface ForgeConfigStep {
   owner_role?: string;
 }
 
+/** Plan-embedded execution defaults for pre-filling the config panel. */
+export interface PlanExecutionDefaults {
+  max_concurrent?: number;
+  timeout_minutes?: number;
+  retry_count?: number;
+  step_overrides?: Record<string, { model?: string; skip?: boolean }>;
+}
+
 export interface ForgeConfigPanelProps {
   steps: ForgeConfigStep[];
   onStart: (config: ForgeConfig) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
   defaultWorkspacePath?: string;
+  /** Pre-fill from plan-embedded execution_config defaults */
+  planDefaults?: PlanExecutionDefaults;
 }
 
 type ModelChoice = 'auto' | 'haiku' | 'sonnet' | 'opus';
@@ -25,8 +35,18 @@ interface StepRow {
   model: ModelChoice;
 }
 
-function buildStepRows(steps: ForgeConfigStep[]): StepRow[] {
-  return steps.map((s) => ({ step_id: s.step_id, included: true, model: 'auto' }));
+function buildStepRows(
+  steps: ForgeConfigStep[],
+  planDefaults?: PlanExecutionDefaults,
+): StepRow[] {
+  return steps.map((s) => {
+    const planOverride = planDefaults?.step_overrides?.[s.step_id];
+    return {
+      step_id: s.step_id,
+      included: planOverride?.skip !== true,
+      model: (planOverride?.model as ModelChoice) ?? 'auto',
+    };
+  });
 }
 
 function assembleConfig(
@@ -87,14 +107,37 @@ export function ForgeConfigPanel({
   onCancel,
   loading = false,
   defaultWorkspacePath = '',
+  planDefaults,
 }: ForgeConfigPanelProps) {
-  const [rows, setRows] = useState<StepRow[]>(() => buildStepRows(steps));
+  const hasPlanDefaults = planDefaults != null;
+
+  const [rows, setRows] = useState<StepRow[]>(() => buildStepRows(steps, planDefaults));
   const [workspacePath, setWorkspacePath] = useState(defaultWorkspacePath);
-  const [maxConcurrentTasks, setMaxConcurrentTasks] = useState('3');
-  const [maxTimeoutMs, setMaxTimeoutMs] = useState('');
-  const [retryCount, setRetryCount] = useState('1');
+  const [maxConcurrentTasks, setMaxConcurrentTasks] = useState(
+    () => planDefaults?.max_concurrent?.toString() ?? '3',
+  );
+  const [maxTimeoutMs, setMaxTimeoutMs] = useState(
+    () => planDefaults?.timeout_minutes != null
+      ? (planDefaults.timeout_minutes * 60_000).toString()
+      : '',
+  );
+  const [retryCount, setRetryCount] = useState(
+    () => planDefaults?.retry_count?.toString() ?? '1',
+  );
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  function resetToPlanDefaults() {
+    if (!planDefaults) return;
+    setRows(buildStepRows(steps, planDefaults));
+    setMaxConcurrentTasks(planDefaults.max_concurrent?.toString() ?? '3');
+    setMaxTimeoutMs(
+      planDefaults.timeout_minutes != null
+        ? (planDefaults.timeout_minutes * 60_000).toString()
+        : '',
+    );
+    setRetryCount(planDefaults.retry_count?.toString() ?? '1');
+  }
 
   const isLoading = loading || submitting;
 
@@ -219,6 +262,11 @@ export function ForgeConfigPanel({
             <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Advanced
+          {hasPlanDefaults && (
+            <span className="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-accent-cyan/10 text-accent-cyan">
+              plan defaults applied
+            </span>
+          )}
         </button>
 
         {advancedOpen && (
@@ -270,6 +318,16 @@ export function ForgeConfigPanel({
 
       {/* Footer */}
       <div className="flex items-center justify-end gap-3 pt-1">
+        {hasPlanDefaults && (
+          <button
+            type="button"
+            onClick={resetToPlanDefaults}
+            disabled={isLoading}
+            className="mr-auto px-3 py-2 text-xs text-text-muted hover:text-text-secondary transition-colors"
+          >
+            Reset to plan defaults
+          </button>
+        )}
         <button
           type="button"
           onClick={onCancel}

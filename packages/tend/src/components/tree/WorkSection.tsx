@@ -15,6 +15,8 @@ export interface WorkSectionProps {
   onScopeClick?: () => void;
   onStepClick?: (stepId: string) => void;
   className?: string;
+  /** Step title highlighted from ForgeLogView cross-link */
+  crossFocusedStepName?: string | null;
 }
 
 /**
@@ -43,6 +45,7 @@ export function WorkSection({
   onScopeClick,
   onStepClick,
   className,
+  crossFocusedStepName,
 }: WorkSectionProps) {
   return (
     <div className={cn('font-mono', className)}>
@@ -70,10 +73,18 @@ export function WorkSection({
               const isLast = index === steps.length - 1;
               const isFocused = focusedStepId === step.step_id;
               const isFocusedAwaitingClick = isFocused && !sheetOpen;
+              const isCrossFocused = crossFocusedStepName === step.title;
               const connector = isLast ? '└─' : '├─';
 
               return (
-                <div key={step.step_id} className="flex items-center">
+                <div
+                  key={step.step_id}
+                  data-step-title={step.title}
+                  className={cn(
+                    'flex items-center rounded transition-all duration-300',
+                    isCrossFocused && 'ring-1 ring-accent-primary/60',
+                  )}
+                >
                   {/* Box-drawing connector */}
                   <span className="text-text-muted opacity-40 flex-shrink-0 mr-1 select-none">
                     {connector}

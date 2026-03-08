@@ -64,6 +64,16 @@ export const PlanVersionSchema = z.object({
   change_request_id: z.string().uuid().optional(),
   /** DOT Framework: Decomposition limits and thresholds for this plan */
   decomposition_config: DecompositionConfigSchema.optional(),
+  /** Default execution config for forge builds (pre-fills ForgeConfigPanel) */
+  execution_config: z.object({
+    max_concurrent: z.number().int().positive().optional(),
+    timeout_minutes: z.number().positive().optional(),
+    retry_count: z.number().int().min(0).optional(),
+    step_overrides: z.record(z.object({
+      model: z.string().optional(),
+      skip: z.boolean().optional(),
+    })).optional(),
+  }).optional(),
   metadata: z.record(z.unknown()).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),

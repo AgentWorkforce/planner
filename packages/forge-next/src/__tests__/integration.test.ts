@@ -365,9 +365,9 @@ describe('compilePlan', () => {
     expect(config.name).toBe('plan-plan-1-v1');
     expect(config.description).toBe('Test plan');
 
-    // Swarm
+    // Swarm — 2-step sequential chain infers low concurrency (dep density = 1.0)
     expect(config.swarm.pattern).toBe('dag');
-    expect(config.swarm.maxConcurrency).toBe(5);
+    expect(config.swarm.maxConcurrency).toBe(2);
   });
 
   it('deduplicates agent definitions per unique owner_role', () => {

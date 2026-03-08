@@ -44,8 +44,8 @@ interface UseQuestionNotificationsOptions {
 interface UseQuestionNotificationsResult {
   /** Currently displayed notification (null if queue is empty) */
   currentNotification: QuestionNotification | null;
-  /** Dismiss current notification and advance to next */
-  dismiss: () => void;
+  /** Dismiss a notification by question_id (or current if no id given) */
+  dismiss: (questionId?: string) => void;
   /** All queued notifications (including current) */
   queue: QuestionNotification[];
   /** Add a question to the notification queue */
@@ -87,13 +87,17 @@ export function useQuestionNotifications(
     setQueue((prev) => prev.slice(1));
   }, []);
 
-  // Dismiss current notification
-  const dismiss = useCallback(() => {
+  // Dismiss a specific notification by question_id, or the current one
+  const dismiss = useCallback((questionId?: string) => {
+    if (questionId) {
+      setQueue((prev) => prev.filter((n) => n.question.question_id !== questionId));
+    } else {
+      advance();
+    }
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    advance();
   }, [advance]);
 
   // Add question to queue
