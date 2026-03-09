@@ -47,21 +47,12 @@ export async function extractSignalExample(): Promise<ExtractionResult | null> {
   // Create the user prompt for this specific signal
   const userPrompt = createExtractionUserPrompt(sampleSignal);
 
-  // Format the few-shot examples for the API call
-  // (Comment: This is used in the actual API call below)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const fewShotMessages = EXTRACTION_EXAMPLES.flatMap((example) => [
-    {
-      role: 'user' as const,
-      content: createExtractionUserPrompt(example.input),
-    },
-    {
-      role: 'assistant' as const,
-      content: JSON.stringify(example.output, null, 2),
-    },
-  ]);
-
   // The actual API call would look like this:
+  //
+  // const fewShotMessages = EXTRACTION_EXAMPLES.flatMap((example) => [
+  //   { role: 'user' as const, content: createExtractionUserPrompt(example.input) },
+  //   { role: 'assistant' as const, content: JSON.stringify(example.output, null, 2) },
+  // ]);
   //
   // const response = await anthropic.messages.create({
   //   model: 'claude-sonnet-4-latest',
@@ -139,11 +130,16 @@ export const sampleSignalExpectedOutput: ExtractionResult = {
     "Need to investigate if it's a database issue or the new caching layer",
     "We're losing ~$50K/hour in SLA credits if this isn't resolved soon",
   ],
+  questions: [
+    { text: 'Is the latency spike correlated with last week\'s deploy?', is_explicit: false },
+    { text: 'Need to investigate if it\'s a database issue or the new caching layer', is_explicit: true },
+  ],
   reasoning:
     'This is a moderately-to-highly specific incident report (0.72): it includes quantified metrics (P95: 400-600ms vs 150ms baseline), specific component (user-service API, accounts table), start time, and estimated financial impact. However, root cause is unknown, which reduces specificity slightly. Emotional intensity is high (0.68)—clear urgency markers ("APAC peak hours", "losing ~$50K/hour", "This is affecting"), sense of business criticality, but language remains professional rather than crisis-mode. Actionability is moderate (0.54): the signal identifies the component, metrics, and suspects (database or caching layer), but lacks specific diagnostic commands or remediation steps; next action is investigation, not execution.',
   specificity: 0.72,
   emotional_intensity: 0.68,
   actionability: 0.54,
+  sentiment: 'frustrated',
 };
 
 /**

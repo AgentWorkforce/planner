@@ -65,7 +65,7 @@ export interface CreateClusterContext {
  * ```
  */
 export async function createCluster(context: CreateClusterContext): Promise<Cluster> {
-  const { storage, greenhouseId, name, summary, initialSignalId } = context;
+  const { storage, greenhouseId, name, summary } = context;
 
   // Build the input for storage.createCluster
   const input: CreateClusterInput = {

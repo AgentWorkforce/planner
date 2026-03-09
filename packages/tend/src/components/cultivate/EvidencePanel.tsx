@@ -46,9 +46,9 @@ export function EvidencePanel({ signals }: EvidencePanelProps) {
 
   return (
     <div className="space-y-3">
-      {quotes.map((quote, index) => (
+      {quotes.map((quote) => (
         <div
-          key={index}
+          key={`${quote.author}-${quote.text.slice(0, 60)}`}
           className="border-l-2 border-[var(--color-accent-primary)] pl-3"
         >
           <p className="text-sm text-text-secondary italic leading-relaxed">

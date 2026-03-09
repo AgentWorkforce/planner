@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import type { Suggestion } from '@/hooks/useSuggestions';
+import { DemandIndicator } from '@/components/cultivate/DemandIndicator';
 
 interface SuggestionCardProps {
   suggestion: Suggestion;
@@ -63,6 +64,13 @@ export function SuggestionCard({ suggestion, onOpen }: SuggestionCardProps) {
             <span
               className={cn('w-1.5 h-1.5 rounded-full shrink-0', INTENT_DOT_COLORS[dominantIntent])}
               title={dominantIntent.replace(/_/g, ' ')}
+            />
+          )}
+          {isOpportunity && suggestion.demand_score != null && suggestion.demand_score >= 25 && (
+            <DemandIndicator
+              score={suggestion.demand_score}
+              label={suggestion.demand_score >= 50 ? 'high' : 'medium'}
+              compact
             />
           )}
         </div>

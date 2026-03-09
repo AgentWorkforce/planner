@@ -80,7 +80,7 @@ export async function applyFilters(
   signal: NormalizedEvent,
   greenhouse: Greenhouse,
   config: CultivateConfig,
-  storage: CultivateStorage,
+  _storage: CultivateStorage,
   registry: FilterRuleRegistry
 ): Promise<ApplyFiltersResult> {
   // Build signal metadata for error reporting

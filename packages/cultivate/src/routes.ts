@@ -10,11 +10,13 @@ import { createClusterHandlers } from './api/handlers/clusters.js';
 import { createSourceHandlers } from './api/handlers/sources.js';
 import { createRecommendationHandlers } from './api/handlers/recommendations.js';
 import { createPrdHandlers } from './api/handlers/prd.js';
+import { createReportHandlers } from './api/handlers/reports.js';
 import { createFilterRuleHandlers } from './api/handlers/filter-rules.js';
 import { createDeadLetterHandlers } from './api/handlers/dead-letter.js';
 import { createIngestionHandlers } from './api/handlers/ingestion.js';
 import { createEventsHandler } from './api/handlers/events.js';
 import { createProfileHandlers } from './api/handlers/profiles.js';
+import { registerMCPRoutes } from './mcp/routes.js';
 import { TunerClient } from './tuner/client.js';
 
 /**
@@ -102,6 +104,13 @@ export function createCultivateRouter(context: CultivateContext): Router {
   const prdHandlers = createPrdHandlers(context.storage, context.config.anthropicApiKey);
   router.post('/prd/generate', prdHandlers.generate);
 
+  // ========== Synthesis Reports ==========
+  const reportHandlers = createReportHandlers(context.storage, context.config.anthropicApiKey);
+  router.post('/reports/generate', reportHandlers.generate);
+  router.get('/reports', reportHandlers.list);
+  router.get('/reports/:id', reportHandlers.get);
+  router.delete('/reports/:id', reportHandlers.remove);
+
   // ========== Dead Letter Queue ==========
   const deadLetterHandlers = createDeadLetterHandlers(context.queues.processSignal);
   router.get('/dead-letter', deadLetterHandlers.list);
@@ -119,6 +128,9 @@ export function createCultivateRouter(context: CultivateContext): Router {
   // ========== SSE Events ==========
   const eventsHandler = createEventsHandler(context.sseBroadcaster);
   router.get('/events', eventsHandler.stream);
+
+  // ========== MCP Tools ==========
+  registerMCPRoutes(router, context.storage);
 
   // ========== Config ==========
   // Config handlers (get, update) to be implemented if needed

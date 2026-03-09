@@ -10,8 +10,13 @@ import {
 } from '@/components/ui';
 import { useCultivateCluster } from '@/hooks/useCultivateCluster';
 import { EvidencePanel } from './EvidencePanel';
+import { QuestionsPanel } from './QuestionsPanel';
 import { IntentBadge } from './IntentBadge';
 import { PrdDialog } from './PrdDialog';
+import { SegmentBadge } from './SegmentBadge';
+import { QualityBar } from './QualityBar';
+import { DemandIndicator } from './DemandIndicator';
+import { SentimentBar } from './SentimentBar';
 import { cn } from '@/lib/utils';
 
 interface ClusterDetailDrawerProps {
@@ -50,6 +55,13 @@ export function ClusterDetailDrawer({
   const { cluster, loading, error } = useCultivateCluster(open ? clusterId : null);
   const [prdOpen, setPrdOpen] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Clear action error when drawer opens/closes
+  const handleOpenChange = (next: boolean) => {
+    setActionError(null);
+    onOpenChange(next);
+  };
 
   // Use greenhouse_id from prop or from fetched cluster
   const greenhouseId = greenhouseIdProp ?? cluster?.greenhouse_id ?? '';
@@ -57,6 +69,7 @@ export function ClusterDetailDrawer({
   const handleStartIdeation = async () => {
     if (!cluster) return;
     setStartingSession(true);
+    setActionError(null);
     try {
       const session = await postJson<{ id: string }>(
         '/api/ideation/sessions',
@@ -65,7 +78,7 @@ export function ClusterDetailDrawer({
       onOpenChange(false);
       navigate(`/s/${session.id}`);
     } catch {
-      // Session creation failed — stay on drawer
+      setActionError('Failed to start ideation session');
     } finally {
       setStartingSession(false);
     }
@@ -73,21 +86,30 @@ export function ClusterDetailDrawer({
 
   const trendInfo = cluster?.trend ? TREND_STYLES[cluster.trend] ?? null : null;
 
-  // Aggregate unique authors from cluster signals, sorted by signal count
-  const uniqueAuthors = useMemo(() => {
+  // Merge cluster-specific signal counts with global author profiles
+  const enrichedAuthors = useMemo(() => {
     if (!cluster?.signals) return [];
     const counts = new Map<string, number>();
     for (const s of cluster.signals) {
       counts.set(s.author, (counts.get(s.author) || 0) + 1);
     }
+
+    const profileMap = new Map(
+      (cluster.author_profiles || []).map(p => [p.author, p])
+    );
+
     return Array.from(counts.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [cluster?.signals]);
+      .map(([name, count]) => ({
+        name,
+        clusterCount: count,
+        profile: profileMap.get(name) || null,
+      }))
+      .sort((a, b) => b.clusterCount - a.clusterCount);
+  }, [cluster?.signals, cluster?.author_profiles]);
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           className={cn(
             'fixed right-0 top-0 h-full max-w-lg w-full rounded-none',
@@ -155,6 +177,29 @@ export function ClusterDetailDrawer({
             {/* Loaded content */}
             {cluster && !loading && (
               <>
+                {/* Signal quality distribution */}
+                {cluster.quality && (
+                  <QualityBar
+                    depthScore={cluster.quality.depth_score}
+                    substantiveCount={cluster.quality.substantive_count}
+                    total={cluster.quality.total}
+                  />
+                )}
+
+                {/* Demand scoring */}
+                {cluster.demand && cluster.demand.score > 0 && (
+                  <DemandIndicator
+                    score={cluster.demand.score}
+                    label={cluster.demand.label}
+                    requestRatio={cluster.demand.request_ratio}
+                  />
+                )}
+
+                {/* Sentiment breakdown */}
+                {cluster.sentiment_distribution && cluster.sentiment_distribution.total > 0 && (
+                  <SentimentBar distribution={cluster.sentiment_distribution} />
+                )}
+
                 {/* Evidence section */}
                 <div>
                   <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-2">
@@ -162,6 +207,9 @@ export function ClusterDetailDrawer({
                   </p>
                   <EvidencePanel signals={cluster.signals} />
                 </div>
+
+                {/* Questions being asked */}
+                <QuestionsPanel signals={cluster.signals} />
 
                 {/* Signal list */}
                 <div>
@@ -192,16 +240,30 @@ export function ClusterDetailDrawer({
                 </div>
 
                 {/* Who's asking — profile segments */}
-                {uniqueAuthors.length > 0 && (
+                {enrichedAuthors.length > 0 && (
                   <div>
                     <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-2">
                       Who's asking
                     </p>
                     <div className="space-y-1.5">
-                      {uniqueAuthors.slice(0, 3).map((author) => (
-                        <div key={author.name} className="flex items-center gap-2 px-2 py-1.5 bg-bg-secondary rounded-lg">
-                          <span className="text-sm text-text-primary flex-1 truncate">{author.name}</span>
-                          <span className="text-xs text-text-muted">{author.count} signal{author.count !== 1 ? 's' : ''}</span>
+                      {enrichedAuthors.slice(0, 3).map((author) => (
+                        <div key={author.name} className="flex flex-col gap-1 px-2 py-1.5 bg-bg-secondary rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-text-primary truncate max-w-[180px]">
+                              {author.name}
+                            </span>
+                            {author.profile?.segment && (
+                              <SegmentBadge segment={author.profile.segment} />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-text-secondary">
+                            <span>
+                              {author.clusterCount} signal{author.clusterCount !== 1 ? 's' : ''}
+                            </span>
+                            {author.profile?.top_intents?.slice(0, 2).map((intent) => (
+                              <IntentBadge key={intent} intent={intent} />
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -213,22 +275,27 @@ export function ClusterDetailDrawer({
 
           {/* Sticky actions bar */}
           {cluster && !loading && (
-            <div className="shrink-0 flex items-center gap-2 pt-4 border-t border-border-default">
-              <Button
-                variant="primary"
-                onClick={handleStartIdeation}
-                disabled={startingSession}
-                className="flex-1"
-              >
-                {startingSession ? 'Starting...' : 'Start Ideation'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setPrdOpen(true)}
-                className="flex-1"
-              >
-                Generate PRD
-              </Button>
+            <div className="shrink-0 pt-4 border-t border-border-default space-y-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={handleStartIdeation}
+                  disabled={startingSession}
+                  className="flex-1"
+                >
+                  {startingSession ? 'Starting...' : 'Start Ideation'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setPrdOpen(true)}
+                  className="flex-1"
+                >
+                  Generate PRD
+                </Button>
+              </div>
+              {actionError && (
+                <p className="text-xs text-red-400">{actionError}</p>
+              )}
             </div>
           )}
         </DialogContent>

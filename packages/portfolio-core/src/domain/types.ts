@@ -59,6 +59,7 @@ export const SuggestionSchema = z.object({
   top_quote: z.string().optional(),
   intent_breakdown: z.record(z.number()).optional(),
   top_segment: z.string().optional(),
+  demand_score: z.number().optional(),
 });
 
 export type Suggestion = z.infer<typeof SuggestionSchema>;

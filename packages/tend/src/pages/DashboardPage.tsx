@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
 import { TendLayout } from '@/components/layout/TendLayout';
 import { StatusBar } from '@/components/status/StatusBar';
@@ -13,6 +14,7 @@ import { useSuggestions } from '@/hooks/useSuggestions';
 import { useInitiativeHealth } from '@/hooks/useInitiativeHealth';
 import { useInitiatives } from '@/hooks/useInitiatives';
 import { ClusterDetailDrawer } from '@/components/cultivate/ClusterDetailDrawer';
+import { ReportDialog } from '@/components/cultivate/ReportDialog';
 import { OnboardingPrompt } from '@/components/cultivate/OnboardingPrompt';
 import { OnboardingWizard } from '@/components/cultivate/OnboardingWizard';
 import { useCultivateGreenhouses } from '@/hooks/useCultivateGreenhouses';
@@ -56,6 +58,7 @@ export function DashboardPage() {
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [drawerClusterId, setDrawerClusterId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // Cultivate greenhouse detection
   const { greenhouses, loading: greenhousesLoading, refetch: refetchGreenhouses } = useCultivateGreenhouses();
@@ -302,9 +305,16 @@ export function DashboardPage() {
       {/* Suggestions section */}
       {(primarySuggestion || suggestionsLoading) && (
         <div className="space-y-3">
-          <p className="text-xs text-text-muted font-medium uppercase tracking-wider">
-            Needs attention
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-text-muted font-medium uppercase tracking-wider">
+              Needs attention
+            </p>
+            {hasGreenhouses && (
+              <Button variant="secondary" size="sm" onClick={() => setReportOpen(true)}>
+                Generate Report
+              </Button>
+            )}
+          </div>
 
           {/* Primary suggestion */}
           {primarySuggestion && (
@@ -393,6 +403,14 @@ export function DashboardPage() {
         onOpenChange={setWizardOpen}
         onComplete={refetchGreenhouses}
       />
+      {hasGreenhouses && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          greenhouseId={greenhouses[0].id}
+          greenhouseName={greenhouses[0].name}
+        />
+      )}
     </>
   );
 }

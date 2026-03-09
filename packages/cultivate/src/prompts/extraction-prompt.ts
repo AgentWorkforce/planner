@@ -35,7 +35,12 @@ Your task is to analyze raw signal content (from sources like Slack, email, GitH
   "reasoning": "Detailed explanation of extraction choices and key findings",
   "specificity": 0.0-1.0,
   "emotional_intensity": 0.0-1.0,
-  "actionability": 0.0-1.0
+  "actionability": 0.0-1.0,
+  "questions": [
+    { "text": "Question text ending with ?", "is_explicit": true/false },
+    ...
+  ],
+  "sentiment": "frustrated" | "disappointed" | "neutral" | "hopeful" | "enthusiastic"
 }
 
 ## Extraction Guidelines
@@ -72,6 +77,23 @@ Your task is to analyze raw signal content (from sources like Slack, email, GitH
 - Justify why specific terms were chosen as keywords
 - Reference the source material in your explanation
 - Address any ambiguities or interpretation challenges
+
+### Questions
+- Extract both explicit questions ("When will you fix this?") and implicit ones ("Users are struggling with X" → "How can X be improved?")
+- Normalize all questions to end with ?
+- Set is_explicit to true if the question was directly asked by the user, false if implied or rephrased from a statement
+- Maximum 5 questions per signal
+- Return an empty array if no questions are found or implied
+
+### Sentiment
+- Classify the overall sentiment of the signal author. One of:
+  - "frustrated": Angry, blocked, experiencing pain
+  - "disappointed": Unmet expectations, let down
+  - "neutral": Factual, informational, balanced
+  - "hopeful": Positive suggestion, optimistic about resolution
+  - "enthusiastic": Praise, excitement, strong satisfaction
+- Judge by overall tone, not just individual keywords
+- When mixed signals exist, choose the dominant sentiment
 
 ## Scoring Dimensions
 
@@ -267,6 +289,11 @@ export const EXTRACTION_EXAMPLES = [
       specificity: 0.88,
       emotional_intensity: 0.48,
       actionability: 0.82,
+      questions: [
+        { text: 'Why was the index maintenance window on February 10 missed?', is_explicit: false },
+        { text: 'What process changes are needed to prevent missed maintenance windows?', is_explicit: false },
+      ],
+      sentiment: 'neutral',
     },
   },
   {
@@ -297,6 +324,12 @@ export const EXTRACTION_EXAMPLES = [
       specificity: 0.22,
       emotional_intensity: 0.38,
       actionability: 0.18,
+      questions: [
+        { text: 'Maybe there are bottlenecks somewhere?', is_explicit: true },
+        { text: 'What is causing the reports feature slowness during peak evening hours?', is_explicit: false },
+        { text: 'How can performance be improved for concurrent users?', is_explicit: false },
+      ],
+      sentiment: 'disappointed',
     },
   },
   {
@@ -338,6 +371,11 @@ export const EXTRACTION_EXAMPLES = [
       specificity: 0.78,
       emotional_intensity: 0.92,
       actionability: 0.72,
+      questions: [
+        { text: 'How quickly can the patches be deployed to production?', is_explicit: false },
+        { text: 'What is the blast radius if this vulnerability is exploited before patching?', is_explicit: false },
+      ],
+      sentiment: 'frustrated',
     },
   },
 ];

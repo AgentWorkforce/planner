@@ -59,11 +59,16 @@ export const criticalIncidentReport: ExtractionResult = {
     'Reindexing completed in 8 minutes with zero data loss',
     'Root cause: missed index maintenance window from Feb 10',
   ],
+  questions: [
+    { text: 'Why was the index maintenance window missed on Feb 10?', is_explicit: false },
+    { text: 'What safeguards can prevent cache overflow from cascading?', is_explicit: false },
+  ],
   reasoning:
     'This is a detailed, quantified incident report. Specificity is high due to precise timestamps, affected components, duration metrics, and identified root cause. Emotional intensity is moderate - factual but acknowledges business impact and corrective action needed. Actionability is high because it identifies the exact problem and remediation steps taken, providing clear guidance for preventing recurrence.',
   specificity: 0.88,
   emotional_intensity: 0.48,
   actionability: 0.82,
+  sentiment: 'neutral',
 };
 
 /**
@@ -102,11 +107,16 @@ export const vagueCustomerFeedback: ExtractionResult = {
     'Some features are really sluggish',
     'This happens mostly in the evenings',
   ],
+  questions: [
+    { text: 'Which specific features feel slow?', is_explicit: false },
+    { text: 'What does "peak hours" mean for this customer?', is_explicit: false },
+  ],
   reasoning:
     'This feedback lacks specificity - no metrics, feature names, or quantified performance degradation. Emotional intensity is moderate; the customer is concerned but using measured language rather than crisis urgency. Actionability is low because there is no clear guidance on which features to optimize, what performance targets to hit, or whether this is client-side or server-side.',
   specificity: 0.22,
   emotional_intensity: 0.38,
   actionability: 0.18,
+  sentiment: 'disappointed',
 };
 
 /**
@@ -151,11 +161,16 @@ export const securityVulnerabilityAlert: ExtractionResult = {
     'Patches available and tested',
     'Deploy to production immediately',
   ],
+  questions: [
+    { text: 'Has this vulnerability been exploited in production?', is_explicit: false },
+    { text: 'What is the blast radius if exploited?', is_explicit: false },
+  ],
   reasoning:
     'This alert combines high specificity (identifies exact component and vulnerability type) with very high emotional intensity (crisis language, CRITICAL markers, urgency indicators). Actionability is high - clearly stating what the threat is and that patches exist - though implementation details on deployment procedures could be more explicit.',
   specificity: 0.78,
   emotional_intensity: 0.92,
   actionability: 0.72,
+  sentiment: 'frustrated',
 };
 
 /**
@@ -201,11 +216,16 @@ export const strategicMarketInsight: ExtractionResult = {
     'Competitors are advertising their SOC 2 Type II status',
     'Sales cycle is extending 2-3 weeks waiting on compliance review',
   ],
+  questions: [
+    { text: 'How many deals have been lost or delayed due to missing SOC 2?', is_explicit: false },
+    { text: 'What is the timeline to achieve SOC 2 Type II certification?', is_explicit: false },
+  ],
   reasoning:
     'This insight is moderately specific, providing concrete revenue thresholds and compliance standards but lacking detailed metrics on deal impact. Emotional intensity is low - professional and objective. Actionability is high because it clearly signals product investment priorities and business justification for resource allocation.',
   specificity: 0.68,
   emotional_intensity: 0.18,
   actionability: 0.76,
+  sentiment: 'neutral',
 };
 
 /**
@@ -236,11 +256,16 @@ export const developerExperienceIssue: ExtractionResult = {
     'We get mysterious build failures sometimes',
     'We are working through the issues',
   ],
+  questions: [
+    { text: 'What specific build failures are occurring?', is_explicit: false },
+    { text: 'How much longer is onboarding taking compared to before?', is_explicit: false },
+  ],
   reasoning:
     'This feedback is low specificity - no metrics on onboarding time, no specific build failure descriptions, no root cause analysis. Emotional intensity is moderate; frustration is evident but not crisis-level. Actionability is low; while the issue is acknowledged, there is no clear guidance on what specifically needs fixing or what success looks like.',
   specificity: 0.28,
   emotional_intensity: 0.42,
   actionability: 0.22,
+  sentiment: 'frustrated',
 };
 
 /**
@@ -290,11 +315,16 @@ export const featureRequest: ExtractionResult = {
     'CSV and Parquet formats would cover most use cases',
     'This would enable external analysis workflows',
   ],
+  questions: [
+    { text: 'Can we export more than 500 reports at once?', is_explicit: true },
+    { text: 'Are CSV and Parquet the only formats needed?', is_explicit: false },
+  ],
   reasoning:
     'This request is fairly specific - identifies exact feature, supported formats, and usage patterns. Emotional intensity is low-moderate; it is a normal feature request without urgency markers. Actionability is high because it clearly defines what is wanted (bulk export), acceptable output formats, and implied use cases.',
   specificity: 0.72,
   emotional_intensity: 0.25,
   actionability: 0.78,
+  sentiment: 'hopeful',
 };
 
 /**
@@ -335,11 +365,16 @@ export const ambiguousPerformanceStatement: ExtractionResult = {
     'No one seems to know why',
     'This is concerning us',
   ],
+  questions: [
+    { text: 'What changed in the API over the last 6 months?', is_explicit: false },
+    { text: 'Do we have baseline performance metrics to compare against?', is_explicit: false },
+  ],
   reasoning:
     'This statement is moderately specific - it identifies the component (API) and time frame (6 months) but lacks quantitative metrics (latency targets, actual response times). Emotional intensity is high (concern, frustration). Actionability is moderate; the concern is clear but the path to investigation and resolution is vague - needs performance profiling and baseline data collection.',
   specificity: 0.54,
   emotional_intensity: 0.68,
   actionability: 0.52,
+  sentiment: 'frustrated',
 };
 
 /**
@@ -388,11 +423,13 @@ export const operationalRunbook: ExtractionResult = {
     'Verify consistency check passes before promotion',
     'Restart API with FORCE_SYNC=true to catch up',
   ],
+  questions: [],
   reasoning:
     'This is a detailed operational runbook with very high specificity - exact commands, file paths, and configuration parameters. Emotional intensity is low; it is a neutral procedural document. Actionability is very high; this can be executed as written with minimal interpretation.',
   specificity: 0.94,
   emotional_intensity: 0.12,
   actionability: 0.9,
+  sentiment: 'neutral',
 };
 
 /**

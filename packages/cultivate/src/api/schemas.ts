@@ -165,3 +165,20 @@ export const GeneratePrdSchema = z.object({
 });
 
 export type GeneratePrdRequest = z.infer<typeof GeneratePrdSchema>;
+
+// ========== Synthesis Report Schemas ==========
+
+export const GenerateReportSchema = z.object({
+  greenhouse_id: z.string().min(1, 'Greenhouse ID is required'),
+  title: z.string().optional(),
+  report_type: z.enum(['weekly', 'monthly', 'custom']).optional(),
+  cluster_ids: z.array(z.string()).optional(),
+});
+
+export type GenerateReportRequest = z.infer<typeof GenerateReportSchema>;
+
+export const ListReportsQuerySchema = z.object({
+  greenhouse_id: z.string().min(1, 'Greenhouse ID is required'),
+});
+
+export type ListReportsQuery = z.infer<typeof ListReportsQuerySchema>;

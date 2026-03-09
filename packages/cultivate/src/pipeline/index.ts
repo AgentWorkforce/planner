@@ -413,18 +413,20 @@ export async function processSignal(ctx: ProcessSignalContext): Promise<ProcessS
   // ============================================================================
   // STAGE 6b: PROFILE UPSERT (non-fatal)
   // ============================================================================
-  try {
-    await ctx.storage.upsertProfile({
-      greenhouse_id: ctx.greenhouse.id,
-      author: ctx.signal.author,
-      author_type: ctx.signal.author_type,
-      source_type: ctx.signal.source_type,
-      intent: ctx.intent,
-      cluster_id: ctx.clusterResult?.cluster_id,
-    });
-  } catch (profileErr) {
-    // Profile upsert is non-fatal — log but don't break the pipeline
-    console.warn('[pipeline] Profile upsert failed:', profileErr);
+  if (ctx.signal.author?.trim()) {
+    try {
+      await ctx.storage.upsertProfile({
+        greenhouse_id: ctx.greenhouse.id,
+        author: ctx.signal.author,
+        author_type: ctx.signal.author_type,
+        source_type: ctx.signal.source_type,
+        intent: ctx.intent,
+        cluster_id: ctx.clusterResult?.cluster_id,
+      });
+    } catch (profileErr) {
+      // Profile upsert is non-fatal — log but don't break the pipeline
+      console.warn('[pipeline] Profile upsert failed:', profileErr);
+    }
   }
 
   // ============================================================================

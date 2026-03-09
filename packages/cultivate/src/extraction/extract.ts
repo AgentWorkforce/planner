@@ -87,6 +87,23 @@ const EXTRACTION_TOOL = {
         maximum: 1,
         description: 'Score 0-1 indicating how actionable the signal is',
       },
+      questions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string' },
+            is_explicit: { type: 'boolean' },
+          },
+          required: ['text', 'is_explicit'],
+        },
+        description: 'Questions found in or implied by the content (max 5)',
+      },
+      sentiment: {
+        type: 'string',
+        enum: ['frustrated', 'disappointed', 'neutral', 'hopeful', 'enthusiastic'],
+        description: 'Overall sentiment classification',
+      },
     },
     required: [
       'summary',
@@ -98,6 +115,8 @@ const EXTRACTION_TOOL = {
       'specificity',
       'emotional_intensity',
       'actionability',
+      'questions',
+      'sentiment',
     ],
   },
 };

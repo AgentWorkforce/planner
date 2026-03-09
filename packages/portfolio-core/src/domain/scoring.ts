@@ -43,6 +43,7 @@ export interface ClusterData {
   has_linked_plan: boolean;
   top_quote?: string;
   top_segment?: string;
+  demand_score?: number;
 }
 
 /**
@@ -145,6 +146,10 @@ export function scorePlan(
 /**
  * Score an opportunity (unlinked rising cluster).
  * Only scores clusters where has_linked_plan === false and signal_count >= 3.
+ * Applies demand multiplier when demand_score is available:
+ *   - demand_score >= 50 (high): 1.5x
+ *   - demand_score >= 25 (medium): 1.2x
+ *   - otherwise: 1.0x
  * Pure function — no storage access, no side effects.
  */
 export function scoreOpportunity(cluster: ClusterData): {
@@ -152,17 +157,29 @@ export function scoreOpportunity(cluster: ClusterData): {
   reasons: string[];
   top_quote?: string;
   top_segment?: string;
+  demand_score?: number;
 } | null {
   if (cluster.has_linked_plan || cluster.signal_count < 3) {
     return null;
   }
 
-  const score = cluster.velocity_weekly * cluster.avg_signal_score * 10;
+  let score = cluster.velocity_weekly * cluster.avg_signal_score * 10;
   const reasons = [
     `Rising trend: '${cluster.label}' — ${cluster.signal_count} signals, no plan yet`,
   ];
 
-  return { score, reasons, top_quote: cluster.top_quote, top_segment: cluster.top_segment };
+  // Apply demand multiplier if demand_score is present
+  if (cluster.demand_score != null) {
+    if (cluster.demand_score >= 50) {
+      score *= 1.5;
+      reasons.push(`High demand (score: ${cluster.demand_score}) — 1.5x boost`);
+    } else if (cluster.demand_score >= 25) {
+      score *= 1.2;
+      reasons.push(`Medium demand (score: ${cluster.demand_score}) — 1.2x boost`);
+    }
+  }
+
+  return { score, reasons, top_quote: cluster.top_quote, top_segment: cluster.top_segment, demand_score: cluster.demand_score };
 }
 
 /**
@@ -224,6 +241,7 @@ export function generateSuggestions(
           signal_count: cluster.signal_count,
           top_quote: result.top_quote,
           top_segment: result.top_segment,
+          demand_score: result.demand_score,
         });
       }
     }

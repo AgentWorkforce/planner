@@ -222,6 +222,28 @@ const EntitySchema = z.object({
 });
 
 /**
+ * Question extracted from signal content
+ * Represents either an explicit question asked or an implicit question inferred
+ */
+export const QuestionSchema = z.object({
+  text: z.string().describe('The question text'),
+  is_explicit: z.boolean().describe('Whether the question was explicitly asked vs inferred'),
+});
+export type Question = z.infer<typeof QuestionSchema>;
+
+/**
+ * Sentiment classification for signal content
+ */
+export const SentimentSchema = z.enum([
+  'frustrated',
+  'disappointed',
+  'neutral',
+  'hopeful',
+  'enthusiastic',
+]);
+export type Sentiment = z.infer<typeof SentimentSchema>;
+
+/**
  * Extraction result containing analyzed signal data
  * Produced by extraction jobs and used for clustering and analysis
  */
@@ -231,10 +253,12 @@ export const ExtractionResultSchema = z.object({
   entities: z.array(EntitySchema).describe('Named entities found in content with their types'),
   aspects: z.array(z.string()).describe('Key aspects, themes, or dimensions discussed'),
   quotes: z.array(z.string()).describe('Notable direct quotes from the source'),
+  questions: z.array(QuestionSchema).default([]).describe('Questions extracted from the signal — explicit or inferred'),
   reasoning: z.string().describe('AI reasoning explaining the extraction choices and key findings'),
   specificity: z.number().min(0).max(1).describe('Score 0-1 indicating how specific/general the content is'),
   emotional_intensity: z.number().min(0).max(1).describe('Score 0-1 indicating emotional charge or intensity'),
   actionability: z.number().min(0).max(1).describe('Score 0-1 indicating how actionable the signal is'),
+  sentiment: SentimentSchema.default('neutral').describe('Overall sentiment of the signal author'),
 });
 
 /**

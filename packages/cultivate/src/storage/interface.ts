@@ -17,6 +17,7 @@ import type {
   ExtractionResult,
 } from '../domain/types';
 import type { Profile, IcpSegment } from '../domain/profile-types';
+import type { SynthesisReport } from '../domain/report-types';
 
 /**
  * Query filters for signal listing with pagination
@@ -500,6 +501,11 @@ export interface CultivateStorage {
    */
   getProfileById(id: string): Promise<Profile | null>;
 
+  /**
+   * Batch lookup profiles by author names within a greenhouse
+   */
+  getProfilesByAuthors(greenhouse_id: string, authors: string[]): Promise<Profile[]>;
+
   // ========== ICP Segment Operations ==========
 
   /**
@@ -521,4 +527,26 @@ export interface CultivateStorage {
    * Update segment profile count
    */
   updateSegmentCount(segment_id: string, count: number): Promise<void>;
+
+  // ========== Synthesis Report Operations ==========
+
+  /**
+   * Create a new synthesis report
+   */
+  createReport(report: Omit<SynthesisReport, 'created_at'>): Promise<SynthesisReport>;
+
+  /**
+   * Get a synthesis report by ID
+   */
+  getReportById(id: string): Promise<SynthesisReport | null>;
+
+  /**
+   * List synthesis reports for a greenhouse, ordered by generated_at descending
+   */
+  listReports(greenhouse_id: string): Promise<SynthesisReport[]>;
+
+  /**
+   * Delete a synthesis report
+   */
+  deleteReport(id: string): Promise<void>;
 }

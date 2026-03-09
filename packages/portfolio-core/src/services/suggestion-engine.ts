@@ -39,6 +39,7 @@ export interface CultivateStorageReader {
       linked_plan_id?: string | null;
       score: number;
       scoring_factors?: { strategic_fit?: number };
+      intent?: string | null;
     }>
   >;
   listClustersByGreenhouse(
@@ -684,6 +685,19 @@ export class SuggestionEngine {
           }
         }
 
+        // Compute demand score inline (mirrors cultivate scoring/demand.ts formula)
+        // demand = request_ratio * velocity_factor * quality_factor * 100
+        const actionableIntents = new Set(['feature_request', 'bug_report', 'question']);
+        const actionableCount = signals.filter(
+          (s) => s.intent != null && actionableIntents.has(s.intent),
+        ).length;
+        const requestRatio = signals.length > 0 ? actionableCount / signals.length : 0;
+        const velocityFactor = Math.min(cluster.velocity_weekly / 5, 1.0);
+        const qualityFactor = avgScore; // already computed above as avg signal score
+        const demandScore = signals.length > 0
+          ? Math.round(requestRatio * velocityFactor * qualityFactor * 100)
+          : 0;
+
         clusters.push({
           cluster_id: cluster.id,
           label: cluster.label,
@@ -693,6 +707,7 @@ export class SuggestionEngine {
           has_linked_plan: hasLinkedPlan,
           top_quote: topQuote,
           top_segment: topSegment,
+          demand_score: demandScore,
         });
 
         // Track linked signals per plan

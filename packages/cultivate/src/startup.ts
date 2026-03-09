@@ -8,12 +8,10 @@ import { pipeline } from '@huggingface/transformers';
 import type {
   CultivateStartupConfig,
   CultivateContext,
-  CultivateQueues,
-  CultivateWorkers,
   CultivateConfig,
 } from './types.js';
 import { CultivateStartupError } from './errors.js';
-import { CultivateStorage } from './storage/index.js';
+import { SqliteCultivateStorage } from './storage/sqlite.js';
 import { createQueues } from './jobs/queues.js';
 import { createWorkers } from './jobs/workers.js';
 import { createSSEBroadcaster } from './sse/broadcaster.js';
@@ -161,10 +159,10 @@ async function connectRedis(config: CultivateStartupConfig): Promise<Redis> {
 /**
  * Step 2: Initialize SQLite storage with migrations
  */
-async function initializeStorage(dbPath: string): Promise<CultivateStorage> {
+async function initializeStorage(dbPath: string): Promise<SqliteCultivateStorage> {
   try {
     // Storage initializes synchronously in constructor (runs migrations)
-    const storage = new CultivateStorage(dbPath);
+    const storage = new SqliteCultivateStorage(dbPath);
     return storage;
   } catch (error) {
     throw new CultivateStartupError(
@@ -178,7 +176,7 @@ async function initializeStorage(dbPath: string): Promise<CultivateStorage> {
 /**
  * Auto-create default Greenhouse if none exist
  */
-async function ensureDefaultGreenhouse(storage: CultivateStorage): Promise<void> {
+async function ensureDefaultGreenhouse(storage: SqliteCultivateStorage): Promise<void> {
   const greenhouses = await storage.listGreenhouses();
   if (greenhouses.length === 0) {
     console.log('[cultivate] No Greenhouses found, creating default...');

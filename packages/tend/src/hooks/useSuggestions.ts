@@ -15,6 +15,7 @@ export interface Suggestion {
   signal_count: number;
   top_quote?: string;
   intent_breakdown?: Record<string, number>;
+  demand_score?: number;
 }
 
 export interface UseSuggestionsResult {

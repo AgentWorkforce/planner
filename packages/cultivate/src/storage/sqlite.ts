@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { BaseSqliteStorage } from '@plannr/storage-base';
+import { NotFoundError } from '@plannr/errors';
 import type {
   Signal,
   SignalStatus,
@@ -19,6 +20,7 @@ import type {
   ExtractionResult,
 } from '../domain/types';
 import type { Profile, IcpSegment } from '../domain/profile-types';
+import type { SynthesisReport } from '../domain/report-types';
 import type {
   CultivateStorage,
   SignalQueryFilters,
@@ -210,6 +212,18 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     }
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_signals_intent ON signals(intent)`);
 
+    // Migration: add questions and sentiment columns to extractions table
+    try {
+      this.db.exec(`ALTER TABLE extractions ADD COLUMN questions TEXT NOT NULL DEFAULT '[]'`);
+    } catch (_) {
+      // Column already exists - safe to ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE extractions ADD COLUMN sentiment TEXT NOT NULL DEFAULT 'neutral'`);
+    } catch (_) {
+      // Column already exists - safe to ignore
+    }
+
     // Profiles table - aggregates per-author statistics from signals
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS profiles (
@@ -245,9 +259,26 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       )
     `);
 
+    // Synthesis reports table - periodic or ad-hoc cluster summaries
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS synthesis_reports (
+        id TEXT PRIMARY KEY,
+        greenhouse_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        report_type TEXT NOT NULL DEFAULT 'custom',
+        cluster_ids TEXT NOT NULL DEFAULT '[]',
+        markdown_content TEXT NOT NULL,
+        metadata TEXT NOT NULL DEFAULT '{}',
+        generated_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(greenhouse_id) REFERENCES greenhouses(id) ON DELETE CASCADE
+      )
+    `);
+
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_profiles_greenhouse_id ON profiles(greenhouse_id);
       CREATE INDEX IF NOT EXISTS idx_profiles_segment ON profiles(segment);
+      CREATE INDEX IF NOT EXISTS idx_synthesis_reports_greenhouse ON synthesis_reports(greenhouse_id);
     `);
 
     // Ensure default greenhouse exists
@@ -1146,9 +1177,9 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     this.db
       .prepare(
         `INSERT INTO extractions (
-          id, signal_id, keywords, summary, entities, aspects, quotes, reasoning,
-          specificity, emotional_intensity, actionability, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          id, signal_id, keywords, summary, entities, aspects, quotes, questions, reasoning,
+          specificity, emotional_intensity, actionability, sentiment, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -1158,10 +1189,12 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
         JSON.stringify(extraction.entities),
         JSON.stringify(extraction.aspects),
         JSON.stringify(extraction.quotes),
+        JSON.stringify(extraction.questions ?? []),
         extraction.reasoning,
         extraction.specificity,
         extraction.emotional_intensity,
         extraction.actionability,
+        extraction.sentiment ?? 'neutral',
         now,
         now
       );
@@ -1184,10 +1217,12 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       entities: this.safeJsonParse(row.entities, []),
       aspects: this.safeJsonParse(row.aspects, []),
       quotes: this.safeJsonParse(row.quotes, []),
+      questions: this.safeJsonParse(row.questions, []),
       reasoning: row.reasoning,
       specificity: row.specificity,
       emotional_intensity: row.emotional_intensity,
       actionability: row.actionability,
+      sentiment: row.sentiment ?? 'neutral',
     };
   }
 
@@ -1196,16 +1231,34 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
   async upsertProfile(input: UpsertProfileInput): Promise<Profile> {
     const now = new Date().toISOString();
 
-    // Check if profile exists for this greenhouse + author
-    const existing = this.db.prepare(
-      'SELECT * FROM profiles WHERE greenhouse_id = ? AND author = ?'
-    ).get(input.greenhouse_id, input.author) as any;
+    const txn = this.db.transaction(() => {
+      // Step 1: Atomic upsert — INSERT or bump signal_count
+      const id = randomUUID();
+      const initialIntents = input.intent && input.intent !== 'unclassified' ? [input.intent] : [];
+      const initialClusters = input.cluster_id ? [input.cluster_id] : [];
+      const initialSourceDist = { [input.source_type]: 1 };
 
-    if (existing) {
-      // Update existing profile
-      const topIntents = this.safeJsonParse<string[]>(existing.top_intents, []);
-      const topClusters = this.safeJsonParse<string[]>(existing.top_clusters, []);
-      const sourceDist = this.safeJsonParse<Record<string, number>>(existing.source_distribution, {});
+      this.db.prepare(`
+        INSERT INTO profiles (id, greenhouse_id, author, author_type, signal_count, top_intents, top_clusters, source_distribution, first_seen_at, last_seen_at, segment, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?)
+        ON CONFLICT(greenhouse_id, author) DO UPDATE SET
+          signal_count = signal_count + 1,
+          last_seen_at = excluded.last_seen_at,
+          updated_at = excluded.updated_at
+      `).run(
+        id, input.greenhouse_id, input.author, input.author_type,
+        JSON.stringify(initialIntents), JSON.stringify(initialClusters), JSON.stringify(initialSourceDist),
+        now, now, now, now
+      );
+
+      // Step 2: Read-back and merge JSON arrays (row guaranteed to exist after upsert)
+      const row = this.db.prepare(
+        'SELECT id, top_intents, top_clusters, source_distribution FROM profiles WHERE greenhouse_id = ? AND author = ?'
+      ).get(input.greenhouse_id, input.author) as any;
+
+      const topIntents = this.safeJsonParse<string[]>(row.top_intents, []);
+      const topClusters = this.safeJsonParse<string[]>(row.top_clusters, []);
+      const sourceDist = this.safeJsonParse<Record<string, number>>(row.source_distribution, {});
 
       // Update intent tracking (keep top 5, avoid duplicates)
       if (input.intent && input.intent !== 'unclassified') {
@@ -1224,41 +1277,22 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
 
       this.db.prepare(`
         UPDATE profiles SET
-          signal_count = signal_count + 1,
           top_intents = ?,
           top_clusters = ?,
-          source_distribution = ?,
-          last_seen_at = ?,
-          updated_at = ?
+          source_distribution = ?
         WHERE id = ?
       `).run(
         JSON.stringify(topIntents),
         JSON.stringify(topClusters),
         JSON.stringify(sourceDist),
-        now,
-        now,
-        existing.id
+        row.id
       );
 
-      return this.getProfileById(existing.id) as Promise<Profile>;
-    } else {
-      // Create new profile
-      const id = randomUUID();
-      const topIntents = input.intent && input.intent !== 'unclassified' ? [input.intent] : [];
-      const topClusters = input.cluster_id ? [input.cluster_id] : [];
-      const sourceDist = { [input.source_type]: 1 };
+      return row.id as string;
+    });
 
-      this.db.prepare(`
-        INSERT INTO profiles (id, greenhouse_id, author, author_type, signal_count, top_intents, top_clusters, source_distribution, first_seen_at, last_seen_at, segment, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?)
-      `).run(
-        id, input.greenhouse_id, input.author, input.author_type,
-        JSON.stringify(topIntents), JSON.stringify(topClusters), JSON.stringify(sourceDist),
-        now, now, now, now
-      );
-
-      return this.getProfileById(id) as Promise<Profile>;
-    }
+    const profileId = txn();
+    return this.getProfileById(profileId) as Promise<Profile>;
   }
 
   async listProfiles(filters: ProfileQueryFilters): Promise<Profile[]> {
@@ -1285,6 +1319,15 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
     const row = this.db.prepare('SELECT * FROM profiles WHERE id = ?').get(id) as any;
     if (!row) return null;
     return this.mapRowToProfile(row);
+  }
+
+  async getProfilesByAuthors(greenhouse_id: string, authors: string[]): Promise<Profile[]> {
+    if (authors.length === 0) return [];
+    const placeholders = authors.map(() => '?').join(',');
+    const rows = this.db
+      .prepare(`SELECT * FROM profiles WHERE greenhouse_id = ? AND author IN (${placeholders})`)
+      .all(greenhouse_id, ...authors) as any[];
+    return rows.map((row) => this.mapRowToProfile(row));
   }
 
   private mapRowToProfile(row: any): Profile {
@@ -1359,6 +1402,67 @@ export class SqliteCultivateStorage extends BaseSqliteStorage implements Cultiva
       profile_count: row.profile_count,
       created_at: row.created_at,
       updated_at: row.updated_at,
+    };
+  }
+
+  // ========== Synthesis Report Operations ==========
+
+  async createReport(report: Omit<SynthesisReport, 'created_at'>): Promise<SynthesisReport> {
+    const now = new Date().toISOString();
+
+    this.db.prepare(`
+      INSERT INTO synthesis_reports (id, greenhouse_id, title, report_type, cluster_ids, markdown_content, metadata, generated_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      report.id,
+      report.greenhouse_id,
+      report.title,
+      report.report_type,
+      JSON.stringify(report.cluster_ids),
+      report.markdown_content,
+      JSON.stringify(report.metadata),
+      report.generated_at,
+      now
+    );
+
+    return {
+      ...report,
+      created_at: now,
+    };
+  }
+
+  async getReportById(id: string): Promise<SynthesisReport | null> {
+    const row = this.db.prepare('SELECT * FROM synthesis_reports WHERE id = ?').get(id) as any;
+    if (!row) return null;
+    return this.mapRowToReport(row);
+  }
+
+  async listReports(greenhouse_id: string): Promise<SynthesisReport[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM synthesis_reports WHERE greenhouse_id = ? ORDER BY generated_at DESC')
+      .all(greenhouse_id) as any[];
+
+    return rows.map((row) => this.mapRowToReport(row));
+  }
+
+  async deleteReport(id: string): Promise<void> {
+    const result = this.db.prepare('DELETE FROM synthesis_reports WHERE id = ?').run(id);
+    if (result.changes === 0) {
+      throw new NotFoundError('Report not found');
+    }
+  }
+
+  private mapRowToReport(row: any): SynthesisReport {
+    return {
+      id: row.id,
+      greenhouse_id: row.greenhouse_id,
+      title: row.title,
+      report_type: row.report_type,
+      cluster_ids: this.safeJsonParse(row.cluster_ids, []),
+      markdown_content: row.markdown_content,
+      metadata: this.safeJsonParse(row.metadata, {}),
+      generated_at: row.generated_at,
+      created_at: row.created_at,
     };
   }
 }

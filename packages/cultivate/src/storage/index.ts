@@ -3,7 +3,6 @@
  * Stub implementation for startup sequence
  */
 
-import Database from 'better-sqlite3';
 import { BaseSqliteStorage } from '@plannr/storage-base';
 
 export interface Greenhouse {
