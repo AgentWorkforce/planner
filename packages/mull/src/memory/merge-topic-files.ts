@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs';
 import { readTopicFile } from './read-topic-file.js';
 import { writeTopicFile } from './write-topic-file.js';
 import type { TopicFrontmatter, Nugget } from './read-topic-file.js';
+import type { TopicSummaryMap } from '../domain/types.js';
 
 /** Fixed section ordering for topic files. */
 const SECTION_ORDER = ['Decisions', 'Constraints', 'Patterns', 'Gotchas', 'Context'] as const;
@@ -49,6 +50,7 @@ export function mergeIntoTopicFiles(
   nuggets: MergeNugget[],
   memoryDir: string,
   sessionId: string,
+  topicSummaries?: TopicSummaryMap,
 ): MergeResult {
   const result: MergeResult = {
     topicsUpdated: [],
@@ -86,6 +88,7 @@ export function mergeIntoTopicFiles(
       topicSlug,
       sessionId,
       topicNuggets,
+      topicSummaries?.[topicSlug],
     );
 
     // Render body with fixed section ordering, empty sections omitted
@@ -211,6 +214,7 @@ function buildFrontmatter(
   topicSlug: string,
   sessionId: string,
   nuggets: MergeNugget[],
+  topicSummary?: { abstract: string; overview: string },
 ): TopicFrontmatter {
   // Sessions: append-only
   const sessions = existing?.sessions ? [...existing.sessions] : [];
@@ -239,6 +243,10 @@ function buildFrontmatter(
     updated: new Date().toISOString(),
     sessions,
     tags,
+    abstract: topicSummary?.abstract ?? existing?.abstract,
+    overview: topicSummary?.overview ?? existing?.overview,
+    access_count: existing?.access_count,
+    last_accessed: existing?.last_accessed,
   };
 }
 

@@ -16,12 +16,14 @@ import {
   type RelayDaemonAdapterConfig,
   type TranscriptAdapterConfig,
   type ForgeDbAdapterConfig,
+  type BatonAdapterConfig,
 } from './schemas.js';
 import { TrajectoryAdapter } from './implementations/trajectory-adapter.js';
 import { RelayJsonlAdapter } from './implementations/relay-jsonl-adapter.js';
 import { RelayDaemonAdapter } from './implementations/relay-daemon-adapter.js';
 import { TranscriptAdapter } from './implementations/transcript-adapter.js';
 import { ForgeDbAdapter } from './implementations/forge-db-adapter.js';
+import { BatonAdapter } from './implementations/baton-adapter.js';
 
 /**
  * Check if a value looks like a SessionAdapter (duck typing).
@@ -66,12 +68,12 @@ export function createAdapter(
 
   if (!schema) {
     throw new ValidationError(
-      `Unknown adapter type: '${adapterType}'. Expected one of: trail, relay, relay-daemon, transcript, forge`,
+      `Unknown adapter type: '${adapterType}'. Expected one of: trail, relay, relay-daemon, transcript, forge, baton`,
     );
   }
 
   // Validate config against the adapter's Zod schema
-  let validatedConfig: TrajectoryAdapterConfig | RelayAdapterConfig | RelayDaemonAdapterConfig | TranscriptAdapterConfig | ForgeDbAdapterConfig;
+  let validatedConfig: TrajectoryAdapterConfig | RelayAdapterConfig | RelayDaemonAdapterConfig | TranscriptAdapterConfig | ForgeDbAdapterConfig | BatonAdapterConfig;
   try {
     validatedConfig = schema.parse(config);
   } catch (err) {
@@ -96,5 +98,7 @@ export function createAdapter(
       return new TranscriptAdapter(validatedConfig as TranscriptAdapterConfig);
     case 'forge':
       return new ForgeDbAdapter(validatedConfig as ForgeDbAdapterConfig);
+    case 'baton':
+      return new BatonAdapter(validatedConfig as BatonAdapterConfig);
   }
 }

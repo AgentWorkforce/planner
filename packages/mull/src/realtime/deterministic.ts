@@ -13,7 +13,6 @@ import type {
   ForgeTrajectoryEvent,
   PlannerDecisionEvent,
   RelayMessageEvent,
-  TriggerResult,
 } from './types.js';
 
 // ---------------------------------------------------------------------------

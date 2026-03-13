@@ -310,11 +310,10 @@ function isStructuredContent(content: string): boolean {
  */
 export function matchTopics(
   entities: ExtractedEntity[],
-  facts: ExtractedFact[],
+  _facts: ExtractedFact[],
   existingTopics: string[],
 ): TopicMatch[] {
   const matches: TopicMatch[] = [];
-  const entityTexts = entities.map((e) => e.text.toLowerCase());
 
   // Match against existing topics
   for (const topicSlug of existingTopics) {
@@ -383,7 +382,7 @@ export function matchTopics(
  */
 export function filterTranscript(
   messages: SessionMessage[],
-  facts: ExtractedFact[],
+  _facts: ExtractedFact[],
   decisions?: SessionDecision[],
 ): FilteredExcerpt[] {
   const excerpts: FilteredExcerpt[] = [];

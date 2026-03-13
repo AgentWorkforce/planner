@@ -99,6 +99,26 @@ CREATE INDEX IF NOT EXISTS idx_forge_events_created_at
   ON forge_events (created_at)`;
 
 // ---------------------------------------------------------------------------
+// Batons — phase handoff records
+// ---------------------------------------------------------------------------
+
+const CREATE_BATONS = `
+CREATE TABLE IF NOT EXISTS batons (
+  id         TEXT NOT NULL PRIMARY KEY,
+  run_id     TEXT NOT NULL,
+  phase_id   TEXT NOT NULL,
+  step_id    TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (run_id, phase_id),
+  FOREIGN KEY (run_id) REFERENCES forge_runs (id)
+)`;
+
+const CREATE_BATONS_IDX_RUN = `
+CREATE INDEX IF NOT EXISTS idx_batons_run
+  ON batons (run_id)`;
+
+// ---------------------------------------------------------------------------
 // Relay adapter tables (mirrors WorkflowRunRow / WorkflowStepRow shapes)
 // ---------------------------------------------------------------------------
 
@@ -163,6 +183,8 @@ const DDL_STATEMENTS = [
   CREATE_FORGE_EVENTS,
   CREATE_FORGE_EVENTS_IDX_RUN,
   CREATE_FORGE_EVENTS_IDX_CREATED,
+  CREATE_BATONS,
+  CREATE_BATONS_IDX_RUN,
   CREATE_WORKFLOW_RUNS,
   CREATE_WORKFLOW_RUNS_IDX_STATUS,
   CREATE_WORKFLOW_STEPS,

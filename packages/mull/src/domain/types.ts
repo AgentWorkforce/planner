@@ -197,9 +197,20 @@ export interface Nugget {
   };
 }
 
+/** LLM-generated abstract + overview for a topic, produced alongside nuggets. */
+export interface TopicAbstract {
+  abstract: string;
+  overview: string;
+}
+
+/** Map of topic slug → generated abstract/overview. */
+export type TopicSummaryMap = Record<string, TopicAbstract>;
+
 export interface SynthesisResult {
   nuggets: Nugget[];
   errors: PipelineError[];
+  /** Per-topic abstract + overview generated alongside nuggets. */
+  topicSummaries?: TopicSummaryMap;
 }
 
 export interface TopicMergeResult {
@@ -349,7 +360,7 @@ export interface TopicStore {
   listTopics(memoryDir: string): Promise<string[]>;
 
   /** Merge nuggets into topic files. Returns per-file stats. */
-  merge(nuggets: Nugget[], memoryDir: string, sessionId: string): Promise<TopicMergeResult>;
+  merge(nuggets: Nugget[], memoryDir: string, sessionId: string, topicSummaries?: TopicSummaryMap): Promise<TopicMergeResult>;
 
   /** Rebuild the table of contents index file. */
   rebuildToc(memoryDir: string): Promise<void>;

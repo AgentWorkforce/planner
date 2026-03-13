@@ -8,6 +8,20 @@
 
 import type { ForgeNextEvent, ForgeNextRun, Gate, Question } from '../types.js';
 
+// ---------------------------------------------------------------------------
+// BatonRecord — persisted handoff between execution phases
+// ---------------------------------------------------------------------------
+
+export interface BatonRecord {
+  id: string;
+  run_id: string;
+  phase_id: string;
+  step_id: string;
+  /** JSON-serialised StepBaton */
+  content: string;
+  created_at: string;
+}
+
 export interface ForgeNextStorage {
   // ---------------------------------------------------------------------------
   // Runs
@@ -75,6 +89,19 @@ export interface ForgeNextStorage {
    * If `since` is provided, return only events with created_at strictly after that timestamp.
    */
   listEventsByRun(runId: string, since?: string): ForgeNextEvent[];
+
+  // ---------------------------------------------------------------------------
+  // Batons
+  // ---------------------------------------------------------------------------
+
+  /** Persist a new baton record and return it. Replaces any existing baton for the same (run_id, phase_id). */
+  createBaton(baton: BatonRecord): BatonRecord;
+
+  /** Return the baton for a specific run and phase, or null if not found. */
+  getBaton(runId: string, phaseId: string): BatonRecord | null;
+
+  /** Return all batons for a run, ordered by created_at ascending. */
+  listBatonsByRun(runId: string): BatonRecord[];
 
   // ---------------------------------------------------------------------------
   // Lifecycle

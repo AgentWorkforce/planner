@@ -8,7 +8,7 @@
 
 import { BaseSqliteStorage } from '@plannr/storage-base';
 import { initSchema } from './schema.js';
-import type { ForgeNextStorage } from './interface.js';
+import type { BatonRecord, ForgeNextStorage } from './interface.js';
 import type { ForgeNextEvent, ForgeNextRun, Gate, Question } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +57,15 @@ interface EventRow {
   run_id: string;
   event_type: string;
   payload: string;
+  created_at: string;
+}
+
+interface BatonRow {
+  id: string;
+  run_id: string;
+  phase_id: string;
+  step_id: string;
+  content: string;
   created_at: string;
 }
 
@@ -113,6 +122,17 @@ function rowToEvent(row: EventRow): ForgeNextEvent {
     run_id: row.run_id,
     event_type: row.event_type,
     payload: row.payload,
+    created_at: row.created_at,
+  };
+}
+
+function rowToBaton(row: BatonRow): BatonRecord {
+  return {
+    id: row.id,
+    run_id: row.run_id,
+    phase_id: row.phase_id,
+    step_id: row.step_id,
+    content: row.content,
     created_at: row.created_at,
   };
 }
@@ -307,5 +327,42 @@ export class SqliteForgeNextStorage extends BaseSqliteStorage implements ForgeNe
     }
 
     return rows.map(rowToEvent);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Batons
+  // ---------------------------------------------------------------------------
+
+  createBaton(baton: BatonRecord): BatonRecord {
+    this.db
+      .prepare<BatonRow>(
+        `INSERT INTO batons (id, run_id, phase_id, step_id, content, created_at)
+         VALUES (@id, @run_id, @phase_id, @step_id, @content, @created_at)
+         ON CONFLICT (run_id, phase_id) DO UPDATE SET
+           id         = excluded.id,
+           step_id    = excluded.step_id,
+           content    = excluded.content,
+           created_at = excluded.created_at`,
+      )
+      .run(baton as unknown as BatonRow);
+    return baton;
+  }
+
+  getBaton(runId: string, phaseId: string): BatonRecord | null {
+    const row = this.db
+      .prepare<[string, string], BatonRow>(
+        `SELECT * FROM batons WHERE run_id = ? AND phase_id = ?`,
+      )
+      .get(runId, phaseId);
+    return row ? rowToBaton(row) : null;
+  }
+
+  listBatonsByRun(runId: string): BatonRecord[] {
+    const rows = this.db
+      .prepare<[string], BatonRow>(
+        `SELECT * FROM batons WHERE run_id = ? ORDER BY created_at ASC`,
+      )
+      .all(runId);
+    return rows.map(rowToBaton);
   }
 }

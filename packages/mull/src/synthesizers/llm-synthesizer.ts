@@ -8,6 +8,7 @@ import type {
   Nugget,
   NuggetCategory,
   PipelineError,
+  TopicSummaryMap,
 } from '../domain/types.js';
 import { extractTrailDecisions } from '../pipeline/extract-trail-decisions.js';
 
@@ -32,7 +33,7 @@ export class LlmSynthesizer implements NuggetSynthesizer {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
-  async synthesize(preExtract: PreExtract, config: MullConfig): Promise<SynthesisResult> {
+  async synthesize(preExtract: PreExtract, _config: MullConfig): Promise<SynthesisResult> {
     const errors: PipelineError[] = [];
 
     // 1. Extract trail decisions first (deterministic, no LLM cost)
@@ -48,9 +49,12 @@ export class LlmSynthesizer implements NuggetSynthesizer {
 
     // 4. Call claude -p via subprocess
     let llmNuggets: Nugget[] = [];
+    let topicSummaries: TopicSummaryMap | undefined;
     try {
       const result = await this.runCli(prompt);
-      llmNuggets = filterHollowNuggets(parseNuggetResponse(result, preExtract));
+      const parsed = parseSynthesisResponse(result, preExtract);
+      llmNuggets = filterHollowNuggets(parsed.nuggets);
+      topicSummaries = parsed.topicSummaries;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       errors.push({
@@ -61,7 +65,7 @@ export class LlmSynthesizer implements NuggetSynthesizer {
       // Fall back to trail decisions only
     }
 
-    return { nuggets: [...trailNuggets, ...llmNuggets], errors };
+    return { nuggets: [...trailNuggets, ...llmNuggets], errors, topicSummaries };
   }
 
   private async runCli(prompt: string): Promise<string> {
@@ -231,52 +235,142 @@ NEVER extract:
 - What code does (read the code for that)
 - Process narration ("first we did X, then Y")
 
-Output ONLY a valid JSON array (no markdown, no explanation):
-[{
-  "slug": "example-slug",
-  "category": "Decisions",
-  "content": "Chose X over Y for Z reason.",
-  "topic": "domain-area-slug",
-  "confidence": 0.9,
-  "why": "The actual reasoning — not 'transcript shows'.",
-  "caused": ["related-slug"],
-  "when": "2026-02-08",
-  "tags": ["tag1", "tag2"]
-}]`);
+Output ONLY a valid JSON object (no markdown, no explanation):
+{
+  "nuggets": [{
+    "slug": "example-slug",
+    "category": "Decisions",
+    "content": "Chose X over Y for Z reason.",
+    "topic": "domain-area-slug",
+    "confidence": 0.9,
+    "why": "The actual reasoning — not 'transcript shows'.",
+    "caused": ["related-slug"],
+    "when": "2026-02-08",
+    "tags": ["tag1", "tag2"]
+  }],
+  "topic_summaries": {
+    "domain-area-slug": {
+      "abstract": "One sentence — what this topic area is about.",
+      "overview": "One paragraph (~3-5 sentences). Summarize the key decisions, constraints, and patterns in this topic area. Written for an agent that needs working context, not full detail."
+    }
+  }
+}
+
+The "topic_summaries" field is REQUIRED. For each unique topic slug in your nuggets, provide an abstract (1 sentence, max 150 chars) and overview (1 paragraph, max 500 chars). If updating existing topics, write summaries that incorporate both old and new knowledge.`);
 
   return lines.join('\n');
 }
 
-function parseNuggetResponse(output: string, preExtract: PreExtract): Nugget[] {
-  // Multi-layer parsing: envelope → result → code blocks → brace extraction
-  let rawArray: unknown[] | null = null;
+interface ParsedSynthesis {
+  nuggets: Nugget[];
+  topicSummaries?: TopicSummaryMap;
+}
+
+function parseSynthesisResponse(output: string, preExtract: PreExtract): ParsedSynthesis {
+  // Multi-layer parsing: envelope → wrapper object → bare array (backward compat)
+  let rawObj: Record<string, unknown> | null = null;
 
   // Layer 1: Try claude --output-format json envelope
+  const unwrapped = unwrapEnvelope(output);
+
+  // Layer 2: Try parsing as wrapper object { nuggets: [...], topic_summaries: {...} }
+  rawObj = tryParseWrapperObject(unwrapped);
+
+  if (rawObj) {
+    const nuggets = convertRawNuggets(
+      Array.isArray(rawObj.nuggets) ? rawObj.nuggets : [],
+      preExtract,
+    );
+    const topicSummaries = parseTopicSummaries(rawObj.topic_summaries);
+    return { nuggets, topicSummaries };
+  }
+
+  // Layer 3: Backward compat — bare array of nuggets (no topic summaries)
+  const rawArray = tryParseJsonArray(unwrapped);
+  if (rawArray && rawArray.length > 0) {
+    return { nuggets: convertRawNuggets(rawArray, preExtract) };
+  }
+
+  return { nuggets: [] };
+}
+
+/** Unwrap claude CLI --output-format json envelope if present. */
+function unwrapEnvelope(output: string): string {
   try {
     const envelope = JSON.parse(output);
-    if (envelope && typeof envelope === 'object') {
-      const content = 'result' in envelope ? envelope.result : envelope;
-      if (typeof content === 'string') {
-        rawArray = tryParseJsonArray(content);
-      } else if (Array.isArray(content)) {
-        rawArray = content;
-      }
+    if (envelope && typeof envelope === 'object' && 'result' in envelope) {
+      return typeof envelope.result === 'string' ? envelope.result : JSON.stringify(envelope.result);
     }
   } catch {
     // Not an envelope
   }
+  return output;
+}
 
-  // Layer 2: Try direct parse
-  if (!rawArray) {
-    rawArray = tryParseJsonArray(output);
+/** Try parsing as wrapper object with nuggets + topic_summaries fields. */
+function tryParseWrapperObject(str: string): Record<string, unknown> | null {
+  // Direct parse
+  const parsed = tryParseJson(str);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'nuggets' in parsed) {
+    return parsed as Record<string, unknown>;
   }
 
-  if (!rawArray || rawArray.length === 0) {
-    return [];
+  // Extract from code blocks
+  const codeBlockMatch = str.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch?.[1]) {
+    const inner = tryParseJson(codeBlockMatch[1].trim());
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && 'nuggets' in inner) {
+      return inner as Record<string, unknown>;
+    }
   }
 
-  // Convert raw objects to Nuggets
-  return rawArray
+  // Find first { ... } at top level
+  const braceStart = str.indexOf('{');
+  const braceEnd = str.lastIndexOf('}');
+  if (braceStart !== -1 && braceEnd > braceStart) {
+    const inner = tryParseJson(str.slice(braceStart, braceEnd + 1));
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && 'nuggets' in inner) {
+      return inner as Record<string, unknown>;
+    }
+  }
+
+  return null;
+}
+
+function tryParseJson(str: string): unknown | null {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+/** Extract validated TopicSummaryMap from raw topic_summaries field. */
+function parseTopicSummaries(raw: unknown): TopicSummaryMap | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+
+  const result: TopicSummaryMap = {};
+  let hasEntries = false;
+
+  for (const [slug, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const v = value as Record<string, unknown>;
+      if (typeof v.abstract === 'string' && typeof v.overview === 'string') {
+        result[slug] = {
+          abstract: v.abstract.slice(0, 200),
+          overview: v.overview.slice(0, 600),
+        };
+        hasEntries = true;
+      }
+    }
+  }
+
+  return hasEntries ? result : undefined;
+}
+
+/** Convert raw JSON items to typed Nugget array. */
+function convertRawNuggets(items: unknown[], preExtract: PreExtract): Nugget[] {
+  return items
     .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
     .map(item => ({
       id: crypto.randomUUID(),
@@ -291,7 +385,7 @@ function parseNuggetResponse(output: string, preExtract: PreExtract): Nugget[] {
       tags: Array.isArray(item.tags) ? item.tags.map(String) : undefined,
       source: { sessionRef: preExtract.sessionRef, messageIds: [] },
     }))
-    .filter(n => n.content.length > 0);  // Filter out empty nuggets
+    .filter(n => n.content.length > 0);
 }
 
 function tryParseJsonArray(str: string): unknown[] | null {

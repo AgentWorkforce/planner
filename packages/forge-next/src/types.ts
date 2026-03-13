@@ -137,6 +137,43 @@ export const ForgeNextEventSchema = z.object({
 export type ForgeNextEvent = z.infer<typeof ForgeNextEventSchema>;
 
 // ---------------------------------------------------------------------------
+// StepBaton — structured handoff between execution phases
+// ---------------------------------------------------------------------------
+
+export const StepBatonSchema = z.object({
+  run_id: z.string(),
+  phase_id: z.string(),
+  completed_steps: z.array(z.object({
+    step_id: z.string(),
+    title: z.string(),
+    summary: z.string().max(200),
+  })),
+  artifacts: z.array(z.object({
+    path: z.string(),
+    description: z.string().max(100),
+  })).max(20),
+  gotchas: z.array(z.string().max(150)).max(5),
+  decisions: z.array(z.object({
+    what: z.string().max(150),
+    why: z.string().max(150),
+  })).max(5),
+  state: z.string().max(300),
+  git_ref: z.string().optional(),
+});
+
+export type StepBaton = z.infer<typeof StepBatonSchema>;
+
+/** Compiled representation of a phase boundary within a workflow run. */
+export interface CompiledPhase {
+  phase_id: string;
+  step_ids: string[];
+  boundary_reason?: 'scope_change' | 'gate' | 'role_change' | 'step_count_cap';
+  /** The phase_id that must produce a baton before this phase can start. */
+  requires_baton_from?: string;
+  produces_baton: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Run monitoring event payloads
 // ---------------------------------------------------------------------------
 
@@ -236,3 +273,46 @@ export const ReconciliationVersionDriftEventSchema = z.object({
 });
 
 export type ReconciliationVersionDriftEvent = z.infer<typeof ReconciliationVersionDriftEventSchema>;
+
+// ---------------------------------------------------------------------------
+// Topic injection (knowledge flywheel)
+// ---------------------------------------------------------------------------
+
+/** Summary of a mull topic file relevant to a step. */
+export interface TopicSummary {
+  slug: string;
+  /** L1 overview — purpose-written summary for context injection. Falls back to body excerpt. */
+  content: string;
+}
+
+/** Retrieval trace entry for a single candidate topic. */
+export interface TopicRetrievalCandidate {
+  slug: string;
+  keyword_score: number;
+  hotness_score: number;
+  combined_score: number;
+  selected: boolean;
+  reason: 'selected' | 'below_threshold' | 'budget_exceeded';
+}
+
+/** Full retrieval trace for observability and debugging. */
+export interface TopicRetrievalTrace {
+  query_keywords: string[];
+  candidates_considered: number;
+  results: TopicRetrievalCandidate[];
+}
+
+/** Result from TopicProvider including optional retrieval trace. */
+export interface TopicRetrievalResult {
+  topics: TopicSummary[];
+  trace?: TopicRetrievalTrace;
+}
+
+/**
+ * Provider for mull topic files. Implemented by the server layer
+ * to bridge forge-next and mull's knowledge store.
+ */
+export interface TopicProvider {
+  /** Find topic files relevant to the given keywords. */
+  findRelevant(keywords: string[], maxTopics?: number): Promise<TopicRetrievalResult>;
+}

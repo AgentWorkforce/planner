@@ -48,6 +48,13 @@ export const ForgeDbAdapterConfigSchema = z.object({
 });
 export type ForgeDbAdapterConfig = z.infer<typeof ForgeDbAdapterConfigSchema>;
 
+/** Config for BatonAdapter - reads phase handoff documents from forge SQLite database. */
+export const BatonAdapterConfigSchema = z.object({
+  /** Path to the forge SQLite database file. */
+  dbPath: z.string().min(1, 'dbPath is required'),
+});
+export type BatonAdapterConfig = z.infer<typeof BatonAdapterConfigSchema>;
+
 /** Map of adapter type to its config schema. */
 export const adapterConfigSchemas = {
   trail: TrajectoryAdapterConfigSchema,
@@ -55,4 +62,5 @@ export const adapterConfigSchemas = {
   'relay-daemon': RelayDaemonAdapterConfigSchema,
   transcript: TranscriptAdapterConfigSchema,
   forge: ForgeDbAdapterConfigSchema,
+  baton: BatonAdapterConfigSchema,
 } as const;

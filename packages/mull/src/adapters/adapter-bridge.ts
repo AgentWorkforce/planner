@@ -38,7 +38,7 @@ import { getCursor, setCursor } from './cursor.js';
  */
 export const ADAPTER_REF_ROUTING: Record<string, ReadonlySet<string>> = {
   plan_id: new Set(['trail']),
-  run_id: new Set(['relay', 'relay-daemon', 'transcript', 'forge']),
+  run_id: new Set(['relay', 'relay-daemon', 'transcript', 'forge', 'baton']),
   channel: new Set(['relay', 'relay-daemon']),
 };
 
@@ -53,6 +53,7 @@ export const ADAPTER_SESSION_TYPE: Record<string, string> = {
   relay: 'channel',
   'relay-daemon': 'channel',
   transcript: 'run_id',
+  baton: 'run_id',
 };
 
 // ---------------------------------------------------------------------------

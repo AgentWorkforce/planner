@@ -5,7 +5,7 @@
  * gates, questions, and status aggregation.
  */
 
-export { compilePlan } from './compiler.js';
+export { compilePlan, enrichWithTopics, extractStepKeywords } from './compiler.js';
 export { ModelSelector } from './model-selector.js';
 export { GateManager } from './gate-manager.js';
 export { QuestionManager } from './question-manager.js';
@@ -33,6 +33,11 @@ export type {
   ReconciliationPlanRetractedEvent,
   ReconciliationStallDetectedEvent,
   ReconciliationVersionDriftEvent,
+  TopicSummary,
+  TopicProvider,
+  TopicRetrievalResult,
+  TopicRetrievalTrace,
+  TopicRetrievalCandidate,
 } from './types.js';
 
 // Re-export storage interface

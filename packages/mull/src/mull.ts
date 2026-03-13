@@ -10,7 +10,6 @@ import type {
   SessionRef,
   MullOptions,
   MullResult,
-  MullAdapter,
   MullConfig,
   Nugget,
   NuggetSynthesizer,
@@ -225,7 +224,7 @@ export async function mull(
 
   let mergeResult;
   try {
-    mergeResult = await topicStore.merge(nuggets, config.memoryDir, sessionRef.id);
+    mergeResult = await topicStore.merge(nuggets, config.memoryDir, sessionRef.id, synthesisResult.topicSummaries);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

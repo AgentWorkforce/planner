@@ -9,7 +9,7 @@
  */
 
 import type { TriggerManager } from './trigger-manager.js';
-import type { ForgeTrajectoryEvent, TriggerConfig } from './types.js';
+import type { ForgeTrajectoryEvent } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Configuration

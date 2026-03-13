@@ -9,6 +9,7 @@
 
 import type { RelayYamlConfig, AgentDefinition, WorkflowStep } from '@agent-relay/sdk/workflows';
 import type { ModelSelector } from './model-selector.js';
+import type { StepBaton, CompiledPhase, TopicSummary } from './types.js';
 
 // ============================================
 // Minimal inline types
@@ -94,6 +95,8 @@ interface ForgeConfig {
 
 export interface CompilationResult {
   config: RelayYamlConfig;
+  /** Phase boundaries detected in the compiled step sequence */
+  phases: CompiledPhase[];
   /** Acceptance criteria per step_id, for post-execution scoring */
   stepCriteria: Map<string, AcceptanceCriterion[]>;
   /** Static recovery hints per step_id, for retry context */
@@ -130,8 +133,23 @@ export function compilePlan(
   // Only compile steps that are not skipped
   const activeSteps = steps.filter(s => !skippedIds.has(s.step_id));
 
+  const phases = detectPhases(activeSteps);
+
+  // Build step → phase lookup for baton injection
+  const stepPhaseMap = new Map<string, { phaseId: string; isTerminal: boolean }>();
+  for (const phase of phases) {
+    const lastStepId = phase.step_ids[phase.step_ids.length - 1];
+    for (const stepId of phase.step_ids) {
+      stepPhaseMap.set(stepId, {
+        phaseId: phase.phase_id,
+        // Only inject handoff instructions for terminal steps of phases that produce batons
+        isTerminal: stepId === lastStepId && phase.produces_baton,
+      });
+    }
+  }
+
   const agentDefinitions = buildAgentDefinitions(activeSteps, mergedConfig, modelSelector);
-  const workflowSteps = buildWorkflowSteps(activeSteps, mergedConfig, skippedIds);
+  const workflowSteps = buildWorkflowSteps(activeSteps, mergedConfig, skippedIds, stepPhaseMap);
 
   // Adaptive concurrency: if the user didn't explicitly set a value, derive from
   // plan complexity profile. Research (arXiv:2512.08296) shows that complex/
@@ -177,7 +195,91 @@ export function compilePlan(
     }
   }
 
-  return { config: relayYamlConfig, stepCriteria, stepRetryHints, stepMergeStrategies };
+  return { config: relayYamlConfig, phases, stepCriteria, stepRetryHints, stepMergeStrategies };
+}
+
+// ============================================
+// Phase Detection
+// ============================================
+
+/**
+ * Detect phase boundaries in a sequence of plan steps.
+ *
+ * Heuristics (applied in order, first match triggers boundary):
+ * 1. Scope change: consecutive steps with different scope values
+ * 2. Gate step: any step with gate.type === 'human_approval' ends a phase
+ * 3. Role change: consecutive steps with different owner_role
+ * 4. Step count cap: every maxStepsPerPhase steps (default 5)
+ *
+ * Steps are processed in input order (assumed DAG-topological from planner).
+ */
+export function detectPhases(
+  steps: PlanStep[],
+  maxStepsPerPhase = 5,
+): CompiledPhase[] {
+  if (steps.length === 0) return [];
+
+  const phases: CompiledPhase[] = [];
+  let currentStepIds: string[] = [];
+  let currentScope: string | undefined;
+  let currentRole: string | undefined;
+  let phaseCounter = 1;
+
+  const flushPhase = (boundaryReason?: CompiledPhase['boundary_reason']) => {
+    if (currentStepIds.length === 0) return;
+
+    const phaseId = `phase-${phaseCounter}`;
+    const prevPhaseId = phaseCounter > 1 ? `phase-${phaseCounter - 1}` : undefined;
+
+    phases.push({
+      phase_id: phaseId,
+      step_ids: [...currentStepIds],
+      boundary_reason: boundaryReason,
+      requires_baton_from: prevPhaseId,
+      produces_baton: true,
+    });
+
+    phaseCounter++;
+    currentStepIds = [];
+  };
+
+  for (const step of steps) {
+    const stepScope = step.scope;
+    const stepRole = step.owner_role;
+
+    // Check boundary conditions only after at least one step is in the current phase
+    if (currentStepIds.length > 0) {
+      if (stepScope !== currentScope && (currentScope !== undefined || stepScope !== undefined)) {
+        // 1. Scope change (including transitions to/from undefined)
+        flushPhase('scope_change');
+      } else if (stepRole !== currentRole && (currentRole !== undefined || stepRole !== undefined)) {
+        // 3. Role change (including transitions to/from undefined)
+        flushPhase('role_change');
+      } else if (currentStepIds.length >= maxStepsPerPhase) {
+        // 4. Step count cap
+        flushPhase('step_count_cap');
+      }
+    }
+
+    currentStepIds.push(step.step_id);
+    currentScope = stepScope;
+    currentRole = stepRole;
+
+    // 2. Gate ends a phase (after adding the gated step to the current phase)
+    if (step.gate?.type === 'human_approval') {
+      flushPhase('gate');
+    }
+  }
+
+  // Flush any remaining steps as the final phase
+  flushPhase();
+
+  // Last phase doesn't need to produce a baton — no subsequent phase will read it
+  if (phases.length > 0) {
+    phases[phases.length - 1].produces_baton = false;
+  }
+
+  return phases;
 }
 
 // ============================================
@@ -244,7 +346,8 @@ function buildAgentDefinitions(
 function buildWorkflowSteps(
   activeSteps: PlanStep[],
   config: ForgeConfig,
-  skippedIds: Set<string>
+  skippedIds: Set<string>,
+  stepPhaseMap: Map<string, { phaseId: string; isTerminal: boolean }>,
 ): WorkflowStep[] {
   const timeoutMs = config.execution_policy?.max_timeout_ms;
   const retries = config.execution_policy?.retry_count;
@@ -284,10 +387,15 @@ function buildWorkflowSteps(
       ? [`${step.step_id}:pre`]
       : resolvedDeps;
 
+    const phaseEntry = stepPhaseMap.get(step.step_id);
+    const phaseInfo = phaseEntry
+      ? { isPhaseTerminal: phaseEntry.isTerminal, phaseId: phaseEntry.phaseId }
+      : undefined;
+
     const workflowStep: WorkflowStep = {
       name: step.step_id,
       agent: resolveAgentName(step.owner_role),
-      task: composeTask(step, contextSteps),
+      task: composeTask(step, contextSteps, phaseInfo),
       dependsOn: mainDeps,
     };
 
@@ -442,8 +550,16 @@ function resolveModel(
  * acceptance criteria. For large plans (>15 steps), appends a Plan Context
  * section using a pyramid summarization strategy: direct dependencies with
  * acceptance criteria, then other steps grouped by scope.
+ *
+ * When `phaseInfo.isPhaseTerminal` is true, baton writing instructions are
+ * injected before the retry awareness section so the last step in a phase
+ * produces a structured handoff for the next phase.
  */
-function composeTask(step: PlanStep, allSteps?: PlanStep[]): string {
+function composeTask(
+  step: PlanStep,
+  allSteps?: PlanStep[],
+  phaseInfo?: { isPhaseTerminal: boolean; phaseId: string },
+): string {
   const parts: string[] = [`## ${step.title}`];
 
   if (step.description) {
@@ -466,6 +582,25 @@ function composeTask(step: PlanStep, allSteps?: PlanStep[]): string {
 
   if (allSteps !== undefined && allSteps.length > 15) {
     parts.push(composePlanContext(step, allSteps));
+  }
+
+  // Baton handoff: injected only for the terminal step of a phase
+  if (phaseInfo?.isPhaseTerminal) {
+    parts.push(
+      `### Handoff\n\n` +
+      `You are the last step in this execution phase. When you complete your work, ` +
+      `write a handoff file to \`.forge/batons/${phaseInfo.phaseId}.json\` containing:\n\n` +
+      `\`\`\`json\n` +
+      `{\n` +
+      `  "completed_steps": [{"step_id": "...", "title": "...", "summary": "1-sentence summary"}],\n` +
+      `  "artifacts": [{"path": "file/path", "description": "what this file does"}],\n` +
+      `  "gotchas": ["things the next agent needs to know"],\n` +
+      `  "decisions": [{"what": "choice made", "why": "reasoning"}],\n` +
+      `  "state": "current state of the codebase relevant to next steps"\n` +
+      `}\n` +
+      `\`\`\`\n\n` +
+      `Keep it concise — under 40 lines. The next agent starts fresh; this is all they'll know.`,
+    );
   }
 
   // Retry-awareness: tell agent to check for prior failure context on disk
@@ -592,4 +727,163 @@ function resolveAgentName(ownerRole: string | undefined): string {
   if (!ownerRole) return 'default-worker';
   const sanitized = sanitizeAgentName(ownerRole);
   return sanitized || 'default-worker';
+}
+
+// ============================================
+// Baton context formatting
+// ============================================
+
+/**
+ * Format a previous phase's baton as context for the current phase's first step.
+ *
+ * Returns a markdown block summarising what the prior phase accomplished,
+ * which files it produced, any gotchas, and key decisions made. Returns an
+ * empty string if the baton carries no meaningful content.
+ */
+export function formatBatonContext(baton: StepBaton): string {
+  // Check if baton has any meaningful content before building the section
+  const hasContent = baton.completed_steps.length > 0
+    || baton.artifacts.length > 0
+    || baton.gotchas.length > 0
+    || baton.decisions.length > 0
+    || baton.state;
+
+  if (!hasContent) return '';
+
+  const parts: string[] = ['### Previous Phase Handoff\n'];
+
+  if (baton.completed_steps.length > 0) {
+    parts.push('**Completed:**');
+    for (const step of baton.completed_steps) {
+      parts.push(`- ${step.title}: ${step.summary}`);
+    }
+    parts.push('');
+  }
+
+  if (baton.artifacts.length > 0) {
+    parts.push('**Files created/modified:**');
+    for (const artifact of baton.artifacts) {
+      parts.push(`- \`${artifact.path}\` — ${artifact.description}`);
+    }
+    parts.push('');
+  }
+
+  if (baton.gotchas.length > 0) {
+    parts.push('**Watch out for:**');
+    for (const gotcha of baton.gotchas) {
+      parts.push(`- ${gotcha}`);
+    }
+    parts.push('');
+  }
+
+  if (baton.decisions.length > 0) {
+    parts.push('**Decisions made:**');
+    for (const decision of baton.decisions) {
+      parts.push(`- ${decision.what} — ${decision.why}`);
+    }
+    parts.push('');
+  }
+
+  if (baton.state) {
+    parts.push(`**Current state:** ${baton.state}`);
+  }
+
+  return parts.join('\n');
+}
+
+// ============================================
+// Topic injection (knowledge flywheel)
+// ============================================
+
+/** Max tokens of topic content to inject per step. */
+const TOPIC_INJECTION_BUDGET = 1000;
+const TOPIC_CHARS_PER_TOKEN = 3.5;
+const TOPIC_CHAR_BUDGET = TOPIC_INJECTION_BUDGET * TOPIC_CHARS_PER_TOKEN;
+
+/**
+ * Format topic summaries as a markdown section for injection into a step task.
+ * Respects the token budget — truncates if necessary.
+ */
+function formatTopicContext(topics: TopicSummary[]): string {
+  if (topics.length === 0) return '';
+
+  const parts: string[] = [
+    '### Prior Knowledge\n',
+    'Relevant insights from previous work:\n',
+  ];
+
+  let charCount = parts.join('').length;
+
+  for (const topic of topics) {
+    const section = `**${topic.slug}**\n${topic.content}\n`;
+    if (charCount + section.length > TOPIC_CHAR_BUDGET) break;
+    parts.push(section);
+    charCount += section.length;
+  }
+
+  // If we only have the header and no topics fit, return empty
+  if (parts.length <= 2) return '';
+
+  return parts.join('\n');
+}
+
+/**
+ * Enrich compiled workflow step tasks with relevant topic file content.
+ * Called after compilePlan() with topic data fetched asynchronously.
+ *
+ * @param config - The compiled RelayYamlConfig to enrich
+ * @param topicsByStep - Map of step name → topic summaries to inject
+ * @returns A new config with enriched task descriptions
+ */
+export function enrichWithTopics(
+  config: RelayYamlConfig,
+  topicsByStep: Map<string, TopicSummary[]>,
+): RelayYamlConfig {
+  if (topicsByStep.size === 0) return config;
+  if (!config.workflows) return config;
+
+  // Deep clone workflows to avoid mutation
+  const enrichedWorkflows = config.workflows.map(workflow => ({
+    ...workflow,
+    steps: workflow.steps.map(step => {
+      const topics = topicsByStep.get(step.name);
+      if (!topics || topics.length === 0 || !step.task) return step;
+
+      const topicSection = formatTopicContext(topics);
+      if (!topicSection) return step;
+
+      return {
+        ...step,
+        task: step.task + '\n\n' + topicSection,
+      };
+    }),
+  }));
+
+  return {
+    ...config,
+    workflows: enrichedWorkflows,
+  };
+}
+
+/**
+ * Extract search keywords from a step for topic matching.
+ * Used by the server layer to query TopicProvider before calling enrichWithTopics.
+ */
+export function extractStepKeywords(step: PlanStep): string[] {
+  const text = [step.title, step.description ?? '', step.scope ?? ''].join(' ');
+
+  // Extract meaningful words (3+ chars, skip common stop words)
+  const stopWords = new Set([
+    'the', 'and', 'for', 'with', 'this', 'that', 'from', 'will', 'should',
+    'have', 'been', 'into', 'also', 'each', 'when', 'then', 'than', 'them',
+    'some', 'other', 'more', 'about', 'like', 'just', 'over', 'such', 'make',
+    'can', 'add', 'use', 'set', 'new', 'get', 'all', 'may', 'any',
+  ]);
+
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !stopWords.has(w))
+    .filter((w, i, arr) => arr.indexOf(w) === i); // deduplicate
 }

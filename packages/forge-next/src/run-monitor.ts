@@ -45,6 +45,26 @@ const DEFAULT_STALL_THRESHOLD = 300_000; // 5 min fallback
 const STALL_CHECK_INTERVAL_MS = 30_000;  // check every 30s
 
 // ---------------------------------------------------------------------------
+// Context budget constants
+// ---------------------------------------------------------------------------
+
+/** Conservative context budgets per model tier (tokens). Agents degrade before hitting window limits. */
+const CONTEXT_BUDGETS: Record<string, number> = {
+  haiku:  60_000,
+  sonnet: 80_000,
+  opus:  100_000,
+};
+
+const DEFAULT_CONTEXT_BUDGET = 80_000;
+
+/** Conservative chars-to-tokens ratio for estimation. */
+const CHARS_PER_TOKEN = 3.5;
+
+/** Utilization thresholds for pressure events. */
+const CONTEXT_PRESSURE_THRESHOLD = 0.7;
+const CONTEXT_BUDGET_EXCEEDED_THRESHOLD = 0.85;
+
+// ---------------------------------------------------------------------------
 // Internal tracking state
 // ---------------------------------------------------------------------------
 
@@ -61,6 +81,14 @@ interface StepTracking {
   stallWarned: boolean;
   /** Satisfaction score 0-100 from post-execution scoring, if available. */
   score?: number;
+  /** Estimated token count based on relay message sizes. */
+  estimatedTokens: number;
+  /** Context utilization 0.0 - 1.0 relative to model budget. */
+  contextUtilization: number;
+  /** Prevents duplicate pressure warnings for the same step. */
+  pressureWarned: boolean;
+  /** Prevents duplicate budget-exceeded warnings for the same step. */
+  budgetExceededWarned: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +112,8 @@ export interface RunMetricsPayload {
   steps_total: number;
   /** Average satisfaction score 0-100, averaged across scored steps. 0 if no steps scored. */
   avg_satisfaction: number;
+  /** Maximum context utilization across all active steps. */
+  max_context_utilization: number;
 }
 
 export interface StallWarningPayload {
@@ -142,6 +172,24 @@ export interface StepMergeStatusPayload {
   error?: string;
 }
 
+export interface ContextPressurePayload {
+  run_id: string;
+  step_name: string;
+  model: string;
+  estimated_tokens: number;
+  budget: number;
+  utilization: number;
+}
+
+export interface ContextBudgetExceededPayload {
+  run_id: string;
+  step_name: string;
+  model: string;
+  estimated_tokens: number;
+  budget: number;
+  utilization: number;
+}
+
 // ---------------------------------------------------------------------------
 // EventEmitter map
 // ---------------------------------------------------------------------------
@@ -155,6 +203,8 @@ interface RunMonitorEvents {
   'step:scored': [payload: StepScoredPayload];
   'step:retries-exhausted': [payload: StepRetriesExhaustedPayload];
   'step:merge-status': [payload: StepMergeStatusPayload];
+  'context:pressure': [payload: ContextPressurePayload];
+  'context:budget-exceeded': [payload: ContextBudgetExceededPayload];
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +381,10 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
           estimatedCostUsd: 0,
           durationMs: 0,
           stallWarned: false,
+          estimatedTokens: 0,
+          contextUtilization: 0,
+          pressureWarned: false,
+          budgetExceededWarned: false,
         });
         break;
       }
@@ -341,6 +395,18 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
 
         tracking.completedAt = Date.now();
         tracking.durationMs = tracking.completedAt - tracking.startedAt;
+
+        // Estimate tokens from step output size
+        if (event.output) {
+          tracking.estimatedTokens += Math.ceil(event.output.length / CHARS_PER_TOKEN);
+        }
+
+        // Update context utilization
+        const budget = CONTEXT_BUDGETS[tracking.model] ?? DEFAULT_CONTEXT_BUDGET;
+        tracking.contextUtilization = tracking.estimatedTokens / budget;
+
+        // Emit context pressure events
+        this._checkContextBudget(tracking);
 
         // Estimate cost: (duration_minutes * base_cost) * model_multiplier
         const durationMin = tracking.durationMs / 60_000;
@@ -477,6 +543,7 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
     let completed = 0;
     let totalScore = 0;
     let scoredCount = 0;
+    let maxUtilization = 0;
 
     for (const tracking of this.steps.values()) {
       totalCost += tracking.estimatedCostUsd;
@@ -484,6 +551,9 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
       if (tracking.score !== undefined) {
         totalScore += tracking.score;
         scoredCount++;
+      }
+      if (tracking.contextUtilization > maxUtilization) {
+        maxUtilization = tracking.contextUtilization;
       }
     }
 
@@ -497,7 +567,40 @@ export class RunMonitor extends EventEmitter<RunMonitorEvents> {
       steps_completed: completed,
       steps_total: this.totalSteps,
       avg_satisfaction: avgSatisfaction,
+      max_context_utilization: Math.round(maxUtilization * 100) / 100,
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Context budget tracking
+  // ---------------------------------------------------------------------------
+
+  private _checkContextBudget(tracking: StepTracking): void {
+    if (!this.forgeRunId) return;
+
+    const budget = CONTEXT_BUDGETS[tracking.model] ?? DEFAULT_CONTEXT_BUDGET;
+
+    if (tracking.contextUtilization >= CONTEXT_BUDGET_EXCEEDED_THRESHOLD && !tracking.budgetExceededWarned) {
+      tracking.budgetExceededWarned = true;
+      this.emit('context:budget-exceeded', {
+        run_id: this.forgeRunId,
+        step_name: tracking.stepName,
+        model: tracking.model,
+        estimated_tokens: tracking.estimatedTokens,
+        budget,
+        utilization: Math.round(tracking.contextUtilization * 100) / 100,
+      });
+    } else if (tracking.contextUtilization >= CONTEXT_PRESSURE_THRESHOLD && !tracking.pressureWarned) {
+      tracking.pressureWarned = true;
+      this.emit('context:pressure', {
+        run_id: this.forgeRunId,
+        step_name: tracking.stepName,
+        model: tracking.model,
+        estimated_tokens: tracking.estimatedTokens,
+        budget,
+        utilization: Math.round(tracking.contextUtilization * 100) / 100,
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------

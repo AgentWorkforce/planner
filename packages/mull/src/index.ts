@@ -32,6 +32,8 @@ export type {
   DryRunFact,
   DryRunTopicMatch,
   DryRunNugget,
+  TopicAbstract,
+  TopicSummaryMap,
 } from './domain/types.js';
 
 export { SessionRefSchema, AdapterConfigSchema, MullConfigSchema } from './domain/types.js';
@@ -64,6 +66,8 @@ export { LlmSynthesizer, type LlmSynthesizerOptions } from './synthesizers/llm-s
 
 // Default implementations
 export { FileTopicStore } from './defaults/topic-store.js';
+export { readTopicFile, type TopicFrontmatter, type TopicFile } from './memory/read-topic-file.js';
+export { computeHotness } from './memory/hotness.js';
 export { PassthroughSynthesizer } from './defaults/passthrough-synthesizer.js';
 
 // Real-time triggers

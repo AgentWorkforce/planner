@@ -17,6 +17,7 @@
     "@plannr/cultivate": "*",
     "@plannr/errors": "*",
     "@plannr/forge-next": "*",
+    "@plannr/mull": "*",
     "@plannr/portfolio-core": "*",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.6",

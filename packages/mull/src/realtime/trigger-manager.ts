@@ -19,7 +19,7 @@
 import { EventEmitter } from 'events';
 import { readdirSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
-import type { MullAdapter, MullConfig, SessionRef, MullResult } from '../domain/types.js';
+import type { MullAdapter, SessionRef, MullResult } from '../domain/types.js';
 import { mull } from '../mull.js';
 import type { MullPipelineOptions } from '../mull.js';
 import {

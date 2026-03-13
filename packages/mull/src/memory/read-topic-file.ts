@@ -7,6 +7,10 @@ export interface TopicFrontmatter {
   updated: string;
   sessions: string[];
   tags: string[];
+  abstract?: string;
+  overview?: string;
+  access_count?: number;
+  last_accessed?: string;
 }
 
 export interface Nugget {
@@ -75,6 +79,10 @@ function parseFrontmatter(lines: string[]): TopicFrontmatter {
       updated: typeof parsed.updated === 'string' ? parsed.updated : '',
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions.map(String) : [],
       tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
+      abstract: typeof parsed.abstract === 'string' ? parsed.abstract : undefined,
+      overview: typeof parsed.overview === 'string' ? parsed.overview : undefined,
+      access_count: typeof parsed.access_count === 'number' ? parsed.access_count : undefined,
+      last_accessed: typeof parsed.last_accessed === 'string' ? parsed.last_accessed : undefined,
     };
   } catch {
     return defaults;

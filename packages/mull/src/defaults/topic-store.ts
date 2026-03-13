@@ -1,5 +1,5 @@
 import * as fs from 'node:fs/promises';
-import type { TopicStore, Nugget, TopicMergeResult } from '../domain/types.js';
+import type { TopicStore, Nugget, TopicMergeResult, TopicSummaryMap } from '../domain/types.js';
 import { mergeIntoTopicFiles } from '../memory/merge-topic-files.js';
 import type { MergeNugget } from '../memory/merge-topic-files.js';
 import { rebuildTOC } from '../memory/rebuild-toc.js';
@@ -38,7 +38,7 @@ export class FileTopicStore implements TopicStore {
     }
   }
 
-  async merge(nuggets: Nugget[], memoryDir: string, sessionId: string): Promise<TopicMergeResult> {
+  async merge(nuggets: Nugget[], memoryDir: string, sessionId: string, topicSummaries?: TopicSummaryMap): Promise<TopicMergeResult> {
     await fs.mkdir(memoryDir, { recursive: true });
 
     // Convert domain Nugget[] → MergeNugget[]
@@ -71,8 +71,17 @@ export class FileTopicStore implements TopicStore {
       });
     }
 
+    // Slugify topic summary keys to match the slugified nugget topics
+    let slugifiedSummaries = topicSummaries;
+    if (topicSummaries) {
+      slugifiedSummaries = {};
+      for (const [key, value] of Object.entries(topicSummaries)) {
+        slugifiedSummaries[slugify(key)] = value;
+      }
+    }
+
     // Delegate to proper merge layer (synchronous)
-    const result = mergeIntoTopicFiles(mergeNuggets, memoryDir, sessionId);
+    const result = mergeIntoTopicFiles(mergeNuggets, memoryDir, sessionId, slugifiedSummaries);
 
     // Map MergeResult (string[]) → TopicMergeResult (numbers)
     return {

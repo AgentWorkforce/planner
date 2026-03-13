@@ -16,7 +16,7 @@ import type { WorkflowRunner, WorkflowEvent } from '@agent-relay/sdk/workflows';
 import type { ForgeNextStorage } from '../storage/interface.js';
 import type { GateManager } from '../gate-manager.js';
 import type { QuestionManager } from '../question-manager.js';
-import type { RunMonitor, StepMetricsPayload, RunMetricsPayload, StallWarningPayload, StepRetryContextPayload, StepFailedEnrichedPayload, StepScoredPayload, StepRetriesExhaustedPayload, StepMergeStatusPayload } from '../run-monitor.js';
+import type { RunMonitor, StepMetricsPayload, RunMetricsPayload, StallWarningPayload, StepRetryContextPayload, StepFailedEnrichedPayload, StepScoredPayload, StepRetriesExhaustedPayload, StepMergeStatusPayload, ContextPressurePayload, ContextBudgetExceededPayload } from '../run-monitor.js';
 import type { Gate, Question } from '../types.js';
 
 function routeParam(req: Request, key: string): string | null {
@@ -109,6 +109,7 @@ interface RunMetricsEvent {
   steps_completed: number;
   steps_total: number;
   avg_satisfaction: number;
+  max_context_utilization: number;
 }
 
 interface StallWarningEvent {
@@ -159,11 +160,32 @@ interface StepRetriesExhaustedEvent {
 
 interface StepMergeStatusEvent {
   type: 'step:merge-status';
+  run_id: string;
   step_name: string;
   status: string;
   branch?: string;
   target_branch?: string;
   error?: string;
+}
+
+interface ContextPressureEvent {
+  type: 'context:pressure';
+  run_id: string;
+  step_name: string;
+  model: string;
+  estimated_tokens: number;
+  budget: number;
+  utilization: number;
+}
+
+interface ContextBudgetExceededEvent {
+  type: 'context:budget-exceeded';
+  run_id: string;
+  step_name: string;
+  model: string;
+  estimated_tokens: number;
+  budget: number;
+  utilization: number;
 }
 
 type SsePayload =
@@ -180,7 +202,9 @@ type SsePayload =
   | StepFailedEnrichedEvent
   | StepScoredEvent
   | StepRetriesExhaustedEvent
-  | StepMergeStatusEvent;
+  | StepMergeStatusEvent
+  | ContextPressureEvent
+  | ContextBudgetExceededEvent;
 
 // ---------------------------------------------------------------------------
 // SSE utility
@@ -497,12 +521,23 @@ export function runEventsSSEHandler(deps: SseDeps) {
       if (payload.run_id !== runId) return;
       emitAndPersist({
         type: 'step:merge-status',
+        run_id: runId,
         step_name: payload.step_name,
         status: payload.status,
         branch: payload.branch,
         target_branch: payload.target_branch,
         error: payload.error,
       });
+    };
+
+    const onContextPressure = (data: ContextPressurePayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'context:pressure', ...data });
+    };
+
+    const onContextBudgetExceeded = (data: ContextBudgetExceededPayload): void => {
+      if (data.run_id !== runId) return;
+      emitAndPersist({ type: 'context:budget-exceeded', ...data });
     };
 
     deps.runMonitor.on('step:metrics', onStepMetrics);
@@ -513,6 +548,8 @@ export function runEventsSSEHandler(deps: SseDeps) {
     deps.runMonitor.on('step:scored', onStepScored);
     deps.runMonitor.on('step:retries-exhausted', onStepRetriesExhausted);
     deps.runMonitor.on('step:merge-status', onStepMergeStatus);
+    deps.runMonitor.on('context:pressure', onContextPressure);
+    deps.runMonitor.on('context:budget-exceeded', onContextBudgetExceeded);
 
     // ---------------------------------------------------------------------------
     // Keepalive ping every 15 seconds to prevent proxy/load-balancer timeouts
@@ -540,6 +577,8 @@ export function runEventsSSEHandler(deps: SseDeps) {
       deps.runMonitor.off('step:scored', onStepScored);
       deps.runMonitor.off('step:retries-exhausted', onStepRetriesExhausted);
       deps.runMonitor.off('step:merge-status', onStepMergeStatus);
+      deps.runMonitor.off('context:pressure', onContextPressure);
+      deps.runMonitor.off('context:budget-exceeded', onContextBudgetExceeded);
       clearInterval(keepalive);
     });
   };

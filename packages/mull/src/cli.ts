@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { resolveConfig } from './config/resolve.js';
 import { createAdapterFromFlags, resolveAdapters } from './config/resolve-adapters.js';
 import { mull } from './mull.js';
-import { normalizeSessionRef } from './routing/session-ref-router.js';
 import { formatDryRunOutput } from './cli/format-dry-run.js';
 import { toMullAdapters, ADAPTER_SESSION_TYPE } from './adapters/adapter-bridge.js';
 import type { MullConfig, AdapterConfig, SessionRef } from './domain/types.js';
