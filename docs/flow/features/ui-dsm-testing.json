@@ -1,0 +1,11 @@
+{
+  "feature_id": "ui-dsm-testing",
+  "title": "Visual Regression Testing",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "parent": "ui-design-system-migration",
+  "summary": {
+    "goal": "Visual Regression Testing"
+  }
+}

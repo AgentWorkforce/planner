@@ -1,0 +1,175 @@
+{
+  "feature_id": "mull-server-plugin",
+  "title": "Server Plugin Mount & REST API",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["mull-pipeline", "mull-planner-db-adapter", "mull-forge-db-adapter"],
+  "parent": "mull-integration",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement the Express plugin mount for the plannr server. Follows the existing pattern: export createMullService(config) factory function that returns { router, initialize(), shutdown(), getStorage() }. Server mounts router at /api/mull. Provides REST endpoints for triggering mull runs programmatically, checking memory status, and reading topic files via API. This enables other services (forge, planner-lead, UI) to trigger memory extraction and query memory state without CLI.",
+    "acceptance_criteria": [
+      { "id": "msp-ac1", "description": "createMullService(config) exports factory following the ServiceConfig/Service pattern: returns { router: Router, initialize(): Promise<void>, shutdown(): Promise<void>, getStorage() }" },
+      { "id": "msp-ac2", "description": "POST /api/mull/run accepts SessionRef discriminant: { type: 'planner-trajectory', planId } | { type: 'forge-run', runId } | { type: 'relay-session', sessionId } and routes to the correct adapter(s)" },
+      { "id": "msp-ac3", "description": "POST /api/mull/run returns MergeResult: { topicsUpdated, topicsCreated, nuggetsWritten }" },
+      { "id": "msp-ac4", "description": "POST /api/mull/run/all triggers mullAll for all unprocessed sessions across all configured adapters" },
+      { "id": "msp-ac5", "description": "GET /api/mull/status returns { topicCount, lastUpdated, recentSessions[], memoryDir, adapterStatus[] }" },
+      { "id": "msp-ac6", "description": "GET /api/mull/topics returns list of topic summaries from index.md frontmatter" },
+      { "id": "msp-ac7", "description": "GET /api/mull/topics/:slug returns full topic file content (parsed frontmatter + body)" },
+      { "id": "msp-ac8", "description": "Server initialization: createMullService configures adapters from server environment (DB paths from ServiceConfig, relay dir)" },
+      { "id": "msp-ac9", "description": "Error handling uses @plannr/errors (NotFoundError for missing topics, BadRequestError for invalid SessionRef)" },
+      { "id": "msp-ac10", "description": "Input validation uses Zod schemas for POST /run body and query params" },
+      { "id": "msp-ac11", "description": "Non-blocking: POST /run executes asynchronously, returns immediately with { jobId, status: 'accepted' } for long sessions" },
+      { "id": "msp-ac12", "description": "SessionRef routing: POST /run dispatches to correct adapter based on discriminant type field, returns BadRequestError for unknown types" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Follows exact same pattern as planner, ideation, forge router factories — but uses the Service interface pattern (router + initialize + shutdown + getStorage)",
+        "Server knows the DB paths (planner.db, forge.db, .agent-relay/) — passes them to createMullService in ServiceConfig",
+        "POST /run is the main action endpoint — SessionRef discriminant type determines which adapter handles the request",
+        "GET /topics endpoints enable UI or agents to query memory without filesystem access",
+        "Non-blocking is important: a full mull run with LLM call takes a few seconds — don't block the HTTP response",
+        "Could use SSE to stream mull progress (like usePlanEvents pattern) if UI needs real-time feedback"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "version": 1,
+    "scopes": ["mull", "server"],
+    "steps": [
+      {
+        "step_id": "msp-s1",
+        "title": "Define MullServiceConfig interface and Zod schemas",
+        "scope": "mull",
+        "description": "Create packages/mull/src/server/types.ts. Define:\n\n1) MullServiceConfig interface following the codebase ServiceConfig pattern:\n   { plannerDbPath: string, forgeDbPath: string, relayDataDir: string, memoryDir: string, includeUserTrajectory?: boolean, includePreferences?: boolean, relayMode?: 'jsonl' | 'sqlite' }\n\n2) Zod schemas for API validation:\n   - RunRequestSchema: discriminated union on 'type' field:\n     z.discriminatedUnion('type', [\n       z.object({ type: z.literal('planner-trajectory'), planId: z.string() }),\n       z.object({ type: z.literal('forge-run'), runId: z.string() }),\n       z.object({ type: z.literal('relay-session'), sessionId: z.string() }),\n     ]).and(z.object({ force: z.boolean().optional(), dryRun: z.boolean().optional() }))\n   - RunAllRequestSchema: { force?: boolean, dryRun?: boolean }\n   - TopicQuerySchema: { slug: z.string() }\n\n3) MullService interface: { router: Router, initialize(): Promise<void>, shutdown(): Promise<void>, getAdapterStatus(): AdapterStatus[] }",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s1-ac1", "description": "MullServiceConfig follows the codebase ServiceConfig pattern" },
+          { "id": "msp-s1-ac2", "description": "RunRequestSchema is a Zod discriminated union on 'type' field with three variants" },
+          { "id": "msp-s1-ac3", "description": "All request/response types exported for consumer use" },
+          { "id": "msp-s1-ac4", "description": "MullService interface defines router, initialize, shutdown, getAdapterStatus" }
+        ],
+        "specification": "Location: packages/mull/src/server/types.ts. Zod discriminatedUnion requires the discriminant field in each variant. Use z.intersection() to add shared fields (force, dryRun) to the discriminated union. Export inferred types: type RunRequest = z.infer<typeof RunRequestSchema>. MullService follows the same pattern as createForgeService/createIdeationService in the server codebase."
+      },
+      {
+        "step_id": "msp-s2",
+        "title": "Implement createMullService factory function",
+        "scope": "mull",
+        "description": "Create packages/mull/src/server/mull-service.ts. Implement createMullService(config: MullServiceConfig): MullService following the exact codebase pattern.\n\ninitialize(): Instantiate the three adapters (PlannerDbAdapter, ForgeDbAdapter, RelayDaemonAdapter) using paths from config. Create the MullPipeline instance with the adapters. Ensure memoryDir exists (mkdir -p equivalent).\n\nshutdown(): Close all adapter DB connections. Clear any pending async jobs.\n\ngetAdapterStatus(): Return status of each adapter (connected/error, last cursor timestamp, config summary).\n\nThe router is created during construction but adapters are initialized in initialize() — this matches the server startup sequence where services are created first, then initialized.",
+        "dependencies": ["msp-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s2-ac1", "description": "createMullService returns object with router, initialize, shutdown, getAdapterStatus" },
+          { "id": "msp-s2-ac2", "description": "initialize() creates all three adapters from config paths" },
+          { "id": "msp-s2-ac3", "description": "shutdown() closes all adapter connections and clears pending jobs" },
+          { "id": "msp-s2-ac4", "description": "Router created during construction, adapters initialized in initialize()" }
+        ],
+        "specification": "Location: packages/mull/src/server/mull-service.ts. Export createMullService(config: MullServiceConfig): MullService. Construction: create Express Router, attach route handlers. initialize(): create PlannerDbAdapter({ dbPath: config.plannerDbPath }), ForgeDbAdapter({ dbPath: config.forgeDbPath }), RelayDaemonAdapter({ dataDir: config.relayDataDir, mode: config.relayMode || 'jsonl' }). Job tracking: const jobs = new Map<string, { status, result?, error? }>(). Use crypto.randomUUID() for jobIds."
+      },
+      {
+        "step_id": "msp-s3",
+        "title": "Implement POST /run with SessionRef routing",
+        "scope": "mull",
+        "description": "Implement the POST /run route handler. Validates request body with RunRequestSchema (Zod). Routes based on the discriminant 'type' field:\n\n- type='planner-trajectory': Extract planId, call pipeline.run() with the PlannerDbAdapter for that planId\n- type='forge-run': Extract runId, call pipeline.run() with the ForgeDbAdapter for that runId\n- type='relay-session': Extract sessionId, call pipeline.run() with the RelayDaemonAdapter for that sessionId\n- Unknown type: Return badRequest('Unknown session type: {type}') from @plannr/errors\n\nExecution is async: Immediately return { jobId: uuid, status: 'accepted' } with HTTP 202. The pipeline.run() executes in the background. Store job state in a Map<jobId, { status, result?, error? }> for later retrieval.\n\nIf force=true, ignore cursor and reprocess all events. If dryRun=true, run extraction but don't write to topic files.",
+        "dependencies": ["msp-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s3-ac1", "description": "Request validated with Zod RunRequestSchema" },
+          { "id": "msp-s3-ac2", "description": "Routes to correct adapter based on discriminant type field" },
+          { "id": "msp-s3-ac3", "description": "Returns HTTP 202 with jobId immediately, runs pipeline in background" },
+          { "id": "msp-s3-ac4", "description": "Unknown type returns BadRequestError from @plannr/errors" },
+          { "id": "msp-s3-ac5", "description": "force flag bypasses cursor, dryRun flag prevents writes" },
+          { "id": "msp-s3-ac6", "description": "Job state tracked in Map for later status retrieval" }
+        ],
+        "specification": "The SessionRef discriminant routing is the key design decision here. Instead of accepting a generic sessionId and guessing which adapter to use, the caller explicitly declares the session type. This makes the API self-documenting and eliminates ambiguity when session IDs from different sources might collide."
+      },
+      {
+        "step_id": "msp-s4",
+        "title": "Implement POST /run/all, GET /status, GET /jobs/:jobId",
+        "scope": "mull",
+        "description": "Implement three additional route handlers:\n\n1) POST /run/all: Call pipeline.runAll() which iterates all configured adapters, calls listSessions() filtered by cursor, and runs the pipeline for each unprocessed session. Returns { jobId, status: 'accepted', sessionsQueued: number }. Async execution like POST /run.\n\n2) GET /status: Synchronous. Returns { topicCount (count .md files in memoryDir), lastUpdated (most recent topic file mtime), recentSessions[] (last 10 processed from cursor files), memoryDir (path), adapterStatus[] (from getAdapterStatus()) }.\n\n3) GET /jobs/:jobId: Returns the current state of an async job: { jobId, status: 'accepted' | 'running' | 'completed' | 'failed', result?: MergeResult, error?: string }. Returns notFound() if jobId unknown.",
+        "dependencies": ["msp-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s4-ac1", "description": "POST /run/all processes all unprocessed sessions across all adapters" },
+          { "id": "msp-s4-ac2", "description": "GET /status returns topic count, last updated, adapter status" },
+          { "id": "msp-s4-ac3", "description": "GET /jobs/:jobId returns job state, notFound for unknown jobId" },
+          { "id": "msp-s4-ac4", "description": "All async endpoints return HTTP 202 with jobId" }
+        ]
+      },
+      {
+        "step_id": "msp-s5",
+        "title": "Implement GET /topics and GET /topics/:slug",
+        "scope": "mull",
+        "description": "Implement topic reading endpoints:\n\n1) GET /topics: Read memoryDir, list all .md files. For each file, parse YAML frontmatter to extract: slug, title, nugget_count, last_updated, tags. Return array of topic summaries sorted by last_updated descending.\n\n2) GET /topics/:slug: Find the topic file by slug (slug.md or directory matching). Parse full content: YAML frontmatter + markdown body. Return { slug, title, frontmatter, body, nuggets[] }. If topic not found, return notFound('Topic not found: {slug}') from @plannr/errors.\n\nUse a simple YAML frontmatter parser (gray-matter or manual --- delimiter split).",
+        "dependencies": ["msp-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s5-ac1", "description": "GET /topics returns list of topic summaries from frontmatter" },
+          { "id": "msp-s5-ac2", "description": "GET /topics/:slug returns full topic content with parsed frontmatter and body" },
+          { "id": "msp-s5-ac3", "description": "Missing topic returns NotFoundError from @plannr/errors" },
+          { "id": "msp-s5-ac4", "description": "Topics sorted by last_updated descending" }
+        ]
+      },
+      {
+        "step_id": "msp-s6",
+        "title": "Mount mull service in server initialization",
+        "scope": "server",
+        "description": "In packages/server/src/server.ts (or wherever services are mounted), add the mull service to the server initialization sequence:\n\n1) Import createMullService from '@plannr/mull'\n2) Create MullServiceConfig from environment: { plannerDbPath: process.env.DB_PATH || './planner.db', forgeDbPath: process.env.FORGE_DB_PATH || './forge.db', relayDataDir: '.agent-relay', memoryDir: '.mull/memory' }\n3) const mullService = createMullService(config)\n4) await mullService.initialize() during server startup\n5) app.use('/api/mull', mullService.router)\n6) Add mullService.shutdown() to graceful shutdown handlers\n\nThis follows the exact same pattern as planner, ideation, and forge service mounting. Mount AFTER relay detection so relayMode can be determined.",
+        "dependencies": ["msp-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s6-ac1", "description": "createMullService imported and initialized in server startup" },
+          { "id": "msp-s6-ac2", "description": "Router mounted at /api/mull" },
+          { "id": "msp-s6-ac3", "description": "Config derived from environment variables (DB_PATH, FORGE_DB_PATH)" },
+          { "id": "msp-s6-ac4", "description": "shutdown() called during graceful server shutdown" },
+          { "id": "msp-s6-ac5", "description": "Mounted after relay detection in startup sequence" }
+        ],
+        "specification": "Location: packages/server/src/server.ts. Follow the exact pattern of existing service mounts (planner, ideation, forge). Import createMullService from '@plannr/mull'. Mount order in server.ts: after forge initialization (so FORGE_DB_PATH is resolved) and after relay detection (so relayMode can be set). Add to the services[] array for graceful shutdown. Config derivation: plannerDbPath from process.env.DB_PATH || './planner.db', forgeDbPath from process.env.FORGE_DB_PATH || './forge.db'."
+      },
+      {
+        "step_id": "msp-s7",
+        "title": "Write tests for API routes and SessionRef routing",
+        "scope": "mull",
+        "description": "Create packages/mull/src/server/__tests__/mull-service.test.ts. Use supertest to test Express routes. Mock the adapters and pipeline. Test:\n- POST /run with each SessionRef type routes to correct adapter\n- POST /run with unknown type returns 400\n- POST /run returns 202 with jobId\n- GET /jobs/:jobId returns job state\n- GET /jobs/:unknown returns 404\n- POST /run/all triggers all adapters\n- GET /status returns adapter status\n- GET /topics returns topic list\n- GET /topics/:slug returns topic content\n- GET /topics/:missing returns 404\n- Zod validation rejects malformed POST bodies\n- force and dryRun flags propagated to pipeline\n\nUse Vitest.",
+        "dependencies": ["msp-s3", "msp-s4", "msp-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "msp-s7-ac1", "description": "Tests cover all three SessionRef routing paths" },
+          { "id": "msp-s7-ac2", "description": "Tests verify error handling (400 for bad input, 404 for missing resources)" },
+          { "id": "msp-s7-ac3", "description": "Tests verify async execution returns 202" },
+          { "id": "msp-s7-ac4", "description": "Tests verify Zod validation rejects malformed bodies" },
+          { "id": "msp-s7-ac5", "description": "All tests pass with Vitest" }
+        ]
+      }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "partial",
+    "criteria": [
+      { "id": "msp-ac1", "status": "partial", "note": "Missing getStorage() method; returns getMemoryDir() + setAdapters() instead" },
+      { "id": "msp-ac2", "status": "partial", "note": "SessionRef uses plan_id/run_id/channel not planner-trajectory/forge-run/relay-session" },
+      { "id": "msp-ac3", "status": "satisfied", "evidence": "packages/mull/src/domain/types.ts:135-140" },
+      { "id": "msp-ac4", "status": "satisfied", "evidence": "packages/mull/src/api/handlers/run.ts:29-49" },
+      { "id": "msp-ac5", "status": "partial", "note": "Returns minimal status only; missing lastUpdated, recentSessions[], adapterStatus[]" },
+      { "id": "msp-ac6", "status": "satisfied", "evidence": "packages/mull/src/api/handlers/topics.ts:7-23" },
+      { "id": "msp-ac7", "status": "satisfied", "evidence": "packages/mull/src/api/handlers/topics.ts:25-52" },
+      { "id": "msp-ac8", "status": "partial", "note": "Service created but adapters never populated in server.ts" },
+      { "id": "msp-ac9", "status": "partial", "note": "Only notFound() used; run handler uses generic 400 not BadRequestError" },
+      { "id": "msp-ac10", "status": "satisfied", "evidence": "packages/mull/src/api/schemas.ts:8-12" },
+      { "id": "msp-ac11", "status": "missing", "note": "Handler blocks and awaits pipeline; no async job queue" },
+      { "id": "msp-ac12", "status": "satisfied", "evidence": "packages/mull/src/routing/session-ref-router.ts:59-80" }
+    ],
+    "drift": [
+      { "finding": "Dry-run mode with dryRunDetails response", "file": "packages/mull/src/mull.ts:196-216", "action": "document" },
+      { "finding": "LLM failure fallback to deterministic trail decisions", "file": "packages/mull/src/mull.ts:176-185", "action": "document" },
+      { "finding": "Session deduplication in mullAll", "file": "packages/mull/src/mull-all.ts:122-138", "action": "document" }
+    ]
+  }
+}

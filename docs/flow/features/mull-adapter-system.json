@@ -1,0 +1,154 @@
+{
+  "feature_id": "mull-adapter-system",
+  "title": "Adapter Orchestration System",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement the adapter orchestration layer that sits between raw data sources and the extraction pipeline. This is NOT the individual adapters — it's the system that manages them: the createAdapter factory, multi-adapter merge logic (when trajectory + relay both contribute to the same session), cursor persistence for incremental processing, adapter config validation, and session listing across multiple adapters. This is the 'Step 1' of the pipeline: Load session data.",
+    "acceptance_criteria": [
+      { "id": "mas-ac1", "description": "createAdapter(type, config) factory creates adapter instances by type string ('trajectory', 'relay', 'transcript')" },
+      { "id": "mas-ac2", "description": "Custom adapters can be passed directly (any object implementing SessionAdapter)" },
+      { "id": "mas-ac3", "description": "Multi-adapter merge: when multiple adapters produce data for the same session, results merge by timestamp into single SessionData" },
+      { "id": "mas-ac4", "description": "Merge strategy: messages interleaved by timestamp, events interleaved by timestamp, decisions combined, retrospective from whichever adapter provides it, artifacts combined" },
+      { "id": "mas-ac5", "description": "Cursor persistence: each adapter tracks last_mulled_at per session via getCursor/setCursor" },
+      { "id": "mas-ac6", "description": "Incremental loading: when cursor exists, adapter only returns events/messages after cursor timestamp" },
+      { "id": "mas-ac7", "description": "listSessions across multiple adapters: union of all adapter session lists, deduplicated by sessionId" },
+      { "id": "mas-ac8", "description": "Adapter config validated via Zod schemas per adapter type (TrajectoryAdapterConfig, RelayAdapterConfig, TranscriptAdapterConfig)" },
+      { "id": "mas-ac9", "description": "loadSessionFromAdapters(sessionId, adapters[]) orchestrates loading from all configured adapters and merging" },
+      { "id": "mas-ac10", "description": "Cursor file stored in .mull/ directory (not in memory/ — that's output only)" },
+      { "id": "mas-ac11", "description": "SessionRef-based routing: loadSessionFromAdapters accepts a SessionRef (discriminated by plan_id, run_id, or channel) and routes to the correct adapter(s) based on the discriminant type" },
+      { "id": "mas-ac12", "description": "Cursor granularity is per-adapter-per-session: stored at .mull/cursors/{adapter-type}/{session-id}.json, enabling independent tracking when multiple adapters serve the same session" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is the orchestration layer ABOVE individual adapters — it manages the adapter lifecycle",
+        "Multi-adapter merge is critical: relay provides inter-agent dialogue, trajectory provides decisions/retrospective. Same session, different data.",
+        "Timestamp-based merge is simple and correct — all sources use ISO 8601",
+        "Cursor tracking enables the idempotency guarantee: 10 partial runs = 1 full run",
+        "Cursor stored separately from memory/ because memory/ is the public output directory",
+        ".mull/ directory pattern: .mull/cursors/{adapter-type}/{session-id}.json",
+        "Factory pattern allows CLI to create adapters from config strings, while programmatic API can pass custom implementations"
+      ],
+      "concerns": [
+        "Session ID matching across adapters: a relay session and trajectory session may use different ID schemes",
+        "Cursor granularity: per-session is correct for CLI, but per-adapter-per-session needed for multi-adapter setups"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-adapter-system",
+    "version": 1,
+    "status": "draft",
+    "scopes": [
+      {
+        "scope_id": "mull-adapter-core",
+        "name": "Adapter Core",
+        "description": "Core adapter orchestration: factory, merge, cursor persistence, session listing"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mas-s1",
+        "title": "Implement createAdapter factory",
+        "scope": "mull-adapter-core",
+        "description": "Build the createAdapter(type, config) factory function that creates adapter instances by type string. Validates config against the appropriate Zod schema for each adapter type (TrajectoryAdapterConfig, RelayAdapterConfig, TranscriptAdapterConfig). Supports passing custom adapter objects directly (any object implementing SessionAdapter interface). Factory throws ValidationError with Zod details if config is invalid.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mas-s1-ac1", "description": "createAdapter('trajectory', config) returns a TrajectoryAdapter instance" },
+          { "id": "mas-s1-ac2", "description": "createAdapter('relay', config) returns a RelayJsonlAdapter instance" },
+          { "id": "mas-s1-ac3", "description": "createAdapter('transcript', config) returns a TranscriptAdapter instance" },
+          { "id": "mas-s1-ac4", "description": "createAdapter throws with Zod validation details for invalid config" },
+          { "id": "mas-s1-ac5", "description": "Custom adapter objects implementing SessionAdapter are passed through without validation" }
+        ],
+        "specification": "Location: src/adapters/factory.ts. Export createAdapter(type: string, config: unknown): SessionAdapter. Use Zod .safeParse() and throw ValidationError on failure. For custom adapters, accept { type: 'custom', adapter: SessionAdapter } shape."
+      },
+      {
+        "step_id": "mas-s2",
+        "title": "Implement multi-adapter merge logic",
+        "scope": "mull-adapter-core",
+        "description": "Build the mergeSessionData(results: SessionData[]) function that combines data from multiple adapters for the same session. Messages interleaved by timestamp. Events interleaved by timestamp. Decisions combined (union). Retrospective taken from whichever adapter provides it (first non-null wins). Artifacts combined (union). Session metadata merged with first adapter taking precedence for conflicting scalar fields.",
+        "dependencies": ["mas-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mas-s2-ac1", "description": "Messages from multiple adapters are interleaved by timestamp in chronological order" },
+          { "id": "mas-s2-ac2", "description": "Events from multiple adapters are interleaved by timestamp in chronological order" },
+          { "id": "mas-s2-ac3", "description": "Decisions from all adapters are combined into a single array" },
+          { "id": "mas-s2-ac4", "description": "Retrospective is taken from the first adapter that provides a non-null value" },
+          { "id": "mas-s2-ac5", "description": "Artifacts from all adapters are combined into a single array" }
+        ],
+        "specification": "Location: src/adapters/merge.ts. Export mergeSessionData(results: SessionData[]): SessionData. Sort messages and events by ISO 8601 timestamp using localeCompare. Concatenate decisions and artifacts. For retrospective, use results.find(r => r.retrospective)?.retrospective."
+      },
+      {
+        "step_id": "mas-s3",
+        "title": "Implement cursor persistence in .mull/ directory",
+        "scope": "mull-adapter-core",
+        "description": "Build cursor read/write functions that persist per-adapter-per-session cursors to .mull/cursors/{adapter-type}/{session-id}.json. Each cursor file contains { last_mulled_at: ISO timestamp, adapter_type: string, session_id: string }. The .mull/ directory is created on first write if it doesn't exist. Cursors enable incremental processing — adapters only return data after the cursor timestamp.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mas-s3-ac1", "description": "Cursor files stored at .mull/cursors/{adapter-type}/{session-id}.json" },
+          { "id": "mas-s3-ac2", "description": "getCursor(adapterType, sessionId, mullDir) returns { last_mulled_at } or null if no cursor exists" },
+          { "id": "mas-s3-ac3", "description": "setCursor(adapterType, sessionId, timestamp, mullDir) writes cursor file, creating directories as needed" },
+          { "id": "mas-s3-ac4", "description": "Cursor granularity is per-adapter-per-session, enabling independent tracking when multiple adapters serve the same session" },
+          { "id": "mas-s3-ac5", "description": "Cursor file is valid JSON, readable by any process" }
+        ],
+        "specification": "Location: src/adapters/cursor.ts. Export getCursor(adapterType: string, sessionId: string, mullDir?: string): CursorData | null and setCursor(adapterType: string, sessionId: string, timestamp: string, mullDir?: string): void. Default mullDir is '.mull'. Use fs.mkdirSync(path, { recursive: true }) for directory creation."
+      },
+      {
+        "step_id": "mas-s4",
+        "title": "Implement loadSessionFromAdapters with SessionRef routing",
+        "scope": "mull-adapter-core",
+        "description": "Build loadSessionFromAdapters that orchestrates loading from all configured adapters and merging results. Accepts a SessionRef (discriminated union of plan_id, run_id, or channel) and routes to the correct adapter(s) based on the discriminant type. For each adapter: check cursor, load data (with cursor-based incremental filtering), collect results. Merge all non-empty results using mergeSessionData. Return merged SessionData.",
+        "dependencies": ["mas-s1", "mas-s2", "mas-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mas-s4-ac1", "description": "loadSessionFromAdapters(sessionRef, adapters[], opts) loads from all adapters and returns merged SessionData" },
+          { "id": "mas-s4-ac2", "description": "SessionRef-based routing: plan_id routes to trajectory adapter, run_id to forge/relay adapter, channel to relay adapter" },
+          { "id": "mas-s4-ac3", "description": "When cursor exists for an adapter, only data after cursor timestamp is loaded" },
+          { "id": "mas-s4-ac4", "description": "When force option is true, cursors are ignored and full session data is loaded" },
+          { "id": "mas-s4-ac5", "description": "Empty adapter results (no new data) are filtered out before merge" }
+        ],
+        "specification": "Location: src/adapters/loader.ts. Export loadSessionFromAdapters(sessionRef: SessionRef, adapters: SessionAdapter[], opts?: { force?: boolean, mullDir?: string }): Promise<SessionData>. SessionRef is { type: 'plan_id', id: string } | { type: 'run_id', id: string } | { type: 'channel', id: string }. Route by matching sessionRef.type to adapter capabilities."
+      },
+      {
+        "step_id": "mas-s5",
+        "title": "Implement cross-adapter session listing",
+        "scope": "mull-adapter-core",
+        "description": "Build listAllSessions that queries all configured adapters for available sessions and returns a deduplicated union. Each session entry includes sessionId, adapter source(s), and optional time range. Deduplication is by sessionId — if multiple adapters report the same session, merge their metadata.",
+        "dependencies": ["mas-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mas-s5-ac1", "description": "listAllSessions(adapters[]) returns union of all adapter session lists" },
+          { "id": "mas-s5-ac2", "description": "Sessions deduplicated by sessionId across adapters" },
+          { "id": "mas-s5-ac3", "description": "Each session entry includes which adapter(s) can provide data for it" },
+          { "id": "mas-s5-ac4", "description": "Optional time range filter passed to individual adapters" }
+        ],
+        "specification": "Location: src/adapters/listing.ts. Export listAllSessions(adapters: SessionAdapter[], opts?: { after?: string, before?: string }): Promise<SessionInfo[]>. Use Map<string, SessionInfo> for deduplication. SessionInfo includes sessionId, sources: string[], timeRange?: { start: string, end: string }."
+      },
+      {
+        "step_id": "mas-s6",
+        "title": "Write adapter orchestration tests",
+        "scope": "mull-adapter-core",
+        "description": "Comprehensive tests for the adapter orchestration layer: factory creation, multi-adapter merge correctness, cursor persistence read/write/incremental, session listing deduplication, SessionRef routing, and error cases (invalid config, missing adapter type, corrupt cursor files).",
+        "dependencies": ["mas-s1", "mas-s2", "mas-s3", "mas-s4", "mas-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mas-s6-ac1", "description": "Factory tests: valid types create correct adapter instances, invalid types throw, invalid config throws with Zod details" },
+          { "id": "mas-s6-ac2", "description": "Merge tests: messages interleaved correctly, events interleaved correctly, decisions combined, retrospective selection, empty inputs handled" },
+          { "id": "mas-s6-ac3", "description": "Cursor tests: write then read returns correct data, missing cursor returns null, per-adapter-per-session isolation verified" },
+          { "id": "mas-s6-ac4", "description": "SessionRef routing tests: plan_id routes to trajectory, run_id routes to forge/relay, channel routes to relay" },
+          { "id": "mas-s6-ac5", "description": "Session listing tests: deduplication across adapters, time range filtering" }
+        ],
+        "specification": "Location: src/adapters/__tests__/adapter-system.test.ts. Use Vitest. Use in-memory or tmp directory for cursor persistence tests. Create mock adapters implementing SessionAdapter for merge and listing tests."
+      }
+    ]
+  }
+}

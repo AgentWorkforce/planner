@@ -1,0 +1,82 @@
+{
+  "feature_id": "trajectory-planner-read-write",
+  "title": "PlannerLead Trajectory Read + Write",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["trajectory-service", "trajectory-interviewer-write", "planner-lead-service"],
+  "parent": "trajectory-integration",
+  "component": "planner-core",
+
+  "summary": {
+    "goal": "PlannerLead reads ideation retrospective as context and records its own trajectory during planning.",
+    "acceptance_criteria": [
+      { "id": "pl-ac1", "description": "On notifyNewPlan, look up ideation trajectory via source.session_id" },
+      { "id": "pl-ac2", "description": "Ideation retrospective injected into PlannerLead prompt if available" },
+      { "id": "pl-ac3", "description": "Planning trajectory started when plan created" },
+      { "id": "pl-ac4", "description": "Tool calls recorded (add_step, update_step, etc.)" },
+      { "id": "pl-ac5", "description": "Decisions recorded with reasoning (step ordering, dependencies)" },
+      { "id": "pl-ac6", "description": "Trajectory completed with retrospective on plan approval/publish" },
+      { "id": "pl-ac7", "description": "trajectory_id stored in plan metadata for forge lookup" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "First consumer AND producer - the full context chain loop",
+        "Keep user-trajectory.ts - different purpose (Q&A duplicate detection)",
+        "Plan metadata needs trajectory_id field for forge workers"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "plrw001",
+        "title": "Add trajectory lookup in notifyNewPlan",
+        "scope": "planner-core",
+        "description": "Look up ideation trajectory via findBySource('ideation', session_id)"
+      },
+      {
+        "step_id": "plrw002",
+        "title": "Inject ideation context into prompt",
+        "scope": "planner-core",
+        "description": "Use formatRetrospectiveAsContext() to enhance prompt"
+      },
+      {
+        "step_id": "plrw003",
+        "title": "Start planning trajectory",
+        "scope": "planner-core",
+        "description": "Create trajectory for plan with goal as title"
+      },
+      {
+        "step_id": "plrw004",
+        "title": "Record tool calls during planning",
+        "scope": "planner-core",
+        "description": "Hook into tool execution loop in planner-lead.ts"
+      },
+      {
+        "step_id": "plrw005",
+        "title": "Record planning decisions",
+        "scope": "planner-core",
+        "description": "Record step ordering, dependency choices, etc."
+      },
+      {
+        "step_id": "plrw006",
+        "title": "Complete trajectory on approval",
+        "scope": "planner-core",
+        "description": "Write retrospective when plan transitions to approved/published"
+      },
+      {
+        "step_id": "plrw007",
+        "title": "Store trajectory_id in plan metadata",
+        "scope": "planner-core",
+        "description": "Add trajectory_id to plan for forge worker lookup"
+      }
+    ]
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "feature_id": "tend-sheets",
+  "title": "Add slide-in detail panels (sheets) for rich step editing",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": ["tend-project-tree"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Add slide-in detail panels (sheets) for rich step editing and inspection.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "SheetContainer slides in from the right edge with subtle drop shadow overlay"
+      },
+      {
+        "id": "ac2",
+        "description": "StepSheet contains: title (editable), scope, owner role, description, dependencies, acceptance criteria, execution info, traceability section"
+      },
+      {
+        "id": "ac3",
+        "description": "Clicking a step at STEP zoom level opens its StepSheet"
+      },
+      {
+        "id": "ac4",
+        "description": "Sheet has a focused chat input at the bottom (messages flow to main conversation)"
+      },
+      {
+        "id": "ac5",
+        "description": "Sheets are always user-initiated (click), never AI-triggered"
+      },
+      {
+        "id": "ac6",
+        "description": "Close button returns to tree view at STEP zoom"
+      },
+      {
+        "id": "ac7",
+        "description": "AcceptanceCriteriaSection (from planner-ui) renders inside sheet, not inline in tree"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Sheets are the primary surface for rich detail and editing. They're essentially the expanded view that planner-ui's StepEditor provides, but as a slide-in panel rather than inline.",
+        "Copy AcceptanceCriteriaSection from planner-ui.",
+        "The sheet pattern (slide from right, overlay) is common in modern UIs — similar to Notion's page peek or Linear's issue detail."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "sht01",
+        "title": "Create SheetContainer with slide-in animation",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/sheets/SheetContainer.tsx. Slide-in panel from right edge, drop shadow overlay, close button (X) in top-right. Use Framer Motion or CSS transitions. Z-index above tree but below status bar.",
+        "acceptance_criteria": ["ac1", "ac6"]
+      },
+      {
+        "id": "sht02",
+        "title": "Create StepSheet with full step detail",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/sheets/StepSheet.tsx. Copy AcceptanceCriteriaSection from packages/planner-ui/src/components/acceptance-criteria/AcceptanceCriteriaSection.tsx. Layout sections: title (EditableText), scope (read-only badge), owner role (read-only), description (EditableText), dependencies (DependencyIndicator list), acceptance criteria (AcceptanceCriteriaSection).",
+        "dependencies": ["sht01"],
+        "acceptance_criteria": ["ac2", "ac7"]
+      },
+      {
+        "id": "sht03",
+        "title": "Add execution info and traceability sections to StepSheet",
+        "scope": "tend",
+        "description": "In StepSheet: add Execution Info section (agent name, status, progress %, time elapsed). Add Traceability section (links to PRs, commits, related messages). Both render empty states when no data. Reference forge artifact structure.",
+        "dependencies": ["sht02"],
+        "acceptance_criteria": ["ac2"]
+      },
+      {
+        "id": "sht04",
+        "title": "Add focused chat input at bottom of sheet",
+        "scope": "tend",
+        "description": "In StepSheet bottom: add ConversationInput variant (smaller, labeled 'Ask about this step'). Messages sent from here flow to main conversation with step_ref metadata. Copy input component from ConversationPane.",
+        "dependencies": ["sht02"],
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "sht05",
+        "title": "Wire sheet open interaction from tree",
+        "scope": "tend",
+        "description": "In StepNode component: when zoom level is STEP, add onClick → open StepSheet. Pass step data to sheet. Sheet state managed in ProjectContext. Clicking close → sheet slides out, tree remains at STEP zoom.",
+        "dependencies": ["sht02"],
+        "acceptance_criteria": ["ac3", "ac5"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "trigger": "click step at STEP zoom level",
+      "source_for_content": "planner-ui AcceptanceCriteriaSection, step editing fields",
+      "pattern": "slide-in panel from right, not modal",
+      "components_to_copy": [
+        "planner-ui AcceptanceCriteriaSection → copy directly"
+      ],
+      "new_components": [
+        "SheetContainer (slide-in wrapper)",
+        "StepSheet (step detail view)"
+      ],
+      "sheet_sections": [
+        "title (editable)",
+        "scope",
+        "owner role",
+        "description",
+        "dependencies",
+        "acceptance criteria (AcceptanceCriteriaSection)",
+        "execution info",
+        "traceability section",
+        "focused chat input at bottom"
+      ],
+      "interaction": {
+        "open": "click step at STEP zoom",
+        "close": "close button returns to STEP zoom",
+        "chat": "input at bottom sends to main conversation"
+      }
+    }
+  }
+}

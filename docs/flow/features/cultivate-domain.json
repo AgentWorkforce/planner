@@ -1,0 +1,150 @@
+{
+  "feature_id": "cultivate-domain",
+  "title": "Domain Types & Zod Schemas",
+  "type": "feature",
+  "status": "verified",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Define all core TypeScript types and Zod schemas for the cultivate pipeline. This is the contract surface — every pipeline stage, adapter, job, and API handler depends on these types. Covers Signal, Cluster, Greenhouse, Recommendation, ScoringFactors, CultivateWeights, CultivateConfig, CultivateOutcome, FilterRule, SourceConfig, IngestionJob, RawEvent, NormalizedEvent, ExtractionResult, StepProvenance, SignalSource, AuthConfig, AuthorType, AdapterType, SourcePreset, and all enums. Model names configurable via CULTIVATE_EXTRACT_MODEL and CULTIVATE_CLUSTER_MODEL env vars.",
+    "acceptance_criteria": [
+      { "id": "cd-ac1", "description": "SignalStatus enum: pending, filtered, processing, scored, clustered, decayed, dead_lettered" },
+      { "id": "cd-ac2", "description": "Signal schema: id, greenhouse_id, source_type, external_id, title, body, author, author_type, url?, score, scoring_factors, cluster_id?, status, provenance, tags[], created_at, updated_at, linked_plan_id?" },
+      { "id": "cd-ac3", "description": "Greenhouse schema: id, name, description?, mode (discovery|refinement|focused), keyword_require[], keyword_exclude[], source_ids[], created_at, updated_at" },
+      { "id": "cd-ac4", "description": "Cluster schema: id, greenhouse_id, label, summary, signal_count, trend (rising|stable|declining), velocity_weekly, velocity_monthly, created_at, updated_at" },
+      { "id": "cd-ac5", "description": "Recommendation schema: id, greenhouse_id, title, reasoning, confidence, supporting_signal_ids[], supporting_cluster_ids[], created_at" },
+      { "id": "cd-ac6", "description": "ScoringFactors schema: recency, specificity, source_authority, repetition, emotional_intensity, strategic_fit, actionability, content_quality — all number(0-1)" },
+      { "id": "cd-ac7", "description": "CultivateWeights schema: same 8 keys as ScoringFactors, values are weight multipliers, keyed per greenhouse_id" },
+      { "id": "cd-ac8", "description": "CultivateConfig schema: weights per greenhouse, filter_rules enabled/disabled, tier1_strictness, tier2_threshold, model overrides" },
+      { "id": "cd-ac9", "description": "CultivateOutcome schema: signal_id, action (link|dismiss), greenhouse_id, metadata?, timestamp" },
+      { "id": "cd-ac10", "description": "FilterRule schema: id, name, description, type (reject|boost), condition, enabled, effectiveness (signals_matched, false_positive_rate)" },
+      { "id": "cd-ac11", "description": "SourceConfig schema: id, name, adapter_type, preset?, endpoint_template?, auth?, poll_interval_ms, greenhouse_ids[], health (healthy|warning|unhealthy|disabled), consecutive_failures, last_error?, enabled, created_at" },
+      { "id": "cd-ac12", "description": "AuthConfig schema: type (bearer|api_key|oauth2|basic|hmac), encrypted_credentials" },
+      { "id": "cd-ac13", "description": "AdapterType enum: poll_api, webhook, push, structured_pull" },
+      { "id": "cd-ac14", "description": "AuthorType enum: user, team, bot, system, unknown" },
+      { "id": "cd-ac15", "description": "RawEvent schema: source_config_id, external_id, raw_payload, received_at" },
+      { "id": "cd-ac16", "description": "NormalizedEvent schema: title, body, author, author_type, url?, source_type, external_id, occurred_at" },
+      { "id": "cd-ac17", "description": "ExtractionResult schema: themes[], entities[], actionability_hint, quality_hint, strategic_fit_hint" },
+      { "id": "cd-ac18", "description": "IngestionJob schema: id, filename, status (pending|chunking|processing|complete|failed), total_chunks, processed_chunks, greenhouse_id, created_at" },
+      { "id": "cd-ac19", "description": "StepProvenance schema: step, timestamp, details? — tracks which pipeline stages a signal passed through" },
+      { "id": "cd-ac20", "description": "SourcePreset schema: id, name, description, adapter_type, endpoint_template, auth_type, default_poll_interval_ms, tier" },
+      { "id": "cd-ac21", "description": "All types exported from package root: import { Signal, Greenhouse, Cluster, ... } from '@plannr/cultivate'" },
+      { "id": "cd-ac22", "description": "Zod schemas enable runtime validation of adapter output, LLM extraction responses, config, and API request bodies" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cd-ac1", "status": "satisfied", "evidence": "src/domain/types.ts:10-18" },
+      { "id": "cd-ac2", "status": "satisfied", "evidence": "src/domain/types.ts:339-350" },
+      { "id": "cd-ac3", "status": "satisfied", "evidence": "src/domain/types.ts:24-29" },
+      { "id": "cd-ac4", "status": "satisfied", "evidence": "src/domain/types.ts:34-38" },
+      { "id": "cd-ac5", "status": "satisfied", "evidence": "src/domain/types.ts:167-177" },
+      { "id": "cd-ac6", "status": "satisfied", "evidence": "src/domain/types.ts:111-121" },
+      { "id": "cd-ac7", "status": "satisfied", "evidence": "src/domain/types.ts:126-136" },
+      { "id": "cd-ac8", "status": "satisfied", "evidence": "src/domain/types.ts:141-150" },
+      { "id": "cd-ac9", "status": "satisfied", "evidence": "src/domain/types.ts:155-162" },
+      { "id": "cd-ac10", "status": "satisfied", "evidence": "src/domain/types.ts:298-310" },
+      { "id": "cd-ac11", "status": "satisfied", "evidence": "src/domain/types.ts:248-262" },
+      { "id": "cd-ac12", "status": "satisfied", "evidence": "src/domain/types.ts:239-243" },
+      { "id": "cd-ac13", "status": "satisfied", "evidence": "src/domain/types.ts:44-50" },
+      { "id": "cd-ac14", "status": "satisfied", "evidence": "src/domain/types.ts:55-62" },
+      { "id": "cd-ac15", "status": "satisfied", "evidence": "src/domain/types.ts:182-188" },
+      { "id": "cd-ac16", "status": "satisfied", "evidence": "src/domain/types.ts:193-203" },
+      { "id": "cd-ac17", "status": "satisfied", "evidence": "src/domain/types.ts:218-234" },
+      { "id": "cd-ac18", "status": "satisfied", "evidence": "src/domain/types.ts:315-323" },
+      { "id": "cd-ac19", "status": "satisfied", "evidence": "src/domain/types.ts:329-334" },
+      { "id": "cd-ac20", "status": "satisfied", "evidence": "src/domain/types.ts:283-293" },
+      { "id": "cd-ac21", "status": "satisfied", "evidence": "src/index.ts:164-206" },
+      { "id": "cd-ac22", "status": "satisfied", "evidence": "src/index.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cd-s1",
+        "title": "Define core enums and primitive types",
+        "scope": "cultivate",
+        "description": "Create src/domain/types.ts. Define Zod schemas and inferred types for all enums: SignalStatus (pending|filtered|processing|scored|clustered|decayed|dead_lettered), GreenhouseMode (discovery|refinement|focused), ClusterTrend (rising|stable|declining), AdapterType (poll_api|webhook|push|structured_pull), AuthorType (user|team|bot|system|unknown), AuthType (bearer|api_key|oauth2|basic|hmac), FilterRuleType (reject|boost), IngestionJobStatus (pending|chunking|processing|complete|failed), SourceHealth (healthy|warning|unhealthy|disabled). Also define ScoringFactors schema with all 8 numeric(0-1) fields.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All enum schemas validate only their allowed values" },
+          { "id": "ac2", "description": "ScoringFactors schema validates all 8 fields as numbers between 0 and 1" }
+        ]
+      },
+      {
+        "step_id": "cd-s2",
+        "title": "Define Signal, Greenhouse, and Cluster types",
+        "scope": "cultivate",
+        "description": "In src/domain/types.ts, add Zod schemas for Signal (with id, greenhouse_id, source_type, external_id, title, body, author, author_type, url?, score, scoring_factors, cluster_id?, status, provenance:StepProvenance[], tags[], created_at, updated_at, linked_plan_id?), Greenhouse (id, name, description?, mode, keyword_require[], keyword_exclude[], source_ids[], created_at, updated_at), and Cluster (id, greenhouse_id, label, summary, signal_count, trend, velocity_weekly, velocity_monthly, created_at, updated_at). Define StepProvenance schema (step, timestamp, details?).",
+        "dependencies": ["cd-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Signal schema validates all required fields and optional cluster_id, url, linked_plan_id" },
+          { "id": "ac2", "description": "Greenhouse schema validates mode as GreenhouseMode enum" },
+          { "id": "ac3", "description": "Cluster schema validates trend as ClusterTrend enum" },
+          { "id": "ac4", "description": "StepProvenance tracks pipeline stage progression" }
+        ]
+      },
+      {
+        "step_id": "cd-s3",
+        "title": "Define config and weights types",
+        "scope": "cultivate",
+        "description": "Add CultivateWeights schema (same 8 keys as ScoringFactors but as weight multipliers, not bounded 0-1), CultivateConfig schema (weights: Record<greenhouse_id, CultivateWeights>, filter_rules: Record<rule_id, {enabled}>, tier1_strictness: number, tier2_threshold: number, extract_model?: string, cluster_model?: string), CultivateOutcome schema (signal_id, action: link|dismiss, greenhouse_id, metadata?, timestamp), and Recommendation schema (id, greenhouse_id, title, reasoning, confidence: number, supporting_signal_ids[], supporting_cluster_ids[], created_at).",
+        "dependencies": ["cd-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CultivateConfig includes model override fields for extract and cluster" },
+          { "id": "ac2", "description": "CultivateOutcome action is strictly link or dismiss" },
+          { "id": "ac3", "description": "Recommendation confidence is a number" }
+        ]
+      },
+      {
+        "step_id": "cd-s4",
+        "title": "Define pipeline types (RawEvent, NormalizedEvent, ExtractionResult)",
+        "scope": "cultivate",
+        "description": "Add pipeline data flow types: RawEvent schema (source_config_id, external_id, raw_payload: unknown, received_at), NormalizedEvent schema (title, body, author, author_type, url?, source_type, external_id, occurred_at), ExtractionResult schema (themes: string[], entities: string[], actionability_hint: number, quality_hint: number, strategic_fit_hint: number). These represent the data transformations through the intake pipeline stages.",
+        "dependencies": ["cd-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RawEvent.raw_payload accepts unknown (any JSON from source)" },
+          { "id": "ac2", "description": "NormalizedEvent is the adapter output contract — validated by Zod before entering pipeline" },
+          { "id": "ac3", "description": "ExtractionResult hint fields are numbers for LLM-provided scores" }
+        ]
+      },
+      {
+        "step_id": "cd-s5",
+        "title": "Define SourceConfig, AuthConfig, and SourcePreset types",
+        "scope": "cultivate",
+        "description": "Add SourceConfig schema (id, name, adapter_type, preset?, endpoint_template?, auth?: AuthConfig, poll_interval_ms, greenhouse_ids[], health: SourceHealth, consecutive_failures: number, last_error?, enabled: boolean, created_at), AuthConfig schema (type: AuthType, encrypted_credentials: string), SourcePreset schema (id, name, description, adapter_type, endpoint_template, auth_type, default_poll_interval_ms, tier: number), FilterRule schema (id, name, description, type: FilterRuleType, condition: string, enabled: boolean, effectiveness: { signals_matched: number, false_positive_rate: number }), and IngestionJob schema (id, filename, status: IngestionJobStatus, total_chunks, processed_chunks, greenhouse_id, created_at).",
+        "dependencies": ["cd-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SourceConfig.health validates against SourceHealth enum" },
+          { "id": "ac2", "description": "AuthConfig.encrypted_credentials is opaque string (actual encryption handled by auth-encryption feature)" },
+          { "id": "ac3", "description": "FilterRule.effectiveness tracks signals_matched count and false_positive_rate" },
+          { "id": "ac4", "description": "SourcePreset.tier is a number representing the source tier (1-5)" }
+        ]
+      },
+      {
+        "step_id": "cd-s6",
+        "title": "Export all types from package index",
+        "scope": "cultivate",
+        "description": "Create or update src/domain/index.ts (or src/index.ts depending on package structure) to re-export all public types and Zod schemas from types.ts. Ensure consumers can import { Signal, Greenhouse, Cluster, ScoringFactors, CultivateConfig, RawEvent, NormalizedEvent, ExtractionResult, SourceConfig, FilterRule, ... } from the cultivate package. Export both Zod schemas (for runtime validation) and inferred TypeScript types (for compile-time usage).",
+        "dependencies": ["cd-s2", "cd-s3", "cd-s4", "cd-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All Zod schemas are exported (SignalSchema, GreenhouseSchema, etc.)" },
+          { "id": "ac2", "description": "All inferred TypeScript types are exported (Signal, Greenhouse, etc.)" },
+          { "id": "ac3", "description": "All enums are exported" }
+        ]
+      }
+    ]
+  }
+}

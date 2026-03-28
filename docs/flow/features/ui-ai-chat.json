@@ -1,0 +1,122 @@
+{
+  "feature_id": "ui-ai-chat",
+  "title": "AI Chat",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["mcp-tools", "ui-editor-inline"],
+
+  "summary": {
+    "goal": "Provide on-demand AI chat for contextual planning assistance",
+    "context": "User can ask questions like 'Is step 3 clear enough?' or 'What acceptance criteria should this have?' AI responds in context of the current plan.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Cmd+/ opens AI chat panel" },
+      { "id": "ac2", "description": "Chat panel slides in without hiding plan" },
+      { "id": "ac3", "description": "User can type questions in natural language" },
+      { "id": "ac4", "description": "AI responses are contextual (aware of current plan)" },
+      { "id": "ac5", "description": "AI can suggest changes (user confirms before applying)" },
+      { "id": "ac6", "description": "Chat history persists within session" },
+      { "id": "ac7", "description": "Chat can be minimized/closed without losing context" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "uac001",
+        "title": "Create ChatPanel component",
+        "scope": "planner-ui",
+        "description": "Slide-in panel for AI chat. Messages area and input field.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Panel slides in from right" },
+          { "id": "ac2", "description": "Messages list displays history" },
+          { "id": "ac3", "description": "Input field at bottom" },
+          { "id": "ac4", "description": "Close button minimizes panel" }
+        ]
+      },
+      {
+        "step_id": "uac002",
+        "title": "Implement Cmd+/ keyboard shortcut",
+        "scope": "planner-ui",
+        "description": "Global keyboard shortcut to toggle AI chat panel.",
+        "dependencies": ["uac001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cmd+/ toggles panel open/close" },
+          { "id": "ac2", "description": "Focus moves to input when opened" },
+          { "id": "ac3", "description": "Escape closes panel" }
+        ]
+      },
+      {
+        "step_id": "uac003",
+        "title": "Create chat message components",
+        "scope": "planner-ui",
+        "description": "Message components for user messages and AI responses with different styling.",
+        "dependencies": ["uac001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "User messages right-aligned" },
+          { "id": "ac2", "description": "AI messages left-aligned with avatar" },
+          { "id": "ac3", "description": "Markdown rendering in AI messages" },
+          { "id": "ac4", "description": "Typing indicator while AI responds" }
+        ]
+      },
+      {
+        "step_id": "uac004",
+        "title": "Implement AI chat API integration",
+        "scope": "planner-ui",
+        "description": "Connect to AI backend (MCP or API) with plan context included.",
+        "dependencies": ["uac003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Send message with plan context" },
+          { "id": "ac2", "description": "Stream AI response" },
+          { "id": "ac3", "description": "Handle errors gracefully" }
+        ]
+      },
+      {
+        "step_id": "uac005",
+        "title": "Implement suggested changes with confirmation",
+        "scope": "planner-ui",
+        "description": "When AI suggests changes, show them with Apply/Dismiss buttons.",
+        "dependencies": ["uac004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Suggestions rendered as cards" },
+          { "id": "ac2", "description": "Apply button applies change" },
+          { "id": "ac3", "description": "Dismiss button removes suggestion" },
+          { "id": "ac4", "description": "Changes preview before applying" }
+        ]
+      },
+      {
+        "step_id": "uac006",
+        "title": "Implement chat history persistence",
+        "scope": "planner-ui",
+        "description": "Chat history persists in session state, survives minimize/reopen.",
+        "dependencies": ["uac004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "History preserved on minimize" },
+          { "id": "ac2", "description": "History cleared on plan navigation" },
+          { "id": "ac3", "description": "Optional: persist to local storage" }
+        ]
+      },
+      {
+        "step_id": "uac007",
+        "title": "Add contextual prompts",
+        "scope": "planner-ui",
+        "description": "When step is selected, chat shows relevant quick prompts.",
+        "dependencies": ["uac004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Quick prompt buttons in chat" },
+          { "id": "ac2", "description": "Prompts relevant to current selection" },
+          { "id": "ac3", "description": "Click fills input and submits" }
+        ]
+      }
+    ]
+  }
+}

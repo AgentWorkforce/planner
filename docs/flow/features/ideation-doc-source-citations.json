@@ -1,0 +1,12 @@
+{
+  "feature_id": "ideation-doc-source-citations",
+  "title": "ideation-doc-source-citations",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "ideation-documents",
+  "component": "ideation-core",
+  "summary": {
+    "goal": "ideation-doc-source-citations"
+  }
+}

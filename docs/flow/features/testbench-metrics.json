@@ -1,0 +1,33 @@
+{
+  "title": "Metrics Collection & Analysis",
+  "summary": {
+    "goal": "Collect and aggregate metrics across runs",
+    "acceptance_criteria": [
+      {
+        "id": "tm1",
+        "description": "MetricsCollector tracks per-run metrics: success, time, tokens, cost, steps"
+      },
+      {
+        "id": "tm2",
+        "description": "Aggregate metrics: success_rate, mean_cost, p95_time, complexity_accuracy"
+      },
+      {
+        "id": "tm3",
+        "description": "Complexity accuracy = correlation(estimated_complexity, actual_time)"
+      },
+      {
+        "id": "tm4",
+        "description": "Learning curve tracking across iterations"
+      }
+    ]
+  },
+  "feature_id": "testbench-metrics",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "testbench",
+  "component": "testbench",
+  "dependencies": [
+    "testbench-runner"
+  ]
+}

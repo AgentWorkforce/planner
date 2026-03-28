@@ -1,0 +1,37 @@
+{
+  "title": "Drift Detector Service",
+  "summary": {
+    "goal": "Compare current execution to baselines and generate alerts",
+    "acceptance_criteria": [
+      {
+        "id": "dd1",
+        "description": "checkDrift returns empty if sample_count < 30 (minimum samples for statistical validity)"
+      },
+      {
+        "id": "dd2",
+        "description": "Duration deviation ≥ 2σ generates warning alert"
+      },
+      {
+        "id": "dd3",
+        "description": "Duration deviation ≥ 3σ generates critical alert"
+      },
+      {
+        "id": "dd4",
+        "description": "Token and success_rate drift detected similarly"
+      },
+      {
+        "id": "dd5",
+        "description": "Alerts are persisted with timestamp"
+      }
+    ]
+  },
+  "feature_id": "tuner-drift-detector",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-baseline-service"
+  ]
+}

@@ -1,0 +1,379 @@
+{
+  "feature_id": "ui-attention-signals",
+  "title": "Attention Signal Computation",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Compute attention signals from existing plan data to categorize plans by what needs human action.",
+    "context": "Attention signals derive from data already in the system. Backend computes these on list fetch; frontend receives pre-categorized results. This avoids N+1 queries and keeps logic centralized. Note: execution status and gate data come from the orchestrator (external service) - the planner handles this gracefully when orchestrator is unavailable.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Backend /plans endpoint returns attention_types for each plan when queried with ?include_attention=true" },
+      { "id": "ac2", "description": "Attention types: awaiting_approval, change_request, gate_pending, execution_failed, unread_comments, stale_draft, active, none" },
+      { "id": "ac3", "description": "awaiting_approval: draft with submitted_at set (waiting for reviewer)" },
+      { "id": "ac4", "description": "change_request: has pending ChangeRequest from orchestrator" },
+      { "id": "ac5", "description": "gate_pending: published plan with execution blocked on human_approval gate" },
+      { "id": "ac6", "description": "execution_failed: published plan with failed execution status" },
+      { "id": "ac7", "description": "unread_comments: plan has unresolved comments on latest version" },
+      { "id": "ac8", "description": "stale_draft: draft not updated in >7 days (configurable threshold)" },
+      { "id": "ac9", "description": "active: draft updated within last 24h OR published with running execution" },
+      { "id": "ac10", "description": "Plans can have multiple attention types; API returns array" },
+      { "id": "ac11", "description": "When orchestrator is unavailable, gate_pending and execution_failed signals are omitted (graceful degradation)" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": [
+      {
+        "step_id": "i001",
+        "title": "Define AttentionType enum and configuration schema",
+        "scope": "planner-core",
+        "description": "Create src/domain/attention.ts with AttentionType enum and AttentionConfig schema. Types: awaiting_approval, change_request, gate_pending, execution_failed, unread_comments, stale_draft, active, none. Config includes stale_draft_threshold_days (default 7) and active_threshold_hours (default 24).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AttentionType enum exported with all 8 types: 'awaiting_approval' | 'change_request' | 'gate_pending' | 'execution_failed' | 'unread_comments' | 'stale_draft' | 'active' | 'none'" },
+          { "id": "ac2", "description": "AttentionConfigSchema with stale_draft_threshold_days (number, default 7) and active_threshold_hours (number, default 24)" },
+          { "id": "ac3", "description": "DEFAULT_ATTENTION_CONFIG exported with sensible defaults" }
+        ]
+      },
+      {
+        "step_id": "i002",
+        "title": "Implement computeAttentionTypes pure function",
+        "scope": "planner-core",
+        "description": "Create computeAttentionTypes function that takes plan data and related context (changeRequests, executionStatus, unresolvedCommentCount) and returns AttentionType[]. This is a pure function with no side effects - all data is passed in.",
+        "dependencies": ["i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Function signature: computeAttentionTypes(input: AttentionInput, config?: AttentionConfig): AttentionType[]" },
+          { "id": "ac2", "description": "AttentionInput type: { plan: Plan, latestVersion: PlanVersion, pendingChangeRequests: number, executionStatus?: ExecutionStatus | null, unresolvedCommentCount: number }" },
+          { "id": "ac3", "description": "Returns 'awaiting_approval' when version.status === 'draft' AND version.submitted_at is set" },
+          { "id": "ac4", "description": "Returns 'change_request' when pendingChangeRequests > 0" },
+          { "id": "ac5", "description": "Returns 'gate_pending' when version.status === 'published' AND executionStatus has blocked step with gate" },
+          { "id": "ac6", "description": "Returns 'execution_failed' when version.status === 'published' AND executionStatus.status === 'failed'" },
+          { "id": "ac7", "description": "Returns 'unread_comments' when unresolvedCommentCount > 0" },
+          { "id": "ac8", "description": "Returns 'stale_draft' when version.status === 'draft' AND updated_at older than threshold" },
+          { "id": "ac9", "description": "Returns 'active' when (version.status === 'draft' AND updated_at within active threshold) OR (version.status === 'published' AND executionStatus.status === 'running')" },
+          { "id": "ac10", "description": "Returns ['none'] if no other signals apply" },
+          { "id": "ac11", "description": "Unit tests cover all 8 attention type conditions plus edge cases (multiple signals, null executionStatus)" }
+        ]
+      },
+      {
+        "step_id": "i003",
+        "title": "Add listPlansWithAttention to storage interface",
+        "scope": "planner-core",
+        "description": "Extend PlanStorage interface with listPlansWithAttention method that returns plans with pre-joined data needed for attention computation (pending change request count, unresolved comment count per plan).",
+        "dependencies": ["i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanStorage interface has: listPlansWithAttention(status?: PlanStatus): PlanWithAttentionData[]" },
+          { "id": "ac2", "description": "PlanWithAttentionData type: { plan: Plan, latestVersion: PlanVersion, pendingChangeRequestCount: number, unresolvedCommentCount: number }" },
+          { "id": "ac3", "description": "SqliteStorage implements listPlansWithAttention using JOINs and subqueries (no N+1)" }
+        ]
+      },
+      {
+        "step_id": "i004",
+        "title": "Implement efficient SQL query for attention data",
+        "scope": "planner-core",
+        "description": "Implement listPlansWithAttention in SqliteStorage using a single query with LEFT JOINs to change_requests and comments tables, aggregating counts. The query should fetch: plans joined with latest version, COUNT of pending change_requests per plan, COUNT of unresolved comments per (plan, latest_version).",
+        "dependencies": ["i003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Single SQL query fetches all data (verified via EXPLAIN or query count logging)" },
+          { "id": "ac2", "description": "Query uses subqueries or window functions to get latest version per plan" },
+          { "id": "ac3", "description": "pending_change_request_count: COUNT of change_requests WHERE status = 'pending' AND plan_id matches" },
+          { "id": "ac4", "description": "unresolved_comment_count: COUNT of comments WHERE resolved = 0 AND plan_id matches AND version = latest_version" },
+          { "id": "ac5", "description": "Status filter still works: when status param provided, only returns plans with matching version status" },
+          { "id": "ac6", "description": "Integration test verifies correct counts with test data" }
+        ]
+      },
+      {
+        "step_id": "i005",
+        "title": "Create orchestrator client for execution status batch fetch",
+        "scope": "planner-core",
+        "description": "Create src/orchestrator/client.ts with getExecutionStatusBatch(planIds: string[]): Promise<Map<string, ExecutionStatus | null>>. This fetches execution status for multiple plans in a single call. Returns null for plans with no execution or when orchestrator is unavailable. Includes timeout and graceful error handling.",
+        "dependencies": ["i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Function: getExecutionStatusBatch(planIds: string[]): Promise<Map<string, ExecutionStatus | null>>" },
+          { "id": "ac2", "description": "Makes single HTTP request to orchestrator batch endpoint: POST /executions/batch with { plan_ids: string[] }" },
+          { "id": "ac3", "description": "Returns Map where key is plan_id, value is ExecutionStatus or null" },
+          { "id": "ac4", "description": "On orchestrator error or timeout (default 5s), returns empty Map (no exceptions thrown to caller)" },
+          { "id": "ac5", "description": "Logs warning when orchestrator unavailable for observability" },
+          { "id": "ac6", "description": "ORCHESTRATOR_URL configurable via environment variable (default: none - disabled)" }
+        ]
+      },
+      {
+        "step_id": "i006",
+        "title": "Extend GET /plans endpoint with include_attention parameter",
+        "scope": "planner-core",
+        "description": "Update plans.ts handler to support ?include_attention=true query param. When set, use listPlansWithAttention, fetch execution status batch from orchestrator, and compute attention_types for each plan using computeAttentionTypes.",
+        "dependencies": ["i004", "i005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ListPlansQuerySchema extended with include_attention: z.boolean().optional()" },
+          { "id": "ac2", "description": "When include_attention=false or omitted, response unchanged (backward compatible)" },
+          { "id": "ac3", "description": "When include_attention=true, each PlanSummary includes attention_types: AttentionType[]" },
+          { "id": "ac4", "description": "Response type: { plans: Array<PlanSummary & { attention_types?: AttentionType[] }> }" },
+          { "id": "ac5", "description": "Orchestrator call is optional - if ORCHESTRATOR_URL not set or call fails, gate_pending and execution_failed signals omitted" },
+          { "id": "ac6", "description": "Performance: entire flow completes in <500ms for 100 plans (excluding network latency to orchestrator)" }
+        ]
+      },
+      {
+        "step_id": "i007",
+        "title": "Add AttentionType to frontend types",
+        "scope": "planner-ui",
+        "description": "Update packages/planner-ui/src/types/plan.ts to add AttentionType enum and extend PlanSummary with optional attention_types field.",
+        "dependencies": ["i006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AttentionType = 'awaiting_approval' | 'change_request' | 'gate_pending' | 'execution_failed' | 'unread_comments' | 'stale_draft' | 'active' | 'none'" },
+          { "id": "ac2", "description": "PlanSummary extended: attention_types?: AttentionType[]" },
+          { "id": "ac3", "description": "Types exported from @/types index" }
+        ]
+      },
+      {
+        "step_id": "i008",
+        "title": "Update listPlans API call to request attention data",
+        "scope": "planner-ui",
+        "description": "Modify packages/planner-ui/src/api/plans.ts listPlans() to add ?include_attention=true to the query string by default. Update return type to reflect attention_types presence.",
+        "dependencies": ["i007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "listPlans(status?: PlanStatus, includeAttention?: boolean = true) signature" },
+          { "id": "ac2", "description": "Query string includes include_attention=true when includeAttention is true" },
+          { "id": "ac3", "description": "Return type: Promise<{ plans: PlanSummary[] }> where PlanSummary may include attention_types" },
+          { "id": "ac4", "description": "Backward compatible: existing call sites work unchanged" }
+        ]
+      },
+      {
+        "step_id": "i009",
+        "title": "Add attention signal helper functions",
+        "scope": "planner-ui",
+        "description": "Create packages/planner-ui/src/utils/attention.ts with helper functions: hasAttention(plan, type), getHighestPriorityAttention(plan), getAttentionLabel(type), getAttentionColor(type). These will be used by ui-attention-sections feature.",
+        "dependencies": ["i007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "hasAttention(plan: PlanSummary, type: AttentionType): boolean" },
+          { "id": "ac2", "description": "getHighestPriorityAttention(plan: PlanSummary): AttentionType - priority order: gate_pending > execution_failed > change_request > awaiting_approval > unread_comments > active > stale_draft > none" },
+          { "id": "ac3", "description": "getAttentionLabel(type: AttentionType): string - human-readable labels" },
+          { "id": "ac4", "description": "getAttentionColor(type: AttentionType): string - returns design system color variable name" },
+          { "id": "ac5", "description": "Unit tests for all helper functions" }
+        ]
+      },
+      {
+        "step_id": "i010",
+        "title": "Write integration tests for attention signals",
+        "scope": "planner-core",
+        "description": "Create comprehensive integration tests covering the full flow: create plans in various states, call GET /plans?include_attention=true, verify attention_types are correctly computed. Include tests for orchestrator unavailable scenario.",
+        "dependencies": ["i006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: draft plan with submitted_at returns awaiting_approval" },
+          { "id": "ac2", "description": "Test: plan with pending change request returns change_request" },
+          { "id": "ac3", "description": "Test: stale draft (>7 days old) returns stale_draft" },
+          { "id": "ac4", "description": "Test: recently updated draft returns active" },
+          { "id": "ac5", "description": "Test: plan with unresolved comments returns unread_comments" },
+          { "id": "ac6", "description": "Test: plan with multiple signals returns all applicable types" },
+          { "id": "ac7", "description": "Test: orchestrator unavailable does not fail request (gate_pending/execution_failed omitted)" },
+          { "id": "ac8", "description": "Test: backward compatibility - request without include_attention returns no attention_types field" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "unit+integration",
+    "priority": "critical",
+    "strategy": "Test the pure computation function exhaustively (all 8 types + combinations). Integration tests verify SQL efficiency and API contract. Minimal frontend tests for helper functions.",
+    "cases": [
+      {
+        "id": "t001",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Draft with submitted_at returns awaiting_approval"
+      },
+      {
+        "id": "t002",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Plan with pendingChangeRequests > 0 returns change_request"
+      },
+      {
+        "id": "t003",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Published plan with executionStatus.status === 'failed' returns execution_failed"
+      },
+      {
+        "id": "t004",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Published plan with blocked gate step returns gate_pending"
+      },
+      {
+        "id": "t005",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Plan with unresolvedCommentCount > 0 returns unread_comments"
+      },
+      {
+        "id": "t006",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Draft with updated_at older than 7 days returns stale_draft"
+      },
+      {
+        "id": "t007",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Draft with updated_at within 24h returns active"
+      },
+      {
+        "id": "t008",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Published plan with executionStatus.status === 'running' returns active"
+      },
+      {
+        "id": "t009",
+        "type": "happy",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Plan with no signals returns ['none']"
+      },
+      {
+        "id": "t010",
+        "type": "edge",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Plan with multiple conditions returns all applicable types (e.g., awaiting_approval + unread_comments)"
+      },
+      {
+        "id": "t011",
+        "type": "edge",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "executionStatus is null - gate_pending and execution_failed not returned"
+      },
+      {
+        "id": "t012",
+        "type": "edge",
+        "scope": "unit",
+        "target": "computeAttentionTypes",
+        "description": "Custom config thresholds respected (stale_draft_threshold_days, active_threshold_hours)"
+      },
+      {
+        "id": "t013",
+        "type": "happy",
+        "scope": "integration",
+        "target": "listPlansWithAttention",
+        "description": "Single SQL query returns plans with correct change_request and comment counts"
+      },
+      {
+        "id": "t014",
+        "type": "edge",
+        "scope": "integration",
+        "target": "listPlansWithAttention",
+        "description": "Status filter works correctly (only returns plans matching status)"
+      },
+      {
+        "id": "t015",
+        "type": "happy",
+        "scope": "unit",
+        "target": "getExecutionStatusBatch",
+        "description": "Returns Map with execution statuses for valid plan IDs"
+      },
+      {
+        "id": "t016",
+        "type": "error",
+        "scope": "unit",
+        "target": "getExecutionStatusBatch",
+        "description": "Returns empty Map on orchestrator timeout (no exception thrown)"
+      },
+      {
+        "id": "t017",
+        "type": "error",
+        "scope": "unit",
+        "target": "getExecutionStatusBatch",
+        "description": "Returns empty Map on orchestrator connection error (no exception thrown)"
+      },
+      {
+        "id": "t018",
+        "type": "edge",
+        "scope": "unit",
+        "target": "getExecutionStatusBatch",
+        "description": "Returns empty Map when ORCHESTRATOR_URL not configured"
+      },
+      {
+        "id": "t019",
+        "type": "happy",
+        "scope": "integration",
+        "target": "GET /plans?include_attention=true",
+        "description": "Returns plans with attention_types array for each plan"
+      },
+      {
+        "id": "t020",
+        "type": "happy",
+        "scope": "integration",
+        "target": "GET /plans",
+        "description": "Backward compatible: without include_attention param, no attention_types in response"
+      },
+      {
+        "id": "t021",
+        "type": "error",
+        "scope": "integration",
+        "target": "GET /plans?include_attention=true",
+        "description": "Orchestrator unavailable: request succeeds, gate_pending and execution_failed omitted"
+      },
+      {
+        "id": "t022",
+        "type": "happy",
+        "scope": "unit",
+        "target": "getHighestPriorityAttention",
+        "description": "Returns highest priority type based on defined order"
+      },
+      {
+        "id": "t023",
+        "type": "happy",
+        "scope": "unit",
+        "target": "getAttentionLabel",
+        "description": "Returns human-readable label for each attention type"
+      },
+      {
+        "id": "t024",
+        "type": "happy",
+        "scope": "unit",
+        "target": "getAttentionColor",
+        "description": "Returns design system color variable for each attention type"
+      }
+    ],
+    "data_requirements": [
+      "Test plan in draft status with submitted_at set",
+      "Test plan with pending change_request record",
+      "Test plan with unresolved comment records",
+      "Test plan with stale updated_at (>7 days ago)",
+      "Test plan with recent updated_at (<24h ago)",
+      "Mock orchestrator response with ExecutionStatus (running, failed, blocked)",
+      "Mock orchestrator unavailable scenario"
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Execution Status Types", "path": "packages/planner-ui/src/types/plan.ts" },
+    { "type": "spec", "title": "Change Request Domain", "path": "src/domain/change-request.ts" },
+    { "type": "spec", "title": "Storage Interface", "path": "src/storage/interface.ts" },
+    { "type": "spec", "title": "Plans Handler", "path": "src/api/handlers/plans.ts" }
+  ]
+}

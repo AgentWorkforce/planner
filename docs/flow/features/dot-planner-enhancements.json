@@ -1,0 +1,1066 @@
+{
+  "feature_id": "dot-planner-enhancements",
+  "title": "DOT Framework - Planner Enhancements",
+  "type": "epic",
+  "status": "draft",
+  "priority": "critical",
+  "component": "planner-core",
+  "change_request": true,
+
+  "summary": {
+    "goal": "Enhance Planner to support DOT Framework (Decomposition, Orchestration, Trajectories) with complexity estimation, language/domain tier detection, step/depth limits enforcement, acceptance criteria generation, and Tuner integration for adaptive learning.",
+    "rationale": "Current Planner produces flat plans with no complexity estimation. Research shows P(success) = (0.5)^(T/50min) - decomposition is critical for reliability. Language tiers (Python vs COBOL) create 68-point accuracy gaps. Planner needs to estimate complexity, enforce limits, and feed predictions to Tuner for accuracy tracking.",
+    "in_scope": [
+      "Complexity estimation (hybrid: deterministic formula + LLM adjustment within +/-20%)",
+      "Language/domain tier detection (Tier S/A/B/C/D affecting budgets and model selection)",
+      "Step limits enforcement (max 15-20 steps per scope)",
+      "Depth limits enforcement (max 3 levels of sub-plans)",
+      "Acceptance criteria generation (structured, machine-verifiable)",
+      "Tuner integration (read PlannerConfig, emit complexity estimates for accuracy tracking)",
+      "Task contracts (inputs/outputs/done_definition per step)"
+    ],
+    "out_of_scope": [
+      "Sub-plan execution in Forge (separate Forge enhancement)",
+      "Aggregation step type (DOT Phase 1, separate feature)",
+      "Plan template caching (DOT Phase 2)",
+      "Cascade model routing (Forge enhancement)",
+      "Speculative execution (Forge enhancement)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Each step has complexity_estimate: { level, score, confidence, signals, recommendation }" },
+      { "id": "ac2", "description": "Complexity score is deterministic formula, with optional LLM adjustment capped at +/-20%" },
+      { "id": "ac3", "description": "Language tier detected from step scope/description (S/A/B/C/D)" },
+      { "id": "ac4", "description": "Language tier multiplier applied to complexity score" },
+      { "id": "ac5", "description": "Plans exceeding 15 steps per scope trigger decomposition warning" },
+      { "id": "ac6", "description": "Plans exceeding 3 levels of sub-plan depth are rejected" },
+      { "id": "ac7", "description": "Acceptance criteria can be structured (type: test/review/metric, validation: exists/schema/test/human)" },
+      { "id": "ac8", "description": "Planner reads PlannerConfig from Tuner on startup (graceful fallback)" },
+      { "id": "ac9", "description": "Complexity weights from PlannerConfig are applied to estimation formula" },
+      { "id": "ac10", "description": "Complexity estimates are included in published plan for Forge/Tuner consumption" },
+      { "id": "ac11", "description": "Steps have optional task_contract: { inputs, outputs, done_definition }" },
+      { "id": "ac12", "description": "API endpoint validates contracts at plan creation" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Current Step schema has: step_id, title, scope, description, dependencies, owner_role, acceptance_criteria, gate, sub_plan_id",
+        "Need to add: complexity_estimate (calculated), contract (optional), language_tier (detected)",
+        "sub_plan_id exists but is not enforced for depth limits",
+        "AcceptanceCriterion currently has { id, description, type? } - needs extension for validation",
+        "PlanVersion needs decomposition_config for limits enforcement",
+        "Tuner emits PlannerConfig with complexity_weights and decomposition thresholds"
+      ],
+      "keywords": ["complexity estimation", "language tier", "decomposition", "task contracts", "Tuner integration"],
+      "questions": [],
+      "concerns": [
+        "LLM adjustment: when to invoke LLM vs. pure deterministic? (Suggestion: only when score is 30-60, borderline)",
+        "Language detection: need heuristic based on file extensions in scope, keywords in description",
+        "Tuner cold start: use research-backed defaults until Tuner available"
+      ],
+      "confidence": "confident"
+    },
+    "research": {
+      "observations": [
+        "METR 2025: P(success) = (0.5)^(T/50min) - 50% at 50min, 25% at 100min",
+        "MultiPL-E: Python 80% vs COBOL 12% = 68-point gap due to training data distribution",
+        "Six Sigma Agent: 5-agent voting on atomic steps = 43x reliability improvement",
+        "Solving Million-Step LLM: Zero errors with hierarchical decomposition",
+        "Research recommends: max 15-20 steps/scope, max 3 depth levels"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "approach": "Extend existing Step/PlanVersion schemas with backward-compatible optional fields",
+      "rationale": "Existing plans continue to work, new features opt-in"
+    },
+    "research": {
+      "complexity_formula": "score = (descTokens/500)*30 + scopeCount*10 + depCount*5 + acCount*3 + keywordBoost + (historical blend)",
+      "language_tiers": {
+        "tier_s": ["Python", "TypeScript", "JavaScript", "Java", "C++"],
+        "tier_a": ["Go", "Rust", "C#", "PHP", "Ruby"],
+        "tier_b": ["Swift", "Kotlin", "R", "Lua", "Haskell"],
+        "tier_c": ["OCaml", "Ada", "Clojure"],
+        "tier_d": ["COBOL", "Fortran", "VHDL"]
+      },
+      "tier_multipliers": { "s": 1.0, "a": 1.4, "b": 2.0, "c": 3.2, "d": 5.0 }
+    }
+  },
+
+  "affected_features": [
+    { "id": "domain-step", "impact": "extend", "description": "Add complexity_estimate, contract, language_tier fields to Step schema" },
+    { "id": "domain-plan", "impact": "extend", "description": "Add decomposition_config to PlanVersion for limits enforcement" },
+    { "id": "storage-sqlite", "impact": "extend", "description": "Store new fields in JSON document, add migration for defaults" },
+    { "id": "api-plan-crud", "impact": "extend", "description": "API validates step limits, depth limits, contract schema" },
+    { "id": "api-workflow", "impact": "extend", "description": "Publish includes complexity estimates in output" }
+  ],
+
+  "new_features": [
+    { "id": "planner-complexity-estimator", "title": "Complexity Estimator Service", "priority": "critical" },
+    { "id": "planner-language-detector", "title": "Language/Domain Tier Detector", "priority": "high" },
+    { "id": "planner-limits-enforcer", "title": "Step & Depth Limits Enforcer", "priority": "high" },
+    { "id": "planner-contract-validator", "title": "Task Contract Validator", "priority": "medium" },
+    { "id": "planner-tuner-integration", "title": "Tuner Config Integration", "priority": "critical" }
+  ],
+
+  "sub_features": [
+    {
+      "id": "planner-complexity-estimator",
+      "title": "Complexity Estimator Service",
+      "summary": {
+        "goal": "Compute complexity estimates for each step using deterministic formula with optional LLM adjustment",
+        "acceptance_criteria": [
+          { "id": "ce1", "description": "estimateComplexity(step) returns ComplexityEstimate with level, score, confidence, signals, recommendation" },
+          { "id": "ce2", "description": "Score formula: descTokens/500*30 + scopeCount*10 + depCount*5 + acCount*3 + keywordBoost" },
+          { "id": "ce3", "description": "Level mapping: <15=trivial, <30=simple, <50=moderate, <75=complex, else=very_complex" },
+          { "id": "ce4", "description": "Recommendation: <30=proceed, <60=consider_decomposition, else=require_decomposition" },
+          { "id": "ce5", "description": "Language tier multiplier applied: score * tier_multiplier" },
+          { "id": "ce6", "description": "Optional LLM adjustment for borderline scores (30-60), capped at +/-20%" },
+          { "id": "ce7", "description": "Confidence is 0.8 if historical data available, else 0.5" }
+        ]
+      }
+    },
+    {
+      "id": "planner-language-detector",
+      "title": "Language/Domain Tier Detector",
+      "summary": {
+        "goal": "Detect programming language tier and domain familiarity from step context",
+        "acceptance_criteria": [
+          { "id": "ld1", "description": "detectLanguageTier(step) returns tier: 's' | 'a' | 'b' | 'c' | 'd'" },
+          { "id": "ld2", "description": "Detection uses: scope field, file extensions mentioned, keywords in description" },
+          { "id": "ld3", "description": "Language mapping covers all Tier S-D languages from research" },
+          { "id": "ld4", "description": "Domain familiarity adjustment: +25% for mobile, +100% for embedded, etc." },
+          { "id": "ld5", "description": "Unknown language defaults to Tier A (conservative estimate)" },
+          { "id": "ld6", "description": "Tier stored on step as language_tier field" }
+        ]
+      }
+    },
+    {
+      "id": "planner-limits-enforcer",
+      "title": "Step & Depth Limits Enforcer",
+      "summary": {
+        "goal": "Enforce step count and sub-plan depth limits per decomposition config",
+        "acceptance_criteria": [
+          { "id": "le1", "description": "Default limits: max 15 steps per scope, max 3 depth levels" },
+          { "id": "le2", "description": "Limits read from PlannerConfig if Tuner available, else use defaults" },
+          { "id": "le3", "description": "validatePlanLimits(plan) checks steps per scope, returns warnings" },
+          { "id": "le4", "description": "validateSubPlanDepth(plan_id) traverses sub_plan_id chain, rejects if > max_depth" },
+          { "id": "le5", "description": "Warnings surfaced in API response, not blocking (soft enforcement)" },
+          { "id": "le6", "description": "Depth violations are hard errors (prevents infinite recursion)" }
+        ]
+      }
+    },
+    {
+      "id": "planner-contract-validator",
+      "title": "Task Contract Validator",
+      "summary": {
+        "goal": "Validate task contracts on steps at plan creation time",
+        "acceptance_criteria": [
+          { "id": "cv1", "description": "TaskContract schema: { inputs: ContractInput[], outputs: ContractOutput[], done_definition: DoneDefinition }" },
+          { "id": "cv2", "description": "ContractInput: { name, type: artifact|context|parameter, source: step_id|plan, required, description? }" },
+          { "id": "cv3", "description": "ContractOutput: { name, type: file|directory|schema|config, path?, validation: exists|schema|test|human, schema_ref? }" },
+          { "id": "cv4", "description": "DoneDefinition: { all_outputs_present, acceptance_criteria_pass, custom_check? }" },
+          { "id": "cv5", "description": "validateContract(step, plan) checks: input sources exist, output types valid" },
+          { "id": "cv6", "description": "Contract is optional - plans without contracts still valid" }
+        ]
+      }
+    },
+    {
+      "id": "planner-tuner-integration",
+      "title": "Tuner Config Integration",
+      "summary": {
+        "goal": "Wire Planner to read PlannerConfig from Tuner for complexity weights and limits",
+        "acceptance_criteria": [
+          { "id": "ti1", "description": "Planner reads TUNER_URL from env (optional, disabled by default)" },
+          { "id": "ti2", "description": "If TUNER_URL set, fetches PlannerConfig on startup" },
+          { "id": "ti3", "description": "Config refreshed every 5 minutes via setInterval" },
+          { "id": "ti4", "description": "If Tuner unavailable, falls back to research-backed defaults" },
+          { "id": "ti5", "description": "complexity_weights from config used in estimateComplexity" },
+          { "id": "ti6", "description": "language_complexity_multipliers from config used for tier adjustment" },
+          { "id": "ti7", "description": "decomposition limits from config used in limits enforcer" }
+        ]
+      }
+    }
+  ],
+
+  "schema_changes": {
+    "step": {
+      "new_fields": [
+        {
+          "name": "complexity_estimate",
+          "type": "ComplexityEstimate",
+          "optional": true,
+          "description": "Computed complexity estimate for the step"
+        },
+        {
+          "name": "language_tier",
+          "type": "'s' | 'a' | 'b' | 'c' | 'd'",
+          "optional": true,
+          "description": "Detected programming language tier"
+        },
+        {
+          "name": "contract",
+          "type": "TaskContract",
+          "optional": true,
+          "description": "Input/output contract for the step"
+        }
+      ]
+    },
+    "plan_version": {
+      "new_fields": [
+        {
+          "name": "decomposition_config",
+          "type": "DecompositionConfig",
+          "optional": true,
+          "description": "Limits and thresholds for decomposition"
+        }
+      ]
+    },
+    "acceptance_criterion": {
+      "extended_fields": [
+        {
+          "name": "validation",
+          "type": "'exists' | 'schema' | 'test' | 'human'",
+          "optional": true,
+          "description": "How to validate this criterion"
+        },
+        {
+          "name": "schema_ref",
+          "type": "string",
+          "optional": true,
+          "description": "Reference to validation schema if validation='schema'"
+        }
+      ]
+    },
+    "new_types": {
+      "ComplexityEstimate": {
+        "fields": [
+          { "name": "level", "type": "'trivial' | 'simple' | 'moderate' | 'complex' | 'very_complex'" },
+          { "name": "score", "type": "number", "description": "0-100" },
+          { "name": "confidence", "type": "number", "description": "0-1" },
+          { "name": "signals", "type": "ComplexitySignals" },
+          { "name": "recommendation", "type": "'proceed' | 'consider_decomposition' | 'require_decomposition'" }
+        ]
+      },
+      "ComplexitySignals": {
+        "fields": [
+          { "name": "description_tokens", "type": "number" },
+          { "name": "scope_count", "type": "number" },
+          { "name": "dependency_count", "type": "number" },
+          { "name": "ac_count", "type": "number" },
+          { "name": "keyword_boost", "type": "number" },
+          { "name": "language_multiplier", "type": "number" },
+          { "name": "historical_avg", "type": "number", "optional": true }
+        ]
+      },
+      "TaskContract": {
+        "fields": [
+          { "name": "inputs", "type": "ContractInput[]" },
+          { "name": "outputs", "type": "ContractOutput[]" },
+          { "name": "done_definition", "type": "DoneDefinition" }
+        ]
+      },
+      "ContractInput": {
+        "fields": [
+          { "name": "name", "type": "string" },
+          { "name": "type", "type": "'artifact' | 'context' | 'parameter'" },
+          { "name": "source", "type": "string", "description": "Step ID or 'plan'" },
+          { "name": "required", "type": "boolean" },
+          { "name": "description", "type": "string", "optional": true }
+        ]
+      },
+      "ContractOutput": {
+        "fields": [
+          { "name": "name", "type": "string" },
+          { "name": "type", "type": "'file' | 'directory' | 'schema' | 'config'" },
+          { "name": "path", "type": "string", "optional": true },
+          { "name": "validation", "type": "'exists' | 'schema' | 'test' | 'human'" },
+          { "name": "schema_ref", "type": "string", "optional": true }
+        ]
+      },
+      "DoneDefinition": {
+        "fields": [
+          { "name": "all_outputs_present", "type": "boolean" },
+          { "name": "acceptance_criteria_pass", "type": "boolean" },
+          { "name": "custom_check", "type": "string", "optional": true }
+        ]
+      },
+      "DecompositionConfig": {
+        "fields": [
+          { "name": "max_step_complexity", "type": "'atomic' | 'simple' | 'compound'" },
+          { "name": "auto_decompose_threshold", "type": "number" },
+          { "name": "max_steps_per_scope", "type": "number", "default": 15 },
+          { "name": "max_depth", "type": "number", "default": 3 },
+          { "name": "allow_sub_plans", "type": "boolean", "default": true }
+        ]
+      }
+    }
+  },
+
+  "implementation_notes": {
+    "backward_compatibility": "All new fields are optional. Existing plans and steps continue to work unchanged.",
+    "migration": "No data migration needed. New fields populated on new/updated plans only.",
+    "tuner_dependency": "Tuner integration is optional. Planner functions with hardcoded defaults if Tuner unavailable.",
+    "llm_adjustment": "LLM complexity adjustment is optional optimization. Core estimation is deterministic.",
+    "phase": "This is Phase 5 of DOT Framework (Planner Enhancements). Tuner package (Phase 4) should be implemented first for full integration."
+  },
+
+  "related_features": [
+    { "id": "tuner-package", "relationship": "depends_on", "description": "Planner reads config from Tuner" },
+    { "id": "tuner-planner-integration", "relationship": "implements", "description": "This feature implements the Planner side of tuner-planner-integration" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "phases": [
+      {
+        "phase_id": "phase-1",
+        "title": "Schema Extensions & Domain Types",
+        "description": "Add new Zod schemas and TypeScript types for complexity estimation, language tiers, task contracts, and decomposition config. All new fields are optional for backward compatibility."
+      },
+      {
+        "phase_id": "phase-2",
+        "title": "Core Services",
+        "description": "Implement the core services: complexity estimator, language detector, limits enforcer, and contract validator."
+      },
+      {
+        "phase_id": "phase-3",
+        "title": "Tuner Integration",
+        "description": "Wire up the Tuner client to fetch and cache PlannerConfig, with graceful fallback to defaults."
+      },
+      {
+        "phase_id": "phase-4",
+        "title": "API Integration & Validation",
+        "description": "Integrate services into API handlers, add validation middleware, and surface warnings/errors in responses."
+      },
+      {
+        "phase_id": "phase-5",
+        "title": "Testing & Verification",
+        "description": "Comprehensive test coverage for all new services and integration points."
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "dot-001",
+        "title": "Add ComplexityEstimate and ComplexitySignals schemas",
+        "scope": "planner-core",
+        "description": "Create new file `src/domain/complexity.ts` with Zod schemas for ComplexityEstimate (level, score, confidence, signals, recommendation) and ComplexitySignals (description_tokens, scope_count, dependency_count, ac_count, keyword_boost, language_multiplier, historical_avg). Export types.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ComplexityEstimateSchema validates: level enum (trivial|simple|moderate|complex|very_complex), score 0-100, confidence 0-1" },
+          { "id": "ac2", "description": "ComplexitySignalsSchema validates all numeric fields, historical_avg optional" },
+          { "id": "ac3", "description": "RecommendationSchema enum: proceed|consider_decomposition|require_decomposition" },
+          { "id": "ac4", "description": "Types exported: ComplexityEstimate, ComplexitySignals, ComplexityLevel, ComplexityRecommendation" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Zod schema with inferred types",
+            "file": "packages/planner/src/domain/complexity.ts",
+            "exports": ["ComplexityEstimateSchema", "ComplexitySignalsSchema", "ComplexityLevel", "ComplexityRecommendation", "ComplexityEstimate", "ComplexitySignals"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-002",
+        "title": "Add LanguageTier schema and mappings",
+        "scope": "planner-core",
+        "description": "Create new file `src/domain/language-tier.ts` with LanguageTier enum (s|a|b|c|d), language-to-tier mappings from research data, file extension mappings, and tier multipliers. Include domain familiarity adjustments.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "LanguageTierSchema validates: 's' | 'a' | 'b' | 'c' | 'd'" },
+          { "id": "ac2", "description": "LANGUAGE_TO_TIER map covers: Python/TS/JS/Java/C++ (S), Go/Rust/C#/PHP/Ruby (A), Swift/Kotlin/R/Lua/Haskell (B), OCaml/Ada/Clojure (C), COBOL/Fortran/VHDL (D)" },
+          { "id": "ac3", "description": "FILE_EXTENSION_TO_TIER map for common extensions (.py, .ts, .js, .java, .cpp, .go, .rs, etc.)" },
+          { "id": "ac4", "description": "TIER_MULTIPLIERS map: { s: 1.0, a: 1.4, b: 2.0, c: 3.2, d: 5.0 }" },
+          { "id": "ac5", "description": "DOMAIN_ADJUSTMENTS map: { mobile: 0.25, embedded: 1.0, blockchain: 0.5 } (additive multipliers)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/language-tier.ts",
+            "exports": ["LanguageTierSchema", "LanguageTier", "LANGUAGE_TO_TIER", "FILE_EXTENSION_TO_TIER", "TIER_MULTIPLIERS", "DOMAIN_ADJUSTMENTS"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-003",
+        "title": "Add TaskContract, ContractInput, ContractOutput, DoneDefinition schemas",
+        "scope": "planner-core",
+        "description": "Create new file `src/domain/contract.ts` with Zod schemas for task contracts. ContractInput has name, type (artifact|context|parameter), source (step_id or 'plan'), required boolean. ContractOutput has name, type (file|directory|schema|config), path, validation method. DoneDefinition has all_outputs_present, acceptance_criteria_pass, custom_check.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ContractInputSchema validates type enum: artifact|context|parameter" },
+          { "id": "ac2", "description": "ContractOutputSchema validates type enum: file|directory|schema|config, validation enum: exists|schema|test|human" },
+          { "id": "ac3", "description": "DoneDefinitionSchema validates booleans and optional custom_check string" },
+          { "id": "ac4", "description": "TaskContractSchema composes: inputs[], outputs[], done_definition" },
+          { "id": "ac5", "description": "All fields properly typed with inference" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/contract.ts",
+            "exports": ["TaskContractSchema", "ContractInputSchema", "ContractOutputSchema", "DoneDefinitionSchema", "TaskContract", "ContractInput", "ContractOutput", "DoneDefinition"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-004",
+        "title": "Add DecompositionConfig schema",
+        "scope": "planner-core",
+        "description": "Create new file `src/domain/decomposition-config.ts` with Zod schema for plan-level decomposition settings: max_step_complexity (atomic|simple|compound), auto_decompose_threshold (number), max_steps_per_scope (default 15), max_depth (default 3), allow_sub_plans (default true). Include DEFAULT_DECOMPOSITION_CONFIG constant.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "DecompositionConfigSchema validates all fields with proper defaults" },
+          { "id": "ac2", "description": "DEFAULT_DECOMPOSITION_CONFIG exports research-backed defaults: { max_step_complexity: 'simple', auto_decompose_threshold: 60, max_steps_per_scope: 15, max_depth: 3, allow_sub_plans: true }" },
+          { "id": "ac3", "description": "Types exported: DecompositionConfig, StepComplexityLevel" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/decomposition-config.ts",
+            "exports": ["DecompositionConfigSchema", "DecompositionConfig", "StepComplexityLevel", "DEFAULT_DECOMPOSITION_CONFIG"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-005",
+        "title": "Extend AcceptanceCriterion schema with validation fields",
+        "scope": "planner-core",
+        "description": "Modify `src/domain/criterion.ts` to add optional `validation` (exists|schema|test|human) and `schema_ref` fields to AcceptanceCriterionSchema. These enable machine-verifiable acceptance criteria.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AcceptanceCriterionSchema extended with optional validation: z.enum(['exists', 'schema', 'test', 'human']).optional()" },
+          { "id": "ac2", "description": "AcceptanceCriterionSchema extended with optional schema_ref: z.string().optional()" },
+          { "id": "ac3", "description": "Existing plans without these fields continue to validate (backward compatible)" },
+          { "id": "ac4", "description": "AcceptanceCriterion type updated with new fields" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/criterion.ts",
+            "pattern": "Extend existing schema, optional fields"
+          }
+        }
+      },
+      {
+        "step_id": "dot-006",
+        "title": "Extend Step schema with complexity_estimate, language_tier, contract",
+        "scope": "planner-core",
+        "description": "Modify `src/domain/step.ts` to import and add optional fields: complexity_estimate (ComplexityEstimate), language_tier (LanguageTier), contract (TaskContract). Update CreateStepOptions interface. All fields optional for backward compatibility.",
+        "dependencies": ["dot-001", "dot-002", "dot-003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "StepSchema extended with complexity_estimate: ComplexityEstimateSchema.optional()" },
+          { "id": "ac2", "description": "StepSchema extended with language_tier: LanguageTierSchema.optional()" },
+          { "id": "ac3", "description": "StepSchema extended with contract: TaskContractSchema.optional()" },
+          { "id": "ac4", "description": "CreateStepOptions interface includes optional complexity_estimate, language_tier, contract" },
+          { "id": "ac5", "description": "createStep function handles new optional fields" },
+          { "id": "ac6", "description": "Existing steps without these fields continue to validate" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/step.ts",
+            "imports": ["ComplexityEstimateSchema from ./complexity", "LanguageTierSchema from ./language-tier", "TaskContractSchema from ./contract"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-007",
+        "title": "Extend PlanVersion schema with decomposition_config",
+        "scope": "planner-core",
+        "description": "Modify `src/domain/plan.ts` to add optional decomposition_config field to PlanVersionSchema. Update createPlanVersion function to accept optional decomposition_config parameter.",
+        "dependencies": ["dot-004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersionSchema extended with decomposition_config: DecompositionConfigSchema.optional()" },
+          { "id": "ac2", "description": "createPlanVersion accepts optional decomposition_config parameter" },
+          { "id": "ac3", "description": "Existing PlanVersions without decomposition_config validate and use defaults when needed" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/plan.ts",
+            "imports": ["DecompositionConfigSchema from ./decomposition-config"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-008",
+        "title": "Update domain/index.ts exports",
+        "scope": "planner-core",
+        "description": "Update `src/domain/index.ts` to re-export all new types and schemas from complexity.ts, language-tier.ts, contract.ts, and decomposition-config.ts.",
+        "dependencies": ["dot-001", "dot-002", "dot-003", "dot-004", "dot-005", "dot-006", "dot-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All new schemas exported: ComplexityEstimateSchema, LanguageTierSchema, TaskContractSchema, DecompositionConfigSchema" },
+          { "id": "ac2", "description": "All new types exported: ComplexityEstimate, LanguageTier, TaskContract, DecompositionConfig, etc." },
+          { "id": "ac3", "description": "All constants exported: LANGUAGE_TO_TIER, TIER_MULTIPLIERS, DEFAULT_DECOMPOSITION_CONFIG, etc." }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/domain/index.ts"
+          }
+        }
+      },
+      {
+        "step_id": "dot-009",
+        "title": "Phase 1 Verification Checkpoint",
+        "scope": "planner-core",
+        "description": "Verify all schema extensions compile correctly, types are properly inferred, backward compatibility is maintained. Run existing tests to ensure no regressions.",
+        "dependencies": ["dot-008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TypeScript compilation succeeds with no errors" },
+          { "id": "ac2", "description": "Existing domain tests pass without modification" },
+          { "id": "ac3", "description": "New schemas can be imported and used in test file" },
+          { "id": "ac4", "description": "Backward compatibility: existing Step/PlanVersion objects validate successfully" }
+        ]
+      },
+      {
+        "step_id": "dot-010",
+        "title": "Create PlannerConfig type for Tuner integration",
+        "scope": "planner-core",
+        "description": "Create new file `src/tuner/config.ts` with PlannerConfig Zod schema matching Tuner's output. Includes complexity_weights, language_complexity_multipliers, decomposition settings. Export DEFAULT_PLANNER_CONFIG with research-backed values.",
+        "dependencies": ["dot-009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlannerConfigSchema includes complexity_weights: { description_weight, scope_weight, dependency_weight, ac_weight, keyword_weight }" },
+          { "id": "ac2", "description": "PlannerConfigSchema includes language_complexity_multipliers matching TIER_MULTIPLIERS structure" },
+          { "id": "ac3", "description": "PlannerConfigSchema includes decomposition settings (max_steps_per_scope, max_depth, etc.)" },
+          { "id": "ac4", "description": "DEFAULT_PLANNER_CONFIG has research-backed defaults: { description_weight: 30, scope_weight: 10, dependency_weight: 5, ac_weight: 3, keyword_weight: 5 }" },
+          { "id": "ac5", "description": "Types exported: PlannerConfig, ComplexityWeights" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/tuner/config.ts",
+            "pattern": "Zod schema with defaults",
+            "exports": ["PlannerConfigSchema", "PlannerConfig", "ComplexityWeights", "DEFAULT_PLANNER_CONFIG"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-011",
+        "title": "Create TunerClient service",
+        "scope": "planner-core",
+        "description": "Create new file `src/tuner/client.ts` with TunerClient class. Reads TUNER_URL from env, fetches PlannerConfig on init, caches config with 5-minute refresh interval, provides getConfig() method. Graceful fallback to DEFAULT_PLANNER_CONFIG if Tuner unavailable.",
+        "dependencies": ["dot-010"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TunerClient constructor reads TUNER_URL from process.env" },
+          { "id": "ac2", "description": "If TUNER_URL not set, operates in disabled mode (uses defaults)" },
+          { "id": "ac3", "description": "fetchConfig() calls GET ${TUNER_URL}/api/planner-config and validates response" },
+          { "id": "ac4", "description": "Config cached in memory, refreshed via setInterval every 5 minutes" },
+          { "id": "ac5", "description": "getConfig() returns cached config or DEFAULT_PLANNER_CONFIG if unavailable" },
+          { "id": "ac6", "description": "Errors logged but do not throw (graceful degradation)" },
+          { "id": "ac7", "description": "stop() method clears refresh interval for cleanup" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/tuner/client.ts",
+            "pattern": "Singleton service with caching",
+            "exports": ["TunerClient", "createTunerClient"]
+          },
+          "security": {
+            "network": "HTTP call to internal service only",
+            "error_handling": "Log and fallback, never expose Tuner errors to API clients"
+          }
+        }
+      },
+      {
+        "step_id": "dot-012",
+        "title": "Create complexity estimator service",
+        "scope": "planner-core",
+        "description": "Create new file `src/services/complexity-estimator.ts`. Implements estimateComplexity(step, config) using deterministic formula: score = (descTokens/500)*weight1 + scopeCount*weight2 + depCount*weight3 + acCount*weight4 + keywordBoost. Apply language tier multiplier. Map score to level and recommendation.",
+        "dependencies": ["dot-010", "dot-006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "estimateComplexity(step, config?) returns ComplexityEstimate" },
+          { "id": "ac2", "description": "Token count estimated via description.length / 4 (approximate)" },
+          { "id": "ac3", "description": "Score formula uses weights from config or defaults" },
+          { "id": "ac4", "description": "Keyword boost adds +5 for each complexity keyword: ['migration', 'refactor', 'security', 'performance', 'integration', 'concurrent']" },
+          { "id": "ac5", "description": "Language multiplier applied: finalScore = baseScore * getTierMultiplier(step.language_tier)" },
+          { "id": "ac6", "description": "Level mapping: <15=trivial, <30=simple, <50=moderate, <75=complex, >=75=very_complex" },
+          { "id": "ac7", "description": "Recommendation: <30=proceed, <60=consider_decomposition, >=60=require_decomposition" },
+          { "id": "ac8", "description": "Confidence: 0.5 (no historical data in v1)" },
+          { "id": "ac9", "description": "Returns complete ComplexityEstimate with all signals" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/services/complexity-estimator.ts",
+            "pattern": "Pure function service",
+            "exports": ["estimateComplexity", "countTokens", "detectComplexityKeywords", "mapScoreToLevel", "mapScoreToRecommendation"]
+          },
+          "testing": {
+            "strategy": "Unit tests with various step configurations",
+            "edge_cases": ["empty description", "no dependencies", "very long description", "all complexity keywords"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-013",
+        "title": "Create language tier detector service",
+        "scope": "planner-core",
+        "description": "Create new file `src/services/language-detector.ts`. Implements detectLanguageTier(step) that analyzes step.scope and step.description to detect programming language and return appropriate tier. Uses file extension patterns, language keywords, and domain indicators.",
+        "dependencies": ["dot-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "detectLanguageTier(step) returns LanguageTier ('s'|'a'|'b'|'c'|'d')" },
+          { "id": "ac2", "description": "Extracts file extensions from scope and description using regex (\\.\\w+)" },
+          { "id": "ac3", "description": "Matches extensions against FILE_EXTENSION_TO_TIER map" },
+          { "id": "ac4", "description": "Falls back to language keyword detection in description ('python', 'typescript', etc.)" },
+          { "id": "ac5", "description": "Returns 'a' (conservative default) if no language detected" },
+          { "id": "ac6", "description": "detectDomainAdjustment(step) returns additional multiplier for mobile/embedded/blockchain domains" },
+          { "id": "ac7", "description": "getEffectiveMultiplier(tier, domain) combines tier multiplier with domain adjustment" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/services/language-detector.ts",
+            "pattern": "Pure function service",
+            "exports": ["detectLanguageTier", "detectDomainAdjustment", "getEffectiveMultiplier", "extractFileExtensions", "extractLanguageKeywords"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-014",
+        "title": "Create limits enforcer service",
+        "scope": "planner-core",
+        "description": "Create new file `src/services/limits-enforcer.ts`. Implements validatePlanLimits(planVersion, config) for step count per scope, and validateSubPlanDepth(plan_id, storage) for sub-plan depth traversal. Returns warnings array and hard errors.",
+        "dependencies": ["dot-004", "dot-007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "validatePlanLimits(planVersion, config?) returns { warnings: string[], errors: string[] }" },
+          { "id": "ac2", "description": "Groups steps by scope, checks count against max_steps_per_scope (default 15)" },
+          { "id": "ac3", "description": "Exceeding limit adds warning: 'Scope {scope} has {count} steps (max {limit})'" },
+          { "id": "ac4", "description": "validateSubPlanDepth(plan_id, storage, max_depth?) traverses sub_plan_id references" },
+          { "id": "ac5", "description": "Depth > max_depth (default 3) returns error: 'Sub-plan depth exceeds maximum ({depth} > {max})'" },
+          { "id": "ac6", "description": "Detects circular references and returns error" },
+          { "id": "ac7", "description": "Uses config from decomposition_config or DEFAULT_DECOMPOSITION_CONFIG" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/services/limits-enforcer.ts",
+            "pattern": "Service with storage dependency for depth traversal",
+            "exports": ["validatePlanLimits", "validateSubPlanDepth", "LimitsValidationResult"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-015",
+        "title": "Create contract validator service",
+        "scope": "planner-core",
+        "description": "Create new file `src/services/contract-validator.ts`. Implements validateContract(step, planVersion) that validates task contract consistency: input sources exist as step_ids or 'plan', output types are valid, done_definition is consistent.",
+        "dependencies": ["dot-003", "dot-006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "validateContract(step, planVersion) returns { valid: boolean, errors: string[] }" },
+          { "id": "ac2", "description": "If step.contract is undefined, returns { valid: true, errors: [] }" },
+          { "id": "ac3", "description": "For each input, validates source is 'plan' or existing step_id in planVersion.steps" },
+          { "id": "ac4", "description": "Invalid input source returns error: 'Input {name} references non-existent step {source}'" },
+          { "id": "ac5", "description": "Validates output validation types match allowed enum" },
+          { "id": "ac6", "description": "If validation='schema', validates schema_ref is present" },
+          { "id": "ac7", "description": "validateAllContracts(planVersion) validates all steps, aggregates errors" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/services/contract-validator.ts",
+            "pattern": "Pure function service",
+            "exports": ["validateContract", "validateAllContracts", "ContractValidationResult"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-016",
+        "title": "Create services/index.ts exports",
+        "scope": "planner-core",
+        "description": "Create `src/services/index.ts` to export all new services: complexity-estimator, language-detector, limits-enforcer, contract-validator.",
+        "dependencies": ["dot-012", "dot-013", "dot-014", "dot-015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Re-exports all functions from complexity-estimator.ts" },
+          { "id": "ac2", "description": "Re-exports all functions from language-detector.ts" },
+          { "id": "ac3", "description": "Re-exports all functions from limits-enforcer.ts" },
+          { "id": "ac4", "description": "Re-exports all functions from contract-validator.ts" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/services/index.ts"
+          }
+        }
+      },
+      {
+        "step_id": "dot-017",
+        "title": "Phase 2 Verification Checkpoint",
+        "scope": "planner-core",
+        "description": "Verify all core services work correctly in isolation. Write unit tests for each service with various inputs. Ensure deterministic behavior for complexity estimation.",
+        "dependencies": ["dot-016", "dot-011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Unit tests for estimateComplexity with 10+ test cases" },
+          { "id": "ac2", "description": "Unit tests for detectLanguageTier with all tier scenarios" },
+          { "id": "ac3", "description": "Unit tests for validatePlanLimits with warning and OK cases" },
+          { "id": "ac4", "description": "Unit tests for validateSubPlanDepth with depth 1, 2, 3, 4 and circular reference" },
+          { "id": "ac5", "description": "Unit tests for validateContract with valid and invalid contracts" },
+          { "id": "ac6", "description": "Unit tests for TunerClient with mock fetch" },
+          { "id": "ac7", "description": "All tests pass" }
+        ]
+      },
+      {
+        "step_id": "dot-018",
+        "title": "Create DOT middleware for plan enrichment",
+        "scope": "planner-core",
+        "description": "Create new file `src/api/middleware/dot-enrichment.ts`. Middleware that enriches steps with language_tier and complexity_estimate before storage. Runs on plan create/update operations.",
+        "dependencies": ["dot-017"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "enrichSteps(steps, config) adds language_tier to each step using detectLanguageTier" },
+          { "id": "ac2", "description": "enrichSteps(steps, config) adds complexity_estimate to each step using estimateComplexity" },
+          { "id": "ac3", "description": "Skips steps that already have these fields populated (allows manual override)" },
+          { "id": "ac4", "description": "Returns enriched steps array" },
+          { "id": "ac5", "description": "Uses TunerClient.getConfig() for weights if available" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/middleware/dot-enrichment.ts",
+            "pattern": "Middleware function",
+            "exports": ["enrichSteps", "enrichPlanVersion"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-019",
+        "title": "Create DOT validation middleware",
+        "scope": "planner-core",
+        "description": "Create new file `src/api/middleware/dot-validation.ts`. Middleware that validates plan limits and contracts. Returns structured validation result with warnings and errors.",
+        "dependencies": ["dot-017"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "validatePlanDOT(planVersion, storage, config) returns DOTValidationResult" },
+          { "id": "ac2", "description": "DOTValidationResult: { valid: boolean, warnings: string[], errors: string[] }" },
+          { "id": "ac3", "description": "Runs validatePlanLimits and aggregates warnings" },
+          { "id": "ac4", "description": "Runs validateSubPlanDepth for plans with sub_plan_id references" },
+          { "id": "ac5", "description": "Runs validateAllContracts and aggregates errors" },
+          { "id": "ac6", "description": "valid=false only if there are errors (warnings don't block)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/middleware/dot-validation.ts",
+            "pattern": "Validation middleware",
+            "exports": ["validatePlanDOT", "DOTValidationResult"]
+          }
+        }
+      },
+      {
+        "step_id": "dot-020",
+        "title": "Integrate TunerClient into application startup",
+        "scope": "planner-core",
+        "description": "Modify `src/index.ts` or app initialization to create and start TunerClient singleton. Make it available to services via dependency injection or module export.",
+        "dependencies": ["dot-011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TunerClient instantiated during app startup" },
+          { "id": "ac2", "description": "If TUNER_URL env var set, initial config fetch attempted" },
+          { "id": "ac3", "description": "TunerClient exported for use by services" },
+          { "id": "ac4", "description": "Graceful shutdown calls tunerClient.stop() to clear interval" },
+          { "id": "ac5", "description": "Startup logs indicate Tuner mode: 'Tuner integration: enabled' or 'disabled'" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/index.ts",
+            "pattern": "Singleton initialization at startup"
+          }
+        }
+      },
+      {
+        "step_id": "dot-021",
+        "title": "Integrate DOT enrichment into plan creation handler",
+        "scope": "planner-core",
+        "description": "Modify `src/api/handlers/plans.ts` createPlan handler to call enrichSteps before storing the plan. Pass TunerClient config to enrichment.",
+        "dependencies": ["dot-018", "dot-020"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /api/plans calls enrichSteps(steps, config) before creating plan" },
+          { "id": "ac2", "description": "Enriched steps stored with language_tier and complexity_estimate" },
+          { "id": "ac3", "description": "Response includes enriched step data" },
+          { "id": "ac4", "description": "If enrichment fails, logs error but proceeds (graceful degradation)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/handlers/plans.ts"
+          }
+        }
+      },
+      {
+        "step_id": "dot-022",
+        "title": "Integrate DOT enrichment into plan update handler",
+        "scope": "planner-core",
+        "description": "Modify `src/api/handlers/plans.ts` updatePlan/addStep handlers to enrich new or modified steps. Only re-enrich steps without existing complexity_estimate.",
+        "dependencies": ["dot-021"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PUT /api/plans/:id calls enrichSteps for new/modified steps" },
+          { "id": "ac2", "description": "POST /api/plans/:id/steps calls enrichSteps for the new step" },
+          { "id": "ac3", "description": "Steps with existing complexity_estimate are not re-enriched" },
+          { "id": "ac4", "description": "Response reflects enriched data" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/handlers/plans.ts"
+          }
+        }
+      },
+      {
+        "step_id": "dot-023",
+        "title": "Integrate DOT validation into plan save operations",
+        "scope": "planner-core",
+        "description": "Modify plan handlers to call validatePlanDOT before saving. Include warnings in response. Block save if validation returns errors.",
+        "dependencies": ["dot-019", "dot-021"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create/update handlers call validatePlanDOT" },
+          { "id": "ac2", "description": "Validation warnings included in response: { data: {...}, warnings: [...] }" },
+          { "id": "ac3", "description": "Validation errors return 400 with { error: 'Validation failed', details: [...] }" },
+          { "id": "ac4", "description": "Sub-plan depth validation only runs when steps have sub_plan_id" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/handlers/plans.ts",
+            "pattern": "Validation before persistence"
+          }
+        }
+      },
+      {
+        "step_id": "dot-024",
+        "title": "Add decomposition_config to API schemas",
+        "scope": "planner-core",
+        "description": "Modify `src/api/schemas.ts` to include decomposition_config in CreatePlanRequest and UpdatePlanRequest schemas. Validate against DecompositionConfigSchema.",
+        "dependencies": ["dot-004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreatePlanRequestSchema includes optional decomposition_config field" },
+          { "id": "ac2", "description": "UpdatePlanRequestSchema includes optional decomposition_config field" },
+          { "id": "ac3", "description": "decomposition_config validated against DecompositionConfigSchema" },
+          { "id": "ac4", "description": "API documentation updated (if applicable)" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/schemas.ts"
+          }
+        }
+      },
+      {
+        "step_id": "dot-025",
+        "title": "Include complexity estimates in publish output",
+        "scope": "planner-core",
+        "description": "Modify `src/api/handlers/workflow.ts` publish handler to ensure complexity_estimate, language_tier, and contract fields are included in the published plan artifact for Forge/Tuner consumption.",
+        "dependencies": ["dot-023"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /api/plans/:id/publish returns plan with all DOT fields populated" },
+          { "id": "ac2", "description": "Published plan includes step.complexity_estimate for each step" },
+          { "id": "ac3", "description": "Published plan includes step.language_tier for each step" },
+          { "id": "ac4", "description": "Published plan includes decomposition_config at plan level" },
+          { "id": "ac5", "description": "Validation warnings logged at publish time" }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/planner/src/api/handlers/workflow.ts"
+          }
+        }
+      },
+      {
+        "step_id": "dot-026",
+        "title": "Phase 4 Verification Checkpoint",
+        "scope": "planner-core",
+        "description": "Verify API integration works end-to-end. Test plan creation, update, and publish flows with DOT enrichment and validation. Check backward compatibility with existing API clients.",
+        "dependencies": ["dot-025", "dot-024"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Integration tests for plan creation with step enrichment" },
+          { "id": "ac2", "description": "Integration tests for plan update with validation warnings" },
+          { "id": "ac3", "description": "Integration tests for publish with full DOT data" },
+          { "id": "ac4", "description": "Integration tests for depth validation with nested sub-plans" },
+          { "id": "ac5", "description": "Backward compatibility: existing API clients work without changes" },
+          { "id": "ac6", "description": "All tests pass" }
+        ]
+      },
+      {
+        "step_id": "dot-027",
+        "title": "Write comprehensive unit tests for complexity-estimator",
+        "scope": "planner-core",
+        "description": "Create `src/services/complexity-estimator.test.ts` with comprehensive test coverage: edge cases, boundary conditions, all complexity levels, keyword detection, language multipliers.",
+        "dependencies": ["dot-012"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: empty description returns trivial complexity" },
+          { "id": "ac2", "description": "Test: long description (>500 tokens) increases score" },
+          { "id": "ac3", "description": "Test: each complexity keyword adds +5 to score" },
+          { "id": "ac4", "description": "Test: multiple dependencies increase score" },
+          { "id": "ac5", "description": "Test: score boundaries: 14=trivial, 15=simple, 29=simple, 30=moderate, etc." },
+          { "id": "ac6", "description": "Test: language tier multiplier applied correctly (tier_d = 5x)" },
+          { "id": "ac7", "description": "Test: custom weights from config override defaults" },
+          { "id": "ac8", "description": "Test: recommendation matches score thresholds" }
+        ],
+        "specification": {
+          "testing": {
+            "file": "packages/planner/src/services/complexity-estimator.test.ts",
+            "framework": "Vitest",
+            "coverage": ">90%"
+          }
+        }
+      },
+      {
+        "step_id": "dot-028",
+        "title": "Write comprehensive unit tests for language-detector",
+        "scope": "planner-core",
+        "description": "Create `src/services/language-detector.test.ts` with test coverage for all language tiers, file extension detection, keyword detection, domain adjustments, and default behavior.",
+        "dependencies": ["dot-013"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: .py extension detected as tier S" },
+          { "id": "ac2", "description": "Test: .go extension detected as tier A" },
+          { "id": "ac3", "description": "Test: .cob extension detected as tier D" },
+          { "id": "ac4", "description": "Test: 'typescript' keyword in description detected as tier S" },
+          { "id": "ac5", "description": "Test: unknown extension returns tier A (default)" },
+          { "id": "ac6", "description": "Test: mobile domain adjustment adds 0.25 multiplier" },
+          { "id": "ac7", "description": "Test: embedded domain adjustment adds 1.0 multiplier" },
+          { "id": "ac8", "description": "Test: multiple extensions uses most specific tier" }
+        ],
+        "specification": {
+          "testing": {
+            "file": "packages/planner/src/services/language-detector.test.ts",
+            "framework": "Vitest"
+          }
+        }
+      },
+      {
+        "step_id": "dot-029",
+        "title": "Write comprehensive unit tests for limits-enforcer",
+        "scope": "planner-core",
+        "description": "Create `src/services/limits-enforcer.test.ts` with test coverage for step count limits, depth traversal, circular reference detection, and config overrides.",
+        "dependencies": ["dot-014"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: 15 steps in scope returns no warnings" },
+          { "id": "ac2", "description": "Test: 16 steps in scope returns warning" },
+          { "id": "ac3", "description": "Test: multiple scopes validated independently" },
+          { "id": "ac4", "description": "Test: depth 3 returns no errors" },
+          { "id": "ac5", "description": "Test: depth 4 returns error" },
+          { "id": "ac6", "description": "Test: circular sub_plan_id reference detected" },
+          { "id": "ac7", "description": "Test: custom max_depth from config respected" },
+          { "id": "ac8", "description": "Test: custom max_steps_per_scope from config respected" }
+        ],
+        "specification": {
+          "testing": {
+            "file": "packages/planner/src/services/limits-enforcer.test.ts",
+            "framework": "Vitest"
+          }
+        }
+      },
+      {
+        "step_id": "dot-030",
+        "title": "Write comprehensive unit tests for contract-validator",
+        "scope": "planner-core",
+        "description": "Create `src/services/contract-validator.test.ts` with test coverage for input source validation, output type validation, schema_ref requirements, and done_definition validation.",
+        "dependencies": ["dot-015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: valid contract with 'plan' source passes" },
+          { "id": "ac2", "description": "Test: valid contract with existing step_id source passes" },
+          { "id": "ac3", "description": "Test: invalid step_id source returns error" },
+          { "id": "ac4", "description": "Test: validation='schema' without schema_ref returns error" },
+          { "id": "ac5", "description": "Test: step without contract passes validation" },
+          { "id": "ac6", "description": "Test: validateAllContracts aggregates errors from all steps" },
+          { "id": "ac7", "description": "Test: all output types validate correctly" }
+        ],
+        "specification": {
+          "testing": {
+            "file": "packages/planner/src/services/contract-validator.test.ts",
+            "framework": "Vitest"
+          }
+        }
+      },
+      {
+        "step_id": "dot-031",
+        "title": "Write integration tests for API handlers with DOT features",
+        "scope": "planner-core",
+        "description": "Extend existing API tests in `src/api/*.test.ts` to cover DOT enrichment and validation behavior in create, update, and publish flows.",
+        "dependencies": ["dot-026"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: POST /api/plans returns enriched steps with complexity_estimate" },
+          { "id": "ac2", "description": "Test: POST /api/plans with >15 steps in scope returns warnings" },
+          { "id": "ac3", "description": "Test: POST /api/plans with invalid contract returns 400" },
+          { "id": "ac4", "description": "Test: PUT /api/plans enriches new steps" },
+          { "id": "ac5", "description": "Test: POST /api/plans/:id/publish includes all DOT fields" },
+          { "id": "ac6", "description": "Test: backward compatibility - plan without DOT fields accepted" }
+        ],
+        "specification": {
+          "testing": {
+            "files": ["packages/planner/src/api/api.test.ts", "packages/planner/src/api/workflow.test.ts"],
+            "framework": "Vitest"
+          }
+        }
+      },
+      {
+        "step_id": "dot-032",
+        "title": "Write TunerClient tests with mock server",
+        "scope": "planner-core",
+        "description": "Create `src/tuner/client.test.ts` with tests for config fetching, caching, refresh interval, error handling, and disabled mode.",
+        "dependencies": ["dot-011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: fetches config from TUNER_URL on init" },
+          { "id": "ac2", "description": "Test: caches config and returns from cache" },
+          { "id": "ac3", "description": "Test: refresh interval triggers re-fetch" },
+          { "id": "ac4", "description": "Test: network error returns DEFAULT_PLANNER_CONFIG" },
+          { "id": "ac5", "description": "Test: invalid config response returns defaults" },
+          { "id": "ac6", "description": "Test: TUNER_URL not set returns defaults immediately" },
+          { "id": "ac7", "description": "Test: stop() clears interval" }
+        ],
+        "specification": {
+          "testing": {
+            "file": "packages/planner/src/tuner/client.test.ts",
+            "framework": "Vitest",
+            "mocking": "vi.mock fetch"
+          }
+        }
+      },
+      {
+        "step_id": "dot-033",
+        "title": "Final verification and documentation",
+        "scope": "planner-core",
+        "description": "Run all tests, verify coverage meets targets, update package exports, and document new features in README or API docs.",
+        "dependencies": ["dot-027", "dot-028", "dot-029", "dot-030", "dot-031", "dot-032"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All unit tests pass" },
+          { "id": "ac2", "description": "All integration tests pass" },
+          { "id": "ac3", "description": "Code coverage >80% for new services" },
+          { "id": "ac4", "description": "TypeScript compilation succeeds with no errors" },
+          { "id": "ac5", "description": "Package exports updated in index.ts" },
+          { "id": "ac6", "description": "Existing tests still pass (no regressions)" }
+        ]
+      },
+      {
+        "step_id": "dot-034",
+        "title": "PR-style final review",
+        "scope": "planner-core",
+        "description": "Review all changes as if reviewing a large PR. Check for: code quality, consistent patterns, proper error handling, no dead code, proper typing, test coverage gaps.",
+        "dependencies": ["dot-033"],
+        "owner_role": "tech-lead:Reviewer",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All new files follow existing codebase patterns" },
+          { "id": "ac2", "description": "Error handling is consistent (log and gracefully degrade)" },
+          { "id": "ac3", "description": "No console.log statements in production code" },
+          { "id": "ac4", "description": "All exported types have JSDoc comments" },
+          { "id": "ac5", "description": "Zod schemas have meaningful error messages" },
+          { "id": "ac6", "description": "No TODO comments without associated issue/task" },
+          { "id": "ac7", "description": "Test names are descriptive and follow 'should X when Y' pattern" }
+        ]
+      }
+    ]
+  }
+}

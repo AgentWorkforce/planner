@@ -1,0 +1,38 @@
+{
+  "title": "Task Contract Validator",
+  "summary": {
+    "goal": "Validate task contracts on steps at plan creation time",
+    "acceptance_criteria": [
+      {
+        "id": "cv1",
+        "description": "TaskContract schema: { inputs: ContractInput[], outputs: ContractOutput[], done_definition: DoneDefinition }"
+      },
+      {
+        "id": "cv2",
+        "description": "ContractInput: { name, type: artifact|context|parameter, source: step_id|plan, required, description? }"
+      },
+      {
+        "id": "cv3",
+        "description": "ContractOutput: { name, type: file|directory|schema|config, path?, validation: exists|schema|test|human, schema_ref? }"
+      },
+      {
+        "id": "cv4",
+        "description": "DoneDefinition: { all_outputs_present, acceptance_criteria_pass, custom_check? }"
+      },
+      {
+        "id": "cv5",
+        "description": "validateContract(step, plan) checks: input sources exist, output types valid"
+      },
+      {
+        "id": "cv6",
+        "description": "Contract is optional - plans without contracts still valid"
+      }
+    ]
+  },
+  "feature_id": "planner-contract-validator",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "dot-planner-enhancements",
+  "component": "planner-core"
+}

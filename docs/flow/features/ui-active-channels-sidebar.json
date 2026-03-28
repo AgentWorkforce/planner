@@ -1,0 +1,345 @@
+{
+  "feature_id": "ui-active-channels-sidebar",
+  "title": "Active Channels in Sidebar",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": ["ui-sidebar-layout", "relay-core"],
+
+  "summary": {
+    "goal": "Add an 'Active Channels' section to the left sidebar that shows relay channels with recent activity (~5 minutes), and a full channel view page at /channels/#<id> copied from relay-dashboard.",
+
+    "context": "The planner-ui needs visibility into agent relay activity. Currently users can't see which channels have active conversations. The relay-dashboard already has a mature channel view implementation (ChannelViewV1, ChannelChat, etc.) that can be adapted for planner-ui.\n\nExisting backend infrastructure:\n- GET /api/channels - Lists channels the user is a member of (src/api/handlers/channels.ts)\n- GET /api/channels/:id/messages - Fetches message history for a channel\n- GET /api/channels/:id/presence - Returns online members\n- WebSocket proxy at /ws - Proxies to relay daemon for real-time updates (src/relay/ws-proxy.ts)\n- Channel management module (src/relay/channels.ts) - Creates #planner and #plan-{id} channels\n\nKey constraint: Agent-relay filters channels by membership. Users only see channels they've joined. Plan channels are created when plans are created, but users need to be auto-joined when they view a plan.",
+
+    "problem_evidence": [
+      "No visibility into active relay channels from the planner UI",
+      "Users must use relay-dashboard separately to monitor agent conversations",
+      "No way to quickly navigate to active channels where agents are working"
+    ],
+
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "'Active Channels' section appears in sidebar below Navigation section" },
+      { "id": "ac2", "description": "Shows channels that have had activity in the last ~5 minutes" },
+      { "id": "ac3", "description": "Each channel shows: channel name (#name format), unread count badge if any" },
+      { "id": "ac4", "description": "Clicking a channel navigates to /channels/#<id>" },
+      { "id": "ac5", "description": "Active channels section collapses when sidebar is collapsed (icon-only mode)" },
+      { "id": "ac6", "description": "/channels/:channelId route renders the channel view" },
+      { "id": "ac7", "description": "Channel view shows: header with channel name, message list, message input" },
+      { "id": "ac8", "description": "Messages display sender avatar, name, timestamp, content in Slack-style layout" },
+      { "id": "ac9", "description": "Can send messages via the input (uses relay sendChannelMessage)" },
+      { "id": "ac10", "description": "Real-time updates: new messages appear without refresh" },
+      { "id": "ac11", "description": "Empty state when no active channels" },
+      { "id": "ac12", "description": "Avatar shows color-coded initial (purple for users, cyan for agents)" },
+      { "id": "ac13", "description": "Messages from same sender within 5 min are grouped (avatar only on first)" },
+      { "id": "ac14", "description": "Date dividers appear between message groups ('Today', 'Yesterday', date)" }
+    ],
+
+    "out_of_scope": [
+      "DM channels (only public #channels for v1)",
+      "Channel creation/deletion from planner-ui",
+      "Unread message tracking/persistence",
+      "Thread replies",
+      "File attachments",
+      "Search within channels",
+      "Member list/management"
+    ],
+
+    "approaches": [
+      {
+        "id": "A",
+        "name": "Copy relay-dashboard components directly",
+        "description": "Copy ChannelViewV1, ChannelMessageList, ChannelHeader, MessageInput from relay-dashboard, adapt imports and styling to planner-ui patterns.",
+        "pros": [
+          "Fastest implementation - proven code",
+          "Consistent UX with relay-dashboard",
+          "Includes edge cases already handled"
+        ],
+        "cons": [
+          "May include unused features (threads, attachments, etc.)",
+          "Need to adapt to planner-ui's useRelay context instead of useChannels hook"
+        ],
+        "recommended": true
+      },
+      {
+        "id": "B",
+        "name": "Build minimal channel view from scratch",
+        "description": "Create simpler components that only implement required features, using planner-ui patterns.",
+        "pros": [
+          "Leaner code, only what's needed",
+          "Fully aligned with planner-ui patterns"
+        ],
+        "cons": [
+          "More development time",
+          "May miss edge cases relay-dashboard handles"
+        ],
+        "recommended": false
+      }
+    ],
+
+    "recommended_approach": "A",
+    "approach_rationale": "The relay-dashboard channel implementation is mature and handles many edge cases. Copying and adapting is faster than rebuilding, and ensures UX consistency. The out-of-scope features can be removed or gated."
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "reference_code": {
+      "source": "https://github.com/AgentWorkforce/relay-dashboard/tree/main/packages/dashboard/src/components/channels/",
+      "files_to_copy": [
+        "ChannelViewV1.tsx",
+        "ChannelHeader.tsx",
+        "ChannelMessageList.tsx",
+        "MessageInput.tsx",
+        "types.ts"
+      ],
+      "hooks_to_adapt": [
+        "useChannels.ts -> adapt to use existing useRelay context"
+      ]
+    },
+    "steps": [
+      {
+        "step_id": "acs-000",
+        "title": "Auto-join user to plan channels on view",
+        "scope": "planner-core",
+        "description": "When a user views a plan (GET /api/plans/:id), ensure the user is auto-joined to that plan's channel (#plan-{id}). This is required because the agent-relay dashboard only shows channels where the user is a member. Without this, users won't see plan channels in the sidebar.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When user views a plan, backend calls joinChannel for the user" },
+          { "id": "ac2", "description": "User identity determined from session/auth context" },
+          { "id": "ac3", "description": "Channel membership persists with _channelMembership metadata in relay" },
+          { "id": "ac4", "description": "Subsequent GET /api/channels includes the plan channel" }
+        ]
+      },
+      {
+        "step_id": "acs-001",
+        "title": "Create useActiveChannels hook",
+        "scope": "planner-ui",
+        "description": "Create a hook that tracks recently active channels. Initial load uses GET /api/channels endpoint (already implemented in src/api/handlers/channels.ts). Then tracks channels that have received messages in the last 5 minutes via WebSocket.",
+        "dependencies": ["acs-000"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Hook returns { activeChannels: Channel[], isLoading: boolean }" },
+          { "id": "ac2", "description": "Initial load fetches from GET /api/channels" },
+          { "id": "ac3", "description": "Subscribes to channel_message events from relay WebSocket" },
+          { "id": "ac4", "description": "Maintains Set of channel names with last activity timestamp" },
+          { "id": "ac5", "description": "Filters to channels active in last 5 minutes" },
+          { "id": "ac6", "description": "Auto-refreshes every minute to prune stale channels" }
+        ]
+      },
+      {
+        "step_id": "acs-002",
+        "title": "Add Active Channels section to AppSidebar",
+        "scope": "planner-ui",
+        "description": "Add a new SidebarGroup for 'Active Channels' in AppSidebar.tsx, between Navigation and Initiatives sections.",
+        "dependencies": ["acs-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "New SidebarGroup with label 'CHANNELS'" },
+          { "id": "ac2", "description": "Lists channels from useActiveChannels hook" },
+          { "id": "ac3", "description": "Each channel is a SidebarMenuButton linking to /channels/:channelId" },
+          { "id": "ac4", "description": "Shows '#' prefix and channel name" },
+          { "id": "ac5", "description": "Empty state: 'No active channels'" },
+          { "id": "ac6", "description": "Respects collapsed sidebar state (shows icon only)" }
+        ]
+      },
+      {
+        "step_id": "acs-003",
+        "title": "Copy and adapt channel types",
+        "scope": "planner-ui",
+        "description": "Copy types.ts from relay-dashboard channels, simplify to only needed types (Channel, ChannelMessage).",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/types/channel.ts with Channel and ChannelMessage types" },
+          { "id": "ac2", "description": "Remove unused types (search, admin, etc.)" },
+          { "id": "ac3", "description": "Types compatible with relay message format" }
+        ]
+      },
+      {
+        "step_id": "acs-004",
+        "title": "Copy and adapt ChannelMessageList with rich styling",
+        "scope": "planner-ui",
+        "description": "Copy ChannelMessageList.tsx from relay-dashboard, adapt to planner-ui patterns. Include Avatar component, message grouping, and date dividers. Remove threads, attachments, but keep visual richness.",
+        "dependencies": ["acs-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/components/channels/ChannelMessageList.tsx" },
+          { "id": "ac2", "description": "Displays messages with sender, timestamp, content" },
+          { "id": "ac3", "description": "Auto-scrolls to bottom on new messages" },
+          { "id": "ac4", "description": "Uses planner-ui design system (bg-bg-card, text-text-primary, etc.)" },
+          { "id": "ac5", "description": "Remove thread/attachment/reaction features" },
+          { "id": "ac6", "description": "Include Avatar component with user/agent color coding (purple for users, cyan for agents)" },
+          { "id": "ac7", "description": "Implement shouldShowAvatar logic (show avatar on sender change or >5min gap)" },
+          { "id": "ac8", "description": "Add DateDivider component between date groups ('Today', 'Yesterday', full date)" }
+        ]
+      },
+      {
+        "step_id": "acs-005",
+        "title": "Copy and adapt MessageInput",
+        "scope": "planner-ui",
+        "description": "Copy MessageInput.tsx from relay-dashboard, simplify to basic text input + send.",
+        "dependencies": ["acs-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/components/channels/MessageInput.tsx" },
+          { "id": "ac2", "description": "Text input with send button" },
+          { "id": "ac3", "description": "Enter to send, Shift+Enter for newline" },
+          { "id": "ac4", "description": "Calls onSend callback with message content" },
+          { "id": "ac5", "description": "Uses planner-ui design system" },
+          { "id": "ac6", "description": "Remove @mention autocomplete (v2 scope)" }
+        ]
+      },
+      {
+        "step_id": "acs-006",
+        "title": "Copy and adapt ChannelHeader",
+        "scope": "planner-ui",
+        "description": "Copy ChannelHeader.tsx from relay-dashboard, simplify to just show channel name.",
+        "dependencies": ["acs-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/components/channels/ChannelHeader.tsx" },
+          { "id": "ac2", "description": "Shows # + channel name" },
+          { "id": "ac3", "description": "Optional back button to return to previous page" },
+          { "id": "ac4", "description": "Remove member list, settings, search buttons" },
+          { "id": "ac5", "description": "Uses planner-ui design system" }
+        ]
+      },
+      {
+        "step_id": "acs-007",
+        "title": "Create ChannelView composite component",
+        "scope": "planner-ui",
+        "description": "Create ChannelView.tsx that combines Header, MessageList, and Input.",
+        "dependencies": ["acs-004", "acs-005", "acs-006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/components/channels/ChannelView.tsx" },
+          { "id": "ac2", "description": "Full-height flex layout: header (fixed), messages (flex-1 scroll), input (fixed)" },
+          { "id": "ac3", "description": "Takes channelId prop" },
+          { "id": "ac4", "description": "Manages messages state from useChannelMessages hook" },
+          { "id": "ac5", "description": "Sends messages via relay connection" }
+        ]
+      },
+      {
+        "step_id": "acs-008",
+        "title": "Create useChannelMessages hook",
+        "scope": "planner-ui",
+        "description": "Hook that manages messages for a specific channel. Fetches message history from existing GET /api/channels/:id/messages endpoint (implemented in src/api/handlers/channels.ts) and subscribes to real-time updates via the WebSocket proxy at /ws.",
+        "dependencies": ["acs-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Returns { messages, sendMessage, isLoading }" },
+          { "id": "ac2", "description": "Fetches initial history from GET /api/channels/:id/messages" },
+          { "id": "ac3", "description": "Subscribes to channel_message events via WebSocket for real-time updates" },
+          { "id": "ac4", "description": "Uses existing useRelay context for WebSocket connection" },
+          { "id": "ac5", "description": "Cleans up subscription on unmount" }
+        ]
+      },
+      {
+        "step_id": "acs-009",
+        "title": "Create ChannelPage route",
+        "scope": "planner-ui",
+        "description": "Create the /channels/:channelId page that renders ChannelView.",
+        "dependencies": ["acs-007", "acs-008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/pages/ChannelPage.tsx" },
+          { "id": "ac2", "description": "Extracts channelId from URL params" },
+          { "id": "ac3", "description": "Renders ChannelView component" },
+          { "id": "ac4", "description": "Handles invalid/missing channel gracefully" },
+          { "id": "ac5", "description": "Add route to App.tsx: /channels/:channelId" }
+        ]
+      },
+      {
+        "step_id": "acs-010",
+        "title": "Add channels icon to icons",
+        "scope": "planner-ui",
+        "description": "Add a ChannelsIcon (hash #) to the icon components.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create ChannelsIcon in src/components/icons/" },
+          { "id": "ac2", "description": "Hash (#) symbol or message bubble icon" },
+          { "id": "ac3", "description": "Supports size prop (sm, md, lg)" },
+          { "id": "ac4", "description": "Export from icons/index.ts" }
+        ]
+      },
+      {
+        "step_id": "acs-011",
+        "title": "Integration testing",
+        "scope": "planner-ui",
+        "description": "Test the full flow: sidebar shows active channels, navigation works, messages display.",
+        "dependencies": ["acs-002", "acs-009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Verify sidebar section appears with active channels" },
+          { "id": "ac2", "description": "Clicking channel navigates to channel page" },
+          { "id": "ac3", "description": "Messages from relay appear in real-time" },
+          { "id": "ac4", "description": "Can send messages" },
+          { "id": "ac5", "description": "Works with collapsed sidebar" }
+        ]
+      },
+      {
+        "step_id": "acs-012",
+        "title": "Enhance ChannelMessageList with relay-dashboard styling",
+        "scope": "planner-ui",
+        "description": "Update existing ChannelMessageList.tsx to use relay-dashboard's richer styling: avatars, message grouping, and date dividers. Replace the current simple chat-bubble style with Slack-style layout.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "status": "completed",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Add Avatar component showing color-coded initial (purple for users, cyan for agents)" },
+          { "id": "ac2", "description": "Implement Slack-style layout: avatar left column (w-9), content right column" },
+          { "id": "ac3", "description": "Group messages: only show avatar when sender changes or >5min gap between messages" },
+          { "id": "ac4", "description": "Add DateDivider component with 'Today', 'Yesterday', or full date format" },
+          { "id": "ac5", "description": "Messages grouped by date with dividers between groups" },
+          { "id": "ac6", "description": "Sender name clickable (non-functional for v1, prep for member profiles)" },
+          { "id": "ac7", "description": "Preserve auto-scroll behavior on new messages" }
+        ],
+        "reference_code": {
+          "source": "https://github.com/AgentWorkforce/relay-dashboard/blob/main/packages/dashboard/src/components/channels/ChannelMessageList.tsx",
+          "copy_components": ["Avatar", "DateDivider", "MessageItem", "shouldShowAvatar", "formatDateKey", "formatDateDisplay"]
+        }
+      }
+    ]
+  },
+
+  "design_decisions": [
+    {
+      "decision": "Copy relay-dashboard components rather than build from scratch",
+      "rationale": "Faster implementation, proven code, handles edge cases. User explicitly requested this approach.",
+      "alternatives_considered": ["Build minimal from scratch"]
+    },
+    {
+      "decision": "Use existing useRelay context instead of creating separate WebSocket",
+      "rationale": "Planner-ui already has RelayProvider with shared connection. Reuse it rather than duplicate.",
+      "alternatives_considered": ["Copy useChannels hook with its own WebSocket"]
+    },
+    {
+      "decision": "5-minute activity window for 'active' channels",
+      "rationale": "Balance between showing recent activity and not showing stale channels. Can be adjusted based on UX feedback.",
+      "alternatives_considered": ["1 minute (too aggressive)", "15 minutes (too stale)"]
+    },
+    {
+      "decision": "Auto-join users to plan channels when viewing plans",
+      "rationale": "Agent-relay only shows channels where the user is a member. Without auto-join, users won't see plan-specific channels even if they have access to the plan. The channel membership is persisted via _channelMembership metadata in relay's JSONL storage.",
+      "alternatives_considered": ["Manual channel subscription UI", "Show all channels regardless of membership"]
+    },
+    {
+      "decision": "Use existing channel REST endpoints (GET /api/channels, GET /api/channels/:id/messages)",
+      "rationale": "These endpoints already exist in src/api/handlers/channels.ts and provide initial channel list and message history. No need to duplicate this logic in the frontend or create new endpoints.",
+      "alternatives_considered": ["Query relay storage directly from frontend", "Create new endpoints"]
+    },
+    {
+      "decision": "Use existing WebSocket proxy at /ws for real-time updates",
+      "rationale": "The backend already proxies WebSocket connections to the relay daemon via src/relay/ws-proxy.ts. Real-time message subscriptions should use this existing infrastructure.",
+      "alternatives_considered": ["Direct WebSocket to relay daemon", "Server-sent events polling"]
+    },
+    {
+      "decision": "Adopt relay-dashboard's Slack-style message layout with avatars and grouping",
+      "rationale": "Initial implementation was too minimal (simple chat bubbles). The relay-dashboard styling with avatars, message grouping, and date dividers provides better UX consistency and visual richness. Copy the proven patterns rather than reinvent.",
+      "alternatives_considered": ["Keep minimal chat-bubble style", "Design new custom style"],
+      "added": "2026-01-31",
+      "change_reason": "User feedback: channel view looks too plain compared to relay-dashboard"
+    }
+  ]
+}

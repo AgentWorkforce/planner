@@ -1,0 +1,323 @@
+{
+  "feature_id": "ui-direct-messaging",
+  "title": "Direct Messaging Agents",
+  "type": "feature",
+  "status": "completed",
+  "priority": "medium",
+  "dependencies": ["ui-relay-messaging", "ui-status-bar", "ui-agent-avatars"],
+
+  "summary": {
+    "goal": "Enable users to send direct messages to specific agents via intuitive entry points (status bar clicks, @mentions) without fragmenting the messaging UX across too many surfaces.",
+
+    "context": "Currently, messages exist in two places: the /channels/:id view (full-page) and the MessagingSidebar (right-side panel). The status bar shows agent avatars that can be clicked. The question is: where should DMs live, and how do they relate to channels?\n\nKey tension: We want quick access to DM agents, but we don't want three separate messaging surfaces that confuse users about where to find conversations.",
+
+    "problem_statement": "User wants to click an agent in the status bar to send a direct message, but unclear where that conversation should live. Options range from inline bubbles, to DM channels in the existing channel infrastructure, to a unified approach.",
+
+    "approaches": [
+      {
+        "id": "A",
+        "name": "DMs as Special Channels",
+        "description": "Treat DMs as channels (e.g., #dm-{userId}-{agentId}). They appear in the channel list, use the same infrastructure, and clicking an agent in status bar navigates to or opens the DM channel in the sidebar.",
+        "pros": [
+          "Unified model - all messages are channels",
+          "Existing infrastructure works (MessagingSidebar, ChannelView)",
+          "/channels view naturally supports DMs alongside public channels",
+          "Message history persisted and searchable in one place",
+          "Consistent mental model for users"
+        ],
+        "cons": [
+          "Channel list could get cluttered with many DM channels",
+          "Need to distinguish DM channels from group channels in UI",
+          "Extra navigation step (click agent -> opens channel)"
+        ],
+        "ux_implication": "Status bar agent click opens MessagingSidebar with DM channel selected"
+      },
+      {
+        "id": "B",
+        "name": "Inline Chat Bubbles",
+        "description": "Clicking an agent in the status bar opens a small chat bubble/popover anchored to the avatar. Ephemeral, quick interactions without navigating away.",
+        "pros": [
+          "Very quick access - no navigation",
+          "Minimal UI footprint",
+          "Good for brief questions/acknowledgments"
+        ],
+        "cons": [
+          "Where does conversation history go?",
+          "Limited space for complex conversations",
+          "Third messaging surface (fragmentation)",
+          "Easy to lose context of ongoing conversations"
+        ],
+        "ux_implication": "Conversations happen in-place but harder to track long-term"
+      },
+      {
+        "id": "C",
+        "name": "Unified Inbox with DM Sections",
+        "description": "The /channels view and MessagingSidebar both support a 'Direct Messages' section alongside 'Channels'. DMs are visually grouped but use the same underlying channel infrastructure.",
+        "pros": [
+          "Clear separation between group channels and DMs",
+          "Single messaging surface with sections",
+          "Consistent with Slack/Discord mental model",
+          "Status bar click scrolls to DM section in sidebar"
+        ],
+        "cons": [
+          "Need to add section headers to existing channel list",
+          "Slightly more complex UI"
+        ],
+        "ux_implication": "Status bar agent click: (1) opens sidebar if collapsed, (2) scrolls to DMs section, (3) selects/creates DM with that agent"
+      }
+    ],
+
+    "recommended_approach": "C",
+    "recommendation_rationale": "Approach C (Unified Inbox with DM Sections) provides the best balance:\n\n1. NO additional messaging surface - reuses existing channels infrastructure\n2. Clear UX - DMs grouped in their own section, not mixed with public channels\n3. Consistent mental model - matches Slack/Discord patterns users know\n4. Quick access - status bar click opens sidebar to DM section\n5. History preserved - DMs are just channels, same persistence/search\n\nThe /channels view should also support this: show both public channels AND DMs. This answers the question 'should /channels support DMs?' - yes, as a dedicated section.",
+
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "ChannelList shows two sections: 'Channels' and 'Direct Messages'" },
+      { "id": "ac2", "description": "Clicking agent avatar in status bar opens MessagingSidebar to DM with that agent" },
+      { "id": "ac3", "description": "If no DM channel exists with agent, one is created on first message" },
+      { "id": "ac4", "description": "DM channels appear in /channels view under 'Direct Messages' section" },
+      { "id": "ac5", "description": "DM channel names show agent display name, not channel ID" },
+      { "id": "ac6", "description": "Only show 'Direct Messages' section if user has any DM channels" },
+      { "id": "ac7", "description": "MessagingSidebar remembers last selected channel across navigation" },
+      { "id": "ac8", "description": "Status bar agent click when agent has pending question: opens DM and scrolls to question" }
+    ],
+
+    "out_of_scope": [
+      "Multi-user DM groups (v2)",
+      "DM notifications/badges (handled by existing channel infrastructure)",
+      "DM-specific settings or preferences",
+      "Agent-initiated DMs to users (handled by existing question queue)"
+    ],
+
+    "open_questions": [],
+    "resolved_decisions": [
+      {
+        "question": "Should clicking an agent in status bar always open the sidebar?",
+        "decision": "Always open to DM",
+        "rationale": "Simplest UX - consistent behavior. Users expect clicking an agent to message them."
+      },
+      {
+        "question": "How to handle DM channels for agents that are no longer active?",
+        "decision": "Keep visible but marked inactive",
+        "rationale": "Preserve conversation history. Mark with visual indicator (grayed out, 'offline' badge)."
+      }
+    ]
+  },
+
+  "design_decisions": [
+    {
+      "decision": "DMs are channels, not a separate messaging surface",
+      "rationale": "Avoids fragmentation. One mental model: everything is a channel. DMs are just 1:1 channels.",
+      "alternatives_considered": ["Separate DM UI", "Inline chat bubbles"]
+    },
+    {
+      "decision": "Status bar agent click opens MessagingSidebar to DM",
+      "rationale": "Quick access without adding new UI surfaces. Reuses existing sidebar infrastructure.",
+      "alternatives_considered": ["Popover chat bubble", "Navigate to /channels/:dm-id"]
+    }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "steps": [
+      {
+        "step_id": "dm-001",
+        "title": "Extend channel types to support DM channels",
+        "scope": "planner-core",
+        "description": "Add 'dm' as a new ChannelType alongside 'global' and 'plan'. Update ChannelInfo interface to include optional agentId and agentName fields for DM channels. Format: #dm-{userSessionId}-{agentId}",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm001-ac1", "description": "ChannelInfo has type: 'global' | 'plan' | 'dm'" },
+          { "id": "dm001-ac2", "description": "ChannelInfo has optional agentId: string for DM channels" },
+          { "id": "dm001-ac3", "description": "ChannelInfo has optional agentName: string for display" }
+        ]
+      },
+      {
+        "step_id": "dm-002",
+        "title": "Add DM channel creation helper",
+        "scope": "planner-core",
+        "description": "Add getDmChannelId(userSessionId, agentId) function to channels.ts. Add createDmChannel(userSessionId, agentId, agentName) that joins planner-core to the channel and tracks it. DM channels are created lazily on first message.",
+        "dependencies": ["dm-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm002-ac1", "description": "getDmChannelId returns '#dm-{userSessionId}-{agentId}'" },
+          { "id": "dm002-ac2", "description": "createDmChannel joins planner-core to the DM channel" },
+          { "id": "dm002-ac3", "description": "DM channels tracked in dmChannels Map (userId -> agentId -> channelId)" }
+        ]
+      },
+      {
+        "step_id": "dm-003",
+        "title": "Update GET /api/channels to include DM channels",
+        "scope": "planner-core",
+        "description": "Modify channels.ts handler to return DM channels for the requesting user. User ID comes from query param or session. DM channels show agentName as display name, not channel ID.",
+        "dependencies": ["dm-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm003-ac1", "description": "GET /channels?userId=X returns user's DM channels" },
+          { "id": "dm003-ac2", "description": "DM channels have type: 'dm', agentId, agentName set" },
+          { "id": "dm003-ac3", "description": "DM channel name shows agent display name, not #dm-xxx-yyy" }
+        ]
+      },
+      {
+        "step_id": "dm-004",
+        "title": "Add POST /api/channels/dm endpoint for DM creation",
+        "scope": "planner-core",
+        "description": "Add endpoint POST /api/channels/dm { agentId, agentName } that creates (or returns existing) DM channel for the requesting user. Returns the channel object with id, name, type.",
+        "dependencies": ["dm-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm004-ac1", "description": "POST /api/channels/dm creates DM channel if not exists" },
+          { "id": "dm004-ac2", "description": "Returns existing DM channel if already exists (idempotent)" },
+          { "id": "dm004-ac3", "description": "Response: { channel: { id, name, type: 'dm', agentId, agentName } }" }
+        ]
+      },
+      {
+        "step_id": "dm-005",
+        "title": "Update frontend Channel type to support DM",
+        "scope": "planner-ui",
+        "description": "Update types/relay.ts ChannelType to include 'dm'. Update Channel interface to include optional agentId and agentName fields.",
+        "dependencies": ["dm-001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm005-ac1", "description": "ChannelType = 'global' | 'plan' | 'dm'" },
+          { "id": "dm005-ac2", "description": "Channel interface has agentId?: string" },
+          { "id": "dm005-ac3", "description": "Channel interface has agentName?: string" }
+        ]
+      },
+      {
+        "step_id": "dm-006",
+        "title": "Add createDmChannel API client function",
+        "scope": "planner-ui",
+        "description": "Add createDmChannel(agentId, agentName) to api/client.ts that calls POST /api/channels/dm. Returns the created/existing DM channel.",
+        "dependencies": ["dm-004", "dm-005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm006-ac1", "description": "createDmChannel(agentId, agentName) function exported" },
+          { "id": "dm006-ac2", "description": "Returns Promise<Channel> with dm type" }
+        ]
+      },
+      {
+        "step_id": "dm-007",
+        "title": "Update ChannelList to show DM section",
+        "scope": "planner-ui",
+        "description": "Modify ChannelList.tsx to group channels into 'Channels' (global + plan) and 'Direct Messages' (dm type). Only show DM section if user has any DM channels. Use agent display name for DM items.",
+        "dependencies": ["dm-005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm007-ac1", "description": "ChannelList shows 'Channels' section for global and plan channels" },
+          { "id": "dm007-ac2", "description": "ChannelList shows 'Direct Messages' section for dm channels" },
+          { "id": "dm007-ac3", "description": "DM section only appears when dmChannels.length > 0" },
+          { "id": "dm007-ac4", "description": "DM items show agentName, not channel ID" }
+        ]
+      },
+      {
+        "step_id": "dm-008",
+        "title": "Add useDmChannel hook for DM management",
+        "scope": "planner-ui",
+        "description": "Create hooks/useDmChannel.ts that provides: openDm(agentId, agentName) which creates DM channel if needed and returns channel ID. Tracks active DM channel for sidebar selection.",
+        "dependencies": ["dm-006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm008-ac1", "description": "useDmChannel hook exported" },
+          { "id": "dm008-ac2", "description": "openDm(agentId, agentName) creates/fetches DM channel" },
+          { "id": "dm008-ac3", "description": "Returns { openDm, activeDmChannelId, isLoading }" }
+        ]
+      },
+      {
+        "step_id": "dm-009",
+        "title": "Update useChannels to pass userId for DM fetch",
+        "scope": "planner-ui",
+        "description": "Modify useChannels hook to include userId from RelayContext when fetching channels. This ensures the backend returns the user's DM channels.",
+        "dependencies": ["dm-003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm009-ac1", "description": "useChannels includes userId query param in GET /channels" },
+          { "id": "dm009-ac2", "description": "DM channels appear in channels array from useChannels" }
+        ]
+      },
+      {
+        "step_id": "dm-010",
+        "title": "Wire status bar agent click to open DM",
+        "scope": "planner-ui",
+        "description": "Update Layout.tsx handleAgentClick to: 1) call openDm from useDmChannel, 2) expand MessagingSidebar if collapsed via callback, 3) set active channel to the DM channel. Must integrate with existing question queue logic (if agent has pending question, still open question modal first).",
+        "dependencies": ["dm-008"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm010-ac1", "description": "Clicking agent avatar in status bar opens MessagingSidebar" },
+          { "id": "dm010-ac2", "description": "DM channel with that agent is selected/created" },
+          { "id": "dm010-ac3", "description": "If agent has pending question, question modal opens first (existing behavior preserved)" }
+        ]
+      },
+      {
+        "step_id": "dm-011",
+        "title": "Add MessagingSidebar open callback to Layout",
+        "scope": "planner-ui",
+        "description": "Layout needs to manage MessagingSidebar collapsed state so agent clicks can expand it. Add state and callback for controlling sidebar visibility from status bar actions.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm011-ac1", "description": "Layout manages messagingSidebarCollapsed state" },
+          { "id": "dm011-ac2", "description": "MessagingSidebar receives isCollapsed and onCollapseChange props" },
+          { "id": "dm011-ac3", "description": "Agent click can expand sidebar via callback" }
+        ]
+      },
+      {
+        "step_id": "dm-012",
+        "title": "Persist last selected channel in localStorage",
+        "scope": "planner-ui",
+        "description": "Update MessagingSidebar to remember last selected channel in localStorage. On mount, restore last channel if still valid. Key: 'planner_last_channel'.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm012-ac1", "description": "Last selected channel ID saved to localStorage" },
+          { "id": "dm012-ac2", "description": "On mount, restores last channel if it exists in channel list" },
+          { "id": "dm012-ac3", "description": "Falls back to plan channel or first channel if last channel gone" }
+        ]
+      },
+      {
+        "step_id": "dm-013",
+        "title": "Add DM icon variant to ChannelList",
+        "scope": "planner-ui",
+        "description": "Create or reuse icon for DM channels (person icon or @). DM items in ChannelList show this icon instead of # channel icon. Also show agent status indicator (online/offline) if available.",
+        "dependencies": ["dm-007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm013-ac1", "description": "DM channels show person/@ icon, not # icon" },
+          { "id": "dm013-ac2", "description": "Agent status dot shown next to DM channel name" }
+        ]
+      },
+      {
+        "step_id": "dm-014",
+        "title": "Update ChannelHeader for DM context",
+        "scope": "planner-ui",
+        "description": "When viewing a DM channel, ChannelHeader should show agent avatar and name prominently, not '#dm-xxx'. Include agent status (working/idle/needs_input) in header.",
+        "dependencies": ["dm-005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm014-ac1", "description": "DM channel header shows agent avatar + name" },
+          { "id": "dm014-ac2", "description": "Agent status badge shown in header" },
+          { "id": "dm014-ac3", "description": "Channel ID not shown for DM channels" }
+        ]
+      },
+      {
+        "step_id": "dm-015",
+        "title": "Integration testing for DM flow",
+        "scope": "planner-ui",
+        "description": "Write tests for the complete DM flow: 1) click agent -> sidebar opens -> DM channel created/selected, 2) ChannelList grouping, 3) last channel persistence.",
+        "dependencies": ["dm-010", "dm-012"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "dm015-ac1", "description": "Test: agent click creates DM channel and selects it" },
+          { "id": "dm015-ac2", "description": "Test: ChannelList groups DMs separately" },
+          { "id": "dm015-ac3", "description": "Test: last channel restored on mount" }
+        ]
+      }
+    ]
+  },
+
+  "references": [
+    { "type": "feature", "title": "Relay Channel Messaging", "path": "docs/flow/features/ui-relay-messaging.json" },
+    { "type": "feature", "title": "Agent Status Bar", "path": "docs/flow/features/ui-status-bar.json" },
+    { "type": "feature", "title": "Active Channels Sidebar", "path": "docs/flow/features/ui-active-channels-sidebar.json" }
+  ]
+}

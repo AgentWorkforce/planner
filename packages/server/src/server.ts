@@ -1,0 +1,579 @@
+/**
+ * Planner Meta-Server
+ *
+ * Thin launcher that mounts the planner and ideation plugins.
+ * This server has no business logic - it just composes plugins.
+ */
+
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Plugin imports (relative paths to sibling packages)
+import { createPlannerService, type PlannerService } from '../../planner/src/index.js';
+import { createIdeationService, type IdeationService } from '../../ideation/src/index.js';
+import { createSpecialistSpawner } from '../../ideation/src/relay/spawner.js';
+import { createForgeService, type ForgeService, type ForgeExecutionMode } from '../../forge-core/src/index.js';
+import {
+  createForgeNextRouter,
+  SqliteForgeNextStorage,
+  GateManager,
+  QuestionManager,
+  RunMonitor,
+} from '../../forge-next/src/index.js';
+import { WorkflowRunner } from '@agent-relay/sdk/workflows';
+import {
+  createMullService,
+  TriggerManager,
+  registerMullTriggers,
+  type MullService,
+  type TriggerCleanupFn,
+} from '../../mull/src/index.js';
+import {
+  createCultivateService,
+  CultivateStartupError,
+  type CultivateService,
+} from '../../cultivate/src/index.js';
+import {
+  createPortfolioService,
+  type PortfolioService,
+} from '../../portfolio-core/src/index.js';
+
+// Mull adapter implementations + bridge
+import {
+  ForgeDbAdapter,
+  TrajectoryAdapter,
+  RelayDaemonAdapter,
+} from '../../mull/src/adapters/implementations/index.js';
+import type { SessionAdapter } from '../../mull/src/adapters/core-types.js';
+import { toMullAdapters } from '../../mull/src/adapters/adapter-bridge.js';
+
+// Shared error handling
+import { errorHandler } from '@plannr/errors';
+
+// Configuration
+import { getServerConfig, type ServerConfig } from './config.js';
+
+// Middleware
+import { timeoutMiddleware } from './middleware/timeout.js';
+
+// Relay infrastructure
+import {
+  connect as connectRelay,
+  destroy as destroyRelay,
+  getRelayConfig,
+  initChannelManagement,
+  registerPlanChannels,
+  initWebSocketProxy,
+  createSessionTimeoutService,
+  initIdeationBridge,
+  stopIdeationBridge,
+  syncIdeationSessionChannels,
+  planChannelMiddleware,
+  qaChannelMiddleware,
+  spawnAgent,
+  emitAgentStatusUpdate,
+  emitAgentParked,
+  initSessionPresence,
+  type AgentState,
+} from './relay/index.js';
+
+// Forge spawner
+import { spawnForgeTask, terminateForgeAgent, spawnGateAgent } from './relay/forge-spawner.js';
+
+// Global events (cross-session notifications)
+import { createGlobalSseRouter } from './events/global-sse.js';
+import { wireGlobalEvents } from './events/event-wiring.js';
+
+// Agent lifecycle
+import { AgentLifecycleManager } from './agents/lifecycle.js';
+
+// Server API routes (relay-aware channel handlers)
+import { createServerRouter } from './api/routes.js';
+
+// Git service
+import { GitService } from './services/git-service.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// =============================================================================
+// Configuration
+// =============================================================================
+
+let serverConfig: ServerConfig;
+try {
+  serverConfig = getServerConfig();
+} catch (error) {
+  console.error('[server:config] Configuration error:', error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
+const PORT = serverConfig.port;
+const DB_PATH = serverConfig.dbPath;
+const IDEATION_DB_PATH = serverConfig.ideationDbPath;
+const FORGE_DB_PATH = serverConfig.forgeDbPath;
+const FORGE_NEXT_DB_PATH = serverConfig.forgeNextDbPath;
+const MULL_MEMORY_DIR = serverConfig.mullMemoryDir;
+
+// =============================================================================
+// Services
+// =============================================================================
+
+let plannerService: PlannerService;
+let ideationService: IdeationService;
+let forgeService: ForgeService;
+let forgeNextStorage: InstanceType<typeof SqliteForgeNextStorage>;
+let mullService: MullService;
+let cultivateService: CultivateService | undefined;
+let portfolioService: PortfolioService;
+let mullTriggerCleanup: TriggerCleanupFn | null = null;
+let globalEventCleanup: (() => void) | null = null;
+
+// =============================================================================
+// Main
+// =============================================================================
+
+async function start(): Promise<void> {
+  // Initialize planner service
+  plannerService = createPlannerService({ dbPath: DB_PATH });
+  plannerService.initialize();
+  console.log(`[planner] Initialized (database: ${DB_PATH})`);
+
+  // Create Express app
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
+
+  // Request timeout middleware (before route handlers)
+  app.use(timeoutMiddleware);
+
+  // Mount plan channel middleware (intercepts POST /api/plans to create channels)
+  app.use('/api', planChannelMiddleware);
+
+  // Mount QA channel middleware (broadcasts QA messages when questions are answered)
+  app.use('/api', qaChannelMiddleware);
+
+  // Initialize git service (no external deps, safe to do early)
+  const gitService = new GitService({ repoRoot: process.cwd() });
+  await gitService.initialize();
+  console.log(`[git] Initialized (available: ${gitService.available})`);
+
+  // Mount server API router (relay-aware channel handlers - must come BEFORE planner router)
+  const storage = plannerService.getStorage();
+  const serverRouter = createServerRouter(storage, gitService);
+  app.use('/api', serverRouter);
+
+  // Mount plugin routers
+  app.use('/api', plannerService.router);
+  // Ideation and Forge routers mounted after relay connection to enable specialist spawning and mode detection
+
+  // Connect to relay broker (throws on failure)
+  const relayConfig = getRelayConfig();
+  console.log(`[relay] Connecting (cwd: ${relayConfig.cwd})...`);
+
+  await connectRelay();
+
+  console.log('[relay] Connected');
+
+  // Initialize ideation service (after relay connection to enable specialist spawning)
+  const specialistSpawner = createSpecialistSpawner({ spawnAgent });
+
+  ideationService = createIdeationService({
+    dbPath: IDEATION_DB_PATH,
+    plannerUrl: `http://localhost:${PORT}`,
+    spawnAgent: specialistSpawner,
+    reportStatus: (agentId, state, options) => {
+      emitAgentStatusUpdate(agentId, state as AgentState, options);
+    },
+  });
+  await ideationService.initialize();
+  app.use('/api/ideation', ideationService.router);
+  console.log(`[ideation] Initialized (database: ${IDEATION_DB_PATH})`);
+
+  // Initialize forge service (after relay connection to enable real mode)
+  // NEVER silently fall back to test mode — test mode must be explicit via FORGE_MODE=test
+  const forgeMode: ForgeExecutionMode =
+    (process.env.FORGE_MODE as ForgeExecutionMode) || 'real';
+
+  forgeService = createForgeService({
+    dbPath: FORGE_DB_PATH,
+    mode: forgeMode,
+    spawnTask: spawnForgeTask,
+    terminateAgent: terminateForgeAgent,
+    spawnGateAgent: spawnGateAgent,
+    plannerUrl: `http://localhost:${PORT}`,
+    repoRoot: process.cwd(),
+    worktreeBase: path.join(process.cwd(), '.forge-worktrees'),
+  });
+  await forgeService.initialize();
+  app.use('/api/forge', forgeService.router);
+  console.log(`[forge] Initialized (database: ${FORGE_DB_PATH}, mode: ${forgeMode})`);
+
+  // Initialize forge-next (thin execution layer on relay SDK workflows)
+  // BaseSqliteStorage runs schema init in the constructor — no separate initialize() call needed.
+  forgeNextStorage = new SqliteForgeNextStorage(FORGE_NEXT_DB_PATH);
+
+  const workflowRunner = new WorkflowRunner();
+  const gateManager = new GateManager(forgeNextStorage);
+  const questionManager = new QuestionManager(forgeNextStorage);
+  const forgeNextRunMonitor = new RunMonitor();
+
+  // Bridge planner storage → forge-next FetchedPlan interface
+  const fetchPlan = async (planId: string, version?: number) => {
+    const pv = version
+      ? storage.getVersion(planId, version)
+      : storage.getLatestVersion(planId);
+    if (!pv) return null;
+    return {
+      plan: {
+        plan_id: pv.plan_id,
+        version: pv.version,
+        summary: pv.summary,
+        execution_config: pv.execution_config,
+      },
+      steps: pv.steps.map((s: any) => ({
+        step_id: s.step_id,
+        title: s.title,
+        description: s.description,
+        dependencies: s.dependencies,
+        owner_role: s.owner_role,
+        scope: s.scope,
+        acceptance_criteria: s.acceptance_criteria,
+        gate: s.gate,
+        retry_hints: s.retry_hints,
+        merge_strategy: s.merge_strategy,
+        hooks: s.hooks,
+        complexity_score: s.complexity_estimate?.score,
+      })),
+    };
+  };
+
+  app.use('/api/forge-next', createForgeNextRouter({
+    storage: forgeNextStorage,
+    runner: workflowRunner,
+    gateManager,
+    questionManager,
+    runMonitor: forgeNextRunMonitor,
+    fetchPlan,
+  }));
+  console.log(`[forge-next] Initialized (database: ${FORGE_NEXT_DB_PATH})`);
+
+  // Mount global events SSE endpoint (cross-session notifications)
+  app.use('/api/events', createGlobalSseRouter());
+
+  // Wire forge-next events → global event bus
+  globalEventCleanup = wireGlobalEvents({
+    runner: workflowRunner,
+    runMonitor: forgeNextRunMonitor,
+    gateManager,
+    questionManager,
+    forgeNextStorage,
+    plannerStorage: storage,
+  });
+
+  // Initialize cultivate service (after existing services)
+  if (serverConfig.cultivate.secret) {
+    console.log('[cultivate] Attempting to initialize...');
+    cultivateService = createCultivateService({
+      dbPath: serverConfig.cultivate.dbPath,
+      redis: {
+        host: new URL(serverConfig.cultivate.redisUrl).hostname,
+        port: parseInt(new URL(serverConfig.cultivate.redisUrl).port || '6379'),
+      },
+      encryptionSecret: serverConfig.cultivate.secret,
+      extractModel: serverConfig.cultivate.extractModel,
+      clusterModel: serverConfig.cultivate.clusterModel,
+    });
+
+    try {
+      await cultivateService.initialize();
+      console.log(`[cultivate] ✅ Initialized (database: ${serverConfig.cultivate.dbPath})`);
+    } catch (error) {
+      if (error instanceof CultivateStartupError) {
+        console.error(`[cultivate] Startup error [${error.code}]: ${error.message}`);
+        if (error.diagnostics) {
+          console.error(`[cultivate] Diagnostics:`, error.diagnostics);
+        }
+
+        if (serverConfig.cultivateRequired) {
+          console.error('[cultivate] CULTIVATE_REQUIRED=true, aborting server startup');
+          throw error;
+        } else {
+          console.warn('[cultivate] ⚠ Continuing without cultivate (CULTIVATE_REQUIRED=false)');
+          cultivateService = undefined;
+        }
+      } else {
+        // Unknown error - rethrow
+        throw error;
+      }
+    }
+  } else {
+    if (serverConfig.cultivateRequired) {
+      console.error('[cultivate] CULTIVATE_SECRET not provided but CULTIVATE_REQUIRED=true');
+      throw new Error('CULTIVATE_SECRET is required when CULTIVATE_REQUIRED=true');
+    }
+    console.log('[cultivate] Skipped (CULTIVATE_SECRET not provided)');
+  }
+
+  // Mount cultivate router if initialization succeeded
+  if (cultivateService) {
+    app.use('/api/cultivate', cultivateService.router);
+  }
+
+  // Initialize portfolio service (after planner, forge, and cultivate for cross-domain reads)
+  // Create adapter to match PlannerStorageReader interface
+  const plannerStorageAdapter = {
+    listPlansWithAttention: storage.listPlansWithAttention.bind(storage),
+    getInitiative: storage.getInitiative?.bind(storage),
+    listInitiatives: storage.listInitiatives?.bind(storage),
+    listTrajectoryEvents: storage.listTrajectoryEvents?.bind(storage),
+    listProjects: (filter?: { plan_id?: string }) => {
+      // ProjectFilter doesn't support plan_id — fetch all and filter in-memory
+      const all = storage.listProjects().map((p) => ({
+        id: p.id,
+        plan_id: p.plan_id ?? null,
+        run_id: p.run_id ?? null,
+      }));
+      if (filter?.plan_id) {
+        return all.filter((p) => p.plan_id === filter.plan_id);
+      }
+      return all;
+    },
+  };
+
+  portfolioService = createPortfolioService({
+    plannerStorage: plannerStorageAdapter,
+    cultivateStorage: cultivateService?.getContext?.()?.storage,
+    forgeStorage: forgeService.getStorage(),
+  });
+  await portfolioService.initialize();
+  app.use('/api/portfolio', portfolioService.router);
+  console.log('[portfolio] Initialized');
+
+  // Initialize mull service (after planner and forge — reads their databases)
+  mullService = createMullService({
+    memoryDir: MULL_MEMORY_DIR,
+  });
+  await mullService.initialize();
+
+  // Wire mull adapters after relay connection established
+  const sessionAdapters: SessionAdapter[] = [];
+
+  // Forge DB adapter - reads trajectory events from forge runs
+  sessionAdapters.push(new ForgeDbAdapter({
+    dbPath: FORGE_DB_PATH,
+    includeUserTrajectory: true,
+    includePreferences: true,
+  }));
+
+  // Trajectory adapter - reads decision events from planner
+  sessionAdapters.push(new TrajectoryAdapter({
+    dbPath: DB_PATH,
+  }));
+
+  // Relay daemon adapter - reads agent session data from embedded broker data dir
+  const relayDataDir = path.join(relayConfig.cwd, '.agent-relay');
+  sessionAdapters.push(new RelayDaemonAdapter({
+    dataDir: relayDataDir,
+  }));
+
+  // Bridge SessionAdapter[] → MullAdapter[] for the pipeline
+  const mullDir = path.resolve(__dirname, '../../../.mull');
+  mullService.setAdapters(toMullAdapters(sessionAdapters, mullDir));
+
+  app.use('/api/mull', mullService.router);
+  console.log(`[mull] Initialized (memoryDir: ${MULL_MEMORY_DIR})`);
+
+  // Wire real-time triggers (if enabled via config)
+  const triggerEnabled = process.env.MULL_TRIGGERS_ENABLED !== 'false'; // Default: true
+  if (triggerEnabled) {
+    const mullAdapters = toMullAdapters(sessionAdapters, mullDir);
+    const triggerManager = new TriggerManager({
+      adapters: mullAdapters,
+      config: {
+        enabled: triggerEnabled,
+        mullDir: path.resolve(__dirname, '../../../.mull'),
+        memoryDir: MULL_MEMORY_DIR,
+      },
+    });
+
+    mullTriggerCleanup = registerMullTriggers({
+      triggerManager,
+      enabled: triggerEnabled,
+      trajectoryCapture: forgeService.getTrajectoryCapture(),
+      retrospectiveService: forgeService.getRetrospectiveService(),
+    });
+
+    console.log('[mull:triggers] Real-time triggers enabled and wired to forge events');
+  } else {
+    console.log('[mull:triggers] Real-time triggers disabled via MULL_TRIGGERS_ENABLED=false');
+  }
+
+  // Initialize agent lifecycle manager (spawns/releases relay agents)
+  const lifecycle = new AgentLifecycleManager({
+    mcpServerUrl: `http://localhost:${PORT}`,
+  });
+
+  // Initialize ideation bridge (routes relay messages to ideation package)
+  initIdeationBridge(lifecycle, ideationService.getStorage());
+
+  // Initialize session presence tracking (manages grace/park timers)
+  initSessionPresence({
+    onPark: async (sessionId, agentName) => {
+      console.log(`[server] Parking agent ${agentName} for session ${sessionId}`);
+      try {
+        await lifecycle.release(agentName);
+        emitAgentParked(agentName, 'no_users_5min');
+      } catch (err) {
+        console.error(`[server] Failed to park agent ${agentName}:`, err);
+      }
+    },
+  });
+
+  // Initialize channel management
+  initChannelManagement();
+
+  // Register plan channels with existing plans (local bookkeeping for routing)
+  const plans = storage.listPlans();
+  const planIds = plans.map((p) => p.plan_id);
+  registerPlanChannels(planIds);
+
+  // Sync ideation session channels with existing active sessions
+  const ideationStorage = ideationService.getStorage();
+  await syncIdeationSessionChannels(ideationStorage);
+
+  // Note: PlannerLead agents are now spawned on-demand via AgentLifecycleManager
+
+  // Create session timeout service
+  const sessionTimeoutService = createSessionTimeoutService(storage);
+  sessionTimeoutService.start();
+
+  // Mount error handler middleware (must be last)
+  app.use(errorHandler);
+
+  // Start HTTP server
+  const server = app.listen(PORT, () => {
+    console.log('');
+    console.log(`Planner API server running at http://localhost:${PORT}`);
+    console.log(`Database: ${DB_PATH}`);
+    console.log('');
+    console.log('Available endpoints:');
+    console.log('  GET    /api/plans');
+    console.log('  POST   /api/plans');
+    console.log('  GET    /api/plans/:id');
+    console.log('  GET    /api/plans/:id/versions');
+    console.log('  GET    /api/plans/:id/versions/:version');
+    console.log('  POST   /api/plans/:id/versions/:version/submit');
+    console.log('  POST   /api/plans/:id/versions/:version/approve');
+    console.log('  POST   /api/plans/:id/versions/:version/publish');
+    console.log('  GET    /api/health/relay');
+    console.log('  GET    /api/capabilities');
+    console.log('  GET    /api/channels');
+    console.log('  GET    /api/channels/:id/messages');
+    console.log('  GET    /api/channels/:id/presence');
+    console.log('  WS     /ws/relay');
+    console.log('');
+    console.log('Ideation endpoints:');
+    console.log('  GET    /api/ideation/sessions');
+    console.log('  POST   /api/ideation/sessions');
+    console.log('  GET    /api/ideation/sessions/:id');
+    console.log('  POST   /api/ideation/sessions/:id/messages');
+    console.log('  GET    /api/ideation/sessions/:id/events (SSE)');
+    console.log('');
+    console.log('Forge endpoints:');
+    console.log('  GET    /api/forge/health');
+    console.log('  GET    /api/forge/runs');
+    console.log('  POST   /api/forge/runs');
+    console.log('  GET    /api/forge/runs/:id');
+    console.log('  GET    /api/forge/runs/:id/events (SSE)');
+    console.log('');
+    console.log('Forge-next endpoints:');
+    console.log('  GET    /api/forge-next/runs');
+    console.log('  POST   /api/forge-next/runs');
+    console.log('  GET    /api/forge-next/runs/:id');
+    console.log('  GET    /api/forge-next/runs/:id/events (SSE)');
+    console.log('  POST   /api/forge-next/runs/:id/pause');
+    console.log('  POST   /api/forge-next/runs/:id/resume');
+    console.log('  POST   /api/forge-next/runs/:id/cancel');
+    console.log('');
+    console.log('Mull endpoints:');
+    console.log('  GET    /api/mull/status');
+    console.log('  POST   /api/mull/run');
+    console.log('  GET    /api/mull/topics');
+    console.log('  GET    /api/mull/topics/:slug');
+  });
+
+  // Initialize WebSocket proxy for relay communication
+  const wss = initWebSocketProxy(server);
+  console.log('[ws-proxy] WebSocket proxy attached to HTTP server');
+
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    console.log(`\n[server] Received ${signal}, shutting down gracefully...`);
+
+    // Release all spawned agents
+    await lifecycle.releaseAll();
+
+    // Stop ideation bridge
+    stopIdeationBridge();
+
+    // Stop session timeout service
+    sessionTimeoutService.stop();
+
+    // Clean up global event wiring
+    if (globalEventCleanup) {
+      globalEventCleanup();
+    }
+
+    // Clean up mull triggers
+    if (mullTriggerCleanup) {
+      mullTriggerCleanup();
+    }
+
+    // Close WebSocket server
+    wss.close(() => {
+      console.log('[server] WebSocket server closed');
+    });
+
+    // Shutdown cultivate service BEFORE HTTP server closes
+    // This allows in-flight requests to complete properly
+    if (cultivateService) {
+      try {
+        console.log('[server] Shutting down cultivate service...');
+        await cultivateService.shutdown();
+        console.log('[server] ✓ Cultivate service shutdown complete');
+      } catch (error) {
+        console.error('[server] ✗ Error during cultivate shutdown:', error);
+        // Continue with remaining shutdowns - don't block other services
+      }
+    }
+
+    // Close HTTP server
+    server.close(() => {
+      console.log('[server] HTTP server closed');
+    });
+
+    // Disconnect relay
+    destroyRelay();
+
+    // Shutdown remaining services
+    plannerService.shutdown();
+    await ideationService.shutdown();
+    forgeService.shutdown();
+    portfolioService.shutdown();
+    mullService.shutdown();
+
+    // Exit after cleanup
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+
+// Start the server
+start().catch((error) => {
+  console.error('[server] Failed to start:', error);
+  process.exit(1);
+});

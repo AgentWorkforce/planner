@@ -1,0 +1,117 @@
+{
+  "feature_id": "cultivate-server-mount",
+  "title": "Server Integration",
+  "type": "feature",
+  "status": "verified",
+  "priority": "critical",
+  "dependencies": ["cultivate-startup"],
+  "parent": "cultivate-package",
+  "component": "server",
+  "summary": {
+    "goal": "Integrate the cultivate package into the server meta-server. Add environment variable configuration (CULTIVATE_DB_PATH, CULTIVATE_SECRET, CULTIVATE_REDIS_URL, CULTIVATE_EXTRACT_MODEL, CULTIVATE_CLUSTER_MODEL). Import createCultivateService from @plannr/cultivate, call initialize(), mount the router at /api/cultivate. Add graceful shutdown integration with the server's existing shutdown handler. Add @plannr/cultivate as a dependency in the server package.json. Update dev.sh to ensure Redis is available.",
+    "acceptance_criteria": [
+      { "id": "csm-ac1", "description": "CULTIVATE_DB_PATH, CULTIVATE_SECRET, CULTIVATE_REDIS_URL, CULTIVATE_EXTRACT_MODEL, CULTIVATE_CLUSTER_MODEL env vars are read by server" },
+      { "id": "csm-ac2", "description": "createCultivateService() imported and initialize() called during server startup" },
+      { "id": "csm-ac3", "description": "Cultivate router mounted at /api/cultivate" },
+      { "id": "csm-ac4", "description": "Cultivate shutdown() called during server graceful shutdown" },
+      { "id": "csm-ac5", "description": "@plannr/cultivate added to server package.json dependencies" },
+      { "id": "csm-ac6", "description": "dev.sh updated to start Redis before server" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "csm-ac1", "status": "satisfied", "evidence": "packages/server/src/config.ts" },
+      { "id": "csm-ac2", "status": "satisfied", "evidence": "packages/server/src/server.ts" },
+      { "id": "csm-ac3", "status": "satisfied", "evidence": "packages/server/src/server.ts" },
+      { "id": "csm-ac4", "status": "satisfied", "evidence": "packages/server/src/server.ts" },
+      { "id": "csm-ac5", "status": "satisfied", "evidence": "packages/server/package.json" },
+      { "id": "csm-ac6", "status": "satisfied", "evidence": "scripts/dev.sh" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["server"],
+    "steps": [
+      {
+        "step_id": "csm-s1",
+        "title": "Add env var configuration",
+        "scope": "server",
+        "description": "Update the server's configuration module to read cultivate-specific environment variables: CULTIVATE_DB_PATH (default: ./cultivate.db), CULTIVATE_SECRET (required for auth encryption, no default), CULTIVATE_REDIS_URL (default: redis://localhost:6379), CULTIVATE_EXTRACT_MODEL (optional, overrides default Sonnet model for extraction), CULTIVATE_CLUSTER_MODEL (optional, overrides default Haiku model for clustering). Add these to the server's config type and validation.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All 5 env vars read with correct defaults" },
+          { "id": "ac2", "description": "CULTIVATE_SECRET has no default (must be provided)" },
+          { "id": "ac3", "description": "Config type updated to include cultivate settings" }
+        ]
+      },
+      {
+        "step_id": "csm-s2",
+        "title": "Import and initialize cultivate service in server",
+        "scope": "server",
+        "description": "In the server's initialization sequence (packages/server/src/server.ts or equivalent), import createCultivateService from @plannr/cultivate. After existing services are initialized (planner, ideation, forge), create the cultivate service with the config from env vars. Call cultivateService.initialize(). Handle CultivateStartupError — log the error and decide whether to abort server startup or continue without cultivate (configurable via CULTIVATE_REQUIRED env var, default false for backward compatibility).",
+        "dependencies": ["csm-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cultivate service created and initialized after existing services" },
+          { "id": "ac2", "description": "CultivateStartupError handled per CULTIVATE_REQUIRED flag" },
+          { "id": "ac3", "description": "Server can start without cultivate when CULTIVATE_REQUIRED is false" }
+        ]
+      },
+      {
+        "step_id": "csm-s3",
+        "title": "Mount router at /api/cultivate",
+        "scope": "server",
+        "description": "Mount the cultivate Express router at the /api/cultivate path prefix, consistent with other domain mounts (/api/plans, /api/ideation, /api/forge). Ensure the cultivate router is only mounted if initialization succeeded. Place it in the middleware stack alongside other domain routers, before the error handler.",
+        "dependencies": ["csm-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Router mounted at /api/cultivate" },
+          { "id": "ac2", "description": "Only mounted if cultivate initialization succeeded" },
+          { "id": "ac3", "description": "Positioned correctly in middleware stack (before error handler)" }
+        ]
+      },
+      {
+        "step_id": "csm-s4",
+        "title": "Add graceful shutdown integration",
+        "scope": "server",
+        "description": "Integrate cultivate's shutdown() into the server's existing graceful shutdown handler (SIGTERM/SIGINT). Call cultivateService.shutdown() alongside existing service shutdowns. Cultivate shutdown should happen before the HTTP server closes to allow in-flight requests to complete. Log cultivate shutdown progress. Handle errors during cultivate shutdown without blocking other service shutdowns.",
+        "dependencies": ["csm-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cultivate shutdown called on SIGTERM/SIGINT" },
+          { "id": "ac2", "description": "Shutdown happens before HTTP server close" },
+          { "id": "ac3", "description": "Shutdown errors logged but don't block other services" }
+        ]
+      },
+      {
+        "step_id": "csm-s5",
+        "title": "Add new dependencies to server package.json",
+        "scope": "server",
+        "description": "Add @plannr/cultivate as a workspace dependency in packages/server/package.json. Ensure the TypeScript references in tsconfig.json include the cultivate package for build ordering. Verify the import resolves correctly in the monorepo workspace setup.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "@plannr/cultivate added to server package.json dependencies" },
+          { "id": "ac2", "description": "tsconfig.json references updated for build ordering" },
+          { "id": "ac3", "description": "Import resolves correctly in workspace" }
+        ]
+      },
+      {
+        "step_id": "csm-s6",
+        "title": "Update dev.sh for Redis",
+        "scope": "server",
+        "description": "Update scripts/dev.sh to ensure Redis is available before starting the server. Add a Redis check (redis-cli ping) or start Redis if not running. Options: check for existing Redis process, start via brew services or docker, or document Redis as a prerequisite. Add CULTIVATE_REDIS_URL to the .env.example if one exists. Log Redis status during dev startup.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "dev.sh checks Redis availability before server start" },
+          { "id": "ac2", "description": "Clear error message if Redis is not available" },
+          { "id": "ac3", "description": "Redis connection URL documented or in env example" }
+        ]
+      }
+    ]
+  }
+}

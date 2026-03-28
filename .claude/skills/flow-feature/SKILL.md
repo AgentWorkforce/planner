@@ -1,0 +1,137 @@
+---
+name: flow-feature
+description: When user needs to document behavior as testable steps - "what happens when user does X?", "describe the user flow", or feature needs user_flow for testing. Creates atomic [action], [assert], [system] steps that are observable and verifiable.
+user-invocable: false
+---
+# Feature Flow: Feature → User Flow
+
+**Owns**: Feature `user_flow` section; may contribute to `understanding`
+
+## Purpose
+
+Document "what the product does" as atomic steps:
+- Capture user actions, system behavior, expected outcomes
+- Make flows testable (observable assertions)
+- Serve as source of truth for E2E/integration tests
+
+## Input
+
+- Feature file with `summary` section
+
+## Output
+
+Feature's `user_flow` section filled.
+
+## Prerequisites
+
+Requires: feature file with `summary` section.
+
+If no feature file → "Run /flow discover or /flow brainstorm first."
+
+## Modes
+
+**Declare**: User describes feature behavior; convert to flow.
+
+**Elaborate**: Feature already has summary; expand into detailed steps.
+
+For documenting behavior of existing code without a feature file, use `/flow discover` first.
+
+## Rules
+
+- Use `mcp__conductor__AskUserQuestion` for choices; 1–2 questions max.
+- Each step must be atomic: one action or one assertion
+- Assertions must be observable (UI state, URL, API response, persisted record)
+- No vague language ("works", "handles correctly")
+- Happy path first; add variants only when they change behavior materially
+- After completion: single-sentence summary unless user requests more.
+
+## Workflow
+
+### 1. Understand the Feature
+
+Read `summary.goal` and `summary.acceptance_criteria`.
+Identify the happy path and key variants.
+
+### 2. Draft Steps
+
+Write atomic steps using tags:
+
+```json
+{
+  "user_flow": {
+    "steps": [
+      { "step_id": "s001", "title": "[action] User enters credentials" },
+      { "step_id": "s002", "title": "[system] API validates credentials" },
+      { "step_id": "s003", "title": "[assert] Dashboard is visible" },
+      { "step_id": "s004", "title": "[assert] Welcome message shows username" }
+    ]
+  }
+}
+```
+
+### 3. Step Tags
+
+| Tag | Meaning |
+|-----|---------|
+| `[action]` | User action (click, type, navigate) |
+| `[assert]` | Observable assertion (visible, contains, URL) |
+| `[system]` | System side-effect (verified via later assert) |
+
+### 4. Quality Bar
+
+- Each step is atomic: one action or one assertion
+- Assertions must be observable (UI state, URL, API response, persisted record)
+- No vague language ("works", "handles correctly")
+- Happy path first; add variants only when they change behavior materially
+
+### 5. Handle Complexity
+
+If a feature has >10 flow steps or multiple distinct paths:
+- Split into sub-features
+- Use epic structure with `sub_features` array
+
+### 6. Record Flow Observations (Optional)
+
+If significant patterns or concerns emerge while documenting flows, capture in understanding:
+
+```json
+"understanding": {
+  "architect": {
+    "observations": ["Complex state machine in checkout flow", "Multiple async operations"],
+    "concerns": ["Race condition possible between steps 3-4"]
+  },
+  "designer": {
+    "observations": ["Flow has 3 decision points", "Error states need clear messaging"]
+  }
+}
+```
+
+Only add understanding entries when genuinely useful—not required for every feature.
+
+## Fits the Whole
+
+| Skill | Section |
+|-------|---------|
+| flow-discover | `summary`, `understanding`, `context` (from code) |
+| flow-brainstorm | `summary`, `understanding`, `context` (from ideas) |
+| flow-ui-ux-designer | `design_spec`, `context.designer`, `understanding.designer` |
+| flow-planner | `plan_implementation` (with step `specification`) |
+| flow-tasks | Creates executable tasks from plan |
+| **flow-feature** | `user_flow` |
+| flow-ui-ux-validation | `validation_uiux` |
+| flow-test-designer | `plan_tests` |
+| flow-visualize | Reads all, renders diagram |
+| flow-change-request | Updates any, cascades |
+
+## Suggested Next Steps
+
+- To validate in real UI: `/flow validate`
+- To design test coverage: `/flow test`
+
+## Done When
+
+- `user_flow` section is filled
+- Each step is atomic and tagged
+- Assertions are observable
+- Happy path is complete; key variants documented
+- Flow observations captured in `understanding` (if significant patterns emerged)

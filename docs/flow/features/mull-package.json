@@ -1,0 +1,128 @@
+{
+  "feature_id": "mull-package",
+  "title": "Mull: Cross-Agent Shared Memory",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "component": "mull",
+  "dependencies": [],
+  "design_reference": "docs/mull-spec.md",
+  "summary": {
+    "goal": "Build a generic, source-agnostic knowledge extraction pipeline that reads session data from any supported source, extracts the 5-10% that is actual knowledge (decisions, constraints, patterns, gotchas, context), and writes structured markdown topic files to memory/. Two-stage pipeline: deterministic extraction ($0, <100ms) then selective LLM synthesis (one call). Built as packages/mull/ in the monorepo but structured for easy extraction to a standalone repo. Both CLI and programmatic API.",
+    "in_scope": [
+      "Core type system: Zod schemas for SessionData, Nugget, PreExtract, TopicFile, MergeResult, and all intermediate types",
+      "Adapter orchestration: SessionAdapter interface, multi-adapter merge by timestamp, cursor-based incremental processing, createAdapter factory",
+      "3 built-in generic adapters: trajectory-file (.trajectory.json), relay-jsonl (YYYY-MM-DD.jsonl), transcript (md/jsonl/txt)",
+      "Deterministic extraction: entity extraction (compromise.js + tech lexicon), fact extraction (structural from events), topic matching (against memory/), transcript filtering (decision-adjacent only)",
+      "LLM synthesis: prompt construction from PreExtract, single Haiku call, structured nugget output parsing, trail decision shortcut, Tier 0 fallback",
+      "Topic file system: markdown + YAML frontmatter, slug-based merge, section management (Decisions/Constraints/Patterns/Gotchas/Context), causal links",
+      "Index generation: memory/index.md auto-rebuilt from all topic file frontmatter after every write",
+      "Pipeline orchestrator: wires stages together, handles incremental processing, idempotency guarantees, dry-run support",
+      "CLI: mull <session-id>, --all, --source, --dry-run, --force, --memory-dir",
+      "Programmatic API: mull(sessionId, opts) → MergeResult, createAdapter(type, config)",
+      "Configuration: mull.config.json, package.json mull key, CLI flag overrides, zero-config defaults"
+    ],
+    "out_of_scope": [
+      "Vector embeddings / RAG (Tier 2 evolution)",
+      "Graph database from causal links (Tier 3 evolution)",
+      "Reranker + timeline anchoring (Tier 4 evolution)",
+      "Retrieval — mull only writes, search tools read",
+      "Any UI — CLI and programmatic API only for core",
+      "Plannr-specific SQLite adapters (separate epic: mull-integration)",
+      "Server plugin mount (separate epic: mull-integration)",
+      "Real-time event triggers during live sessions (separate epic: mull-integration)"
+    ],
+    "acceptance_criteria": [
+      { "id": "mull-ac1", "description": "mull <session-id> reads session data via adapter, extracts knowledge, writes topic files to memory/" },
+      { "id": "mull-ac2", "description": "Deterministic extraction runs at $0 cost and <100ms for typical sessions" },
+      { "id": "mull-ac3", "description": "LLM synthesis makes exactly one API call per session (Claude Haiku default)" },
+      { "id": "mull-ac4", "description": "Topic files are markdown with YAML frontmatter, organized by topic not session" },
+      { "id": "mull-ac5", "description": "Running mull twice on the same session produces identical output (idempotent)" },
+      { "id": "mull-ac6", "description": "Nuggets merge by slug — no duplicates on re-run" },
+      { "id": "mull-ac7", "description": "memory/index.md is auto-regenerated after every write, reflects reality" },
+      { "id": "mull-ac8", "description": "mull --dry-run shows extraction results without writing files" },
+      { "id": "mull-ac9", "description": "Zero-config default: looks for .trajectories/ in cwd, writes to ./memory/" },
+      { "id": "mull-ac10", "description": "Package has no dependency on plannr, relay SDK, or any project-specific system" },
+      { "id": "mull-ac11", "description": "Custom adapters can be provided via SessionAdapter interface" },
+      { "id": "mull-ac12", "description": "Trail decisions from trajectories bypass LLM and map directly to Decision nuggets" },
+      { "id": "mull-ac13", "description": "Mull never modifies source data — read-only access to all inputs" },
+      { "id": "mull-ac14", "description": "Every nugget is self-contained — understandable without the original transcript" },
+      { "id": "mull-ac15", "description": "Causal links between nuggets use slugs (human-readable), not IDs" },
+      { "id": "mull-ac16", "description": "Without LLM API key, mull still produces value from deterministic extraction alone (Tier 0)" },
+      { "id": "mull-ac17", "description": "Incremental runs compose: 10 partial runs = 1 full run (cursor-based)" },
+      { "id": "mull-ac18", "description": "Parallel sessions don't conflict: each writes to topic files using slug-based merge" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Two-stage pipeline is the core innovation: 80% deterministic + 20% LLM matches pure-LLM quality at 375-500x lower cost (LoCoMo benchmark)",
+        "The pipeline has 8 explicit steps across 2 stages with a clear PreExtract boundary between them",
+        "Adapters are the ONLY external interface — core pipeline never reads sources directly",
+        "Topic-organized not session-organized: future agent asking 'what about OAuth?' finds ONE file with complete picture",
+        "Filesystem IS the database — no SQLite, no Redis, no vector store for core. Any search tool is the query engine.",
+        "compromise.js for NLP entity extraction — ~1MB/sec, zero API calls, likely needs custom lexicon for tech terms",
+        "gray-matter for YAML frontmatter — lightweight, standard",
+        "Spec maps to ~300 lines of core code: extract.ts (~200 lines) + synthesize.ts (~100 lines)",
+        "Package structure maps cleanly to standalone repo: zero monorepo dependencies in core",
+        "8 invariants in spec section 10 form the test contract"
+      ],
+      "keywords": ["knowledge extraction", "topic files", "nuggets", "deterministic", "LLM synthesis", "adapters", "idempotent", "incremental", "compromise.js", "gray-matter"],
+      "questions": [],
+      "concerns": [
+        "compromise.js entity extraction quality for technical terms — may need custom lexicon for TypeScript, OAuth, PKCE, etc.",
+        "Topic matching confidence thresholds need tuning with real data before they're reliable",
+        "Slug collision handling when two sessions produce same-slug nuggets for different topics",
+        "filterTranscript heuristics: too aggressive loses context, too loose wastes LLM tokens — needs empirical tuning"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "context": {
+    "architect": {
+      "language": "TypeScript",
+      "runtime": "Node.js 20+",
+      "package_location": "packages/mull/",
+      "portability": "Zero dependencies on plannr monorepo — can be extracted to standalone repo",
+      "dependencies": {
+        "compromise": "NLP entity extraction (~1MB/sec, zero API calls)",
+        "@anthropic-ai/sdk": "LLM synthesis (default provider, swappable)",
+        "gray-matter": "Parse/write YAML frontmatter",
+        "commander": "CLI framework",
+        "zod": "Type-safe validation"
+      },
+      "testing": "Vitest (matches monorepo)",
+      "cost_model": {
+        "short_session": "~$0.001 (1 LLM call, 500-2K tokens in)",
+        "medium_session": "~$0.002-0.003 (2-3 LLM calls)",
+        "long_session": "~$0.003-0.004 (3-4 LLM calls)"
+      }
+    },
+    "research": {
+      "basis": "LoCoMo benchmark (Snap Research, ACL 2024) — 300+ turn conversations",
+      "key_findings": [
+        "Structured observations beat raw dialogue by 22-66%",
+        "Long context alone is worse than selective extraction",
+        "File-based memory is competitive at 74% (Letta benchmark)",
+        "80% deterministic + 20% LLM matches pure-LLM at 375-500x lower cost"
+      ],
+      "evolution_path": {
+        "tier_0": "Deterministic extraction + TOC (free baseline, always on)",
+        "tier_1": "+ selective LLM synthesis → topic files (~74% LoCoMo, BUILD THIS)",
+        "tier_2": "+ vector embeddings for retrieval (~82%, trigger: >50 topic files)",
+        "tier_3": "+ graph from Caused links (~87%, trigger: multi-hop questions fail)",
+        "tier_4": "+ reranker + timeline anchoring (~91%, trigger: need near-human accuracy)"
+      }
+    }
+  },
+  "sub_features": [
+    { "id": "mull-domain-types", "title": "Core Type System & Schemas" },
+    { "id": "mull-adapter-system", "title": "Adapter Orchestration System" },
+    { "id": "mull-builtin-adapters", "title": "Built-in Generic Adapters" },
+    { "id": "mull-deterministic-extraction", "title": "Deterministic Extraction Layer" },
+    { "id": "mull-llm-synthesis", "title": "LLM Synthesis Layer" },
+    { "id": "mull-topic-file-system", "title": "Topic File System & Index Generation" },
+    { "id": "mull-pipeline", "title": "Pipeline Orchestrator" },
+    { "id": "mull-cli", "title": "CLI Interface" }
+  ]
+}

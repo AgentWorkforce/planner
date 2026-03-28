@@ -1,0 +1,32 @@
+{
+  "feature_id": "ui-plan-creation",
+  "title": "Plan Creation",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["rest-api"],
+
+  "summary": {
+    "goal": "Enable users to create new plans through various entry points in the UI",
+    "context": "Users can start with a vague goal, import a PRD document, or use templates. AI always drafts first - the blank page problem doesn't exist.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Users can create plan from goal text" },
+      { "id": "ac2", "description": "Users can import from document (PRD, spec)" },
+      { "id": "ac3", "description": "AI generates initial structure from any input" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Experience 1", "path": "docs/ui-vision.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "ui-plan-create-goal", "title": "Create from Goal", "ref": "ui-plan-create-goal.json" },
+    { "feature_id": "ui-plan-create-import", "title": "Import from Document", "ref": "ui-plan-create-import.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  }
+}

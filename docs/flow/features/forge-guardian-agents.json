@@ -1,0 +1,188 @@
+{
+  "feature_id": "forge-guardian-agents",
+  "title": "Guardian Agent Support",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "forge-core",
+  "dependencies": ["forge-relay-integration", "forge-trajectory-capture", "forge-storage"],
+
+  "summary": {
+    "goal": "Support persistent guardian agents that shadow workers, maintain context across phases (ideation->planning->execution), and intervene when they observe violations. Unlike task agents (spawn->work->exit), guardians persist and accumulate understanding.",
+    "acceptance_criteria": [
+      { "id": "fga-ac1", "description": "Guardian agent config in forge-config.yaml: enabled, shadow targets, speak_on triggers" },
+      { "id": "fga-ac2", "description": "Spawn guardian with Relay shadowOf capability" },
+      { "id": "fga-ac3", "description": "Guardian receives trajectory from previous phases as context" },
+      { "id": "fga-ac4", "description": "Guardian can speak on specific trigger events (security_concern, boundary_violation, etc.)" },
+      { "id": "fga-ac5", "description": "Guardian trajectory persists at project scope (not just run scope)" },
+      { "id": "fga-ac6", "description": "Predefined guardian types: Security, Architect, QA" },
+      { "id": "fga-ac7", "description": "Guardian interventions recorded in run trajectory" },
+      { "id": "fga-ac8", "description": "Guardian retrospective at run completion" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Guardian vs Task agent: persistent vs ephemeral, accumulated vs task-scoped context",
+        "Relay shadow capability enables non-intrusive observation",
+        "Project-scoped trajectories enable cross-run learning",
+        "speak_on triggers prevent noise - only speak when relevant"
+      ],
+      "patterns": [
+        "Shadow agent pattern from Relay SDK",
+        "Persistent context via trajectory injection",
+        "Configuration-driven guardian setup"
+      ],
+      "keywords": ["guardian", "shadow", "persistent-context", "oversight"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "guardian_types": ["Security", "Architect", "QA", "Compliance"],
+      "speak_on_examples": ["security_concern", "credential_exposure", "boundary_violation", "api_inconsistency", "test_coverage_drop"],
+      "trajectory_scope": "project (persists across runs)"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fga-s1",
+        "title": "Define guardian configuration schema",
+        "scope": "forge-core",
+        "description": "Define configuration format for guardian agents",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GuardianConfigSchema: { type: 'Security' | 'Architect' | 'QA' | 'Compliance', enabled: bool, shadow_targets: string[], speak_on: string[] }" },
+          { "id": "ac2", "description": "speak_on examples: security_concern, credential_exposure, boundary_violation, api_inconsistency, test_coverage_drop" },
+          { "id": "ac3", "description": "Loaded from forge-config.yaml guardians section" }
+        ],
+        "specification": {
+          "architecture": {
+            "config_example": {
+              "guardians": [
+                { "type": "Security", "enabled": true, "shadow_targets": ["*"], "speak_on": ["security_concern", "credential_exposure"] }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "step_id": "fga-s2",
+        "title": "Add guardian trajectory table to storage",
+        "scope": "forge-core",
+        "description": "Schema for guardian-specific trajectory at project scope",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CREATE_GUARDIAN_TRAJECTORIES_TABLE: event_id PK, project_id, guardian_type, observation, concern_level, recommendation, timestamp" },
+          { "id": "ac2", "description": "concern_level: 'info' | 'warning' | 'critical'" },
+          { "id": "ac3", "description": "Index on (project_id, guardian_type) for efficient queries" },
+          { "id": "ac4", "description": "ForgeStorage methods: createGuardianEvent, listGuardianEvents(projectId, guardianType)" }
+        ],
+        "specification": {
+          "architecture": {
+            "scope": "Project-scoped (persists across runs)"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s3",
+        "title": "Implement guardian spawning",
+        "scope": "forge-core",
+        "description": "Spawn guardian agents with shadow capability",
+        "dependencies": ["fga-s1", "fga-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "spawnGuardian(type, config, projectId) spawns persistent guardian agent" },
+          { "id": "ac2", "description": "Guardian uses relay shadowOf capability to observe workers" },
+          { "id": "ac3", "description": "Guardian receives accumulated trajectory from previous runs via storage" },
+          { "id": "ac4", "description": "Guardian name pattern: guardian-{type}-{projectId}" }
+        ],
+        "specification": {
+          "pattern_reference": "Relay SDK shadow agent documentation",
+          "pattern_description": "Use shadowOf capability from relay for non-intrusive observation"
+        }
+      },
+      {
+        "step_id": "fga-s4",
+        "title": "Implement speak_on trigger system",
+        "scope": "forge-core",
+        "description": "Trigger guardian to speak only on configured events",
+        "dependencies": ["fga-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Guardian receives filtered events matching speak_on triggers" },
+          { "id": "ac2", "description": "Non-matching events observed but not actioned" },
+          { "id": "ac3", "description": "Guardian can intervene by sending message to worker or alerting human" },
+          { "id": "ac4", "description": "Intervention recorded in both run trajectory and guardian trajectory" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Event filter on shadow stream",
+            "intervention_options": ["message_worker", "alert_human", "record_observation"]
+          }
+        }
+      },
+      {
+        "step_id": "fga-s5",
+        "title": "Implement guardian retrospective",
+        "scope": "forge-core",
+        "description": "Trigger guardian retrospective at run completion",
+        "dependencies": ["fga-s3", "fga-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On run completion, prompt active guardians for retrospective" },
+          { "id": "ac2", "description": "Retrospective summarizes observations, concerns raised, recommendations" },
+          { "id": "ac3", "description": "Retrospective stored in guardian trajectory for future reference" },
+          { "id": "ac4", "description": "Optional: send retrospective to human for review" }
+        ],
+        "specification": {
+          "architecture": {
+            "trigger": "Run status transition to 'completed' or 'failed'"
+          }
+        }
+      },
+      {
+        "step_id": "fga-s6",
+        "title": "Implement predefined guardian types",
+        "scope": "forge-core",
+        "description": "Create prompt templates for standard guardian types",
+        "dependencies": ["fga-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Security guardian: monitors for credential exposure, injection risks, auth issues" },
+          { "id": "ac2", "description": "Architect guardian: monitors for boundary violations, pattern inconsistencies" },
+          { "id": "ac3", "description": "QA guardian: monitors for test coverage, quality regressions" },
+          { "id": "ac4", "description": "Each type has specific speak_on defaults and prompt template" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/prompts/planning-agent.ts",
+          "pattern_description": "Create guardian-specific prompt templates"
+        }
+      },
+      {
+        "step_id": "fga-s7",
+        "title": "Create guardian management API",
+        "scope": "forge-core",
+        "description": "API endpoints for guardian management",
+        "dependencies": ["fga-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /guardians lists active guardians for project" },
+          { "id": "ac2", "description": "GET /guardians/:type/trajectory returns guardian trajectory" },
+          { "id": "ac3", "description": "POST /guardians/:type/spawn spawns guardian for project" },
+          { "id": "ac4", "description": "POST /guardians/:type/stop stops guardian" }
+        ],
+        "specification": {
+          "integration": "Add to forge-api router"
+        }
+      }
+    ]
+  }
+}

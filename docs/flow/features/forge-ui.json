@@ -1,0 +1,248 @@
+{
+  "feature_id": "forge-ui",
+  "title": "Forge UI Package",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "component": "forge-ui",
+  "dependencies": ["forge-api"],
+
+  "summary": {
+    "goal": "Mission Control dashboard for run monitoring, gate approvals, trajectory exploration, and question queue management. Provides visibility into Forge execution for humans overseeing agent work.",
+    "scope_in": [
+      "Runs list with status filtering",
+      "Run dashboard showing progress, active agents, pending gates",
+      "Pre-flight check view before starting runs",
+      "Gate approval interface with artifact review",
+      "Run timeline/audit log view",
+      "Active agent cards with status and messages",
+      "Artifacts display with external links",
+      "Status bar integration for at-a-glance monitoring",
+      "Agent question queue for blocking questions"
+    ],
+    "scope_out": [
+      "Trajectory deep-dive exploration (Phase 2)",
+      "User preference learning UI (Phase 2)",
+      "Advanced analytics dashboards (Phase 2)",
+      "Guardian agent configuration UI (Phase 2)"
+    ],
+    "acceptance_criteria": [
+      { "id": "fui-ac1", "description": "User can see list of runs with status filters (running, completed, failed)" },
+      { "id": "fui-ac2", "description": "User can view run dashboard showing real-time progress via SSE" },
+      { "id": "fui-ac3", "description": "User can review pre-flight check before starting a run" },
+      { "id": "fui-ac4", "description": "User can approve/reject gates with artifact review and optional notes" },
+      { "id": "fui-ac5", "description": "User can view run timeline showing all events" },
+      { "id": "fui-ac6", "description": "User can see active agents and their current status" },
+      { "id": "fui-ac7", "description": "User can view and click through to artifacts (PRs, deployments)" },
+      { "id": "fui-ac8", "description": "Status bar shows active run progress at a glance" },
+      { "id": "fui-ac9", "description": "User can answer agent questions from queue" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Follows Mission Control design system from planner-ui",
+        "SSE for real-time updates (not polling)",
+        "Gate approvals are the primary human interaction point",
+        "Timeline enables post-run debugging and audit"
+      ],
+      "patterns": [
+        "Same tech stack as planner-ui (React, Vite, Tailwind, shadcn/ui)",
+        "Reuse design system components from planner-ui",
+        "SSE hooks for real-time subscriptions",
+        "Status bar from ui-agent-orchestration pattern"
+      ],
+      "keywords": ["dashboard", "monitoring", "gates", "SSE", "Mission Control"],
+      "confidence": "confident"
+    },
+    "designer": {
+      "observations": [
+        "ASCII wireframes in design doc define the layouts",
+        "Pre-flight → Dashboard → Timeline is the user journey",
+        "Notifications for gates are critical (can't miss approvals)",
+        "Agent cards show context without overwhelming"
+      ],
+      "keywords": ["progress-bar", "cards", "timeline", "notification"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "tech_stack": "TypeScript, React, Vite, Tailwind CSS 4, shadcn/ui",
+      "api_integration": "Forge REST API + SSE",
+      "component_reuse": "Extend planner-ui design system and patterns"
+    },
+    "designer": {
+      "design_reference": ".context/forge-design.md (UI Views section)"
+    }
+  },
+
+  "sub_features": [
+    {
+      "id": "forge-ui-layout",
+      "title": "Forge Layout & Navigation",
+      "priority": "critical",
+      "summary": {
+        "goal": "Base layout with navigation, routing, and shared components for Forge UI",
+        "acceptance_criteria": [
+          { "id": "ful-ac1", "description": "App shell with sidebar navigation" },
+          { "id": "ful-ac2", "description": "Routes: /forge (runs list), /forge/runs/:id (dashboard), /forge/runs/:id/timeline" },
+          { "id": "ful-ac3", "description": "Shared API client for Forge endpoints" },
+          { "id": "ful-ac4", "description": "SSE connection management hook" },
+          { "id": "ful-ac5", "description": "Theme integration with Mission Control design system" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-runs-list",
+      "title": "Runs List View",
+      "priority": "high",
+      "dependencies": ["forge-ui-layout"],
+      "summary": {
+        "goal": "List all runs with status filtering, search, and quick actions",
+        "acceptance_criteria": [
+          { "id": "frl-ac1", "description": "Table/card list of runs showing status, plan name, duration" },
+          { "id": "frl-ac2", "description": "Filter by status: all, running, completed, failed, paused" },
+          { "id": "frl-ac3", "description": "Click to navigate to run dashboard" },
+          { "id": "frl-ac4", "description": "Import Plan button to create new run" },
+          { "id": "frl-ac5", "description": "Real-time status updates via SSE" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-run-dashboard",
+      "title": "Run Dashboard",
+      "priority": "critical",
+      "dependencies": ["forge-ui-layout"],
+      "summary": {
+        "goal": "Main view during execution showing progress, tasks, and agents",
+        "acceptance_criteria": [
+          { "id": "frd-ac1", "description": "Progress bar with task counts (X/Y completed)" },
+          { "id": "frd-ac2", "description": "Task list showing status icons, titles, durations, artifacts" },
+          { "id": "frd-ac3", "description": "Active agents section with current task info" },
+          { "id": "frd-ac4", "description": "Run controls: Pause, Resume, Cancel" },
+          { "id": "frd-ac5", "description": "Real-time updates via SSE subscription" },
+          { "id": "frd-ac6", "description": "Gate pending indicator with notification" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-preflight",
+      "title": "Pre-Flight Check View",
+      "priority": "high",
+      "dependencies": ["forge-ui-layout"],
+      "summary": {
+        "goal": "Review plan and configuration before starting execution",
+        "acceptance_criteria": [
+          { "id": "fpf-ac1", "description": "Plan summary (goal, step count, estimated time)" },
+          { "id": "fpf-ac2", "description": "Pre-flight checklist (repos accessible, roles mapped, gates identified)" },
+          { "id": "fpf-ac3", "description": "Environment selector if multiple configured" },
+          { "id": "fpf-ac4", "description": "Start Forging button to begin execution" },
+          { "id": "fpf-ac5", "description": "Cancel to return without starting" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-gate-approval",
+      "title": "Gate Approval UI",
+      "priority": "critical",
+      "dependencies": ["forge-ui-run-dashboard"],
+      "summary": {
+        "goal": "Interface for humans to approve or reject gates with full context",
+        "acceptance_criteria": [
+          { "id": "fga-ac1", "description": "Gate details: step title, description, verification results" },
+          { "id": "fga-ac2", "description": "Artifacts list with links (PRs, reports, deployments)" },
+          { "id": "fga-ac3", "description": "Optional notes field for approval/rejection" },
+          { "id": "fga-ac4", "description": "Approve and Reject buttons with confirmation" },
+          { "id": "fga-ac5", "description": "Notification badge when gate is pending" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-timeline",
+      "title": "Run Timeline View",
+      "priority": "medium",
+      "dependencies": ["forge-ui-run-dashboard"],
+      "summary": {
+        "goal": "Audit log showing all events in chronological order",
+        "acceptance_criteria": [
+          { "id": "ftl-ac1", "description": "Chronological list of all run events with timestamps" },
+          { "id": "ftl-ac2", "description": "Event types: task started/completed/failed, agent spawned, gate resolved" },
+          { "id": "ftl-ac3", "description": "Filter by event type" },
+          { "id": "ftl-ac4", "description": "Export log button" },
+          { "id": "ftl-ac5", "description": "Link artifacts to timeline entries" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-agent-cards",
+      "title": "Active Agent Cards",
+      "priority": "high",
+      "dependencies": ["forge-ui-run-dashboard"],
+      "summary": {
+        "goal": "Visual cards showing active agents and their current status",
+        "acceptance_criteria": [
+          { "id": "fac-ac1", "description": "Card per active agent with role icon and name" },
+          { "id": "fac-ac2", "description": "Current task title displayed" },
+          { "id": "fac-ac3", "description": "Latest status message from agent" },
+          { "id": "fac-ac4", "description": "View Details link to expanded view" },
+          { "id": "fac-ac5", "description": "Real-time updates as agent reports progress" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-artifacts",
+      "title": "Artifacts Display",
+      "priority": "high",
+      "dependencies": ["forge-ui-run-dashboard"],
+      "summary": {
+        "goal": "Display and link to artifacts produced by the run",
+        "acceptance_criteria": [
+          { "id": "faf-ac1", "description": "List artifacts by type (PR, commit, deployment, file)" },
+          { "id": "faf-ac2", "description": "External links open in new tab (GitHub, deployment URL)" },
+          { "id": "faf-ac3", "description": "Associated task shown for each artifact" },
+          { "id": "faf-ac4", "description": "Status badge (merged, open, deployed)" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-status-bar",
+      "title": "Forge Status Bar Integration",
+      "priority": "high",
+      "dependencies": ["forge-ui-layout"],
+      "summary": {
+        "goal": "Status bar showing active run progress at a glance",
+        "acceptance_criteria": [
+          { "id": "fsb-ac1", "description": "Progress indicator (4/7 tasks) in status bar" },
+          { "id": "fsb-ac2", "description": "Active agent count with status dots" },
+          { "id": "fsb-ac3", "description": "Pending gates indicator" },
+          { "id": "fsb-ac4", "description": "Elapsed time display" },
+          { "id": "fsb-ac5", "description": "Click to expand full run dashboard" }
+        ]
+      }
+    },
+    {
+      "id": "forge-ui-question-queue",
+      "title": "Agent Question Queue UI",
+      "priority": "high",
+      "dependencies": ["forge-ui-run-dashboard"],
+      "summary": {
+        "goal": "Interface for answering agent questions that are blocking execution",
+        "acceptance_criteria": [
+          { "id": "fqq-ac1", "description": "Queue showing pending questions from agents" },
+          { "id": "fqq-ac2", "description": "Question context: which agent, which task, urgency" },
+          { "id": "fqq-ac3", "description": "Response options or free-form input" },
+          { "id": "fqq-ac4", "description": "Notification when new question arrives" },
+          { "id": "fqq-ac5", "description": "Question type badges (blocking, preference, FYI)" }
+        ]
+      }
+    }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": []
+  }
+}

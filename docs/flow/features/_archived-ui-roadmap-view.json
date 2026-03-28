@@ -1,0 +1,150 @@
+{
+  "feature_id": "ui-roadmap-view",
+  "title": "Mini Roadmap View",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["schema-org-initiative", "ui-sidebar-layout"],
+
+  "summary": {
+    "goal": "Create a timeline view showing initiatives and plans with their dependencies across time",
+    "context": "Roadmap provides visual timeline of work. Shows initiatives as swimlanes, plans as bars on timeline. Cross-initiative dependencies shown as connecting lines. Read-only visualization (no drag editing in v1).",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Route /roadmap shows timeline view" },
+      { "id": "ac2", "description": "Horizontal axis is time (weeks/months), vertical axis is initiatives" },
+      { "id": "ac3", "description": "Each initiative is a swimlane row with its name/icon on left" },
+      { "id": "ac4", "description": "Plans appear as horizontal bars within their initiative's swimlane" },
+      { "id": "ac5", "description": "Plan bar width represents duration (created_at to target date or now if no target)" },
+      { "id": "ac6", "description": "Plan bar color indicates status: draft=muted, approved=cyan, published=green" },
+      { "id": "ac7", "description": "Hovering plan bar shows tooltip: goal, status, step count" },
+      { "id": "ac8", "description": "Clicking plan bar navigates to plan editor" },
+      { "id": "ac9", "description": "Cross-plan dependencies shown as arrow lines connecting plan bars" },
+      { "id": "ac10", "description": "Today marker shown as vertical line on timeline" },
+      { "id": "ac11", "description": "Zoom controls: week, month, quarter views" },
+      { "id": "ac12", "description": "Scroll/pan to navigate timeline horizontally" },
+      { "id": "ac13", "description": "Filter to show/hide initiatives by status" },
+      { "id": "ac14", "description": "Empty state when no initiatives/plans exist" }
+    ]
+  },
+
+  "design_spec": {
+    "approach": "SVG-based timeline with initiative swimlanes. Custom rendering for plan bars and dependency arrows.",
+    "shadcn_components": [
+      "Select",
+      "ToggleGroup",
+      "Tooltip",
+      "Button"
+    ],
+    "views": [
+      {
+        "view_id": "roadmap-timeline",
+        "name": "Roadmap Timeline",
+        "route": "/roadmap",
+        "layout": "full width content area, flex column",
+        "elements": [
+          {
+            "component": "RoadmapToolbar",
+            "use": "top controls",
+            "custom": true,
+            "children": [
+              { "component": "Select", "use": "initiative filter", "props": "'All Initiatives' + initiative list with status filter" },
+              { "component": "ToggleGroup", "use": "zoom level", "props": "Week | Month | Quarter" },
+              { "component": "Button", "use": "today button", "props": "ghost, 'Today' - jumps to current date" }
+            ]
+          },
+          {
+            "component": "RoadmapTimeline",
+            "use": "main visualization",
+            "custom": true,
+            "props": "SVG-based, horizontal scroll, pan with drag"
+          }
+        ]
+      },
+      {
+        "view_id": "timeline-structure",
+        "name": "Timeline Internal Structure",
+        "layout": "SVG coordinate system",
+        "elements": [
+          { "component": "TimeAxis", "use": "horizontal time scale", "custom": true, "props": "fixed at top, shows week/month/quarter markers" },
+          { "component": "TodayMarker", "use": "current date line", "custom": true, "props": "vertical line, accent-orange, dashed" },
+          { "component": "InitiativeSwimlane", "use": "each initiative row", "custom": true, "props": "icon + name label on left (sticky), horizontal lane" },
+          { "component": "PlanBar", "use": "plan visualization", "custom": true, "props": "rounded rect, width=duration, height=24px" },
+          { "component": "DependencyArrow", "use": "cross-plan links", "custom": true, "props": "SVG path with arrowhead, curved bezier" }
+        ]
+      },
+      {
+        "view_id": "plan-bar",
+        "name": "Plan Bar Component",
+        "layout": "SVG rect with text",
+        "elements": [
+          { "component": "rect", "use": "bar shape", "props": "rounded corners (rx=4), fill by status" },
+          { "component": "text", "use": "plan title", "props": "truncated, text-xs, centered in bar" }
+        ],
+        "states": {
+          "draft": "fill-bg-tertiary, border-border-subtle",
+          "approved": "fill-accent-cyan/20, border-accent-cyan",
+          "published": "fill-accent-green/20, border-accent-green",
+          "hover": "border-2, show tooltip"
+        }
+      },
+      {
+        "view_id": "plan-tooltip",
+        "name": "Plan Bar Tooltip",
+        "layout": "Tooltip component from shadcn",
+        "elements": [
+          { "component": "goal", "use": "plan goal text", "props": "font-medium, line-clamp-2" },
+          { "component": "meta", "use": "status + step count", "props": "text-text-secondary, text-xs" },
+          { "component": "dates", "use": "start - end range", "props": "text-text-muted, text-xs" }
+        ]
+      },
+      {
+        "view_id": "empty-state",
+        "name": "No Roadmap Data",
+        "layout": "centered, max-w-sm",
+        "elements": [
+          { "component": "illustration", "use": "empty graphic", "props": "calendar/timeline icon, muted" },
+          { "component": "text", "use": "message", "props": "'No plans to show on roadmap'" },
+          { "component": "subtext", "use": "guidance", "props": "'Create initiatives and plans to see them on the timeline'" }
+        ]
+      }
+    ],
+    "custom_needed": [
+      "RoadmapTimeline - SVG container with pan/zoom, renders swimlanes and time axis",
+      "RoadmapToolbar - Composed toolbar with filters and zoom controls",
+      "TimeAxis - SVG group rendering time scale markers (weeks/months/quarters)",
+      "TodayMarker - Vertical SVG line at current date position",
+      "InitiativeSwimlane - Horizontal row with sticky label, contains plan bars",
+      "PlanBar - SVG rect representing a plan, click navigates to editor",
+      "DependencyArrow - SVG path connecting plan bars across swimlanes"
+    ],
+    "interaction_notes": {
+      "pan": "Click and drag on empty timeline area to pan horizontally",
+      "zoom": "ToggleGroup changes time scale (week=detailed, quarter=overview)",
+      "click": "Click plan bar navigates to /plans/:id",
+      "hover": "Hover plan bar shows Tooltip with details",
+      "sticky_labels": "Initiative labels stay visible on left during horizontal scroll"
+    },
+    "color_mapping": {
+      "draft_bar": "bg-bg-tertiary border-border-subtle (muted grey)",
+      "approved_bar": "bg-accent-cyan/20 border-accent-cyan (cyan glow)",
+      "published_bar": "bg-accent-green/20 border-accent-green (green glow)",
+      "dependency_line": "stroke-text-muted, 1px, curved",
+      "today_line": "stroke-accent-orange, 2px, dashed",
+      "swimlane_bg": "alternating bg-bg-primary and bg-bg-secondary for visual separation"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  },
+
+  "notes": {
+    "future_enhancements": [
+      "Drag to adjust plan dates",
+      "Drag to create dependencies",
+      "Milestone markers",
+      "Resource allocation view"
+    ]
+  }
+}

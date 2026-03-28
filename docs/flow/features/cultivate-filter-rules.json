@@ -1,0 +1,132 @@
+{
+  "feature_id": "cultivate-filter-rules",
+  "title": "Tier 0 + Tier 1 Filtering (Greenhouse Gate + Rule Registry)",
+  "type": "feature",
+  "status": "verified",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain", "cultivate-storage"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement the first two filtering tiers of the cultivate pipeline. Tier 0 (Greenhouse Gate): keyword-based filtering using greenhouse keyword_require and keyword_exclude lists — signals must match at least one required keyword (if list non-empty) and must not match any excluded keyword. Tier 1 (Rule Registry): a registry of deterministic FilterRule functions with default rules (noise_reject, bot_reject, length_check, specificity_boost, structure_boost, question_boost). Rules are Tuner-managed (enable/disable per greenhouse) with effectiveness tracking (signals_matched count, false_positive_rate). Tier 1 also respects tier1_strictness from CultivateConfig.",
+    "acceptance_criteria": [
+      { "id": "cfr-ac1", "description": "Tier 0: signal with greenhouse keyword_require=['auth','login'] passes if body contains 'auth' or 'login' (case-insensitive)" },
+      { "id": "cfr-ac2", "description": "Tier 0: signal with greenhouse keyword_exclude=['spam','test'] is rejected if body contains 'spam' or 'test'" },
+      { "id": "cfr-ac3", "description": "Tier 0: empty keyword_require means all signals pass (no require filter)" },
+      { "id": "cfr-ac4", "description": "Tier 1: noise_reject rejects signals with less than 20 characters" },
+      { "id": "cfr-ac5", "description": "Tier 1: bot_reject rejects signals where author_type is 'bot'" },
+      { "id": "cfr-ac6", "description": "Tier 1: length_check rejects signals shorter than configurable minimum" },
+      { "id": "cfr-ac7", "description": "Tier 1: boost rules (specificity_boost, structure_boost, question_boost) add score hints, do not reject" },
+      { "id": "cfr-ac8", "description": "Tier 1: disabled rules are skipped" },
+      { "id": "cfr-ac9", "description": "Tier 1: effectiveness tracking increments signals_matched on each rule execution" },
+      { "id": "cfr-ac10", "description": "Tier 1: tier1_strictness from config determines rejection threshold for aggregate rule scoring" },
+      { "id": "cfr-ac11", "description": "Rejected signals throw SignalFilteredError with filter_tier, rule_name, and reason" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cfr-ac1", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" },
+      { "id": "cfr-ac2", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" },
+      { "id": "cfr-ac3", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" },
+      { "id": "cfr-ac4", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac5", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac6", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac7", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac8", "status": "satisfied", "evidence": "src/filters/rule-registry.ts" },
+      { "id": "cfr-ac9", "status": "satisfied", "evidence": "src/filters/default-rules.ts" },
+      { "id": "cfr-ac10", "status": "satisfied", "evidence": "src/filters/rule-registry.ts" },
+      { "id": "cfr-ac11", "status": "satisfied", "evidence": "src/filters/greenhouse-gate.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cfr-s1",
+        "title": "Implement Tier 0 greenhouse keyword gate",
+        "scope": "cultivate",
+        "description": "Create src/filters/greenhouse-gate.ts. Implement applyGreenhouseGate(signal: {title, body}, greenhouse: {keyword_require, keyword_exclude}): { passed: boolean, reason?: string }. Logic: if keyword_require is non-empty, check that title+body contains at least one required keyword (case-insensitive substring match). Then check that title+body does not contain any excluded keyword. Return {passed: false, reason} on failure, {passed: true} on success. Throw SignalFilteredError(filter_tier=0, reason) on rejection for pipeline integration.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Empty keyword_require passes all signals" },
+          { "id": "ac2", "description": "keyword_require=['auth'] matches 'Authentication flow' (case-insensitive)" },
+          { "id": "ac3", "description": "keyword_exclude=['test'] rejects 'This is a test message'" },
+          { "id": "ac4", "description": "Returns clear reason string on rejection" }
+        ]
+      },
+      {
+        "step_id": "cfr-s2",
+        "title": "Define FilterRule interface and registry",
+        "scope": "cultivate",
+        "description": "Create src/filters/rule-registry.ts. Define FilterRuleFunction type: (signal: NormalizedEvent, config: { tier1_strictness: number }) => FilterRuleResult. FilterRuleResult type: { action: 'pass' | 'reject' | 'boost', score_adjustment?: number, reason?: string }. Implement FilterRuleRegistry class with: register(id, name, description, type, fn), get(id), list(), execute(signal, enabledRuleIds, config) — runs all enabled rules in order, collects results. A single 'reject' action from any rule rejects the signal. Boost actions accumulate score_adjustment.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Registry stores rule functions by id" },
+          { "id": "ac2", "description": "execute() runs only rules whose ids are in enabledRuleIds" },
+          { "id": "ac3", "description": "A reject from any rule short-circuits and returns rejection" },
+          { "id": "ac4", "description": "Boost score_adjustments are accumulated and returned in result" }
+        ]
+      },
+      {
+        "step_id": "cfr-s3",
+        "title": "Implement default filter rules",
+        "scope": "cultivate",
+        "description": "Create src/filters/default-rules.ts. Implement and register 6 default rules: noise_reject (reject if title+body combined < 20 chars), bot_reject (reject if author_type === 'bot'), length_check (reject if body < configurable min length based on tier1_strictness), specificity_boost (boost +0.1 if body contains specific technical terms, code snippets, or URLs), structure_boost (boost +0.05 if body has structured formatting: bullet points, numbered lists, headers), question_boost (boost +0.1 if body contains question patterns: '?', 'how to', 'why does', 'what if'). Export a registerDefaultRules(registry) function.",
+        "dependencies": ["cfr-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "noise_reject rejects 'hi' (< 20 chars)" },
+          { "id": "ac2", "description": "bot_reject rejects signals from author_type='bot'" },
+          { "id": "ac3", "description": "specificity_boost gives +0.1 for signals with URLs or code" },
+          { "id": "ac4", "description": "question_boost gives +0.1 for signals containing '?'" },
+          { "id": "ac5", "description": "All 6 rules registered via registerDefaultRules()" }
+        ]
+      },
+      {
+        "step_id": "cfr-s4",
+        "title": "Add Tuner-managed enable/disable",
+        "scope": "cultivate",
+        "description": "Extend the rule execution path to respect CultivateConfig.filter_rules settings. In the pipeline's Tier 1 execution: load current CultivateConfig from storage, extract enabled rule IDs from config.filter_rules (rules where enabled=true), pass only enabled IDs to registry.execute(). If no config exists, all default rules are enabled. Also read tier1_strictness from config (default 0.5) and pass to rule functions that use it (e.g., length_check threshold scales with strictness).",
+        "dependencies": ["cfr-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Disabled rules are not executed" },
+          { "id": "ac2", "description": "tier1_strictness from config is passed to rule functions" },
+          { "id": "ac3", "description": "Missing config defaults to all rules enabled, strictness 0.5" }
+        ]
+      },
+      {
+        "step_id": "cfr-s5",
+        "title": "Add effectiveness tracking",
+        "scope": "cultivate",
+        "description": "After each Tier 1 execution, update effectiveness metrics in storage. For each rule that was evaluated: increment signals_matched count. Track rejection outcomes to compute false_positive_rate (signals that were rejected by a rule but later manually re-admitted or linked to a plan — computed lazily, not in real-time). Implement updateRuleEffectiveness(ruleId, matched: boolean) in the filter module, which calls storage.updateEffectiveness(). Add a recalculateFalsePositiveRate(ruleId) function that queries linked/dismissed signal outcomes.",
+        "dependencies": ["cfr-s3", "cfr-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "signals_matched incremented for each rule evaluated against a signal" },
+          { "id": "ac2", "description": "recalculateFalsePositiveRate queries signal outcomes to compute rate" },
+          { "id": "ac3", "description": "Effectiveness data persisted to storage via updateEffectiveness" }
+        ]
+      },
+      {
+        "step_id": "cfr-s6",
+        "title": "Integrate tiers into pipeline-ready filter function",
+        "scope": "cultivate",
+        "description": "Create src/filters/index.ts that exports a unified applyFilters(signal: NormalizedEvent, greenhouse: Greenhouse, config: CultivateConfig, storage: CultivateStorage): Promise<{ passed: boolean, tier?: 0|1, reason?: string, score_adjustments: number }> function. This runs Tier 0 (greenhouse gate) first, then Tier 1 (rule registry) if Tier 0 passes. Returns aggregated result with score adjustments from boost rules. On rejection, throws SignalFilteredError with the appropriate tier and reason. Also export the registry, greenhouse gate, and individual components for direct use.",
+        "dependencies": ["cfr-s1", "cfr-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tier 0 runs before Tier 1 — Tier 0 rejection skips Tier 1 entirely" },
+          { "id": "ac2", "description": "Score adjustments from boost rules are accumulated and returned" },
+          { "id": "ac3", "description": "SignalFilteredError thrown with correct tier (0 or 1) and reason" },
+          { "id": "ac4", "description": "All filter components exported from src/filters/index.ts" }
+        ]
+      }
+    ]
+  }
+}

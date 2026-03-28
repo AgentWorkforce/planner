@@ -1,0 +1,304 @@
+{
+  "feature_id": "forge-ui-question-queue",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fuqq-s1-task",
+      "step_id": "fuqq-s1",
+      "title": "Create QuestionQueue component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review planner-ui question queue component",
+            "Review context.architect.duplicate_handling for grouping logic"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "QuestionQueue component displays list of pending questions",
+            "Questions sorted by priority_score (highest first)",
+            "Empty state when no pending questions",
+            "Duplicate questions (same question_text) grouped into single card"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test sorting",
+            "Test duplicate grouping"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fuqq-s2-task",
+      "step_id": "fuqq-s2",
+      "title": "Create QuestionCard component",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review shadcn/ui Card, Button, Badge, Textarea components"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Shows: question text, agent name (or 'Asked by N agents'), task title, blocking level badge",
+            "Shows priority factors: steps_blocked, agents_waiting (= subscribers.length)",
+            "Expandable context section if context provided",
+            "Options displayed as button group if pre-defined options exist",
+            "Free-form text input for custom answers",
+            "For grouped questions: 'Asked by N agents' with expandable agent list"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all card variants",
+            "Test options and text input"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fuqq-s3-task",
+      "step_id": "fuqq-s3",
+      "title": "Create blocking level badges",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review design system question type badges"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "BLOCKING badge: red, used for hard_block",
+            "PREFERENCE badge: orange, used for soft_block",
+            "FYI badge: cyan, used for fyi and preference blocking_level",
+            "Badge component with variant prop matching blocking_level value"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all badge variants"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fuqq-s4-task",
+      "step_id": "fuqq-s4",
+      "title": "Implement answer submission with duplicate handling",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review planner-ui API call patterns",
+            "Check if backend supports batch answer endpoint"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Answer button calls POST /questions/:id/answer",
+            "For grouped questions: submit answer to all question IDs in group",
+            "Loading state during submission",
+            "Optimistic UI update (question(s) removed from list)",
+            "Error handling with toast notification"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test single answer",
+            "Test grouped answer"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration test with backend"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fuqq-s5-task",
+      "step_id": "fuqq-s5",
+      "title": "Create notification badge for header",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review header badge patterns"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Badge in header/nav showing pending question count",
+            "Badge updates in real-time via SSE",
+            "Clicking badge navigates to question queue view",
+            "Badge hidden when count is 0"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test badge visibility",
+            "Test SSE updates"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fuqq-s6-task",
+      "step_id": "fuqq-s6",
+      "title": "Implement real-time updates via SSE",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review planner-ui SSE subscription pattern"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Subscribe to question_added event",
+            "Subscribe to question_answered event",
+            "Update UI without page refresh",
+            "Reconnect on connection loss",
+            "Re-group questions when new question matches existing text"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test SSE updates",
+            "Test reconnection"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Integration tests"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fuqq-s7-task",
+      "step_id": "fuqq-s7",
+      "title": "Add priority score visualization",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review context.architect.data_mapping for field sources"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Show steps_blocked count with icon (from Question.steps_blocked)",
+            "Show agents_waiting count with icon (from Question.subscribers.length)",
+            "Tooltip explaining priority calculation"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test display",
+            "Test tooltip"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Visual inspection"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fuqq-s7"
+          ]
+        }
+      }
+    }
+  ]
+}

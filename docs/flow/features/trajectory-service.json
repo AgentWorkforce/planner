@@ -1,0 +1,78 @@
+{
+  "feature_id": "trajectory-service",
+  "title": "Shared Trajectory Service",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": [],
+  "parent": "trajectory-integration",
+  "component": "planner-core",
+
+  "summary": {
+    "goal": "Thin wrapper around agent-trajectories library shared by all persistent services in the server process.",
+    "acceptance_criteria": [
+      { "id": "svc-ac1", "description": "Service initializes FileStorage with .trajectories/ base directory" },
+      { "id": "svc-ac2", "description": "startTrajectory() creates trajectory with source metadata and initial chapter" },
+      { "id": "svc-ac3", "description": "record() adds events (tool_call, finding, note, error types)" },
+      { "id": "svc-ac4", "description": "recordDecisionEvent() adds structured decisions with alternatives" },
+      { "id": "svc-ac5", "description": "complete() writes retrospective (summary, approach, confidence)" },
+      { "id": "svc-ac6", "description": "findBySource() retrieves trajectory by source.system + source.id" },
+      { "id": "svc-ac7", "description": "formatRetrospectiveAsContext() produces markdown prompt injection" },
+      { "id": "svc-ac8", "description": "All functions gracefully no-op if storage not initialized" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Single FileStorage instance for the process - avoid multiple writers",
+        "Immutable update pattern - functions return new trajectory object",
+        "Low-frequency writes (~20-30 per session) - FileStorage JSON rewrite is acceptable"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "new_file": "packages/server/src/trajectory/service.ts",
+      "dependency": "agent-trajectories (npm package)"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "svc001",
+        "title": "Add agent-trajectories dependency",
+        "scope": "planner-core",
+        "description": "npm install agent-trajectories to root package.json"
+      },
+      {
+        "step_id": "svc002",
+        "title": "Create trajectory service module",
+        "scope": "planner-core",
+        "description": "Create packages/server/src/trajectory/service.ts with all functions per plan"
+      },
+      {
+        "step_id": "svc003",
+        "title": "Initialize service on server startup",
+        "scope": "planner-core",
+        "description": "Call initTrajectoryService() in server.ts startup sequence"
+      },
+      {
+        "step_id": "svc004",
+        "title": "Add .trajectories/ to .gitignore",
+        "scope": "planner-core",
+        "description": "Ensure trajectory files don't get committed"
+      },
+      {
+        "step_id": "svc005",
+        "title": "Write unit tests",
+        "scope": "planner-core",
+        "description": "Test create, record, complete, findBySource, formatRetrospectiveAsContext"
+      }
+    ]
+  }
+}

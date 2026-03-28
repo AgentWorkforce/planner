@@ -1,0 +1,107 @@
+{
+  "feature_id": "cultivate-auth-encryption",
+  "title": "Credential Encryption",
+  "type": "feature",
+  "status": "verified",
+  "priority": "high",
+  "dependencies": ["cultivate-domain"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement AES-256-GCM encryption and decryption for source credentials stored in the source_configs table. Key derived from CULTIVATE_SECRET environment variable using PBKDF2. Encrypted credentials are stored as opaque base64 strings in SQLite — the storage layer never sees plaintext. This ensures API keys, OAuth tokens, and other secrets are encrypted at rest.",
+    "acceptance_criteria": [
+      { "id": "cae-ac1", "description": "encrypt(plaintext) returns a base64 string containing IV + auth tag + ciphertext" },
+      { "id": "cae-ac2", "description": "decrypt(encrypted) returns the original plaintext string" },
+      { "id": "cae-ac3", "description": "Encryption key derived from CULTIVATE_SECRET env var via PBKDF2 with salt" },
+      { "id": "cae-ac4", "description": "Each encryption uses a random 12-byte IV (nonce) — same plaintext produces different ciphertext" },
+      { "id": "cae-ac5", "description": "Tampered ciphertext throws on decrypt (GCM authentication failure)" },
+      { "id": "cae-ac6", "description": "Missing CULTIVATE_SECRET env var throws descriptive error at startup, not at first encrypt call" },
+      { "id": "cae-ac7", "description": "EncryptedCredential type distinguishes encrypted strings from plain strings at the type level" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "cae-ac1", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac2", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac3", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac4", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac5", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac6", "status": "satisfied", "evidence": "src/auth/encryption.ts" },
+      { "id": "cae-ac7", "status": "satisfied", "evidence": "src/auth/encryption.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cae-s1",
+        "title": "Implement key derivation from CULTIVATE_SECRET",
+        "scope": "cultivate",
+        "description": "Create src/auth/encryption.ts. Implement deriveKey(secret: string) using Node.js crypto.pbkdf2Sync with: SHA-512 hash, 100,000 iterations, 32-byte output (256-bit key), and a fixed application salt (e.g., 'cultivate-credential-encryption-v1'). The fixed salt is acceptable because CULTIVATE_SECRET is the variable input. Cache the derived key in module scope to avoid re-deriving on every call. Add initEncryption() function that reads CULTIVATE_SECRET from process.env, calls deriveKey, and throws CultivateStartupError('MISSING_CULTIVATE_SECRET') if the env var is missing or empty.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "deriveKey produces a 32-byte Buffer from the secret via PBKDF2" },
+          { "id": "ac2", "description": "Key is cached after first derivation, not re-derived per call" },
+          { "id": "ac3", "description": "initEncryption() throws clearly if CULTIVATE_SECRET is missing or empty" }
+        ]
+      },
+      {
+        "step_id": "cae-s2",
+        "title": "Implement encrypt and decrypt functions with AES-256-GCM",
+        "scope": "cultivate",
+        "description": "Implement encrypt(plaintext: string): string using Node.js crypto: generate random 12-byte IV via crypto.randomBytes(12), create cipher with crypto.createCipheriv('aes-256-gcm', key, iv), encrypt the plaintext, get the 16-byte auth tag via cipher.getAuthTag(). Concatenate IV (12 bytes) + auth tag (16 bytes) + ciphertext and return as base64 string. Implement decrypt(encrypted: string): string that decodes base64, splits into IV/authTag/ciphertext, creates decipher with crypto.createDecipheriv, sets auth tag, and decrypts. GCM auth failure throws — this detects tampering.",
+        "dependencies": ["cae-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "encrypt returns base64-encoded string containing IV + authTag + ciphertext" },
+          { "id": "ac2", "description": "decrypt(encrypt(text)) === text for any input string" },
+          { "id": "ac3", "description": "Each encrypt call uses a fresh random IV — same plaintext produces different output" },
+          { "id": "ac4", "description": "Tampered ciphertext (flipped bit) throws Error on decrypt" }
+        ]
+      },
+      {
+        "step_id": "cae-s3",
+        "title": "Add EncryptedCredential type",
+        "scope": "cultivate",
+        "description": "Define a branded type EncryptedCredential (string & { __brand: 'EncryptedCredential' }) to distinguish encrypted strings from plain strings at the TypeScript type level. Update encrypt() return type to EncryptedCredential. Update decrypt() parameter type to EncryptedCredential. This prevents accidentally storing plaintext where encrypted is expected, or decrypting a non-encrypted string. Add a type guard isEncryptedCredential() that checks the base64 format and minimum length.",
+        "dependencies": ["cae-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "EncryptedCredential is a branded string type" },
+          { "id": "ac2", "description": "encrypt() returns EncryptedCredential, decrypt() accepts EncryptedCredential" },
+          { "id": "ac3", "description": "Passing a plain string to decrypt() is a TypeScript compile error" }
+        ]
+      },
+      {
+        "step_id": "cae-s4",
+        "title": "Integrate with source config storage",
+        "scope": "cultivate",
+        "description": "Create src/auth/credential-manager.ts with CredentialManager class that wraps encrypt/decrypt for the source config use case. Methods: encryptCredentials(credentials: Record<string, string>): EncryptedCredential — JSON.stringify then encrypt. decryptCredentials(encrypted: EncryptedCredential): Record<string, string> — decrypt then JSON.parse. This handles the common case of source configs having multiple credential fields (api_key, client_id, client_secret, etc.) stored as a single encrypted blob.",
+        "dependencies": ["cae-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "encryptCredentials accepts a key-value object and returns a single encrypted string" },
+          { "id": "ac2", "description": "decryptCredentials returns the original key-value object" },
+          { "id": "ac3", "description": "Round-trip: decryptCredentials(encryptCredentials(obj)) deep-equals obj" }
+        ]
+      },
+      {
+        "step_id": "cae-s5",
+        "title": "Add validation for missing CULTIVATE_SECRET",
+        "scope": "cultivate",
+        "description": "Add validateEncryptionReady() function that checks if initEncryption() has been called and the key is available. Called by the startup sequence before any source config operations. If CULTIVATE_SECRET is not set, throw CultivateStartupError with a clear message explaining what the env var is for and how to generate a secure value (e.g., 'openssl rand -hex 32'). Export initEncryption, encrypt, decrypt, EncryptedCredential, CredentialManager, and validateEncryptionReady from src/auth/index.ts.",
+        "dependencies": ["cae-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "validateEncryptionReady() throws if initEncryption() was never called" },
+          { "id": "ac2", "description": "Error message includes instructions for generating CULTIVATE_SECRET" },
+          { "id": "ac3", "description": "All auth module exports available from src/auth/index.ts" }
+        ]
+      }
+    ]
+  }
+}

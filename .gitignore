@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Database files
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+
+# Trajectory storage
+.trajectories/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+.windsurf/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temp files
+*.tmp
+*.temp
+
+# Runtime files
+*.pid
+*.sock
+
+# Agent Relay runtime (messages, sessions, identities)
+.agent-relay/
+
+# Screenshots (testing/debug artifacts)
+.playwright-mcp/
+forge-ui-*.png
+
+# Lock files
+prpm.lock
+
+# Claude prompts (local snippets)
+.prompts/
+
+# Mull runtime data (realtime entity accumulator state)
+.mull/
+
+# Mull memory output (generated topic files)
+memory/
+
+# Vite caches
+.vite/
+
+# Forge worktrees
+.forge-worktrees/
+
+# Forge investigation artifacts
+FORGE_INVESTIGATION.md
+
+# Dev script PID files
+.dev-*.pid
+
+# Local docs (not tracked, except docs/flow/)
+docs/*
+!docs/flow/
+!docs/flow/**
+!docs/cultivate-forge-operations.md
+docs/flow/**/.DS_Store
+packages/server/.forge-worktrees/

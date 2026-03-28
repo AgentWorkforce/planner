@@ -1,0 +1,49 @@
+{
+  "feature_id": "trajectory-spawned-agents",
+  "title": "Spawned Agent Trajectory (Best-Effort)",
+  "type": "feature",
+  "status": "approved",
+  "priority": "low",
+  "dependencies": ["trajectory-service", "trajectory-forge-read"],
+  "parent": "trajectory-integration",
+  "component": "ideation-core",
+
+  "summary": {
+    "goal": "Inject trail CLI instructions into spawned agent prompts so they can self-record if trail is available.",
+    "acceptance_criteria": [
+      { "id": "spn-ac1", "description": "Specialist agent prompts include trail CLI instructions" },
+      { "id": "spn-ac2", "description": "Forge worker prompts include trail CLI instructions" },
+      { "id": "spn-ac3", "description": "Instructions are best-effort - no failure if trail unavailable" }
+    ],
+    "note": "Best-effort. If trail isn't installed or agents don't follow instructions, upstream trajectories still capture the reasoning that matters."
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Relay SDK spawn() has no env parameter - can't inject trajectory env vars",
+        "Workaround: inject instructions into prompt text",
+        "Graceful degradation - doesn't break if trail not installed"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["ideation-core", "forge-core"],
+    "steps": [
+      {
+        "step_id": "spn001",
+        "title": "Add trail instructions to specialist prompt",
+        "scope": "ideation-core",
+        "description": "In spawner.ts, add trajectory section to specialist task prompt"
+      },
+      {
+        "step_id": "spn002",
+        "title": "Add trail instructions to forge worker prompt",
+        "scope": "forge-core",
+        "description": "In forge-spawner.ts, add trajectory section to worker task prompt"
+      }
+    ]
+  }
+}

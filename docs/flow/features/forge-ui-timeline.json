@@ -1,0 +1,242 @@
+{
+  "feature_id": "forge-ui-timeline",
+  "title": "Run Timeline View",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "parent": "forge-ui",
+  "dependencies": ["forge-ui-run-dashboard"],
+
+  "summary": {
+    "goal": "Audit log showing all events in chronological order. Enables post-run debugging, retrospective analysis, and compliance auditing.",
+    "acceptance_criteria": [
+      { "id": "ftl-ac1", "description": "Chronological list of all run events with timestamps (HH:MM:SS format)" },
+      { "id": "ftl-ac2", "description": "Event types with icons: task lifecycle, agent events, gate events" },
+      { "id": "ftl-ac3", "description": "Filter by event type (tasks, agents, gates, all)" },
+      { "id": "ftl-ac4", "description": "Export log button (JSON or CSV)" },
+      { "id": "ftl-ac5", "description": "Artifact references as clickable links in timeline entries" },
+      { "id": "ftl-ac6", "description": "Visual indicators for run start/end" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Timeline pulls from trajectory capture in forge-core",
+        "Useful for debugging failed runs",
+        "Export enables external analysis tools",
+        "Virtualization needed for long timelines (>100 events)"
+      ],
+      "patterns": [
+        "Virtualized list for long timelines",
+        "Event type filtering via tabs or dropdown"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "virtualization": {
+        "library": "@tanstack/react-virtual",
+        "rationale": "Modern, well-maintained, React 18 compatible, better than react-window for this use case",
+        "threshold": "Enable virtualization when events.length > 100",
+        "row_height": "Fixed height per event type for smooth scrolling",
+        "heights": {
+          "default": 56,
+          "expanded": 120
+        }
+      }
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-ui"],
+    "steps": [
+      {
+        "step_id": "ftl-s1",
+        "title": "Create timeline API module",
+        "scope": "forge-ui",
+        "description": "API functions for fetching timeline events",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getRunTimeline(runId, filter?: { type?: string }) returns { events: TimelineEvent[] }" },
+          { "id": "ac2", "description": "TimelineEvent type: { event_id, run_id, event_type, timestamp, data, task_id?, agent_id? }" },
+          { "id": "ac3", "description": "Event types: run_started, run_completed, run_failed, task_started, task_completed, task_failed, agent_spawned, agent_exited, gate_reached, gate_approved, gate_rejected, question_asked, question_answered" }
+        ],
+        "specification": {
+          "api_endpoint": "GET /runs/:id/timeline?type=X",
+          "notes": "Endpoint from forge-trajectory-capture feature"
+        }
+      },
+      {
+        "step_id": "ftl-s2",
+        "title": "Create TimelineEvent component",
+        "scope": "forge-ui",
+        "description": "Single event row in the timeline with fixed height for virtualization",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Timestamp in HH:MM:SS format (relative to run start)" },
+          { "id": "ac2", "description": "Event type icon with color coding" },
+          { "id": "ac3", "description": "Event description with context (task title, agent name, etc.)" },
+          { "id": "ac4", "description": "Expandable details section for complex events" },
+          { "id": "ac5", "description": "Artifact links if event has associated artifacts" },
+          { "id": "ac6", "description": "Fixed height: 56px collapsed, 120px expanded (for virtualization)" }
+        ],
+        "specification": {
+          "design": {
+            "layout": "flex items-start gap-4 p-3 border-l-2 border-border-subtle hover:bg-bg-tertiary",
+            "height_collapsed": "h-14 (56px)",
+            "height_expanded": "h-30 (120px)",
+            "icons": {
+              "run_started": "PlayIcon text-success",
+              "run_completed": "CheckCircleIcon text-success",
+              "run_failed": "XCircleIcon text-error",
+              "task_started": "PlayIcon text-accent-cyan",
+              "task_completed": "CheckIcon text-success",
+              "task_failed": "XIcon text-error",
+              "agent_spawned": "UserPlusIcon text-accent-purple",
+              "agent_exited": "UserMinusIcon text-text-muted",
+              "gate_reached": "ShieldIcon text-warning",
+              "gate_approved": "ShieldCheckIcon text-success",
+              "gate_rejected": "ShieldXIcon text-error"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "ftl-s3",
+        "title": "Create TimelineFilter component",
+        "scope": "forge-ui",
+        "description": "Filter controls for timeline view",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Dropdown or tabs: All, Tasks, Agents, Gates, Questions" },
+          { "id": "ac2", "description": "Filter persists to URL params" },
+          { "id": "ac3", "description": "Count badges showing number of events per type" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components/TabNavigation.tsx",
+          "pattern_description": "Similar filter tabs pattern"
+        }
+      },
+      {
+        "step_id": "ftl-s4",
+        "title": "Create TimelineList component with virtualization",
+        "scope": "forge-ui",
+        "description": "Virtualized scrollable list of timeline events",
+        "dependencies": ["ftl-s2"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Renders TimelineEvent for each event" },
+          { "id": "ac2", "description": "Visual marker for run start (top) and run end (bottom if completed)" },
+          { "id": "ac3", "description": "Auto-scrolls to latest event for running runs" },
+          { "id": "ac4", "description": "Virtualized rendering when events.length > 100" },
+          { "id": "ac5", "description": "Uses @tanstack/react-virtual for virtualization" },
+          { "id": "ac6", "description": "Smooth scrolling with fixed row heights" }
+        ],
+        "specification": {
+          "virtualization": {
+            "library": "@tanstack/react-virtual",
+            "threshold": 100,
+            "estimateSize": "() => 56 (collapsed height)",
+            "getItemKey": "(index) => events[index].event_id",
+            "overscan": 5
+          },
+          "design": {
+            "layout": "relative pl-4 ml-4 (vertical line on left)",
+            "markers": {
+              "start": "absolute -left-[9px] w-4 h-4 rounded-full bg-success",
+              "end": "absolute -left-[9px] w-4 h-4 rounded-full bg-text-muted"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "ftl-s5",
+        "title": "Create ExportButton component",
+        "scope": "forge-ui",
+        "description": "Button to export timeline as JSON or CSV",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Dropdown button: Export JSON, Export CSV" },
+          { "id": "ac2", "description": "JSON export: full event data" },
+          { "id": "ac3", "description": "CSV export: timestamp, type, description, task_id, agent_id" },
+          { "id": "ac4", "description": "Downloads file with filename: forge-run-{runId}-timeline.{ext}" }
+        ],
+        "specification": {
+          "pattern": "Client-side export using Blob and download link",
+          "design": {
+            "button": "secondary style with DownloadIcon"
+          }
+        }
+      },
+      {
+        "step_id": "ftl-s6",
+        "title": "Create useTimeline hook",
+        "scope": "forge-ui",
+        "description": "Data fetching hook for timeline events",
+        "dependencies": ["ftl-s1"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useTimeline(runId, filter) returns { events, isLoading, error }" },
+          { "id": "ac2", "description": "For running runs: SSE subscription for new events" },
+          { "id": "ac3", "description": "Appends new events to existing list (no full refetch)" },
+          { "id": "ac4", "description": "Client-side filtering when filter changes (no API refetch for type filter)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Initial fetch + SSE append for running runs",
+            "optimization": "Client-side filtering to avoid API calls"
+          }
+        }
+      },
+      {
+        "step_id": "ftl-s7",
+        "title": "Implement TimelinePage",
+        "scope": "forge-ui",
+        "description": "Main timeline page assembly",
+        "dependencies": ["ftl-s3", "ftl-s4", "ftl-s5", "ftl-s6"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Header with breadcrumb: Forge > Run [id] > Timeline" },
+          { "id": "ac2", "description": "Back button to return to dashboard" },
+          { "id": "ac3", "description": "TimelineFilter and ExportButton in toolbar" },
+          { "id": "ac4", "description": "TimelineList as main content" },
+          { "id": "ac5", "description": "Loading state: skeleton timeline entries" },
+          { "id": "ac6", "description": "Empty state: 'No events recorded yet'" }
+        ],
+        "specification": {
+          "design": {
+            "layout": "flex flex-col h-full",
+            "toolbar": "flex justify-between items-center p-4 border-b border-border-subtle"
+          }
+        }
+      },
+      {
+        "step_id": "ftl-s8",
+        "title": "Add artifact links",
+        "scope": "forge-ui",
+        "description": "Make artifact references clickable in timeline",
+        "dependencies": ["ftl-s7"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Detect artifact references in event data" },
+          { "id": "ac2", "description": "Render as external links (target='_blank')" },
+          { "id": "ac3", "description": "Icon indicates type: GitHubIcon for PRs/commits, LinkIcon for deployments" },
+          { "id": "ac4", "description": "Copy link button on hover" }
+        ],
+        "specification": {
+          "pattern_reference": "packages/planner-ui/src/components (artifact links pattern)",
+          "design": {
+            "link": "text-accent-cyan hover:underline inline-flex items-center gap-1"
+          }
+        }
+      }
+    ]
+  }
+}

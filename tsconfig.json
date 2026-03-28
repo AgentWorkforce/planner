@@ -1,0 +1,21 @@
+{
+  "references": [
+    { "path": "./packages/cultivate" },
+    { "path": "./packages/planner" },
+    { "path": "./packages/portfolio-core" },
+    { "path": "./packages/server" },
+    { "path": "./packages/ideation" },
+    { "path": "./packages/forge-core" },
+    { "path": "./packages/forge-next" },
+    { "path": "./packages/testbench" },
+    { "path": "./packages/tuner" },
+    { "path": "./packages/planner-ui" },
+    { "path": "./packages/ideation-ui" },
+    { "path": "./packages/forge-ui" },
+    { "path": "./packages/shared-ui" },
+    { "path": "./packages/tend" },
+    { "path": "./packages/mull" }
+  ],
+  "include": [],
+  "exclude": ["node_modules", "dist"]
+}

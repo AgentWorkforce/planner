@@ -1,0 +1,53 @@
+{
+  "id": "hello-cli-ideation",
+  "name": "Hello CLI (via Ideation)",
+  "difficulty": "trivial",
+  "planning_strategy": "hardcoded",
+  "goal": "Create a CLI program that takes a name as the first command-line argument and prints 'Hello, <name>!' to stdout. If no name is provided, print 'Hello, World!'.",
+  "ideation": {
+    "ideation_strategy": "preconfigured",
+    "understanding": {
+      "Architect": {
+        "patterns": ["cli-argument-parsing"],
+        "technology": "Node.js",
+        "file_structure": "Single index.js file",
+        "confidence": "confident"
+      },
+      "Designer": {
+        "output_format": "Simple text to stdout",
+        "edge_cases": ["no argument provided", "empty string argument"],
+        "confidence": "confident"
+      }
+    },
+    "blocks": [
+      {
+        "type": "feature",
+        "title": "CLI Argument Parsing",
+        "keyword": "Args",
+        "emoji": "terminal",
+        "content": "Read first command-line argument using process.argv[2]"
+      },
+      {
+        "type": "feature",
+        "title": "Greeting Output",
+        "keyword": "Greet",
+        "emoji": "wave",
+        "content": "Print 'Hello, <name>!' or 'Hello, World!' based on argument presence"
+      }
+    ]
+  },
+  "expected": {
+    "language_tier": "s",
+    "complexity_level": "trivial",
+    "step_count": { "min": 1, "max": 3 },
+    "time_minutes": { "min": 1, "max": 5 }
+  },
+  "verification": {
+    "type": "script",
+    "commands": ["node index.js Alice"],
+    "expect_output": "Hello, Alice!",
+    "expect_exit_code": 0,
+    "timeout_seconds": 30
+  },
+  "tags": ["ideation", "synthetic", "trivial"]
+}

@@ -1,0 +1,68 @@
+{
+  "feature_id": "ideation-package",
+  "title": "Ideation Package",
+  "type": "epic",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": [],
+  "summary": {
+    "goal": "Build the Ideation layer that transforms raw intent into crystallized understanding ready for formal planning. This is the 'nugget extraction' phase in the gold mining architecture - where human ideas become refined, understood intents with guardian agent observations.",
+    "in_scope": [
+      "Session entity (persisted brainstorm conversations with transcript and understanding)",
+      "Understanding as freeform state (map of specialist name -> freeform observations)",
+      "Interviewer agent (persistent service like PlannerLead)",
+      "Dynamic specialists spawned on-demand (not fixed 5)",
+      "SQLite persistence for sessions",
+      "REST API for session CRUD and send-to-planner",
+      "Relay integration for agent messaging",
+      "Send to Planner (create/update plan from session understanding at any time)",
+      "Mode B: Human-initiated brainstorm"
+    ],
+    "out_of_scope": [
+      "Mode A: Signal-driven ideation (future - requires Intake)",
+      "Channel monitoring and signal clustering",
+      "Integration with external channels (Slack, email, GitHub)",
+      "Guardian persistence across sessions (v2 - trajectory integration)"
+    ],
+    "related_packages": ["ideation-ui"],
+    "constraints": [
+      "Must use existing tech stack (TypeScript, SQLite, Zod, Relay)",
+      "Interviewer follows PlannerLead pattern (persistent RelayClient service)",
+      "Must produce output compatible with Planner's freeform understanding schema",
+      "Specialists must be able to observe conversation and contribute freeform observations",
+      "Intelligence lives in agent prompts, not Zod schemas"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Session can be created with initial intent and optional initiative_id, persisted to SQLite" },
+      { "id": "ac2", "description": "Conversation transcript (user + assistant only) is captured and persisted per session" },
+      { "id": "ac3", "description": "Interviewer facilitates brainstorming via Relay messaging (user never sees specialists)" },
+      { "id": "ac4", "description": "Specialists are spawned on-demand and add freeform observations to understanding" },
+      { "id": "ac5", "description": "Understanding is freeform: Record<string, Record<string, unknown>>" },
+      { "id": "ac6", "description": "Session understanding can be sent to Planner at any time to create/update a Plan" },
+      { "id": "ac7", "description": "Sessions stay active after sending to Planner (user can continue ideating)" },
+      { "id": "ac8", "description": "Session status lifecycle: active | abandoned (no crystallized/promoted states)" },
+      { "id": "ac9", "description": "REST API exposes session CRUD and send-to-planner operations" },
+      { "id": "ac10", "description": "Mock mode works without Anthropic API key" }
+    ],
+    "decisions": [
+      { "decision": "No Nugget entity - Understanding is live state", "rationale": "Understanding continuously evolves. Sent to planner as snapshot. Simpler model without intermediate crystallization." },
+      { "decision": "Sessions stay active indefinitely", "rationale": "User can continue ideating after sending to planner, send again for replanning. No artificial end state." },
+      { "decision": "Chat is pure user ↔ Interviewer", "rationale": "Specialists NEVER appear in chat or reveal their existence. Interviewer weaves their insights into its own questions." },
+      { "decision": "Freeform Understanding schema", "rationale": "Intelligence lives in agent prompts, not Zod schemas. Any specialist type, any observation structure." },
+      { "decision": "Lazy specialist spawning", "rationale": "Interviewer spawns specialists on-demand based on conversation needs, not all at start. More efficient." },
+      { "decision": "Send to Planner available anytime with confidence indicator", "rationale": "Confidence bar (red→orange→green) is advisory, not blocking. Button always enabled." },
+      { "decision": "Mode B first (human-initiated) with hooks for Mode A", "rationale": "Pragmatic MVP without Intake dependency" },
+      { "decision": "Interviewer as persistent service (not spawn)", "rationale": "Must remain available for conversation continuity, like PlannerLead" },
+      { "decision": "No fixed specialist roles", "rationale": "Interviewer decides what expertise is needed and spawns appropriate specialists dynamically" },
+      { "decision": "Prompt templates as suggestions", "rationale": "Common templates (Architect, Designer, etc.) available but Interviewer can spawn custom specialists" }
+    ]
+  },
+  "sub_features": [
+    "ideation-domain",
+    "ideation-storage",
+    "ideation-api",
+    "ideation-lead",
+    "ideation-specialists",
+    "ideation-planner-handoff"
+  ]
+}

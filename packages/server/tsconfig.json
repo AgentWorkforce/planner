@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "references": [
+    { "path": "../cultivate" },
+    { "path": "../planner" },
+    { "path": "../ideation" },
+    { "path": "../forge-core" },
+    { "path": "../forge-next" },
+    { "path": "../mull" }
+  ],
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

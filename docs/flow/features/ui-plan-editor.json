@@ -1,0 +1,36 @@
+{
+  "feature_id": "ui-plan-editor",
+  "title": "Plan Editor",
+  "type": "epic",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["rest-api"],
+
+  "summary": {
+    "goal": "Provide the core editing experience for viewing and modifying plans",
+    "context": "The plan editor is where most work happens. Inline editing, multi-scope visualization, keyboard shortcuts. AI works continuously in background while user focuses on decisions.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Plans display with goal, scopes, and steps" },
+      { "id": "ac2", "description": "Inline editing for all fields" },
+      { "id": "ac3", "description": "Multi-scope visualization shows cross-scope dependencies" },
+      { "id": "ac4", "description": "Keyboard navigation and shortcuts work" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "UI Vision - Design Principles", "path": "docs/ui-vision.md" },
+    { "type": "spec", "title": "Multi-Scope Plans", "path": "docs/planner-scale.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "ui-editor-inline", "title": "Inline Editing", "ref": "ui-editor-inline.json" },
+    { "feature_id": "ui-editor-steps", "title": "Step Editor", "ref": "ui-editor-steps.json" },
+    { "feature_id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "ref": "ui-editor-multiscope.json" },
+    { "feature_id": "ui-subplan-navigation", "title": "Sub-Plan Navigation", "ref": "ui-subplan-navigation.json" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": []
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "feature_id": "ui-change-request-ui",
+  "title": "Change Request Handling",
+  "type": "feature",
+  "status": "approved",
+  "priority": "medium",
+  "dependencies": ["api-change-requests", "ui-execution-status"],
+
+  "summary": {
+    "goal": "Display and handle change requests from orchestrator during execution",
+    "context": "Orchestrator can request plan changes mid-execution (missing steps, wrong dependencies). These surface as action items in the UI, creating a new draft version for review.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Change requests appear as action items (prominent notification)" },
+      { "id": "ac2", "description": "Change request shows: reason, suggested changes, source run" },
+      { "id": "ac3", "description": "User can view diff between original and suggested changes" },
+      { "id": "ac4", "description": "Accept creates new draft version with changes applied" },
+      { "id": "ac5", "description": "Reject dismisses the change request" },
+      { "id": "ac6", "description": "New draft version links back to change request for traceability" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "ucr001",
+        "title": "Create change request notification",
+        "scope": "planner-ui",
+        "description": "Prominent notification when change requests exist for a plan.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Banner at top of plan view" },
+          { "id": "ac2", "description": "Shows count of pending requests" },
+          { "id": "ac3", "description": "Attention-grabbing styling" }
+        ]
+      },
+      {
+        "step_id": "ucr002",
+        "title": "Create ChangeRequestCard component",
+        "scope": "planner-ui",
+        "description": "Card showing change request details with reason and suggested changes.",
+        "dependencies": ["ucr001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows reason for request" },
+          { "id": "ac2", "description": "Shows source run ID" },
+          { "id": "ac3", "description": "Preview of suggested changes" },
+          { "id": "ac4", "description": "View Diff button" }
+        ]
+      },
+      {
+        "step_id": "ucr003",
+        "title": "Create change diff view",
+        "scope": "planner-ui",
+        "description": "Side-by-side or inline diff showing original vs suggested changes.",
+        "dependencies": ["ucr002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shows steps added" },
+          { "id": "ac2", "description": "Shows steps removed" },
+          { "id": "ac3", "description": "Shows steps modified" },
+          { "id": "ac4", "description": "Clear visual diff styling" }
+        ]
+      },
+      {
+        "step_id": "ucr004",
+        "title": "Implement accept change request",
+        "scope": "planner-ui",
+        "description": "Accept button creates new draft version with suggested changes applied.",
+        "dependencies": ["ucr003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Accept calls API to create new version" },
+          { "id": "ac2", "description": "New version has changes applied" },
+          { "id": "ac3", "description": "Navigates to new draft version" },
+          { "id": "ac4", "description": "Shows link to change request" }
+        ]
+      },
+      {
+        "step_id": "ucr005",
+        "title": "Implement reject change request",
+        "scope": "planner-ui",
+        "description": "Reject button dismisses the change request with optional reason.",
+        "dependencies": ["ucr002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Reject button with confirmation" },
+          { "id": "ac2", "description": "Optional reason field" },
+          { "id": "ac3", "description": "Request marked as rejected" },
+          { "id": "ac4", "description": "Removed from pending list" }
+        ]
+      },
+      {
+        "step_id": "ucr006",
+        "title": "Show change request link on version",
+        "scope": "planner-ui",
+        "description": "Versions created from change requests show link back to request.",
+        "dependencies": ["ucr004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Badge indicating from change request" },
+          { "id": "ac2", "description": "Link to view original request" },
+          { "id": "ac3", "description": "Traceability for audit" }
+        ]
+      }
+    ]
+  }
+}

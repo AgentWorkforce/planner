@@ -1,0 +1,38 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: tend
+    - button "Switch to dark mode" [ref=e7]:
+      - img [ref=e8]
+  - generic [ref=e13]:
+    - generic [ref=e15]:
+      - heading "What would you like to work on?" [level=2] [ref=e16]
+      - paragraph [ref=e17]: Describe an idea, a feature, or a problem. I'll help you explore it.
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - textbox "Start typing to begin a new project..." [ref=e20]
+        - button "Send message" [disabled]:
+          - img
+      - paragraph [ref=e21]: Press Enter to send, Shift+Enter for new line
+  - generic [ref=e23]:
+    - generic [ref=e24]: Projects
+    - generic [ref=e26]:
+      - button "Test New Project Audit └ ideating · 10m ago" [ref=e27]:
+        - generic [ref=e28]: Test New Project Audit
+        - generic [ref=e29]: └ ideating · 10m ago
+      - button "My Real-Time Kanban App └ ideating · 46m ago" [ref=e30]:
+        - generic [ref=e31]: My Real-Time Kanban App
+        - generic [ref=e32]: └ ideating · 46m ago
+      - button "Test Project from Playwright └ ideating · 1h ago" [ref=e33]:
+        - generic [ref=e34]: Test Project from Playwright
+        - generic [ref=e35]: └ ideating · 1h ago
+      - button "Just a project to check out tend features └ ideating · 1h ago" [ref=e36]:
+        - generic [ref=e37]: Just a project to check out tend features
+        - generic [ref=e38]: └ ideating · 1h ago
+  - generic [ref=e39]:
+    - generic [ref=e41]: No agents active
+    - generic [ref=e42]:
+      - button "❓ 0" [disabled] [ref=e43]
+      - generic [ref=e44]: ⏱️ 00:00
+      - generic [ref=e47]: Connected
+      - button "Collapse status bar" [ref=e48]:
+        - img [ref=e49]

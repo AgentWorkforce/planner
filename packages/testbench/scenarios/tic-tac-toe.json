@@ -1,0 +1,20 @@
+{
+  "id": "tic-tac-toe",
+  "name": "Tic Tac Toe CLI",
+  "difficulty": "simple",
+  "goal": "Build a CLI tic-tac-toe game where two players take turns entering positions (1-9) on a 3x3 grid. Display the board after each move. Detect wins (three in a row horizontally, vertically, or diagonally) and draws (all cells filled). Show which player won or if it's a draw.",
+  "expected": {
+    "language_tier": "s",
+    "complexity_level": "simple",
+    "step_count": { "min": 3, "max": 8 },
+    "time_minutes": { "min": 5, "max": 20 }
+  },
+  "verification": {
+    "type": "script",
+    "commands": ["echo '1\n5\n2\n6\n3' | node index.js"],
+    "expect_output": "win",
+    "expect_exit_code": 0,
+    "timeout_seconds": 30
+  },
+  "tags": ["simple", "game"]
+}

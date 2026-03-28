@@ -1,0 +1,108 @@
+{
+  "feature_id": "tend-theming",
+  "title": "Replace Mission Control dark theme with tend's earth-tone zen garden palette",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["tend-scaffold"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Replace Mission Control dark theme with tend's earth-tone zen garden palette.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "globals.css contains earth-tone CSS custom properties for light mode (bg-deep: #f5f0e8, bg-primary: #ece7dd, accent-primary: #4a7c59 moss, accent-secondary: #c4703e clay)"
+      },
+      {
+        "id": "ac2",
+        "description": "globals.css contains dark mode tokens (.theme-dark) with warm charcoal (#1a1816) backgrounds"
+      },
+      {
+        "id": "ac3",
+        "description": "Light mode is the default (matches :root)"
+      },
+      {
+        "id": "ac4",
+        "description": "System preference respected via prefers-color-scheme media query"
+      },
+      {
+        "id": "ac5",
+        "description": "Font stack unchanged (Outfit, Inter, IBM Plex Mono) — inherited from shared-ui"
+      },
+      {
+        "id": "ac6",
+        "description": "All inherited components render correctly in the new palette (no neon colors visible)"
+      },
+      {
+        "id": "ac7",
+        "description": "Status colors use earth tones: success=#4a7c59 (moss), warning=#c4703e (clay), error=#b54a3a (brick red)"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "ideation-ui already has a canvas theme (warm cream #f2f1ed) in its globals.css. Extend this approach to full earth-tone system.",
+        "The shared-ui preset structure stays — we override CSS variables, keep everything else.",
+        "Font stack is neutral enough for tend."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "thm01",
+        "title": "Write earth-tone light mode tokens in globals.css",
+        "scope": "tend",
+        "description": "Replace the existing globals.css color tokens with the full earth-tone palette from docs/tend-implementation.md (Theming section). :root and .theme-light get warm sand backgrounds, moss/clay accents, earth-tone status colors. Keep font imports and base styles unchanged.",
+        "acceptance_criteria": ["ac1", "ac3", "ac7"]
+      },
+      {
+        "id": "thm02",
+        "title": "Add dark mode tokens",
+        "scope": "tend",
+        "description": "Add .theme-dark class with warm charcoal backgrounds (#1a1816), lighter earth-tone text, and adjusted accent colors per docs/tend-implementation.md. Add prefers-color-scheme media query that applies .theme-dark.",
+        "dependencies": ["thm01"],
+        "acceptance_criteria": ["ac2", "ac4"]
+      },
+      {
+        "id": "thm03",
+        "title": "Verify component rendering and fix leaks",
+        "scope": "tend",
+        "description": "Start the dev server. Visually check every inherited component (chat, blocks, layout, status bar) renders in the new palette. Hunt for any hard-coded neon colors (cyan #00d9ff, orange #ff6b35, purple #a855f7) and replace with tend tokens. Confirm fonts unchanged (Outfit, Inter, IBM Plex Mono).",
+        "dependencies": ["thm02"],
+        "acceptance_criteria": ["ac5", "ac6"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "palette": "zen garden earth tones",
+      "default_mode": "light",
+      "source_tokens": "ideation-ui globals.css canvas theme as starting point",
+      "bg_light": "#f5f0e8 warm sand",
+      "bg_dark": "#1a1816 warm charcoal",
+      "accents": "moss green + clay terracotta",
+      "colors": {
+        "light_mode": {
+          "bg_deep": "#f5f0e8",
+          "bg_primary": "#ece7dd",
+          "accent_primary": "#4a7c59",
+          "accent_secondary": "#c4703e"
+        },
+        "dark_mode": {
+          "bg_deep": "#1a1816",
+          "bg_primary": "#2a2826"
+        },
+        "status": {
+          "success": "#4a7c59",
+          "warning": "#c4703e",
+          "error": "#b54a3a"
+        }
+      }
+    }
+  }
+}

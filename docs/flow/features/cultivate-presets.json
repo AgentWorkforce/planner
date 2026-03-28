@@ -1,0 +1,90 @@
+{
+  "feature_id": "cultivate-presets",
+  "title": "All 30+ Source Presets",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["cultivate-adapters"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Factory functions for all 30+ source preset configurations across 5 authority tiers. Each preset defines: name, adapter_type, description, required_inputs, optional_inputs, defaults, and channel_authority score. Presets provide zero-config source setup — users select a preset and fill in required inputs.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "SourcePreset schema defines name, adapter_type, description, required_inputs, optional_inputs, defaults, and channel_authority" },
+      { "id": "ac2", "description": "Tier 1 presets (highest authority): support tickets, surveys, user interviews" },
+      { "id": "ac3", "description": "Tier 2 presets: GitHub issues/PRs, app store reviews, review sites, analytics events, in-app feedback" },
+      { "id": "ac4", "description": "Tier 3 presets: Slack, Discord, Teams, CRM notes, sales call transcripts" },
+      { "id": "ac5", "description": "Tier 4 presets: Reddit, Hacker News, Twitter/X, RSS feeds, web scraping" },
+      { "id": "ac6", "description": "Tier 5 presets (lowest authority): manual entry, document upload, CSV import, Zapier webhook" },
+      { "id": "ac7", "description": "All presets retrievable via a registry with catalog endpoint support" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "partial",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/domain/types.ts:283-293" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/presets/tier-1.ts" },
+      { "id": "ac3", "status": "missing", "evidence": "No tier-2.ts file exists" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/presets/tier-3.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/presets/tier-4.ts" },
+      { "id": "ac6", "status": "missing", "evidence": "No tier-5.ts file exists" },
+      { "id": "ac7", "status": "partial", "evidence": "Presets exported from index.ts; API builds catalog dynamically; no formal PresetRegistry class" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "cp-s1",
+        "title": "Define SourcePreset schema",
+        "scope": "cultivate",
+        "description": "Create Zod schema and TypeScript type for SourcePreset: name (string), adapter_type (AdapterType enum), description (string), required_inputs (array of {key, label, type, description}), optional_inputs (array of {key, label, type, description, default?}), defaults (Record<string, unknown> for pre-configured adapter settings), channel_authority (number 0-1 representing source tier weight). Export InputField type for required/optional input definitions.",
+        "dependencies": []
+      },
+      {
+        "id": "cp-s2",
+        "title": "Implement Tier 1 presets (support, surveys, interviews)",
+        "scope": "cultivate",
+        "description": "Create factory functions for highest-authority presets (channel_authority: 0.9-1.0): createSupportTicketPreset (poll_api, requires: API endpoint, auth token), createSurveyPreset (poll_api, requires: survey platform API key), createUserInterviewPreset (push, requires: none — manual upload of transcripts, speaker-aware chunking default). Each returns a complete SourcePreset with sensible defaults for polling intervals, pagination, and data mapping.",
+        "dependencies": ["cp-s1"]
+      },
+      {
+        "id": "cp-s3",
+        "title": "Implement Tier 2 presets (github, appstores, reviews, analytics, in-app)",
+        "scope": "cultivate",
+        "description": "Create factory functions for Tier 2 presets (channel_authority: 0.7-0.85): createGitHubIssuesPreset, createGitHubPRsPreset (poll_api, requires: repo, token), createAppStorePreset (poll_api, requires: app ID), createPlayStorePreset (poll_api, requires: package name), createG2ReviewPreset, createTrustpilotPreset (poll_api), createAnalyticsEventPreset (webhook), createInAppFeedbackPreset (webhook, HMAC verification). Include appropriate polling intervals and endpoint templates.",
+        "dependencies": ["cp-s1"]
+      },
+      {
+        "id": "cp-s4",
+        "title": "Implement Tier 3 presets (slack, discord, teams, CRM, sales)",
+        "scope": "cultivate",
+        "description": "Create factory functions for Tier 3 presets (channel_authority: 0.5-0.65): createSlackPreset (poll_api, requires: bot token, channel IDs), createDiscordPreset (poll_api, requires: bot token, channel IDs), createTeamsPreset (poll_api, requires: webhook URL), createCRMNotesPreset (poll_api, configurable for Salesforce/HubSpot), createSalesCallPreset (push, speaker-aware chunking for call transcripts). These sources have moderate authority — conversational context that may contain signal.",
+        "dependencies": ["cp-s1"]
+      },
+      {
+        "id": "cp-s5",
+        "title": "Implement Tier 4 presets (reddit, hackernews, twitter, RSS, web)",
+        "scope": "cultivate",
+        "description": "Create factory functions for Tier 4 presets (channel_authority: 0.3-0.45): createRedditPreset (poll_api, requires: subreddit names), createHackerNewsPreset (poll_api, requires: search terms), createTwitterPreset (poll_api, requires: API key, search queries), createRSSPreset (poll_api, requires: feed URLs), createWebScraperPreset (poll_api, requires: target URLs, CSS selectors). Lower authority because sources are public and unvetted. Longer polling intervals to respect rate limits.",
+        "dependencies": ["cp-s1"]
+      },
+      {
+        "id": "cp-s6",
+        "title": "Implement Tier 5 presets (manual, document, CSV, zapier)",
+        "scope": "cultivate",
+        "description": "Create factory functions for Tier 5 presets (channel_authority: 0.1-0.25): createManualEntryPreset (push, no inputs required — signals created via API), createDocumentUploadPreset (push, recursive chunking for uploaded documents), createCSVImportPreset (push, requires: column mapping configuration), createZapierWebhookPreset (webhook, HMAC verification, generic payload normalization). Lowest authority tier — least structured, most manual.",
+        "dependencies": ["cp-s1"]
+      },
+      {
+        "id": "cp-s7",
+        "title": "Add preset registry and catalog endpoint",
+        "scope": "cultivate",
+        "description": "Build PresetRegistry that collects all preset factory functions into a searchable registry. Methods: getAll() returns all presets grouped by tier, getByName(name) returns a specific preset, getByAdapterType(type) filters by adapter type. Export getPresetCatalog() that returns the full catalog as a serializable array for the GET /api/cultivate/presets endpoint. Each entry includes name, description, tier, adapter_type, required_inputs, and optional_inputs (but not defaults/secrets).",
+        "dependencies": ["cp-s2", "cp-s3", "cp-s4", "cp-s5", "cp-s6"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "feature_id": "cultivate-dedup",
+  "title": "Deduplication (Exact + Near)",
+  "type": "feature",
+  "status": "verified",
+  "priority": "high",
+  "dependencies": ["cultivate-domain", "cultivate-storage"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Two-tier deduplication. Exact dedup: source_type + external_id uniqueness check before pipeline entry. Near dedup: after extraction, same cluster + >80% keyword overlap from same source type within 7 days is marked near_duplicate_of with repetition boost on original.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Exact dedup rejects signals with matching source_type + external_id before entering the pipeline" },
+      { "id": "ac2", "description": "Near dedup detects signals in the same cluster with >80% keyword overlap from the same source type within 7 days" },
+      { "id": "ac3", "description": "Near-duplicate signals are marked with near_duplicate_of referencing the original signal ID" },
+      { "id": "ac4", "description": "When a near-duplicate is detected, the original signal receives a repetition score boost" },
+      { "id": "ac5", "description": "Exact dedup runs pre-pipeline (before any processing), near dedup runs post-extraction (after keywords are available)" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/dedup/checkExactDuplicate.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/dedup/checkNearDuplicate.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/dedup/checkNearDuplicate.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/dedup/checkNearDuplicate.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/dedup/checkExactDuplicate.ts and src/dedup/checkNearDuplicate.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "cd-s1",
+        "title": "Implement exact dedup check",
+        "scope": "cultivate",
+        "description": "Build checkExactDuplicate(sourceType, externalId) that queries storage for an existing signal with the same source_type and external_id combination. Add a unique composite index on (source_type, external_id) in the signals table. If a match is found, return the existing signal ID to indicate a duplicate. This runs before the pipeline to reject already-processed signals immediately.",
+        "dependencies": []
+      },
+      {
+        "id": "cd-s2",
+        "title": "Implement near dedup detection with keyword overlap",
+        "scope": "cultivate",
+        "description": "Build checkNearDuplicate(signal, extraction, clusterId) that: (1) queries signals in the same cluster from the same source_type created within the last 7 days, (2) for each candidate, computes keyword overlap as intersection/union of keyword sets, (3) if overlap > 0.8, returns the original signal as the near-duplicate match. Keyword comparison is case-insensitive. Returns null if no near duplicate found.",
+        "dependencies": ["cd-s1"]
+      },
+      {
+        "id": "cd-s3",
+        "title": "Add near_duplicate_of marking with repetition boost",
+        "scope": "cultivate",
+        "description": "When a near duplicate is detected: (1) mark the new signal with near_duplicate_of = originalSignalId in storage, (2) boost the original signal's repetition score factor to reflect the repeated observation, (3) the near-duplicate signal is still stored (for audit trail) but flagged so it is excluded from default cluster views and scoring aggregations.",
+        "dependencies": ["cd-s2"]
+      },
+      {
+        "id": "cd-s4",
+        "title": "Integrate dedup into pipeline stages",
+        "scope": "cultivate",
+        "description": "Wire exact dedup as a pre-pipeline gate: before any processing, check source_type + external_id and reject if duplicate. Wire near dedup as a post-extraction step: after Tier 3 extraction produces keywords and after cluster assignment, run near dedup check. Both checks integrate with the pipeline's StepProvenance tracking to record dedup decisions.",
+        "dependencies": ["cd-s1", "cd-s2", "cd-s3"]
+      }
+    ]
+  }
+}

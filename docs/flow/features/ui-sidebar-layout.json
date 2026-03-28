@@ -1,0 +1,354 @@
+{
+  "feature_id": "ui-sidebar-layout",
+  "title": "Left Sidebar Layout",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": ["schema-org-initiative"],
+
+  "summary": {
+    "goal": "Replace top-nav with Linear-style left sidebar that's collapsible on desktop and slide-out on mobile",
+    "context": "Current Layout.tsx uses horizontal top nav. Need vertical left sidebar with: workspace header (logo/name), quick actions (+New, Cmd+K), global nav (Inbox, My Plans, All Plans, Roadmap), initiatives section with collapsible list showing nested plans.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Sidebar is 240px wide when expanded, 64px when collapsed (icon-only)" },
+      { "id": "ac2", "description": "Collapse toggle button persists state to localStorage" },
+      { "id": "ac3", "description": "On mobile (<768px), sidebar is hidden by default, slides in from left on hamburger click" },
+      { "id": "ac4", "description": "Workspace header shows app logo and workspace name" },
+      { "id": "ac5", "description": "Quick actions: New Plan button, Search button (opens Cmd+K palette)" },
+      { "id": "ac6", "description": "Global nav items: All Plans, Initiatives, Pipeline - each links to respective view (Inbox deferred to v2)" },
+      { "id": "ac7", "description": "Initiatives section header with 'New Initiative' action" },
+      { "id": "ac8", "description": "Each initiative row is collapsible, shows icon/color, name, plan count" },
+      { "id": "ac9", "description": "Expanded initiative shows nested plan links (title, status badge)" },
+      { "id": "ac10", "description": "Active route is highlighted in sidebar" },
+      { "id": "ac11", "description": "Hover states and transitions follow design system (accent-cyan highlights)" },
+      { "id": "ac12", "description": "Content area fills remaining width, scrolls independently" }
+    ]
+  },
+
+  "design_spec": {
+    "approach": "Use shadcn/ui Sidebar component as foundation, themed to Mission Control",
+    "shadcn_components": [
+      "Sidebar (collapsible='icon')",
+      "SidebarProvider",
+      "SidebarHeader",
+      "SidebarContent",
+      "SidebarGroup",
+      "SidebarGroupLabel",
+      "SidebarMenu",
+      "SidebarMenuItem",
+      "SidebarMenuButton",
+      "SidebarMenuSub",
+      "SidebarMenuSubItem",
+      "SidebarTrigger",
+      "Collapsible"
+    ],
+    "views": [
+      {
+        "view_id": "sidebar-expanded",
+        "name": "Sidebar Expanded",
+        "layout": "fixed left, 240px width, full height, bg-bg-secondary",
+        "sections": [
+          {
+            "name": "Header",
+            "component": "SidebarHeader",
+            "elements": [
+              { "component": "Logo", "use": "app identity", "props": "diamond icon + 'Planner' text" },
+              { "component": "SidebarTrigger", "use": "collapse toggle", "props": "ChevronLeft icon" }
+            ]
+          },
+          {
+            "name": "Quick Actions",
+            "component": "SidebarGroup",
+            "elements": [
+              { "component": "SidebarMenuButton", "use": "new plan", "props": "PlusIcon, variant=outline, full width" },
+              { "component": "SidebarMenuButton", "use": "search", "props": "SearchIcon, 'Search' + kbd Cmd+K" }
+            ]
+          },
+          {
+            "name": "Navigation",
+            "component": "SidebarGroup",
+            "elements": [
+              { "component": "SidebarMenuButton", "use": "all plans", "props": "ListIcon, link to /plans" },
+              { "component": "SidebarMenuButton", "use": "initiatives", "props": "TargetIcon, link to /initiatives" },
+              { "component": "SidebarMenuButton", "use": "pipeline", "props": "GitBranchIcon, link to /pipeline" }
+            ]
+          },
+          {
+            "name": "Initiatives List",
+            "component": "SidebarGroup + Collapsible",
+            "elements": [
+              { "component": "SidebarGroupLabel", "use": "section header", "props": "'INITIATIVES' + PlusIcon action" },
+              { "component": "InitiativeCollapsible", "use": "each initiative", "custom": true, "props": "icon, color dot, name, plan count badge" },
+              { "component": "SidebarMenuSub", "use": "nested plans", "props": "plan title + status dot" }
+            ]
+          }
+        ],
+        "states": {
+          "active": "bg-accent-cyan/10 text-accent-cyan border-l-2 border-accent-cyan",
+          "hover": "bg-bg-tertiary text-text-primary"
+        }
+      },
+      {
+        "view_id": "sidebar-collapsed",
+        "name": "Sidebar Collapsed",
+        "layout": "fixed left, 64px width, icons only",
+        "notes": "Icons only, tooltips on hover, initiatives section hidden"
+      },
+      {
+        "view_id": "sidebar-mobile",
+        "name": "Sidebar Mobile Drawer",
+        "layout": "offcanvas from left, full expanded width, overlay backdrop",
+        "trigger": "hamburger menu in mobile header"
+      }
+    ],
+    "custom_needed": [
+      "InitiativeCollapsible - SidebarMenuItem with Collapsible, shows icon/color/name/count, expands to show plan links",
+      "PlanSubItem - SidebarMenuSubItem with status dot indicator (draft=muted, approved=cyan, published=green)"
+    ],
+    "css_variables": {
+      "--sidebar-width": "240px",
+      "--sidebar-width-collapsed": "64px",
+      "--sidebar-bg": "var(--bg-secondary)",
+      "--sidebar-border": "var(--border-subtle)",
+      "--sidebar-item-hover": "var(--bg-tertiary)",
+      "--sidebar-item-active": "rgba(0, 217, 255, 0.1)"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "steps": [
+      {
+        "step_id": "i001",
+        "title": "Install shadcn/ui sidebar dependencies",
+        "scope": "planner-ui",
+        "description": "Install required shadcn/ui primitives for sidebar: @radix-ui/react-slot, @radix-ui/react-collapsible, @radix-ui/react-tooltip, class-variance-authority, clsx, tailwind-merge. Add shadcn cn() utility function.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "@radix-ui/react-slot, @radix-ui/react-collapsible, @radix-ui/react-tooltip installed in package.json" },
+          { "id": "ac2", "description": "class-variance-authority, clsx, tailwind-merge installed" },
+          { "id": "ac3", "description": "src/lib/utils.ts exports cn() function using clsx + tailwind-merge" }
+        ]
+      },
+      {
+        "step_id": "i002",
+        "title": "Add shadcn/ui Sidebar component files",
+        "scope": "planner-ui",
+        "description": "Create src/components/ui/sidebar.tsx with all sidebar primitives from shadcn/ui (SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem, SidebarTrigger, useSidebar hook). Theme CSS variables to Mission Control colors.",
+        "dependencies": ["i001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "sidebar.tsx exports all listed components" },
+          { "id": "ac2", "description": "useSidebar hook provides { state, open, setOpen, toggleSidebar, isMobile }" },
+          { "id": "ac3", "description": "SidebarProvider accepts collapsible='icon' mode" },
+          { "id": "ac4", "description": "CSS variables use --bg-secondary, --border-subtle, --bg-tertiary from design system" },
+          { "id": "ac5", "description": "Sidebar width: 240px expanded, 64px collapsed (icon mode)" }
+        ]
+      },
+      {
+        "step_id": "i003",
+        "title": "Add Tooltip component for collapsed state",
+        "scope": "planner-ui",
+        "description": "Create src/components/ui/tooltip.tsx using @radix-ui/react-tooltip. Tooltip needed for icon-only collapsed sidebar to show labels on hover.",
+        "dependencies": ["i001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tooltip, TooltipTrigger, TooltipContent, TooltipProvider exported" },
+          { "id": "ac2", "description": "Tooltip styled with bg-bg-elevated, text-text-primary, rounded-md" },
+          { "id": "ac3", "description": "Tooltip appears on hover with 200ms delay" }
+        ]
+      },
+      {
+        "step_id": "i004",
+        "title": "Add initiatives API client functions",
+        "scope": "planner-ui",
+        "description": "Add API client functions to src/api/index.ts for initiatives: listInitiatives(), getInitiative(id). These consume the backend endpoints from schema-org-initiative feature.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "listInitiatives() returns Promise<{ initiatives: Initiative[] }> where Initiative = { initiative_id, org_id, name, description, status, icon, color, plan_count }" },
+          { "id": "ac2", "description": "getInitiative(id) returns Promise<{ initiative: Initiative & { plans: PlanSummary[] } }>" },
+          { "id": "ac3", "description": "Initiative TypeScript interface added to src/types.ts" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "i005",
+        "title": "Create useInitiatives hook",
+        "scope": "planner-ui",
+        "description": "Create src/hooks/useInitiatives.ts that fetches initiatives list and provides loading/error states. Cache results to avoid refetching on navigation.",
+        "dependencies": ["i004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useInitiatives() returns { initiatives, isLoading, error, refetch }" },
+          { "id": "ac2", "description": "Initiatives cached in state, refetch on mount if stale (>30s)" },
+          { "id": "ac3", "description": "Hook exported from src/hooks/index.ts" }
+        ]
+      },
+      {
+        "step_id": "i006",
+        "title": "Create useSidebarState hook for persistence",
+        "scope": "planner-ui",
+        "description": "Create src/hooks/useSidebarState.ts that persists collapsed/expanded state to localStorage. Syncs with SidebarProvider state.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "useSidebarState() returns { isCollapsed, setCollapsed }" },
+          { "id": "ac2", "description": "State persisted to localStorage key 'sidebar-collapsed'" },
+          { "id": "ac3", "description": "Initial state read from localStorage on mount" },
+          { "id": "ac4", "description": "Hook exported from src/hooks/index.ts" }
+        ]
+      },
+      {
+        "step_id": "i007",
+        "title": "Create AppSidebar component",
+        "scope": "planner-ui",
+        "description": "Create src/components/AppSidebar.tsx as the main sidebar component. Compose shadcn/ui sidebar primitives with: Header (logo + collapse toggle), Quick Actions (New Plan + Search), Navigation (All Plans, Initiatives, Pipeline), Initiatives list (collapsible per initiative).",
+        "dependencies": ["i002", "i003", "i005", "i006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AppSidebar renders SidebarHeader with diamond logo + 'Planner' text + collapse toggle" },
+          { "id": "ac2", "description": "Quick Actions group has New Plan button (links to /plans/new) and Search button (opens command palette via useCommandPalette)" },
+          { "id": "ac3", "description": "Navigation group has All Plans (/plans), Initiatives (/initiatives), Pipeline (/pipeline) links" },
+          { "id": "ac4", "description": "Initiatives section header shows 'INITIATIVES' label + Plus icon button" },
+          { "id": "ac5", "description": "Each initiative rendered with InitiativeCollapsible (step i008)" }
+        ]
+      },
+      {
+        "step_id": "i008",
+        "title": "Create InitiativeCollapsible component",
+        "scope": "planner-ui",
+        "description": "Create src/components/InitiativeCollapsible.tsx - a SidebarMenuItem with Collapsible behavior. Shows initiative icon/color dot, name, plan count badge. When expanded, shows nested plan links using SidebarMenuSub.",
+        "dependencies": ["i002", "i004"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InitiativeCollapsible accepts { initiative, plans } props" },
+          { "id": "ac2", "description": "Collapsed state shows: color dot (initiative.color), name, plan count badge" },
+          { "id": "ac3", "description": "Expand/collapse chevron animates on toggle" },
+          { "id": "ac4", "description": "Expanded state shows SidebarMenuSub with plan links" },
+          { "id": "ac5", "description": "Each plan link shows title + status dot (draft=text-muted, approved=accent-cyan, published=accent-green)" }
+        ]
+      },
+      {
+        "step_id": "i009",
+        "title": "Add sidebar CSS variables to globals.css",
+        "scope": "planner-ui",
+        "description": "Add sidebar-specific CSS variables to globals.css: --sidebar-width, --sidebar-width-collapsed, --sidebar-bg, --sidebar-border, --sidebar-item-hover, --sidebar-item-active.",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "--sidebar-width: 240px" },
+          { "id": "ac2", "description": "--sidebar-width-collapsed: 64px" },
+          { "id": "ac3", "description": "--sidebar-bg: var(--bg-secondary)" },
+          { "id": "ac4", "description": "--sidebar-border: var(--border-subtle)" },
+          { "id": "ac5", "description": "--sidebar-item-hover: var(--bg-tertiary)" },
+          { "id": "ac6", "description": "--sidebar-item-active: rgba(0, 217, 255, 0.1)" }
+        ]
+      },
+      {
+        "step_id": "i010",
+        "title": "Refactor Layout.tsx to use sidebar",
+        "scope": "planner-ui",
+        "description": "Replace current top-nav Layout.tsx with sidebar layout. Wrap with SidebarProvider, render AppSidebar on left, main content fills remaining width. Remove old header navigation.",
+        "dependencies": ["i007", "i009"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Layout wrapped in SidebarProvider with collapsible='icon' and defaultOpen from useSidebarState" },
+          { "id": "ac2", "description": "AppSidebar rendered on left side" },
+          { "id": "ac3", "description": "Main content area uses flex-1, scrolls independently" },
+          { "id": "ac4", "description": "Old header nav removed (no more top navigation bar)" },
+          { "id": "ac5", "description": "CommandPalette still mounted and functional" }
+        ]
+      },
+      {
+        "step_id": "i011",
+        "title": "Add mobile sidebar behavior",
+        "scope": "planner-ui",
+        "description": "Add mobile-specific sidebar behavior: hidden by default on <768px, hamburger menu button in mobile header triggers slide-in drawer with backdrop overlay.",
+        "dependencies": ["i010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On viewport <768px, sidebar hidden by default" },
+          { "id": "ac2", "description": "MobileHeader component shows hamburger menu button + app logo" },
+          { "id": "ac3", "description": "Hamburger click opens sidebar as full-height drawer from left" },
+          { "id": "ac4", "description": "Backdrop overlay closes sidebar on click" },
+          { "id": "ac5", "description": "Navigation in mobile sidebar closes drawer after selection" }
+        ]
+      },
+      {
+        "step_id": "i012",
+        "title": "Add active route highlighting",
+        "scope": "planner-ui",
+        "description": "Highlight active route in sidebar navigation using useLocation. Apply active styles per design_spec: bg-accent-cyan/10, text-accent-cyan, border-l-2 border-accent-cyan.",
+        "dependencies": ["i010"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Current route highlighted with isActive prop on SidebarMenuButton" },
+          { "id": "ac2", "description": "Active style: bg-accent-cyan/10 text-accent-cyan border-l-2 border-accent-cyan" },
+          { "id": "ac3", "description": "Nested plan links highlight when on /plans/:id route matching that plan" },
+          { "id": "ac4", "description": "Parent initiative row shows partial highlight when child plan is active" }
+        ]
+      },
+      {
+        "step_id": "i013",
+        "title": "Add New Initiative action",
+        "scope": "planner-ui",
+        "description": "Wire up the Plus button in Initiatives section header to create new initiative. For v1, navigate to /initiatives/new or open a modal (defer full modal to ui-initiatives-view).",
+        "dependencies": ["i007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Plus button in Initiatives header navigates to /initiatives/new" },
+          { "id": "ac2", "description": "Button has tooltip 'New Initiative' in collapsed mode" },
+          { "id": "ac3", "description": "Button styled consistently with other sidebar actions" }
+        ]
+      },
+      {
+        "step_id": "i014",
+        "title": "Add keyboard navigation support",
+        "scope": "planner-ui",
+        "description": "Ensure sidebar supports keyboard navigation: Tab focuses items, Enter activates, Escape closes mobile drawer, Arrow keys navigate within menus.",
+        "dependencies": ["i010", "i011"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tab key moves focus through sidebar items" },
+          { "id": "ac2", "description": "Enter key activates focused item (navigation or expand/collapse)" },
+          { "id": "ac3", "description": "Escape key closes mobile sidebar drawer" },
+          { "id": "ac4", "description": "Arrow Up/Down navigate within menu groups" },
+          { "id": "ac5", "description": "Focus indicators visible (outline-accent-cyan)" }
+        ]
+      },
+      {
+        "step_id": "i015",
+        "title": "Add icons for new navigation items",
+        "scope": "planner-ui",
+        "description": "Add missing icons to src/components/icons/index.tsx: TargetIcon (initiatives), GitBranchIcon (pipeline), ChevronLeftIcon, ChevronRightIcon, MenuIcon (hamburger), DiamondIcon (logo).",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TargetIcon exported (for Initiatives nav item)" },
+          { "id": "ac2", "description": "GitBranchIcon exported (for Pipeline nav item)" },
+          { "id": "ac3", "description": "ChevronLeftIcon, ChevronRightIcon exported (for collapse toggle)" },
+          { "id": "ac4", "description": "MenuIcon exported (hamburger for mobile)" },
+          { "id": "ac5", "description": "DiamondIcon exported (for app logo)" },
+          { "id": "ac6", "description": "All icons follow existing pattern: stroke-based, currentColor, configurable size" }
+        ]
+      },
+      {
+        "step_id": "i016",
+        "title": "Write tests for sidebar components",
+        "scope": "planner-ui",
+        "description": "Add tests for AppSidebar, InitiativeCollapsible, useSidebarState, useInitiatives. Cover: rendering, collapse/expand, localStorage persistence, navigation.",
+        "dependencies": ["i007", "i008", "i005", "i006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AppSidebar.test.tsx: renders all sections, collapse toggle works" },
+          { "id": "ac2", "description": "InitiativeCollapsible.test.tsx: expands to show plans, collapse hides them" },
+          { "id": "ac3", "description": "useSidebarState.test.ts: persists to localStorage, reads initial state" },
+          { "id": "ac4", "description": "useInitiatives.test.ts: fetches initiatives, handles loading/error" },
+          { "id": "ac5", "description": "All tests pass: npm run test" }
+        ]
+      }
+    ]
+  }
+}

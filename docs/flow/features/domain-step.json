@@ -1,0 +1,134 @@
+{
+  "feature_id": "domain-step",
+  "title": "Step Entity",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["domain-plan"],
+
+  "summary": {
+    "goal": "Define Step entity with scopes, dependencies, acceptance criteria, and gates",
+    "context": "Steps are the atomic units of work within a plan. They belong to scopes (repo/team/domain), have AI-inferred dependencies, owner roles, acceptance criteria, and optional human approval gates.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Step has step_id, title, scope, description" },
+      { "id": "ac2", "description": "Dependencies array contains step_ids forming a DAG" },
+      { "id": "ac3", "description": "owner_role specifies role (e.g., 'backend:Coder'), not specific agent" },
+      { "id": "ac4", "description": "AcceptanceCriterion has id, description, optional type" },
+      { "id": "ac5", "description": "Gate supports type: 'human_approval' with optional approver_role" },
+      { "id": "ac6", "description": "sub_plan_id allows referencing another PlanVersion for nested complexity" },
+      { "id": "ac7", "description": "Zod schemas validate all fields" }
+    ]
+  },
+
+  "references": [
+    { "type": "spec", "title": "Multi-Scope Plans", "path": "docs/planner-scale.md" }
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "ds001",
+        "title": "Define AcceptanceCriterion interface and schema",
+        "scope": "planner-core",
+        "description": "Create src/domain/criterion.ts with AcceptanceCriterion: id, description, type?",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AcceptanceCriterion has id: string, description: string" },
+          { "id": "ac2", "description": "AcceptanceCriterion has optional type: string" },
+          { "id": "ac3", "description": "AcceptanceCriterionSchema validates correctly" }
+        ]
+      },
+      {
+        "step_id": "ds002",
+        "title": "Define Gate interface and schema",
+        "scope": "planner-core",
+        "description": "Create src/domain/gate.ts with Gate: type ('human_approval'), approver_role?",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Gate has type: 'human_approval' (literal type)" },
+          { "id": "ac2", "description": "Gate has optional approver_role: string" },
+          { "id": "ac3", "description": "GateSchema validates correctly" }
+        ]
+      },
+      {
+        "step_id": "ds003",
+        "title": "Define Step interface and schema",
+        "scope": "planner-core",
+        "description": "Create src/domain/step.ts with Step: step_id, title, scope?, description?, dependencies[], owner_role?, acceptance_criteria[], gate?, sub_plan_id?",
+        "dependencies": ["ds001", "ds002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Step has step_id: string (required)" },
+          { "id": "ac2", "description": "Step has title: string (required)" },
+          { "id": "ac3", "description": "Step has scope?: string (optional)" },
+          { "id": "ac4", "description": "Step has description?: string (optional)" },
+          { "id": "ac5", "description": "Step has dependencies: string[] (step_ids)" },
+          { "id": "ac6", "description": "Step has owner_role?: string" },
+          { "id": "ac7", "description": "Step has acceptance_criteria?: AcceptanceCriterion[]" },
+          { "id": "ac8", "description": "Step has gate?: Gate" },
+          { "id": "ac9", "description": "Step has sub_plan_id?: string" },
+          { "id": "ac10", "description": "StepSchema validates all fields" }
+        ]
+      },
+      {
+        "step_id": "ds004",
+        "title": "Create Step factory function",
+        "scope": "planner-core",
+        "description": "Implement createStep(title, options?) factory. Generates step_id (UUID), initializes empty dependencies and criteria arrays.",
+        "dependencies": ["ds003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createStep() generates unique step_id" },
+          { "id": "ac2", "description": "createStep() requires title parameter" },
+          { "id": "ac3", "description": "createStep() accepts optional scope, description, owner_role" },
+          { "id": "ac4", "description": "dependencies defaults to empty array" },
+          { "id": "ac5", "description": "Returned Step passes schema validation" }
+        ]
+      },
+      {
+        "step_id": "ds005",
+        "title": "Implement DAG validation helper",
+        "scope": "planner-core",
+        "description": "Create validateStepDag(steps) function that checks for cycles and invalid step_id references.",
+        "dependencies": ["ds003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Returns true for valid acyclic graph" },
+          { "id": "ac2", "description": "Returns false for cyclic dependencies" },
+          { "id": "ac3", "description": "Returns false for references to non-existent step_ids" },
+          { "id": "ac4", "description": "Handles empty steps array" }
+        ]
+      },
+      {
+        "step_id": "ds006",
+        "title": "Update PlanVersion to include steps array",
+        "scope": "planner-core",
+        "description": "Update PlanVersion interface and schema to include steps: Step[]. Add DAG validation.",
+        "dependencies": ["ds003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersion.steps is typed as Step[]" },
+          { "id": "ac2", "description": "PlanVersionSchema includes steps validation" }
+        ]
+      },
+      {
+        "step_id": "ds007",
+        "title": "Add unit tests for Step entities",
+        "scope": "planner-core",
+        "description": "Write vitest tests for Step, AcceptanceCriterion, Gate schemas and factory functions.",
+        "dependencies": ["ds004", "ds005", "ds006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests verify schema validation (valid and invalid inputs)" },
+          { "id": "ac2", "description": "Tests verify factory function produces valid entities" },
+          { "id": "ac3", "description": "Tests verify DAG validation catches cycles" },
+          { "id": "ac4", "description": "Tests verify DAG validation catches invalid references" },
+          { "id": "ac5", "description": "All tests pass" }
+        ]
+      }
+    ]
+  }
+}

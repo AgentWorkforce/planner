@@ -1,0 +1,62 @@
+{
+  "feature_id": "forge-agent-metrics",
+  "title": "Real Agent Usage Metrics from Relay",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "parent": "forge-dot-enhancements",
+  "component": "forge-core",
+  "dependencies": ["forge-relay-integration", "forge-execution-metrics"],
+
+  "summary": {
+    "goal": "Replace synthetic/random token counts in handleTaskCompletion() with real usage metrics from spawned agents. Currently the orchestrator generates fake values (Math.random() * 5000 for tokens, hardcoded 'sonnet' for model). Real metrics are needed for Tuner learning to be meaningful — Thompson sampling with fake data produces garbage model selection.",
+    "acceptance_criteria": [
+      { "id": "am-ac1", "description": "tokens_used in TaskOutcomeEmission reflects actual tokens consumed by the agent (not random)" },
+      { "id": "am-ac2", "description": "cost_usd in TaskOutcomeEmission reflects actual cost (derived from model pricing)" },
+      { "id": "am-ac3", "description": "model_used in TaskOutcomeEmission reflects the actual model the agent used (not hardcoded 'sonnet')" },
+      { "id": "am-ac4", "description": "duration_ms is measured from spawn to report_complete (already works, but verify accuracy)" },
+      { "id": "am-ac5", "description": "Metrics are available even if the agent crashes (partial metrics from last known state)" },
+      { "id": "am-ac6", "description": "Metrics source is documented: whether from relay process tracking, agent self-report via MCP, or CLI output parsing" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Orchestrator handleTaskCompletion() at line ~346 uses: Math.floor(Math.random() * 5000) + 1000 for tokens",
+        "cost_usd = tokensUsed * 0.000003 (fixed rate, not model-aware)",
+        "model_used hardcoded to 'sonnet' with TODO comment",
+        "Relay client tracks spawned agents in spawnedAgents Map (pid, spawnedAt) but no usage data",
+        "Three potential metric sources: (a) relay daemon process stats, (b) agent self-reports via report_progress MCP, (c) CLI stdout parsing",
+        "Claude CLI outputs usage stats on exit — could be captured by relay daemon",
+        "The report_complete MCP tool currently doesn't accept usage metrics — could be extended"
+      ],
+      "questions": [
+        "Does the relay daemon capture process stdout/stderr that could contain usage data?",
+        "Should agents self-report metrics via an extended report_complete, or should relay capture them?",
+        "How do other CLIs (codex, gemini) report usage? Is there a common format?"
+      ],
+      "keywords": ["metrics", "tokens", "cost", "model selection", "relay", "usage tracking"],
+      "confidence": "exploring"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "synthetic_code_location": "packages/forge-core/src/services/orchestrator.ts:346-348",
+      "relay_spawn_tracking": "packages/server/src/relay/client.ts — spawnedAgents Map",
+      "metric_consumers": "Tuner (Thompson sampling, EMA baselines, drift detection)",
+      "approach_options": {
+        "option_a": "Extend report_complete MCP tool to accept tokens_used, cost_usd, model_used — agent self-reports",
+        "option_b": "Relay daemon captures CLI stdout on process exit, parses usage lines, stores in spawn metadata",
+        "option_c": "Hybrid: agent reports what it can, relay fills gaps from process-level data"
+      },
+      "recommended": "option_a for MVP (simplest, agent knows its own usage), option_c for production"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core", "server"],
+    "steps": []
+  }
+}

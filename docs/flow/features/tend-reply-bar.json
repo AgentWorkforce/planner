@@ -1,0 +1,115 @@
+{
+  "feature_id": "tend-reply-bar",
+  "title": "Compact Reply Bar",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["tend-status-bar", "tend-conversation-core"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Add a compact reply bar above the conversation input showing pending items that need user response.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "ReplyBar renders between ConversationMessages and ConversationInput"
+      },
+      {
+        "id": "ac2",
+        "description": "Pending questions from agents accumulate as compact one-line items"
+      },
+      {
+        "id": "ac3",
+        "description": "Each item shows: agent name, question summary, time waiting"
+      },
+      {
+        "id": "ac4",
+        "description": "Clicking an item navigates to the relevant context (agent tab, tree node, or scrolls to question in conversation)"
+      },
+      {
+        "id": "ac5",
+        "description": "ReplyBar hidden when no pending items exist"
+      },
+      {
+        "id": "ac6",
+        "description": "Items persist until explicitly addressed (answered or dismissed)"
+      },
+      {
+        "id": "ac7",
+        "description": "Reply bar adapts the question pipeline from planner-ui (useQuestionQueue pattern)"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "planner-ui has a TriagePanel for managing pending questions",
+        "In tend, this becomes the ReplyBar — a more subtle, inline element above the chat input rather than a floating panel",
+        "The data source is the same: useQuestionQueue polls SSE for pending questions",
+        "The rendering is different: compact text lines instead of cards",
+        "This bridges the status bar bubbles (transient attention) with the persistent question queue",
+        "ReplyBar is essentially a simplified TriagePanel with different positioning and styling"
+      ],
+      "questions": [
+        "Should clicking an item auto-focus the input with context?",
+        "Do we allow dismissing questions or only answering?",
+        "Should the reply bar show a count when collapsed?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "rpb01",
+        "title": "Create ReplyBar component",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/conversation/ReplyBar.tsx. Positioned between ConversationMessages and ConversationInput. Renders compact one-line rows for pending items. Each row: agent name, question summary (truncated), time waiting. Hidden when no items. Minimal styling, blends with conversation.",
+        "acceptance_criteria": ["ac1", "ac2", "ac3", "ac5"]
+      },
+      {
+        "id": "rpb02",
+        "title": "Adapt useQuestionQueue hook from planner-ui",
+        "scope": "tend",
+        "description": "Copy packages/planner-ui/src/hooks/useQuestionQueue.ts → packages/tend/src/hooks/useQuestionQueue.ts. SSE polling for pending questions. Adapt API endpoint to project-scoped questions. Wire to ReplyBar for pending items list. Items persist until addressed.",
+        "dependencies": ["rpb01"],
+        "acceptance_criteria": ["ac6", "ac7"]
+      },
+      {
+        "id": "rpb03",
+        "title": "Render pending items in ReplyBar",
+        "scope": "tend",
+        "description": "In ReplyBar: map pending questions from useQuestionQueue to compact rows. Show agent name, truncate question to ~40 chars, show elapsed time (e.g., '2m ago'). Use attention level 2 styling (noticeable but not raised).",
+        "dependencies": ["rpb02"],
+        "acceptance_criteria": ["ac2", "ac3"]
+      },
+      {
+        "id": "rpb04",
+        "title": "Wire click navigation to context",
+        "scope": "tend",
+        "description": "In ReplyBar item onClick: navigate to relevant context. If question from agent → open agent tab. If question references tree node → zoom to node. If question is in conversation history → scroll to message. Use question metadata (step_refs, agent_id) for routing.",
+        "dependencies": ["rpb03"],
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "rpb05",
+        "title": "Hide ReplyBar when empty",
+        "scope": "tend",
+        "description": "In ReplyBar: check pending items length. Render null when empty. Add fade-in/fade-out transition when items appear/disappear. Test with no questions, one question, multiple questions.",
+        "dependencies": ["rpb01", "rpb02"],
+        "acceptance_criteria": ["ac5"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_pattern": "planner-ui TriagePanel → simplified to inline ReplyBar",
+      "position": "between ConversationMessages and ConversationInput",
+      "data_source": "useQuestionQueue from planner-ui",
+      "rendering_style": "compact text lines with minimal styling, not cards",
+      "interaction": "clicking navigates to context (tree node, agent tab, or scroll to message)",
+      "persistence": "items remain until answered or dismissed",
+      "visibility": "hidden when empty, revealed when items present"
+    }
+  }
+}

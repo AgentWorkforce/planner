@@ -1,0 +1,156 @@
+{
+  "feature_id": "cultivate-api",
+  "title": "REST API Layer",
+  "type": "feature",
+  "status": "verified",
+  "priority": "critical",
+  "dependencies": ["cultivate-storage", "cultivate-pipeline", "cultivate-presets", "cultivate-recommender", "cultivate-jobs", "cultivate-sse", "cultivate-tuner"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement the full REST API layer for cultivate as an Express router factory: createCultivateRouter(deps). Provides CRUD for greenhouses, signals (including link/dismiss actions), clusters (read-only), sources, presets catalog, document ingestion with status tracking, recommendations, filter rules, dead letter management, webhooks, and an SSE endpoint. All request/response bodies validated with Zod schemas.",
+    "acceptance_criteria": [
+      { "id": "ca-ac1", "description": "createCultivateRouter(deps) returns an Express Router with all endpoints mounted" },
+      { "id": "ca-ac2", "description": "Greenhouse CRUD: POST/GET/GET:id/PUT/DELETE /greenhouses" },
+      { "id": "ca-ac3", "description": "Signal CRUD + actions: GET/GET:id /signals, POST /signals/:id/link, POST /signals/:id/dismiss" },
+      { "id": "ca-ac4", "description": "Cluster read: GET /clusters, GET /clusters/:id (with signals)" },
+      { "id": "ca-ac5", "description": "Source CRUD: POST/GET/PUT/DELETE /sources" },
+      { "id": "ca-ac6", "description": "Presets catalog: GET /presets returns all registered source presets" },
+      { "id": "ca-ac7", "description": "Ingestion: POST /ingest (file upload), GET /ingest/:id/status" },
+      { "id": "ca-ac8", "description": "Recommendations: GET /recommendations?greenhouse_id=" },
+      { "id": "ca-ac9", "description": "Filter rules: GET/PUT /filter-rules" },
+      { "id": "ca-ac10", "description": "Dead letter: GET /dead-letter, POST /dead-letter/:id/replay, POST /dead-letter/replay-all, DELETE /dead-letter/:id" },
+      { "id": "ca-ac11", "description": "SSE endpoint: GET /events streams all cultivate SSE events" },
+      { "id": "ca-ac12", "description": "All request bodies validated with Zod; validation errors return 422 with details" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "ca-ac1", "status": "satisfied", "evidence": "src/routes.ts:24" },
+      { "id": "ca-ac2", "status": "satisfied", "evidence": "src/routes.ts:40-44" },
+      { "id": "ca-ac3", "status": "satisfied", "evidence": "src/routes.ts:53-56" },
+      { "id": "ca-ac4", "status": "satisfied", "evidence": "src/routes.ts:60-61" },
+      { "id": "ca-ac5", "status": "satisfied", "evidence": "src/routes.ts:65-69" },
+      { "id": "ca-ac6", "status": "satisfied", "evidence": "src/routes.ts:72" },
+      { "id": "ca-ac7", "status": "satisfied", "evidence": "src/routes.ts:87-88" },
+      { "id": "ca-ac8", "status": "satisfied", "evidence": "src/routes.ts:95" },
+      { "id": "ca-ac9", "status": "satisfied", "evidence": "src/routes.ts:76-80" },
+      { "id": "ca-ac10", "status": "satisfied", "evidence": "src/routes.ts:99-102" },
+      { "id": "ca-ac11", "status": "satisfied", "evidence": "src/routes.ts:106" },
+      { "id": "ca-ac12", "status": "satisfied", "evidence": "src/api/schemas.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "ca-s1",
+        "title": "Implement createCultivateRouter factory",
+        "scope": "cultivate",
+        "description": "Create src/api/router.ts. Implement createCultivateRouter(deps) that receives dependencies (storage, pipeline, queues, recommender, sse broadcaster, tuner client, presets registry, dead letter manager) and returns an Express Router. Set up JSON body parsing, Zod validation middleware pattern (validate request body against schema, return 422 on failure), and mount all sub-routers. Export the factory function from the package.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Factory receives all dependencies via injection" },
+          { "id": "ac2", "description": "Zod validation middleware returns 422 with field-level error details" },
+          { "id": "ac3", "description": "All sub-routers mounted at correct paths" }
+        ]
+      },
+      {
+        "step_id": "ca-s2",
+        "title": "Add Greenhouse CRUD endpoints",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/greenhouses.ts. Implement: POST /greenhouses (create with name, description, mode, keyword filters, source_ids — Zod validated), GET /greenhouses (list all), GET /greenhouses/:id (get by id with signal/cluster counts), PUT /greenhouses/:id (update fields), DELETE /greenhouses/:id (soft delete, check no active signals). Use @plannr/errors for NotFoundError, BadRequestError.",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All 5 CRUD operations implemented and Zod-validated" },
+          { "id": "ac2", "description": "GET by id includes signal and cluster counts" },
+          { "id": "ac3", "description": "Delete checks for active signals before removal" }
+        ]
+      },
+      {
+        "step_id": "ca-s3",
+        "title": "Add Signal CRUD + link/dismiss endpoints",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/signals.ts. Implement: GET /signals (list with pagination, filtering by greenhouse_id, status, cluster_id, date range), GET /signals/:id (full signal with provenance), POST /signals/:id/link (link signal to plan — sets linked_plan_id, records Tuner outcome), POST /signals/:id/dismiss (dismiss signal — records Tuner outcome, updates status). Link and dismiss actions trigger Tuner outcome recording via the injected tuner client.",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Signal listing supports pagination and filtering by greenhouse, status, cluster, date" },
+          { "id": "ac2", "description": "Link action sets linked_plan_id and records Tuner boost outcome" },
+          { "id": "ac3", "description": "Dismiss action records Tuner dampen outcome" }
+        ]
+      },
+      {
+        "step_id": "ca-s4",
+        "title": "Add Cluster read endpoints",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/clusters.ts. Implement: GET /clusters (list with filtering by greenhouse_id, trend, min signal count, sorted by signal_count or velocity), GET /clusters/:id (full cluster with its signals included). Clusters are read-only in the API — they are created and managed by the pipeline and recluster system.",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Cluster listing supports greenhouse, trend, and min signal count filters" },
+          { "id": "ac2", "description": "GET by id includes the cluster's signals" },
+          { "id": "ac3", "description": "No write operations exposed for clusters" }
+        ]
+      },
+      {
+        "step_id": "ca-s5",
+        "title": "Add Source CRUD + Presets catalog endpoints",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/sources.ts. Implement: POST /sources (create source from config or preset — Zod validated, encrypts auth credentials), GET /sources (list with health status), PUT /sources/:id (update config, re-encrypt if auth changed), DELETE /sources/:id (disable and remove). GET /presets returns the full presets catalog with all 30+ source presets organized by tier.",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Source creation encrypts auth credentials before storage" },
+          { "id": "ac2", "description": "Source listing includes current health status" },
+          { "id": "ac3", "description": "Presets catalog returns all presets organized by tier" }
+        ]
+      },
+      {
+        "step_id": "ca-s6",
+        "title": "Add Ingestion endpoints (upload + status)",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/ingestion.ts. Implement: POST /ingest (accepts file upload via multipart form data, creates IngestionJob, enqueues ingest-document job, returns job id), GET /ingest/:id/status (returns IngestionJob with progress — total_chunks, processed_chunks, status). File upload uses Express multer middleware or similar for multipart handling.",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "File upload creates IngestionJob and enqueues processing" },
+          { "id": "ac2", "description": "Status endpoint returns progress with chunk counts" },
+          { "id": "ac3", "description": "Multipart form data handling for file uploads" }
+        ]
+      },
+      {
+        "step_id": "ca-s7",
+        "title": "Add Recommendations + Filter Rules + Dead Letter endpoints",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/recommendations.ts, src/api/handlers/filter-rules.ts, and src/api/handlers/dead-letter.ts. Recommendations: GET /recommendations?greenhouse_id= (returns cached or fresh recommendations). Filter rules: GET /filter-rules (list all with effectiveness stats), PUT /filter-rules (bulk update enabled/disabled states). Dead letter: GET /dead-letter (list with pagination), POST /dead-letter/:id/replay (re-enqueue single job), POST /dead-letter/replay-all (re-enqueue all), DELETE /dead-letter/:id (discard).",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Recommendations endpoint supports greenhouse filtering" },
+          { "id": "ac2", "description": "Filter rules support bulk enable/disable updates" },
+          { "id": "ac3", "description": "Dead letter supports list, replay, replay-all, and discard" }
+        ]
+      },
+      {
+        "step_id": "ca-s8",
+        "title": "Add SSE endpoint (GET /events) wiring",
+        "scope": "cultivate",
+        "description": "Create src/api/handlers/events.ts. Implement GET /events as an SSE endpoint. Set appropriate headers (Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive). Wire the SSE broadcaster to write events to connected clients. Support optional greenhouse_id query param to filter events to a specific greenhouse. Handle client disconnect cleanup. Each SSE event includes type (signal:new, cluster:trending, etc.) and JSON data payload.",
+        "dependencies": ["ca-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "SSE headers correctly set for event streaming" },
+          { "id": "ac2", "description": "Events filterable by greenhouse_id query parameter" },
+          { "id": "ac3", "description": "Client disconnect properly cleaned up" },
+          { "id": "ac4", "description": "All SSE event types propagated to connected clients" }
+        ]
+      }
+    ]
+  }
+}

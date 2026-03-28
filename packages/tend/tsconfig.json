@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.vite.json",
+  "compilerOptions": {
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@plannr/shared-ui": ["../shared-ui/src/index.ts"],
+      "@plannr/shared-ui/*": ["../shared-ui/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

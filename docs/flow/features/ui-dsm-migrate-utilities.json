@@ -1,0 +1,11 @@
+{
+  "feature_id": "ui-dsm-migrate-utilities",
+  "title": "Migrate Utility Components",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "parent": "ui-design-system-migration",
+  "summary": {
+    "goal": "Migrate Utility Components"
+  }
+}

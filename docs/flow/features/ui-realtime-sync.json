@@ -1,0 +1,191 @@
+{
+  "feature_id": "ui-realtime-sync",
+  "title": "Real-Time Plan Sync",
+  "type": "feature",
+  "status": "completed",
+  "completed_at": "2026-01-29",
+  "audit_note": "All 8 implementation steps complete. Backend: plan-events emitter, plan-operations hooks, SSE endpoint at GET /plans/:id/events. Frontend: usePlanEvents hook with auto-reconnect (5 retries, 3s delay), integrated into PlanEditorPage with 300ms debounce. 22 tests passing (8 backend + 9 frontend + 5 integration).",
+  "priority": "high",
+  "dependencies": ["relay-session-connect"],
+
+  "summary": {
+    "goal": "When the planning agent modifies the plan via MCP tools, the UI automatically reflects those changes without requiring a page reload",
+    "context": "Currently, agent calls MCP → database updates → UI shows stale data. User must manually reload to see agent's work. This breaks the collaborative feel of AI-assisted planning.",
+    "in_scope": [
+      "SSE endpoint for plan change events",
+      "UI subscription when AI is connected",
+      "Automatic plan data refresh on change events",
+      "Version conflict handling (UI shows newer version)"
+    ],
+    "out_of_scope": [
+      "Full collaborative editing (multiple humans editing simultaneously)",
+      "Granular field-level updates (full plan refresh is fine for MVP)",
+      "Offline sync / reconnection queue",
+      "WebSocket upgrade (SSE is sufficient for one-way server→client)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Backend emits SSE event when plan version changes (step added/edited/removed)" },
+      { "id": "ac2", "description": "UI subscribes to SSE stream when connectionStatus === 'connected'" },
+      { "id": "ac3", "description": "UI automatically fetches fresh plan data when change event received" },
+      { "id": "ac4", "description": "UI handles version conflicts gracefully (newer version replaces local state)" },
+      { "id": "ac5", "description": "SSE connection closes when leaving plan editor page" },
+      { "id": "ac6", "description": "SSE reconnects automatically if connection drops while on page" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "approach": "SSE-based one-way sync from backend to frontend. Backend emits events when plan changes, UI subscribes when agent is connected.",
+    "steps": [
+      {
+        "step_id": "urs001",
+        "title": "Create plan event emitter module",
+        "scope": "planner-core",
+        "description": "Create src/events/plan-events.ts with EventEmitter for plan changes. Exports: emitPlanChange(planId, version, changeType), onPlanChange(planId, callback), offPlanChange(planId, callback).",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "emitPlanChange(planId, version, changeType) broadcasts to listeners for that planId" },
+          { "id": "ac2", "description": "changeType is 'step_added' | 'step_edited' | 'step_removed' | 'criteria_added' | 'criteria_edited'" },
+          { "id": "ac3", "description": "Multiple listeners per planId supported" },
+          { "id": "ac4", "description": "offPlanChange removes specific listener" }
+        ]
+      },
+      {
+        "step_id": "urs002",
+        "title": "Hook plan-operations to emit events",
+        "scope": "planner-core",
+        "description": "Update src/domain/plan-operations.ts to call emitPlanChange after successful modifications. Affects: addStepToPlan, editStepInPlan, removeStepFromPlan, addCriteriaToStep, editCriteriaInStep.",
+        "dependencies": ["urs001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "addStepToPlan emits { planId, version, changeType: 'step_added', stepId }" },
+          { "id": "ac2", "description": "editStepInPlan emits { planId, version, changeType: 'step_edited', stepId }" },
+          { "id": "ac3", "description": "removeStepFromPlan emits { planId, version, changeType: 'step_removed', stepId }" },
+          { "id": "ac4", "description": "Events only emitted on success (result.success === true)" }
+        ]
+      },
+      {
+        "step_id": "urs003",
+        "title": "Create SSE endpoint for plan events",
+        "scope": "planner-core",
+        "description": "Add GET /plans/:id/events SSE endpoint in src/api/handlers/events.ts. Subscribes to plan events and streams to client. Uses standard SSE format: 'event: plan_change\\ndata: {json}\\n\\n'.",
+        "dependencies": ["urs001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Response Content-Type is 'text/event-stream'" },
+          { "id": "ac2", "description": "Connection kept alive with periodic ':keepalive' comments (every 30s)" },
+          { "id": "ac3", "description": "Events formatted as 'event: plan_change\\ndata: {\"version\":N,\"changeType\":\"...\",\"stepId\":\"...\"}\\n\\n'" },
+          { "id": "ac4", "description": "Returns 404 if plan doesn't exist" },
+          { "id": "ac5", "description": "Cleans up listener on client disconnect (req.on('close'))" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "urs004",
+        "title": "Add SSE route to Express app",
+        "scope": "planner-core",
+        "description": "Register the events endpoint in src/api/routes.ts.",
+        "dependencies": ["urs003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /plans/:id/events route registered" },
+          { "id": "ac2", "description": "Route uses createEventsHandler(storage)" }
+        ]
+      },
+      {
+        "step_id": "urs005",
+        "title": "Create usePlanEvents hook",
+        "scope": "planner-ui",
+        "description": "Create packages/planner-ui/src/hooks/usePlanEvents.ts. Manages EventSource lifecycle, reconnection, and event callbacks.",
+        "dependencies": ["urs003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "usePlanEvents(planId, enabled, onEvent) signature" },
+          { "id": "ac2", "description": "Creates EventSource to /api/plans/:id/events when enabled=true" },
+          { "id": "ac3", "description": "Calls onEvent(data) when 'plan_change' event received" },
+          { "id": "ac4", "description": "Closes EventSource when enabled becomes false or component unmounts" },
+          { "id": "ac5", "description": "Auto-reconnects on error after 3 second delay (max 5 retries)" },
+          { "id": "ac6", "description": "Returns { isConnected: boolean, error: string | null }" }
+        ]
+      },
+      {
+        "step_id": "urs006",
+        "title": "Integrate usePlanEvents into PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Update packages/planner-ui/src/pages/PlanEditorPage.tsx to subscribe to plan events when AI is connected. On event, refetch plan data with debounce.",
+        "dependencies": ["urs005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "usePlanEvents called with enabled = (connectionStatus === 'connected')" },
+          { "id": "ac2", "description": "onEvent callback triggers refetch of plan data" },
+          { "id": "ac3", "description": "Refetch is debounced (300ms) to handle rapid events" },
+          { "id": "ac4", "description": "If fetched version > local version, state is updated" },
+          { "id": "ac5", "description": "If fetched version <= local version, no-op (local is current)" }
+        ],
+        "integration": true
+      },
+      {
+        "step_id": "urs007",
+        "title": "Add backend integration tests",
+        "scope": "planner-core",
+        "description": "Add tests in src/api/events.test.ts for SSE endpoint and event emission.",
+        "dependencies": ["urs002", "urs004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: SSE endpoint returns 404 for non-existent plan" },
+          { "id": "ac2", "description": "Test: Adding step via MCP tool emits event to SSE client" },
+          { "id": "ac3", "description": "Test: Event data includes version, changeType, stepId" },
+          { "id": "ac4", "description": "Test: Client disconnect removes listener (no memory leak)" }
+        ]
+      },
+      {
+        "step_id": "urs008",
+        "title": "Add frontend unit tests",
+        "scope": "planner-ui",
+        "description": "Add tests for usePlanEvents hook with mocked EventSource.",
+        "dependencies": ["urs006"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: Hook creates EventSource when enabled=true" },
+          { "id": "ac2", "description": "Test: Hook closes EventSource when enabled becomes false" },
+          { "id": "ac3", "description": "Test: Hook calls onEvent when message received" },
+          { "id": "ac4", "description": "Test: Hook auto-reconnects after error" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      { "type": "happy", "description": "emitPlanChange broadcasts to all listeners for planId", "scope": "backend", "step_id": "urs001" },
+      { "type": "happy", "description": "offPlanChange removes specific listener without affecting others", "scope": "backend", "step_id": "urs001" },
+      { "type": "happy", "description": "addStepToPlan emits step_added event with stepId", "scope": "backend", "step_id": "urs002" },
+      { "type": "happy", "description": "editStepInPlan emits step_edited event with stepId", "scope": "backend", "step_id": "urs002" },
+      { "type": "happy", "description": "removeStepFromPlan emits step_removed event with stepId", "scope": "backend", "step_id": "urs002" },
+      { "type": "happy", "description": "SSE endpoint returns Content-Type: text/event-stream", "scope": "backend", "step_id": "urs003" },
+      { "type": "happy", "description": "SSE events formatted as 'event: plan_change\\ndata: {...}\\n\\n'", "scope": "backend", "step_id": "urs003" },
+      { "type": "happy", "description": "usePlanEvents creates EventSource when enabled=true", "scope": "frontend", "step_id": "urs005" },
+      { "type": "happy", "description": "usePlanEvents calls onEvent callback when message received", "scope": "frontend", "step_id": "urs005" },
+      { "type": "happy", "description": "PlanEditorPage subscribes when connectionStatus === 'connected'", "scope": "frontend", "step_id": "urs006" },
+      { "type": "happy", "description": "onEvent triggers refetch and updates state if version > local", "scope": "frontend", "step_id": "urs006" },
+      { "type": "edge", "description": "Failed operations do not emit events (success check)", "scope": "backend", "step_id": "urs002" },
+      { "type": "edge", "description": "SSE client disconnect removes listener (no memory leak)", "scope": "backend", "step_id": "urs003" },
+      { "type": "edge", "description": "usePlanEvents closes EventSource when enabled becomes false", "scope": "frontend", "step_id": "urs005" },
+      { "type": "edge", "description": "usePlanEvents auto-reconnects after error (max 5 retries)", "scope": "frontend", "step_id": "urs005" },
+      { "type": "edge", "description": "Multiple rapid events debounced to single refresh (300ms)", "scope": "frontend", "step_id": "urs006" },
+      { "type": "edge", "description": "No-op if fetched version <= local version", "scope": "frontend", "step_id": "urs006" },
+      { "type": "error", "description": "SSE endpoint returns 404 for non-existent plan", "scope": "backend", "step_id": "urs003" },
+      { "type": "error", "description": "usePlanEvents handles connection failure gracefully", "scope": "frontend", "step_id": "urs005" }
+    ],
+    "data_requirements": [
+      "Test plan with 2+ existing steps (for edit/remove scenarios)",
+      "Storage mock that tracks emitted events",
+      "Mock EventSource class for frontend hook tests",
+      "Timer mocks for debounce testing"
+    ],
+    "notes": "Moderate coverage - integration tests for backend (event emitter + SSE endpoint), unit tests with mocked EventSource for frontend hook. Skip E2E browser tests."
+  }
+}

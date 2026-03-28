@@ -1,0 +1,261 @@
+{
+  "feature_id": "ui-workflow-integration",
+  "title": "Workflow Actions Integration",
+  "type": "feature",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["ui-submit-review", "ui-approve", "ui-publish"],
+  "summary": {
+    "goal": "Integrate the existing WorkflowActions.tsx component into PlanEditorPage to connect the UI to the workflow API endpoints (submit, approve, publish)",
+    "context": "WorkflowActions.tsx exists with 170 lines of fully implemented UI (submit/approve/publish buttons, approval modal with approver name input, loading states, error handling, status display) but is never imported anywhere. The API client functions (submitVersion, approveVersion, publishVersion) also exist. This feature connects these existing pieces.",
+    "in_scope": [
+      "Import WorkflowActions into PlanEditorPage",
+      "Wire onSubmit/onApprove/onPublish callbacks to API functions",
+      "Update local version state after successful workflow transitions",
+      "Position WorkflowActions appropriately in the plan header area"
+    ],
+    "out_of_scope": [
+      "Modifying WorkflowActions.tsx component logic",
+      "Modifying backend API handlers",
+      "Adding new workflow states or transitions"
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "WorkflowActions component is imported and rendered in PlanEditorPage"
+      },
+      {
+        "id": "ac2",
+        "description": "Draft plans without submitted_at show 'Submit for Review' button"
+      },
+      {
+        "id": "ac3",
+        "description": "Submitted draft plans show 'Approve' button"
+      },
+      {
+        "id": "ac4",
+        "description": "Approved plans show 'Publish' button"
+      },
+      {
+        "id": "ac5",
+        "description": "Published plans show 'Published - Ready for Orchestrator' badge"
+      },
+      {
+        "id": "ac6",
+        "description": "Clicking Submit calls submitVersion API and updates version state"
+      },
+      {
+        "id": "ac7",
+        "description": "Clicking Approve opens modal, collects approver name, calls approveVersion API"
+      },
+      {
+        "id": "ac8",
+        "description": "Clicking Publish calls publishVersion API and updates version state"
+      },
+      {
+        "id": "ac9",
+        "description": "Approval info (approver name, timestamp) displays after approval"
+      },
+      {
+        "id": "ac10",
+        "description": "Error states from API failures are displayed to user"
+      }
+    ]
+  },
+  "design_spec": {
+    "views": [
+      {
+        "view_id": "v001",
+        "name": "WorkflowActions in Plan Header",
+        "layout": "Inside .plan-header-main, after .plan-meta. Vertical stack within header.",
+        "placement_rationale": "Header placement keeps actions visible without scrolling. Better than footer (requires scroll) or floating (conflicts with existing chat toggle at bottom-right).",
+        "elements": [
+          { "component": "div.workflow-status", "use": "Status display", "content": "Shows 'Status: DRAFT/APPROVED/PUBLISHED' with color coding" },
+          { "component": "div.workflow-buttons", "use": "Action row", "layout": "flex row with gap" },
+          { "component": "button.btn.btn-primary", "use": "Submit for Review", "condition": "status=draft AND !submitted_at" },
+          { "component": "button.btn.btn-success", "use": "Approve", "condition": "status=draft AND submitted_at" },
+          { "component": "button.btn.btn-primary", "use": "Publish", "condition": "status=approved" },
+          { "component": "span.workflow-published-badge", "use": "Published indicator", "condition": "status=published" },
+          { "component": "div.workflow-approval-info", "use": "Approval metadata", "condition": "version.approval_info exists" }
+        ],
+        "states": {
+          "loading": "Active button shows 'Submitting.../Approving.../Publishing...' and is disabled",
+          "error": "div.workflow-error shows inline error message above buttons",
+          "success": "Version state updates, button changes to next action"
+        }
+      },
+      {
+        "view_id": "v002",
+        "name": "Approval Modal",
+        "layout": "Centered modal (max-w 500px) with backdrop overlay",
+        "elements": [
+          { "component": "div.modal-overlay", "use": "Backdrop", "behavior": "Click to close" },
+          { "component": "div.modal", "use": "Modal card" },
+          { "component": "h3", "use": "Title", "content": "Approve Plan" },
+          { "component": "p", "use": "Description", "content": "By approving this plan, you confirm that the steps and acceptance criteria are correct and ready for execution." },
+          { "component": "div.form-group", "use": "Approver name input" },
+          { "component": "input[type=text]", "use": "Name field", "props": "placeholder='Enter your name'" },
+          { "component": "div.modal-actions", "use": "Button row", "layout": "flex row, justify-end" },
+          { "component": "button.btn.btn-secondary", "use": "Cancel", "behavior": "Closes modal" },
+          { "component": "button.btn.btn-success", "use": "Approve Plan", "behavior": "Calls onApprove(name)" }
+        ],
+        "states": {
+          "empty_name": "Approve button enabled but shows error on click if name empty",
+          "loading": "Approve button shows 'Approving...' and is disabled",
+          "error": "div.workflow-error shows error message in modal"
+        }
+      }
+    ],
+    "visual_hierarchy": {
+      "description": "Button prominence reflects workflow progression and accountability weight",
+      "buttons": [
+        { "action": "Submit for Review", "style": "btn-primary (blue)", "weight": "standard", "rationale": "Initiates review, not final" },
+        { "action": "Approve", "style": "btn-success (green)", "weight": "high", "rationale": "Accountability checkpoint, locks the plan - needs distinct color" },
+        { "action": "Publish", "style": "btn-primary (blue)", "weight": "standard", "rationale": "Final release, but approval was the key checkpoint" }
+      ]
+    },
+    "status_indicators": {
+      "draft": { "class": "status-draft", "color": "amber (#92400e on #fef3c7)" },
+      "draft_submitted": { "class": "status-draft + (submitted) suffix", "color": "amber with purple submitted badge" },
+      "approved": { "class": "status-approved", "color": "green (#166534)" },
+      "published": { "class": "status-published", "color": "blue (#1e40af on #dbeafe)" }
+    },
+    "custom_needed": []
+  },
+  "plan_implementation": {
+    "scopes": ["planner-ui"],
+    "design_reference": "design_spec.views[v001] for header placement, design_spec.visual_hierarchy for button styling",
+    "steps": [
+      {
+        "step_id": "uwi001",
+        "title": "Add WorkflowActions import and API imports to PlanEditorPage",
+        "scope": "planner-ui",
+        "description": "Import WorkflowActions from @/components and add submitVersion, approveVersion, publishVersion to API imports",
+        "dependencies": [],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "uwi001-ac1", "description": "WorkflowActions imported from '@/components/WorkflowActions'" },
+          { "id": "uwi001-ac2", "description": "submitVersion, approveVersion, publishVersion imported from '@/api'" }
+        ]
+      },
+      {
+        "step_id": "uwi002",
+        "title": "Create workflow handler callbacks",
+        "scope": "planner-ui",
+        "description": "Create handleSubmit, handleApprove, and handlePublish callbacks that call the API functions and update version state on success",
+        "dependencies": ["uwi001"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "uwi002-ac1", "description": "handleSubmit calls submitVersion(planId, version.version) and setVersion(result.version)" },
+          { "id": "uwi002-ac2", "description": "handleApprove(approver) calls approveVersion(planId, version.version, approver) and setVersion(result.version)" },
+          { "id": "uwi002-ac3", "description": "handlePublish calls publishVersion(planId, version.version) and setVersion(result.version)" },
+          { "id": "uwi002-ac4", "description": "All handlers use useCallback with proper dependencies [planId, version]" }
+        ]
+      },
+      {
+        "step_id": "uwi003",
+        "title": "Render WorkflowActions in plan header per design_spec.views[v001]",
+        "scope": "planner-ui",
+        "description": "Add WorkflowActions component inside .plan-header-main after .plan-meta (per design_spec.views[v001].layout). This header placement keeps actions visible without scrolling - better than footer (requires scroll) or floating (conflicts with chat toggle). Pass version and handler callbacks as props.",
+        "design_ref": "design_spec.views[v001]",
+        "dependencies": ["uwi002"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "uwi003-ac1", "description": "WorkflowActions rendered inside .plan-header-main div after .plan-meta (design_spec.views[v001].layout)" },
+          { "id": "uwi003-ac2", "description": "Props passed: version={version}, onSubmit={handleSubmit}, onApprove={handleApprove}, onPublish={handlePublish}" }
+        ]
+      },
+      {
+        "step_id": "uwi004",
+        "title": "Verify button styling matches design_spec.visual_hierarchy",
+        "scope": "planner-ui",
+        "description": "Verify WorkflowActions component uses correct button styling per design_spec.visual_hierarchy: Submit=btn-primary (blue), Approve=btn-success (green) for visual distinction as accountability checkpoint, Publish=btn-primary (blue). Also verify status color coding per design_spec.status_indicators.",
+        "design_ref": "design_spec.visual_hierarchy, design_spec.status_indicators",
+        "dependencies": ["uwi003"],
+        "owner_role": "frontend:QA",
+        "acceptance_criteria": [
+          { "id": "uwi004-ac1", "description": "Draft plan without submitted_at shows 'Submit for Review' button (btn-primary/blue)" },
+          { "id": "uwi004-ac2", "description": "Draft plan with submitted_at shows 'Approve' button (btn-success/green per visual_hierarchy)" },
+          { "id": "uwi004-ac3", "description": "Approved plan shows 'Publish' button (btn-primary/blue)" },
+          { "id": "uwi004-ac4", "description": "Published plan shows 'Published - Ready for Orchestrator' badge" },
+          { "id": "uwi004-ac5", "description": "Status indicators use correct colors: draft=amber, approved=green, published=blue (per status_indicators)" }
+        ]
+      },
+      {
+        "step_id": "uwi005",
+        "title": "Add unit tests for workflow integration",
+        "scope": "planner-ui",
+        "description": "Add tests verifying WorkflowActions integration. Tests should cover: header placement rendering, button visibility per status, API callback wiring, and modal behavior per design_spec.views[v002] (approval modal with approver name input).",
+        "design_ref": "design_spec.views[v001], design_spec.views[v002]",
+        "dependencies": ["uwi003"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "uwi005-ac1", "description": "Test: WorkflowActions renders in PlanEditorPage header (per v001 layout)" },
+          { "id": "uwi005-ac2", "description": "Test: Submit button calls submitVersion API" },
+          { "id": "uwi005-ac3", "description": "Test: Approve modal collects name and calls approveVersion API (per v002 modal design)" },
+          { "id": "uwi005-ac4", "description": "Test: Publish button calls publishVersion API" },
+          { "id": "uwi005-ac5", "description": "Test: Version state updates after successful transitions" }
+        ]
+      }
+    ]
+  },
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "rationale": "Tests WorkflowActions integration into PlanEditorPage. Focus on button visibility logic and API callback wiring - the two critical paths for this integration feature.",
+    "cases": [
+      {
+        "type": "happy",
+        "description": "Draft plan (no submitted_at) shows 'Submit for Review' button",
+        "verifies": ["ac2"]
+      },
+      {
+        "type": "happy",
+        "description": "Submitted draft plan shows 'Approve' button",
+        "verifies": ["ac3"]
+      },
+      {
+        "type": "happy",
+        "description": "Approved plan shows 'Publish' button",
+        "verifies": ["ac4"]
+      },
+      {
+        "type": "happy",
+        "description": "Published plan shows 'Published - Ready for Orchestrator' badge",
+        "verifies": ["ac5"]
+      },
+      {
+        "type": "happy",
+        "description": "Submit button click calls submitVersion API and updates version state",
+        "verifies": ["ac6"]
+      },
+      {
+        "type": "happy",
+        "description": "Approve button opens modal, collects name, calls approveVersion API",
+        "verifies": ["ac7"]
+      },
+      {
+        "type": "happy",
+        "description": "Publish button click calls publishVersion API and updates version state",
+        "verifies": ["ac8"]
+      },
+      {
+        "type": "error",
+        "description": "API failure on submit shows error message",
+        "verifies": ["ac10"]
+      },
+      {
+        "type": "error",
+        "description": "API failure on approve shows error message",
+        "verifies": ["ac10"]
+      }
+    ],
+    "data_requirements": [
+      "Mock PlanVersion objects with different statuses: draft (no submitted_at), draft (with submitted_at), approved, published",
+      "Mock API functions: submitVersion, approveVersion, publishVersion (success and failure variants)",
+      "getPlan mock returning test plan data"
+    ],
+    "test_file": "packages/planner-ui/src/pages/PlanEditorPage.test.tsx",
+    "notes": "WorkflowActions component already has internal loading/error handling. These tests verify the integration layer - that callbacks are wired correctly and version state updates after successful transitions."
+  }
+}

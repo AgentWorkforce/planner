@@ -1,0 +1,260 @@
+// Status enums and schemas
+export {
+  RunStatus,
+  RunStatusSchema,
+  TaskStatus,
+  TaskStatusSchema,
+  GateStatus,
+  GateStatusSchema,
+  ArtifactType,
+  ArtifactTypeSchema,
+  AttemptOutcome,
+  AttemptOutcomeSchema,
+  QuestionBlockingLevel,
+  QuestionBlockingLevelSchema,
+  QuestionStatus,
+  QuestionStatusSchema,
+  // Guardian status enums
+  GuardianConcernLevel,
+  GuardianConcernLevelSchema,
+  GuardianStatus,
+  GuardianStatusSchema,
+} from './types.js';
+
+// Entity schemas and types
+export {
+  AcceptanceCriterionSchema,
+  type AcceptanceCriterion,
+  GateConfigSchema,
+  type GateConfig,
+  ForgeStepSchema,
+  type ForgeStep,
+  ForgePlanSchema,
+  type ForgePlan,
+  RunSchema,
+  type Run,
+  TaskSchema,
+  type Task,
+  AuditFindingSchema,
+  type AuditFinding,
+  TaskAttemptSchema,
+  type TaskAttempt,
+  ArtifactSchema,
+  type Artifact,
+  GateSchema,
+  type Gate,
+  QuestionSchema,
+  type Question,
+  TaskSnapshotSchema,
+  type TaskSnapshot,
+  CheckpointSnapshotSchema,
+  type CheckpointSnapshot,
+  CheckpointSchema,
+  type Checkpoint,
+  type CreateCheckpointOptions,
+  TrajectoryEventSchema,
+  type TrajectoryEvent,
+  WorkspaceCleanupSchema,
+  type WorkspaceCleanup,
+  // Guardian types
+  GuardianEventSchema,
+  type GuardianEvent,
+  ActiveGuardianSchema,
+  type ActiveGuardian,
+} from './types.js';
+
+// Factory functions
+export {
+  createRun,
+  createTask,
+  createTaskAttempt,
+  createArtifact,
+  createGate,
+  createQuestion,
+  createCheckpoint,
+  createTrajectoryEvent,
+  // Guardian factory functions
+  createGuardianEvent,
+  type CreateGuardianEventOptions,
+  createActiveGuardian,
+  type CreateQuestionOptions,
+  BLOCKING_LEVEL_VALUES,
+  calculateQuestionPriorityScore,
+} from './types.js';
+
+// State transition validators
+export {
+  VALID_RUN_TRANSITIONS,
+  VALID_TASK_TRANSITIONS,
+  validateRunTransition,
+  validateTaskTransition,
+  transitionRun,
+  transitionTask,
+} from './types.js';
+
+// Trajectory event types and schemas
+export {
+  TrajectoryEventType,
+  TrajectoryEventTypeSchema,
+  TrajectoryPayloadSchemas,
+  validateTrajectoryPayload,
+  safeValidateTrajectoryPayload,
+  // Run event payloads
+  RunStartedPayloadSchema,
+  type RunStartedPayload,
+  RunCompletedPayloadSchema,
+  type RunCompletedPayload,
+  RunFailedPayloadSchema,
+  type RunFailedPayload,
+  RunPausedPayloadSchema,
+  type RunPausedPayload,
+  RunCancelledPayloadSchema,
+  type RunCancelledPayload,
+  RunResumedPayloadSchema,
+  type RunResumedPayload,
+  // Task event payloads
+  TaskStartedPayloadSchema,
+  type TaskStartedPayload,
+  TaskCompletedPayloadSchema,
+  type TaskCompletedPayload,
+  TaskFailedPayloadSchema,
+  type TaskFailedPayload,
+  TaskBlockedPayloadSchema,
+  type TaskBlockedPayload,
+  TaskQueuedPayloadSchema,
+  type TaskQueuedPayload,
+  TaskRetryingPayloadSchema,
+  type TaskRetryingPayload,
+  // Agent event payloads
+  AgentSpawnedPayloadSchema,
+  type AgentSpawnedPayload,
+  AgentProgressPayloadSchema,
+  type AgentProgressPayload,
+  AgentToolCallPayloadSchema,
+  type AgentToolCallPayload,
+  AgentExitedPayloadSchema,
+  type AgentExitedPayload,
+  // Gate event payloads
+  GateReachedPayloadSchema,
+  type GateReachedPayload,
+  GateApprovedPayloadSchema,
+  type GateApprovedPayload,
+  GateRejectedPayloadSchema,
+  type GateRejectedPayload,
+  // Question event payloads
+  HumanInputRequestedPayloadSchema,
+  type HumanInputRequestedPayload,
+  QuestionAnsweredPayloadSchema,
+  type QuestionAnsweredPayload,
+  QuestionDismissedPayloadSchema,
+  type QuestionDismissedPayload,
+  QuestionAutoAnsweredPayloadSchema,
+  type QuestionAutoAnsweredPayload,
+  QuestionAutoDefaultedPayloadSchema,
+  type QuestionAutoDefaultedPayload,
+  QuestionSubscriberAddedPayloadSchema,
+  type QuestionSubscriberAddedPayload,
+  // Audit event payloads
+  AuditStartedPayloadSchema,
+  type AuditStartedPayload,
+  AuditCompletedPayloadSchema,
+  type AuditCompletedPayload,
+  // Decision and checkpoint payloads
+  DecisionRecordedPayloadSchema,
+  type DecisionRecordedPayload,
+  CheckpointCreatedPayloadSchema,
+  type CheckpointCreatedPayload,
+  // AC Audit event payloads
+  RunAcAuditStartedPayloadSchema,
+  type RunAcAuditStartedPayload,
+  RunAcAuditCompletedPayloadSchema,
+  type RunAcAuditCompletedPayload,
+} from './trajectory-events.js';
+
+// User trajectory types and schemas
+export {
+  UserTrajectoryScope,
+  UserTrajectoryScopeSchema,
+  UserTrajectoryEventSchema,
+  type UserTrajectoryEvent,
+  DerivedPreferenceSchema,
+  type DerivedPreference,
+  SimilarQuestionResultSchema,
+  type SimilarQuestionResult,
+  // Factory functions
+  calculateConfidence,
+  createUserTrajectoryEvent,
+  type CreateUserTrajectoryEventOptions,
+  createDerivedPreference,
+  type CreateDerivedPreferenceOptions,
+  updatePreferenceWithEvidence,
+  overridePreference,
+  // Similarity helpers
+  levenshteinDistance,
+  calculateTextSimilarity,
+  extractTrigrams,
+  trigramSimilarity,
+  combinedTextSimilarity,
+  // Constants
+  PREFERENCE_CONFIDENCE_THRESHOLD,
+  DEFAULT_SIMILARITY_THRESHOLD,
+  MIN_EVIDENCE_FOR_PREFERENCE,
+} from './user-trajectory.js';
+
+// Retrospective types and schemas
+export {
+  // Schemas
+  RetrospectiveDecisionSchema,
+  type RetrospectiveDecision,
+  RetrospectiveSchema,
+  type Retrospective,
+  LinkedRetrospectiveDecisionSchema,
+  type LinkedRetrospectiveDecision,
+  LinkedRetrospectiveSchema,
+  type LinkedRetrospective,
+  // Event payload schemas
+  RetrospectiveRecordedPayloadSchema,
+  type RetrospectiveRecordedPayload,
+  RetrospectiveTimeoutPayloadSchema,
+  type RetrospectiveTimeoutPayload,
+  RetrospectiveParseErrorPayloadSchema,
+  type RetrospectiveParseErrorPayload,
+  RetrospectiveValidationErrorPayloadSchema,
+  type RetrospectiveValidationErrorPayload,
+  // Event types
+  RetrospectiveEventType,
+  // Result types
+  type RetrospectiveResult,
+  type RetrospectiveSuccess,
+  type RetrospectiveTimeoutResult,
+  type RetrospectiveParseErrorResult,
+  type RetrospectiveValidationErrorResult,
+  // Type guards
+  isRetrospectiveSuccess,
+  isRetrospectiveTimeout,
+  isRetrospectiveParseError,
+  isRetrospectiveValidationError,
+} from './retrospective.js';
+
+// Build domain types and schemas
+export {
+  BuildStatus,
+  BuildStatusSchema,
+  BuildRunStatus,
+  BuildRunStatusSchema,
+  VALID_BUILD_TRANSITIONS,
+  validateBuildTransition,
+  ForgeExecutionModeSchema,
+  BuildTierSchema,
+  type BuildTier,
+  BuildRequestSchema,
+  type BuildRequest,
+  BuildSchema,
+  type Build,
+  BuildRunSchema,
+  type BuildRun,
+  // Build factory functions
+  createBuild,
+  createBuildRun,
+  type CreateBuildRunOptions,
+} from './build-types.js';

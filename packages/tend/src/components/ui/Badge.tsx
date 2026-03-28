@@ -1,0 +1,47 @@
+import { HTMLAttributes } from 'react';
+
+export type BadgeVariant =
+  | 'default'
+  | 'active'
+  | 'abandoned'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'info';
+
+interface BadgeProps extends HTMLAttributes<HTMLElement> {
+  variant?: BadgeVariant;
+  as?: 'span' | 'button';
+}
+
+const variantClasses: Record<BadgeVariant, string> = {
+  default: 'bg-bg-tertiary text-text-secondary',
+  active: 'bg-accent-cyan/10 text-accent-cyan',
+  abandoned: 'bg-bg-tertiary text-text-muted',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  error: 'bg-error/10 text-error',
+  info: 'bg-accent-cyan/10 text-accent-cyan',
+};
+
+export function Badge({
+  variant = 'default',
+  as = 'span',
+  className = '',
+  children,
+  ...props
+}: BadgeProps) {
+  const baseClasses =
+    'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide';
+
+  const Component = as;
+
+  return (
+    <Component
+      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
+      {...props}
+    >
+      {children}
+    </Component>
+  );
+}

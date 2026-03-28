@@ -1,0 +1,389 @@
+---
+name: flow-schema
+description: Data structures for flow skills. Defines catalog.json and feature file formats. Reference skill - not user-invocable.
+user-invocable: false
+---
+# Flow Schema
+
+Defines the data structure used by all flow-* skills.
+
+## File Structure
+
+```
+docs/flow/
+├── catalog.json              # Project index
+└── features/
+    └── <slug>.json           # Feature file (epic or leaf)
+```
+
+## Catalog
+
+```json
+{
+  "project_id": "my-project",
+  "status": "draft|approved|published",
+
+  "components": [
+    {
+      "id": "component-id",
+      "name": "Human-readable name",
+      "tech": ["Technology", "Framework"],
+      "path": "src/path/",
+      "description": "What this component does"
+    }
+  ],
+
+  "design_system": {
+    "feel": "professional, minimal",
+    "library": {
+      "name": "shadcn/ui",
+      "docs": "https://ui.shadcn.com"
+    },
+    "patterns": {
+      "forms": "vertical stack, FormField per input",
+      "lists": "Card-based or Table for dense data",
+      "loading": "Skeleton matching content shape",
+      "errors": "inline FormMessage, Toast for actions",
+      "empty": "centered message with action"
+    }
+  },
+
+  "features": [
+    { "id": "auth", "title": "Authentication", "type": "epic", "status": "approved" },
+    { "id": "settings", "title": "User Settings", "type": "feature", "status": "draft" }
+  ]
+}
+```
+
+### Component Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | Yes | Slug used in `plan_implementation.scopes` |
+| `name` | Yes | Human-readable name |
+| `tech` | No | Array of technologies/frameworks |
+| `path` | No | Root path in repo (for discovery) |
+| `description` | No | What this component does |
+
+## Feature
+
+```json
+{
+  "feature_id": "auth",
+  "title": "Authentication",
+  "type": "epic|feature",
+  "status": "draft|approved|implemented|verified|published|deprecated",
+  "priority": "critical|high|medium|low",
+  "dependencies": ["other-feature-id"],
+
+  "summary": {
+    "goal": "What this feature achieves",
+    "context": "Optional background",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Checkable outcome" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": ["Uses repository pattern", "SQLite for storage"],
+      "keywords": ["CRUD", "REST", "validation"],
+      "questions": ["Should we add caching?"],
+      "concerns": ["N+1 query potential"],
+      "references": ["src/storage/sqlite.ts"],
+      "confidence": "exploring|forming|confident"
+    },
+    "designer": { },
+    "tester": { },
+    "security": { }
+  },
+
+  "context": {
+    "designer": {
+      "library": "shadcn/ui",
+      "theme": "dark mode",
+      "patterns": "card-based lists"
+    },
+    "architect": {
+      "tech_stack": "TypeScript, Express, SQLite",
+      "api_style": "REST with Zod validation",
+      "storage": "JSONB for nested data"
+    }
+  },
+
+  "design_spec": {
+    "views": [
+      {
+        "view_id": "v001",
+        "name": "Login",
+        "layout": "centered Card, max-w-md",
+        "elements": [
+          { "component": "Input", "use": "email", "props": "type=email" },
+          { "component": "Button", "use": "submit", "props": "variant=default size=lg" }
+        ],
+        "states": {
+          "loading": "Button disabled with Loader2 spinning",
+          "error": "FormMessage below invalid field"
+        }
+      }
+    ],
+    "custom_needed": ["PasswordInput - Input with visibility toggle"]
+  },
+
+  "user_flow": {
+    "steps": [
+      {
+        "step_id": "s001",
+        "title": "[action|assert|system] Description",
+        "description": "Detailed instruction or expected outcome"
+      }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["backend", "frontend"],
+    "steps": [
+      {
+        "step_id": "i001",
+        "title": "Step title",
+        "scope": "backend",
+        "description": "What to do",
+        "dependencies": ["i000"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [{ "id": "ac1", "description": "..." }],
+        "gate": { "type": "human_approval", "approver_role": "tech-lead" },
+        "specification": {
+          "architecture": {
+            "pattern": "middleware chain",
+            "tech": "express-jwt"
+          },
+          "security": {
+            "auth_method": "JWT",
+            "token_expiry": "1h"
+          }
+        }
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "e2e|integration|unit",
+    "priority": "critical|high|medium|low",
+    "cases": [
+      { "type": "happy|edge|error", "description": "Test case" }
+    ],
+    "data_requirements": ["Test accounts", "Seed data"]
+  },
+
+  "validation_uiux": {
+    "env": "local|staging|prod",
+    "viewport": "desktop|mobile|both",
+    "steps": [
+      {
+        "step_id": "s001",
+        "present": "pass|fail|unknown",
+        "designed": "pass|fail|unknown",
+        "holistic": "pass|fail|unknown",
+        "issues": [{ "severity": "blocker|major|minor", "issue": "...", "fix": "..." }]
+      }
+    ],
+    "summary": {
+      "present": "pass|fail|unknown",
+      "designed": "pass|fail|unknown",
+      "holistic": "pass|fail|unknown",
+      "blockers": 0,
+      "majors": 0,
+      "minors": 0
+    }
+  },
+
+  "audit": {
+    "last_run": "2026-01-29",
+    "result": "pass|partial|fail",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied|partial|missing", "evidence": "file:line or note" }
+    ],
+    "drift": [
+      { "finding": "Undocumented functionality", "file": "path", "action": "document or remove" }
+    ]
+  },
+
+  "references": [
+    { "type": "prd", "title": "Auth PRD v2", "url": "https://..." },
+    { "type": "design", "title": "Login Figma", "url": "https://..." },
+    { "type": "spec", "title": "OAuth Integration", "path": "docs/oauth-spec.md" }
+  ],
+
+  "sub_features": [
+    { "feature_id": "auth-login", "title": "Login", "type": "feature" },
+    { "feature_id": "auth-reset", "ref": "auth-reset.json" }
+  ]
+}
+```
+
+## Section Ownership
+
+| Section | Skill | Purpose |
+|---------|-------|---------|
+| `summary` | flow-brainstorm/flow-discover | What the feature is |
+| `understanding` | Any agent (as needed) | Agent observations during ideation |
+| `context` | Any agent (as needed) | Formalized decisions by role |
+| `design_spec` | flow-ui-ux-designer | How it looks (views, components) |
+| `user_flow` | flow-feature | How it behaves (for testing) |
+| `plan_implementation` | flow-planner | How to build it (steps + specification) |
+| `plan_tests` | flow-test-designer | Test design/coverage |
+| `validation_uiux` | flow-ui-ux-validation | UI/UX validation results |
+| `audit` | flow-audit | Implementation verification |
+| `references` | Any | Links to external docs |
+| `sub_features` | Any | Nested features (inline or ref) |
+
+Note: `catalog.design_system` is owned by flow-ui-ux-designer (project-level).
+
+## Understanding
+
+Agent observations during ideation, keyed by role. Agents add their observations as needed.
+
+```json
+"understanding": {
+  "<role>": {
+    "observations": ["string"],
+    "keywords": ["string"],
+    "questions": ["string"],
+    "concerns": ["string"],
+    "references": ["string"],
+    "confidence": "exploring|forming|confident"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `observations` | string[] | What the agent noticed |
+| `keywords` | string[] | Key terms/concepts |
+| `questions` | string[] | Open questions to resolve |
+| `concerns` | string[] | Risks or issues identified |
+| `references` | string[] | Files/docs referenced |
+| `confidence` | enum | How confident the agent is |
+
+**Common roles**: architect, designer, tester, security, modeler
+
+**Confidence levels**:
+- `exploring` - Still gathering information
+- `forming` - Initial understanding taking shape
+- `confident` - Clear understanding established
+
+## Context
+
+Formalized decisions by role. Freeform key-value pairs - any field allowed.
+
+```json
+"context": {
+  "<role>": {
+    "<key>": "<value>",
+    ...
+  }
+}
+```
+
+**Suggested fields by role**:
+
+| Role | Suggested Fields |
+|------|------------------|
+| designer | library, theme, typography, patterns, icons |
+| architect | tech_stack, api_style, storage, boundaries |
+| modeler | approach, entities, relationships, conventions, migrations |
+| tester | framework, coverage_target, strategy, test_data |
+| security | auth, compliance, data_handling |
+
+Note: `catalog.design_system` provides project-level design context. Feature-level `context.designer` can override or extend for specific features.
+
+## Specification (Step-Level)
+
+Per-step domain specifications in `plan_implementation.steps[].specification`. Freeform - any domain, any fields.
+
+```json
+"specification": {
+  "<domain>": {
+    "<key>": "<value>",
+    ...
+  }
+}
+```
+
+**Suggested domains**: architecture, design, model, testing, security
+
+**Example**:
+```json
+"specification": {
+  "architecture": {
+    "pattern": "repository",
+    "tech": "better-sqlite3"
+  },
+  "design": {
+    "component": "Card",
+    "variants": "default, outline"
+  },
+  "security": {
+    "auth_required": true,
+    "permissions": ["admin", "user"]
+  }
+}
+```
+
+## Status Semantics
+
+| Status | Meaning |
+|--------|---------|
+| `draft` | Incomplete or unclear |
+| `approved` | Stable enough to implement/test |
+| `implemented` | Code complete (claimed) |
+| `verified` | Code verified against docs (by flow-audit) |
+| `published` | Validated baseline |
+| `deprecated` | Intentionally removed |
+
+## Type Semantics
+
+| Type | Meaning |
+|------|---------|
+| `epic` | Container for sub-features |
+| `feature` | Leaf feature with actual content |
+
+## Feature DAG
+
+Features form a dependency graph (DAG) via the `dependencies` array:
+- Features with no dependencies (or all dependencies complete) are **unblocked**
+- Use `priority` to rank unblocked features
+- `/flow` uses this to suggest which feature to work on next
+
+Work order: highest priority unblocked feature first.
+
+## Nesting Rule
+
+- **Inline** sub-feature if anticipated complexity is low (simple flow, few implementation steps)
+- **Separate file** if complex (multi-path flows, multiple scopes, high-risk)
+- Use `"ref": "filename.json"` for separate files
+
+## Step Tags (user_flow)
+
+| Tag | Meaning |
+|-----|---------|
+| `[action]` | User action |
+| `[assert]` | Observable assertion |
+| `[system]` | System side-effect (verified via later assert) |
+
+## References
+
+External documents linked at feature level:
+
+| Type | Use for |
+|------|---------|
+| `prd` | Product requirements document |
+| `design` | Figma, Sketch, design files |
+| `spec` | Technical specification |
+| `api` | API documentation |
+| `doc` | General documentation |
+
+Each reference has:
+- `type`: category (above)
+- `title`: human-readable name
+- `url` or `path`: external URL or local file path

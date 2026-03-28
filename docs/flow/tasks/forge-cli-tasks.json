@@ -1,0 +1,346 @@
+{
+  "feature_id": "forge-cli",
+  "generated_at": "2025-02-03",
+  "tasks": [
+    {
+      "task_id": "fc-s1-task",
+      "step_id": "fc-s1",
+      "title": "Set up CLI framework",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review commander.js documentation",
+            "Review context.architect for CLI structure"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Create packages/forge-core/src/cli/index.ts",
+            "Use commander.js for command parsing",
+            "Global --api-url and --format flags",
+            "Configurable via FORGE_API_URL env var"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test CLI framework initialization",
+            "Verify global flags work"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for CLI framework"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s1"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s2-task",
+      "step_id": "fc-s2",
+      "title": "Create API client for CLI",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review Forge API endpoints",
+            "Understand error handling requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "ForgeApiClient class with all API methods",
+            "Configurable base URL",
+            "Error handling with descriptive messages"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test API client methods",
+            "Verify error messages are helpful"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for ForgeApiClient"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s2"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s3-task",
+      "step_id": "fc-s3",
+      "title": "Implement run commands",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review run API endpoints",
+            "Review specification.output for display format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "forge run start <plan.json> - POST /runs with ForgePlan",
+            "forge run list - GET /runs, display as table",
+            "forge run status <run_id> - GET /runs/:id, show tasks",
+            "forge run pause/resume/cancel - POST /runs/:id/pause etc."
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all run commands",
+            "Verify output format"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "CLI tests for run commands"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s3"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s4-task",
+      "step_id": "fc-s4",
+      "title": "Implement trajectory commands",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review trajectory API endpoints",
+            "Review specification.output for display format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "forge trajectory show <run_id> - GET /runs/:id/trajectory",
+            "forge trajectory show <run_id> <task_id> - filter by task",
+            "forge trajectory export <run_id> --format json|markdown",
+            "forge trajectory decisions <run_id> - filter to decision_recorded events"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all trajectory commands",
+            "Verify export formats"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "CLI tests for trajectory commands"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s4"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s5-task",
+      "step_id": "fc-s5",
+      "title": "Implement gate commands",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review gate API endpoints",
+            "Review specification.output for display format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "forge gate list - GET /gates/pending",
+            "forge gate approve <task_id> [--comment '...'] - POST /gates/:taskId/approve",
+            "forge gate reject <task_id> --reason '...' - POST /gates/:taskId/reject"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all gate commands",
+            "Verify output format"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "CLI tests for gate commands"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s5"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s6-task",
+      "step_id": "fc-s6",
+      "title": "Implement question commands",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review question API endpoints",
+            "Review specification.output for display format"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "forge question list - GET /questions/pending",
+            "forge question answer <question_id> <answer> - POST /questions/:id/answer",
+            "Interactive mode: prompt for answer if not provided"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all question commands",
+            "Test interactive mode"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "CLI tests for question commands"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s6"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s7-task",
+      "step_id": "fc-s7",
+      "title": "Add output formatting",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review cli-table3 documentation",
+            "Understand format flag requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "Table format using cli-table3 or similar",
+            "JSON format (raw API response)",
+            "Markdown format for trajectory export",
+            "--format flag on all commands"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test all output formats",
+            "Verify format flag works"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "Unit tests for output formatting"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s7"
+          ]
+        }
+      }
+    },
+    {
+      "task_id": "fc-s8-task",
+      "step_id": "fc-s8",
+      "title": "Create package binary",
+      "status": "pending",
+      "checkpoints": {
+        "PRE": {
+          "status": "pending",
+          "checklist": [
+            "Review package.json bin configuration",
+            "Understand npx execution requirements"
+          ]
+        },
+        "IMPL": {
+          "status": "pending",
+          "checklist": [
+            "bin/forge entry point in package.json",
+            "npx forge works after npm install",
+            "--help shows all commands and options"
+          ]
+        },
+        "POST": {
+          "status": "pending",
+          "checklist": [
+            "Test npx forge execution",
+            "Verify --help output"
+          ]
+        },
+        "VERIFY": {
+          "status": "pending",
+          "checklist": [
+            "E2E tests for CLI binary"
+          ]
+        },
+        "DOC": {
+          "status": "pending",
+          "checklist": [
+            "Compare to plan step fc-s8"
+          ]
+        }
+      }
+    }
+  ]
+}

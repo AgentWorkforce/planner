@@ -1,0 +1,197 @@
+{
+  "feature_id": "mull-cli",
+  "title": "CLI Interface",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["mull-pipeline"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement the mull CLI entry point (src/cli.ts) using commander. This is the user-facing interface for standalone use. Supports: mull <session-id> (process one session), mull --all (process all unprocessed), mull --source <type> --dir <path> (specific adapter), mull --dry-run (preview without writing), mull --force (ignore cursor), mull --memory-dir <path> (output location). CLI handles config file loading, adapter instantiation from flags, progress output, and exit codes.",
+    "acceptance_criteria": [
+      { "id": "mcli-ac1", "description": "mull <session-id> processes a specific session through the full pipeline" },
+      { "id": "mcli-ac2", "description": "mull --all processes all unprocessed sessions from configured adapters" },
+      { "id": "mcli-ac3", "description": "mull --source trajectory --dir .trajectories/ creates trajectory adapter from CLI flags" },
+      { "id": "mcli-ac4", "description": "mull --source relay --dir .agent-relay/messages/ creates relay-JSONL adapter from CLI flags" },
+      { "id": "mcli-ac5", "description": "mull --source transcript --path ./logs/ creates transcript adapter from CLI flags" },
+      { "id": "mcli-ac6", "description": "mull --dry-run shows: entities found, facts extracted, topic matches, would-be nuggets — without writing" },
+      { "id": "mcli-ac7", "description": "mull --force re-processes session ignoring existing cursor" },
+      { "id": "mcli-ac8", "description": "mull --memory-dir ./memory specifies output directory" },
+      { "id": "mcli-ac9", "description": "Config loaded from: mull.config.json in cwd, then package.json mull key, then CLI flags override" },
+      { "id": "mcli-ac10", "description": "Progress output: shows session being processed, entities found, nuggets extracted, topics updated" },
+      { "id": "mcli-ac11", "description": "Exit codes: 0 = success, 1 = error, 2 = no sessions to process" },
+      { "id": "mcli-ac12", "description": "mull --help shows usage with all options documented" },
+      { "id": "mcli-ac13", "description": "bin entry in package.json: 'mull' → src/cli.ts (via tsx or compiled)" }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "CLI is a thin wrapper around the pipeline orchestrator — all logic lives in mull() and mullAll()",
+        "commander handles arg parsing, config loading happens in the CLI layer before calling pipeline",
+        "Progress output should be clean for human consumption: not too verbose, shows what matters",
+        "bin entry makes it runnable as npx mull or global install",
+        "CLI flag → adapter mapping: --source + --dir creates the right adapter type"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-cli",
+    "version": 1,
+    "status": "verified",
+    "scopes": [
+      {
+        "scope_id": "mull-cli-core",
+        "name": "CLI Core",
+        "description": "Commander setup, argument parsing, config loading, adapter instantiation"
+      },
+      {
+        "scope_id": "mull-cli-output",
+        "name": "CLI Output",
+        "description": "Progress display, dry-run output, exit code handling"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mcli-s1",
+        "title": "Set up commander program with commands and options",
+        "scope": "mull-cli-core",
+        "description": "Set up the CLI entry point using commander. Define the main program with version, description, and global options. Register 'mull <session-id>' as the default command and 'mull --all' as the batch mode. Register all options: --source <type>, --dir <path>, --path <path>, --dry-run, --force, --memory-dir <path>, --format <format> (for transcript adapter). Add --help with all options documented. Set up bin entry in package.json.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s1-ac1", "description": "commander program defined with name, version, description" },
+          { "id": "mcli-s1-ac2", "description": "Default command: mull <session-id> with session-id as argument" },
+          { "id": "mcli-s1-ac3", "description": "Options: --all, --source, --dir, --path, --dry-run, --force, --memory-dir, --format" },
+          { "id": "mcli-s1-ac4", "description": "--help shows usage with all options documented" },
+          { "id": "mcli-s1-ac5", "description": "bin entry in package.json maps 'mull' to src/cli.ts" }
+        ],
+        "specification": "Location: src/cli.ts. Use commander's program.argument('[session-id]') for optional positional. Options use .option() with descriptions. --source accepts 'trajectory' | 'relay' | 'transcript'. --format accepts 'markdown' | 'jsonl' | 'plaintext' (only relevant when --source=transcript). Add #!/usr/bin/env tsx shebang. package.json: { \"bin\": { \"mull\": \"./src/cli.ts\" } }."
+      },
+      {
+        "step_id": "mcli-s2",
+        "title": "Implement config file loading and adapter instantiation from flags",
+        "scope": "mull-cli-core",
+        "description": "Build the CLI-to-pipeline bridge: load config from mull.config.json and package.json, then overlay CLI flags. Instantiate adapters from --source/--dir/--path flags using createAdapter factory. Map CLI flags to MullOpts: --dry-run to dryRun, --force to force, --memory-dir to memoryDir. When no --source is specified and no config file exists, default to trajectory adapter with dir='.trajectories/'.",
+        "dependencies": ["mcli-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s2-ac1", "description": "Loads mull.config.json from cwd if present" },
+          { "id": "mcli-s2-ac2", "description": "Loads package.json 'mull' key if present" },
+          { "id": "mcli-s2-ac3", "description": "CLI flags override config file values" },
+          { "id": "mcli-s2-ac4", "description": "--source trajectory --dir X creates TrajectoryAdapter with dir=X" },
+          { "id": "mcli-s2-ac5", "description": "--source relay --dir X creates RelayJsonlAdapter with dir=X" },
+          { "id": "mcli-s2-ac6", "description": "--source transcript --path X --format Y creates TranscriptAdapter with path=X, format=Y" },
+          { "id": "mcli-s2-ac7", "description": "Zero-config default: trajectory adapter with .trajectories/ when no flags or config" }
+        ],
+        "specification": "Location: src/cli.ts (inline) or src/cli-config.ts. Use resolveConfig() from pipeline module, then overlay CLI-specific flags. Create adapters via createAdapter(source, { dir, path, format }). Validate that --source transcript requires --format (error if missing)."
+      },
+      {
+        "step_id": "mcli-s3",
+        "title": "Implement mull command (single session)",
+        "scope": "mull-cli-core",
+        "description": "Implement the default command handler: when session-id is provided, call mull(sessionId, opts) from the pipeline module. Display progress during processing. On success, display summary (entities found, nuggets extracted, topics updated/created). On error, display error message and exit with code 1.",
+        "dependencies": ["mcli-s1", "mcli-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s3-ac1", "description": "Calls mull(sessionId, opts) from pipeline module" },
+          { "id": "mcli-s3-ac2", "description": "Displays progress: 'Processing session {id}...'" },
+          { "id": "mcli-s3-ac3", "description": "On success: displays summary with nuggets written, topics updated/created" },
+          { "id": "mcli-s3-ac4", "description": "On error: displays error message, exits with code 1" }
+        ],
+        "specification": "Location: src/cli.ts action handler. Use process.stdout.write for progress (no newline until complete). Summary format: 'Done: {n} nuggets written to {t} topics ({c} new)'. Error format: 'Error: {message}'. Use process.exit(1) for errors."
+      },
+      {
+        "step_id": "mcli-s4",
+        "title": "Implement mullAll command (batch mode)",
+        "scope": "mull-cli-core",
+        "description": "Implement the --all flag handler: call mullAll(opts) from the pipeline module. Display per-session progress as each session is processed. On completion, display aggregate summary. If no sessions to process, display message and exit with code 2. Handle partial failures (some sessions succeed, some fail) with appropriate reporting.",
+        "dependencies": ["mcli-s1", "mcli-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s4-ac1", "description": "Calls mullAll(opts) from pipeline module when --all flag is set" },
+          { "id": "mcli-s4-ac2", "description": "Displays per-session progress: 'Processing {id} ({n}/{total})...'" },
+          { "id": "mcli-s4-ac3", "description": "On completion: displays aggregate summary (total sessions, nuggets, topics)" },
+          { "id": "mcli-s4-ac4", "description": "No sessions to process: displays message, exits with code 2" },
+          { "id": "mcli-s4-ac5", "description": "Partial failure: reports which sessions failed, still exits 0 if any succeeded" }
+        ],
+        "specification": "Location: src/cli.ts action handler. Check opts.all flag in action. Aggregate format: 'Processed {n} sessions: {nuggets} nuggets across {topics} topics'. For failures: 'Failed: {sessionId} - {error}' per failed session. Exit 2 only when mullAll returns 0 processed + 0 failed (truly nothing to do)."
+      },
+      {
+        "step_id": "mcli-s5",
+        "title": "Implement dry-run output display",
+        "scope": "mull-cli-output",
+        "description": "Implement the dry-run output display: when --dry-run is set, show detailed extraction and synthesis results without writing files. Display: entities found (grouped by type), facts extracted (with pre-structured flag), topic matches (with confidence scores), would-be nuggets (with category and topic assignment). Format for human readability with indentation and grouping.",
+        "dependencies": ["mcli-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s5-ac1", "description": "Shows entities found grouped by type (keyword, tech, filepath, function, noun)" },
+          { "id": "mcli-s5-ac2", "description": "Shows facts extracted with pre-structured flag indicated" },
+          { "id": "mcli-s5-ac3", "description": "Shows topic matches with confidence scores and isNew flags" },
+          { "id": "mcli-s5-ac4", "description": "Shows would-be nuggets with category and topic assignment" },
+          { "id": "mcli-s5-ac5", "description": "Clearly indicates no files were written: '[DRY RUN] No files written'" }
+        ],
+        "specification": "Location: src/cli.ts or src/cli-display.ts. Use console.log with formatted output. Group entities: '  Keywords: oauth, pkce, ...\\n  Tech: SQLite, TypeScript, ...'. Facts: '  [pre-structured] Decision: Use OAuth PKCE flow\\n  Tool call: fs.writeFileSync...'. Topics: '  auth-oauth (0.85) ✓\\n  new-topic (NEW)'. Nuggets: '  [decision] use-oauth-pkce → auth-oauth'."
+      },
+      {
+        "step_id": "mcli-s6",
+        "title": "Implement progress output and exit codes",
+        "scope": "mull-cli-output",
+        "description": "Implement clean progress output for human consumption during pipeline execution. Show: session being processed, stage progression (loading, extracting, synthesizing, merging), per-stage counts. Implement exit codes: 0 for success, 1 for error, 2 for no sessions to process. Ensure output is clean (no debug noise) and informative.",
+        "dependencies": ["mcli-s3", "mcli-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s6-ac1", "description": "Shows session being processed with clear stage indicators" },
+          { "id": "mcli-s6-ac2", "description": "Stage progression: Loading → Extracting → Synthesizing → Merging → Done" },
+          { "id": "mcli-s6-ac3", "description": "Per-stage counts: entities found, facts extracted, nuggets synthesized, topics updated" },
+          { "id": "mcli-s6-ac4", "description": "Exit code 0 on success" },
+          { "id": "mcli-s6-ac5", "description": "Exit code 1 on error" },
+          { "id": "mcli-s6-ac6", "description": "Exit code 2 when no sessions to process" }
+        ],
+        "specification": "Location: src/cli.ts. Use process.stdout.write for inline progress updates (overwrite with \\r for stage changes). Final summary on new line. Format: '  Loading session abc123... ✓\\n  Extracting: 15 entities, 8 facts ✓\\n  Synthesizing: 5 nuggets ✓\\n  Merging: 3 topics (1 new) ✓'. process.exitCode for clean exit."
+      },
+      {
+        "step_id": "mcli-s7",
+        "title": "Write CLI tests",
+        "scope": "mull-cli-core",
+        "description": "Test suite for the CLI interface. Tests: argument parsing (session-id, --all, --source, --dir, --path, --format, --dry-run, --force, --memory-dir), config file loading precedence, adapter instantiation from flags, exit codes (0, 1, 2), dry-run output format, progress output format, error display. Use commander's parseAsync with mock argv.",
+        "dependencies": ["mcli-s1", "mcli-s2", "mcli-s3", "mcli-s4", "mcli-s5", "mcli-s6"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mcli-s7-ac1", "description": "Argument parsing tests: all flags parsed correctly into opts" },
+          { "id": "mcli-s7-ac2", "description": "Config loading tests: config file + CLI flags merged with correct precedence" },
+          { "id": "mcli-s7-ac3", "description": "Adapter instantiation tests: --source/--dir/--path create correct adapter types" },
+          { "id": "mcli-s7-ac4", "description": "Exit code tests: 0 on success, 1 on error, 2 on no sessions" },
+          { "id": "mcli-s7-ac5", "description": "Dry-run output test: entities, facts, topics, nuggets displayed, no files written" },
+          { "id": "mcli-s7-ac6", "description": "Error display test: error message shown, exit code 1" }
+        ],
+        "specification": "Location: src/__tests__/cli.test.ts. Use Vitest. Mock mull() and mullAll() from pipeline module. Use commander's .parseAsync(['node', 'mull', ...args]) for argument testing. Capture console.log output via vi.spyOn. Mock process.exit to verify exit codes. Use tmp directories for config file tests."
+      }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-13",
+    "result": "pass",
+    "criteria": [
+      { "id": "mcli-ac1", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:235-296" },
+      { "id": "mcli-ac2", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:115-214" },
+      { "id": "mcli-ac3", "status": "satisfied", "evidence": "packages/mull/src/config/resolve-adapters.ts:56-66" },
+      { "id": "mcli-ac4", "status": "satisfied", "evidence": "packages/mull/src/config/resolve-adapters.ts:67-70" },
+      { "id": "mcli-ac5", "status": "satisfied", "evidence": "packages/mull/src/config/resolve-adapters.ts:75-78" },
+      { "id": "mcli-ac6", "status": "satisfied", "evidence": "packages/mull/src/mull.ts:197-215, packages/mull/src/cli/format-dry-run.ts" },
+      { "id": "mcli-ac7", "status": "satisfied", "evidence": "packages/mull/src/mull.ts:103-115" },
+      { "id": "mcli-ac8", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:44,87-89" },
+      { "id": "mcli-ac9", "status": "satisfied", "evidence": "packages/mull/src/config/resolve.ts:85-107" },
+      { "id": "mcli-ac10", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:160-186,244-270" },
+      { "id": "mcli-ac11", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:136,231-233,294" },
+      { "id": "mcli-ac12", "status": "satisfied", "evidence": "packages/mull/src/cli.ts:26-45" },
+      { "id": "mcli-ac13", "status": "satisfied", "evidence": "packages/mull/package.json:8-10" }
+    ],
+    "drift": [
+      { "finding": "relay-daemon adapter type supported beyond documented 3 sources", "file": "packages/mull/src/config/resolve-adapters.ts", "action": "document" },
+      { "finding": "Unsafe type cast SessionAdapter[] as MullAdapter[]", "file": "packages/mull/src/cli.ts:116,240", "action": "fix type bridge or align interfaces" }
+    ]
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "feature_id": "relay-dead-code-cleanup",
+  "title": "Relay Module Dead Code Cleanup",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": [],
+
+  "summary": {
+    "goal": "Remove ~40 unused exported functions from the relay module to reduce maintenance burden and improve code clarity",
+    "context": "Audit identified exported functions that are never called. These exports create false API surface, make refactoring harder, and add confusion about what's actually in use.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "All identified dead code functions are removed from source files" },
+      { "id": "ac2", "description": "All related exports are removed from index.ts" },
+      { "id": "ac3", "description": "TypeScript compilation succeeds with no errors" },
+      { "id": "ac4", "description": "All existing tests pass" },
+      { "id": "ac5", "description": "No runtime errors when starting the server" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Dead code falls into 4 categories: agent spawning helpers, channel utilities, planner-lead helpers, ws-proxy utilities",
+        "Many functions were created for future features that never materialized",
+        "Some functions are legacy from spawn-based agent pattern (now using RelayClient)",
+        "The question queue functions (emitQuestion, askQuestion, answerQuestion) may have been intended for trajectory integration but aren't wired up",
+        "Index.ts re-exports all functions, making the public API bloated"
+      ],
+      "keywords": ["dead-code", "exports", "relay", "cleanup", "technical-debt"],
+      "questions": [
+        "Should we keep any functions for future use with a KEEP_FOR_FUTURE marker?",
+        "Are any of these functions used in tests that should also be updated?"
+      ],
+      "concerns": [
+        "Some functions may be used in ideation package - need to verify before removing",
+        "spawnAgent/releaseAgent are used by ideation specialists - NOT dead code there"
+      ],
+      "references": [
+        "packages/server/src/relay/client.ts",
+        "packages/server/src/relay/channels.ts",
+        "packages/server/src/relay/planner-lead.ts",
+        "packages/server/src/relay/ws-proxy.ts",
+        "packages/server/src/relay/index.ts"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "cleanup_strategy": "Remove from source, update exports, verify tests",
+      "verification_method": "TypeScript compilation + test suite + manual server start"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "dc001",
+        "title": "Analyze usage across packages",
+        "scope": "planner-core",
+        "description": "Verify each function's usage across all packages (server, planner, planner-ui, ideation) to confirm true dead code vs cross-package dependencies",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc001-ac1", "description": "Each function categorized as: REMOVE (unused everywhere), KEEP (used in other package), or DEFER (unclear)" }
+        ]
+      },
+      {
+        "step_id": "dc002",
+        "title": "Remove ws-proxy dead code",
+        "scope": "planner-core",
+        "description": "Remove getActiveConnections() and broadcastToUsers() from ws-proxy.ts if confirmed unused",
+        "dependencies": ["dc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc002-ac1", "description": "Functions removed from ws-proxy.ts" },
+          { "id": "dc002-ac2", "description": "Exports removed from index.ts" }
+        ],
+        "specification": {
+          "dead_code": {
+            "file": "packages/server/src/relay/ws-proxy.ts",
+            "functions": ["getActiveConnections", "broadcastToUsers"],
+            "risk": "low",
+            "rationale": "Monitoring/admin utilities never wired to any endpoint"
+          }
+        }
+      },
+      {
+        "step_id": "dc003",
+        "title": "Remove channels.ts dead code",
+        "scope": "planner-core",
+        "description": "Remove unused channel utility functions: removePlanChannel, getAllChannels, getChannelsForUser, channelExists",
+        "dependencies": ["dc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc003-ac1", "description": "Functions removed from channels.ts" },
+          { "id": "dc003-ac2", "description": "Exports removed from index.ts" }
+        ],
+        "specification": {
+          "dead_code": {
+            "file": "packages/server/src/relay/channels.ts",
+            "functions": ["removePlanChannel", "getAllChannels", "getChannelsForUser", "channelExists"],
+            "risk": "low",
+            "rationale": "Channel listing/query functions never exposed via API"
+          }
+        }
+      },
+      {
+        "step_id": "dc004",
+        "title": "Remove planner-lead question helpers",
+        "scope": "planner-core",
+        "description": "Remove question queue functions that are defined but not wired: emitQuestion, askQuestion, answerQuestion, emitPendingQuestion, clearPendingQuestion. Also remove related types and pending questions map if unused.",
+        "dependencies": ["dc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc004-ac1", "description": "Functions removed from planner-lead.ts" },
+          { "id": "dc004-ac2", "description": "QuestionPriority type removed if unused elsewhere" },
+          { "id": "dc004-ac3", "description": "pendingQuestions map removed" }
+        ],
+        "specification": {
+          "dead_code": {
+            "file": "packages/server/src/relay/planner-lead.ts",
+            "functions": ["emitQuestion", "askQuestion", "answerQuestion", "emitPendingQuestion", "clearPendingQuestion"],
+            "risk": "medium",
+            "rationale": "Question queue integration was planned but implemented differently via MCP tools. Check if QuestionPriority type is used elsewhere before removing."
+          }
+        }
+      },
+      {
+        "step_id": "dc005",
+        "title": "Remove planner-lead legacy helpers",
+        "scope": "planner-core",
+        "description": "Remove legacy/deprecated exports: isPlannerLeadActive, getPlannerLeadAgentId, joinPlannerLeadToChannel (already marked as no-op)",
+        "dependencies": ["dc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc005-ac1", "description": "Legacy functions removed from planner-lead.ts" },
+          { "id": "dc005-ac2", "description": "Exports removed from index.ts" }
+        ],
+        "specification": {
+          "dead_code": {
+            "file": "packages/server/src/relay/planner-lead.ts",
+            "functions": ["isPlannerLeadActive", "getPlannerLeadAgentId", "joinPlannerLeadToChannel"],
+            "risk": "low",
+            "rationale": "Already marked as deprecated or no-op in comments"
+          }
+        }
+      },
+      {
+        "step_id": "dc006",
+        "title": "Verify client.ts spawn functions usage",
+        "scope": "planner-core",
+        "description": "Verify spawnAgent, releaseAgent, getSpawnedAgents, isAgentSpawned usage. These ARE used by ideation package - do NOT remove from client.ts, but may be able to remove from planner-core's index.ts if only ideation uses them directly.",
+        "dependencies": ["dc001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc006-ac1", "description": "Document which spawn functions are used by ideation" },
+          { "id": "dc006-ac2", "description": "Determine if exports should remain in index.ts or only in ideation's imports" }
+        ],
+        "specification": {
+          "analysis": {
+            "file": "packages/server/src/relay/client.ts",
+            "functions": ["spawnAgent", "releaseAgent", "getSpawnedAgents", "isAgentSpawned"],
+            "risk": "high",
+            "rationale": "Used by ideation package specialists - verify import paths before any changes"
+          }
+        }
+      },
+      {
+        "step_id": "dc007",
+        "title": "Update index.ts exports",
+        "scope": "planner-core",
+        "description": "Remove all dead exports from packages/server/src/relay/index.ts after individual files are cleaned",
+        "dependencies": ["dc002", "dc003", "dc004", "dc005", "dc006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc007-ac1", "description": "index.ts only exports functions that are actually used" },
+          { "id": "dc007-ac2", "description": "TypeScript compilation succeeds" }
+        ]
+      },
+      {
+        "step_id": "dc008",
+        "title": "Run tests and verify",
+        "scope": "planner-core",
+        "description": "Run full test suite, type check, and manual server startup to verify nothing broke",
+        "dependencies": ["dc007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "dc008-ac1", "description": "npm run typecheck passes" },
+          { "id": "dc008-ac2", "description": "npm run test passes" },
+          { "id": "dc008-ac3", "description": "Server starts without errors" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "high",
+    "cases": [
+      { "type": "happy", "description": "TypeScript compilation succeeds after removal" },
+      { "type": "happy", "description": "All existing tests pass" },
+      { "type": "happy", "description": "Server starts and accepts connections" },
+      { "type": "edge", "description": "Ideation package still works with specialists" },
+      { "type": "error", "description": "Removed exports cause compile error if still referenced (expected fail during dev)" }
+    ],
+    "data_requirements": [
+      "Existing test fixtures remain unchanged"
+    ]
+  }
+}

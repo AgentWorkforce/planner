@@ -1,0 +1,81 @@
+{
+  "feature_id": "cultivate-clusterer",
+  "title": "AI Cluster Assignment (Haiku)",
+  "type": "feature",
+  "status": "verified",
+  "priority": "critical",
+  "dependencies": ["cultivate-domain", "cultivate-storage"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Grounded theory clustering via Haiku (configurable via CULTIVATE_CLUSTER_MODEL). Assign signals to existing clusters or create new ones. Summary regeneration every 5th signal via Sonnet. Per-Greenhouse scope — clusters NEVER span Greenhouses.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "assignCluster() uses Haiku to determine best-fit existing cluster or recommends new cluster creation" },
+      { "id": "ac2", "description": "createCluster() initializes a new cluster with name, summary, and initial signal" },
+      { "id": "ac3", "description": "Cluster summaries are regenerated via Sonnet every 5th signal added to the cluster" },
+      { "id": "ac4", "description": "Clusters are strictly scoped per-Greenhouse — a cluster query for Greenhouse A never returns Greenhouse B clusters" },
+      { "id": "ac5", "description": "Clustering model is configurable via CULTIVATE_CLUSTER_MODEL env var, defaulting to Haiku" },
+      { "id": "ac6", "description": "Cluster assignment prompt includes existing cluster names and summaries for the Greenhouse as context" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-15",
+    "result": "pass",
+    "criteria": [
+      { "id": "ac1", "status": "satisfied", "evidence": "src/clustering/assign.ts" },
+      { "id": "ac2", "status": "satisfied", "evidence": "src/clustering/create.ts" },
+      { "id": "ac3", "status": "satisfied", "evidence": "src/clustering/regenerate-summary.ts" },
+      { "id": "ac4", "status": "satisfied", "evidence": "src/clustering/assign.ts" },
+      { "id": "ac5", "status": "satisfied", "evidence": "src/clustering/assign.ts" },
+      { "id": "ac6", "status": "satisfied", "evidence": "src/clustering/assign.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "id": "cc-s1",
+        "title": "Define cluster assignment prompt",
+        "scope": "cultivate",
+        "description": "Design the system and user prompt for Haiku cluster assignment. The prompt receives: signal summary/keywords from extraction, list of existing clusters (name + summary) for the target Greenhouse. Haiku must return either an existing cluster_id or a recommendation to create a new cluster with a proposed name and summary. Use structured output to guarantee response shape.",
+        "dependencies": []
+      },
+      {
+        "id": "cc-s2",
+        "title": "Implement assignCluster() function",
+        "scope": "cultivate",
+        "description": "Build assignCluster(signal, extraction, greenhouseId) that: (1) fetches existing clusters for the Greenhouse from storage, (2) calls Haiku with the cluster assignment prompt including signal extraction data and existing clusters, (3) parses the response to get either an existing cluster_id or new cluster recommendation, (4) returns ClusterAssignment with cluster_id and isNew flag. Enforce Greenhouse isolation by only querying clusters for the given greenhouseId.",
+        "dependencies": ["cc-s1"]
+      },
+      {
+        "id": "cc-s3",
+        "title": "Implement createCluster() for new clusters",
+        "scope": "cultivate",
+        "description": "Build createCluster(greenhouseId, name, summary, initialSignalId) that inserts a new cluster record in storage with the Greenhouse association, initial name and summary from Haiku's recommendation, signal count of 1, and created_at timestamp. Return the new cluster with its generated ID.",
+        "dependencies": ["cc-s2"]
+      },
+      {
+        "id": "cc-s4",
+        "title": "Add summary regeneration every 5th signal",
+        "scope": "cultivate",
+        "description": "After a signal is assigned to an existing cluster, check the cluster's signal count. If signal_count % 5 === 0, trigger summary regeneration via Sonnet (using CULTIVATE_EXTRACT_MODEL). Fetch the cluster's recent signals, call Sonnet with a summary regeneration prompt, and update the cluster's summary in storage. This keeps cluster summaries fresh as they grow.",
+        "dependencies": ["cc-s2", "cc-s3"]
+      },
+      {
+        "id": "cc-s5",
+        "title": "Enforce per-Greenhouse cluster isolation invariant",
+        "scope": "cultivate",
+        "description": "Add storage-level constraints and query filters to ensure clusters never span Greenhouses. The clusters table must have a greenhouse_id NOT NULL foreign key. All cluster queries must include greenhouse_id in WHERE clauses. Add a database constraint preventing cluster_id reuse across Greenhouses. Write assertions in assignCluster() that validate Greenhouse matching.",
+        "dependencies": ["cc-s2"]
+      },
+      {
+        "id": "cc-s6",
+        "title": "Add model configurability",
+        "scope": "cultivate",
+        "description": "Read CULTIVATE_CLUSTER_MODEL from process.env to determine which Anthropic model to use for cluster assignment. Default to claude-haiku when not set. Summary regeneration uses CULTIVATE_EXTRACT_MODEL (Sonnet) since it requires more capable reasoning. Validate model names at startup.",
+        "dependencies": ["cc-s2"]
+      }
+    ]
+  }
+}

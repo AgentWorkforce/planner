@@ -1,0 +1,188 @@
+{
+  "feature_id": "tend-unified-interviewer",
+  "title": "Unified Interviewer Service",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["tend-project-entity", "tend-conversation-core"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Merge InterviewerService and PlannerLead into a single TendInterviewerService with unified tool set, project-scoped channels, and forge event subscription.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "TendInterviewerService created as persistent relay service (RelayClient, not spawn)"
+      },
+      {
+        "id": "ac2",
+        "description": "Listens on #project-{projectId} channels (replacing #ideation-{sessionId} + #plan-{planId})"
+      },
+      {
+        "id": "ac3",
+        "description": "Tool set includes ideation tools: spawn_specialist, read_blocks, update_understanding, update_synthesis"
+      },
+      {
+        "id": "ac4",
+        "description": "Tool set includes planner tools: add_step, edit_step, read_plan"
+      },
+      {
+        "id": "ac5",
+        "description": "Tool set includes bridge tools: graduate_blocks, start_execution"
+      },
+      {
+        "id": "ac6",
+        "description": "Tool set includes interaction tools: ask_user_question, spawn_agent, release_agent"
+      },
+      {
+        "id": "ac7",
+        "description": "One conversation history per project (combining all context)"
+      },
+      {
+        "id": "ac8",
+        "description": "Context focus enrichment: when user's current_focus changes, next AI invocation includes focus details in system prompt"
+      },
+      {
+        "id": "ac9",
+        "description": "Forge SSE subscription: Interviewer receives forge events and makes editorial trickle decisions (trickle milestones, suppress routine, summarize completions)"
+      },
+      {
+        "id": "ac10",
+        "description": "Blocking forge events (agent needs input) trigger immediate Interviewer invocation"
+      },
+      {
+        "id": "ac11",
+        "description": "System prompt follows structure from implementation doc (project state, pending events, specialist insights, rules)"
+      },
+      {
+        "id": "ac12",
+        "description": "AI maintains one voice — never reveals specialists or internal agents"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is the largest new backend piece",
+        "InterviewerService (packages/ideation/src/interviewer/service.ts, ~965 lines) has session management, tool calling, specialist spawning",
+        "PlannerLead (packages/server/src/relay/planner-lead.ts) has plan editing, relay messaging, agent orchestration",
+        "Both use Anthropic SDK with tool calling and manage per-channel conversation history",
+        "Merging: combine tool sets, unify channels to #project-{id}, add forge SSE subscription for trickle layer",
+        "The trickle layer is editorial — the AI decides what to surface based on its prompt rules, not hard-coded event filtering",
+        "Conversation history combines ideation context (blocks, specialists, understanding) + planner context (steps, dependencies) + forge context (running agents, results)"
+      ],
+      "questions": [
+        "Should we maintain separate conversation histories per tool category or truly unify?",
+        "How do we handle migration of existing sessions/plans to projects?",
+        "Should specialists continue to exist or be absorbed into the unified Interviewer?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["backend"],
+    "steps": [
+      {
+        "id": "uni01",
+        "title": "Create TendInterviewerService shell",
+        "scope": "backend",
+        "description": "Copy InterviewerService structure from packages/ideation/src/interviewer/service.ts (~965 lines). Create TendInterviewerService as persistent RelayClient service (NOT spawn). Initialize RelayClient with agentId 'tend-interviewer', listen on #project-{id} channels (replacing #ideation-{sessionId} + #plan-{planId}). Keep Anthropic SDK integration pattern, conversation history management.",
+        "acceptance_criteria": ["ac1", "ac2"]
+      },
+      {
+        "id": "uni02",
+        "title": "Merge ideation tool set",
+        "scope": "backend",
+        "description": "Copy tools from packages/ideation/src/interviewer/tools.ts: spawn_specialist (unchanged), read_blocks (was read_session — adapt to read from project.session_id), update_understanding, update_synthesis. Preserve specialist spawning pattern (lazy, AI-driven, session-scoped lifecycle).",
+        "dependencies": ["uni01"],
+        "acceptance_criteria": ["ac3"]
+      },
+      {
+        "id": "uni03",
+        "title": "Merge planner tool set",
+        "scope": "backend",
+        "description": "Copy tools from packages/server/src/relay/planner-lead-tools/: add_step, edit_step, read_plan, list_steps. Adapt to read from project.plan_id instead of accepting plan_id as param. Keep existing validation logic.",
+        "dependencies": ["uni01"],
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "uni04",
+        "title": "Add bridge tools",
+        "scope": "backend",
+        "description": "Create two new tools: graduate_blocks (calls POST /api/projects/:id/graduate with block_ids array), start_execution (calls POST /api/forge/runs with project.plan_id, project.config.scopes, project.config.execution_policy). Return artifact references from both.",
+        "dependencies": ["uni01"],
+        "acceptance_criteria": ["ac5"]
+      },
+      {
+        "id": "uni05",
+        "title": "Add interaction tools",
+        "scope": "backend",
+        "description": "Copy from planner-lead: ask_user_question (surfaces blocking questions via attention system), spawn_agent (relay spawning pattern), release_agent (cleanup). Keep existing question queue and agent tracking logic.",
+        "dependencies": ["uni01"],
+        "acceptance_criteria": ["ac6"]
+      },
+      {
+        "id": "uni06",
+        "title": "Implement context focus enrichment",
+        "scope": "backend",
+        "description": "Read project.current_focus from ProjectStorage on each invocation. If focus exists (focus_type: 'step', focus_id: 'step-abc'), enrich system prompt with focused entity details. For step focus: include step title, status, AC, dependencies, agent status, recent events. For scope focus: include scope summary, progress, active steps.",
+        "dependencies": ["uni01"],
+        "acceptance_criteria": ["ac8"]
+      },
+      {
+        "id": "uni07",
+        "title": "Implement forge SSE subscription",
+        "scope": "backend",
+        "description": "Subscribe to GET /api/forge/runs/:id/events SSE stream on behalf of Interviewer. Buffer non-blocking events (step progress, agent spawned, PR created) in pending context queue. For blocking events (agent_needs_input, gate_reached), trigger immediate Interviewer invocation. Copy SSE subscription pattern from existing event listeners.",
+        "dependencies": ["uni01"],
+        "acceptance_criteria": ["ac9", "ac10"]
+      },
+      {
+        "id": "uni08",
+        "title": "Write system prompt template",
+        "scope": "backend",
+        "description": "Implement system prompt per implementation doc structure: project state (name, initiative, phase), pending forge events (from buffer), specialist insights queue, current_focus enrichment, rules (one voice, trickle milestones not routine, propose graduation at threshold, adapt to focus). Prompt should guide editorial trickle decisions.",
+        "dependencies": ["uni06", "uni07"],
+        "acceptance_criteria": ["ac11"]
+      },
+      {
+        "id": "uni09",
+        "title": "Unify conversation history",
+        "scope": "backend",
+        "description": "Merge conversation history management from InterviewerService and PlannerLead. One history per project stored in project_messages table. Each message tagged with channel_id ('main' or 'agent-{agentId}'), role (user/assistant/system), metadata (block_refs, step_refs, attention_level). History combines all context: blocks, specialists, steps, forge events.",
+        "dependencies": ["uni02", "uni03", "uni04", "uni05"],
+        "acceptance_criteria": ["ac7", "ac12"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_interviewer": "packages/ideation/src/interviewer/service.ts (~965 lines, 7 tools)",
+      "source_planner_lead": "packages/server/src/relay/planner-lead.ts (11 tools)",
+      "merge_strategy": "combined tool set, project-scoped channels, one history per project",
+      "trickle_logic": "prompt-driven editorial decisions, not code-driven filtering",
+      "channel_pattern": "#project-{projectId}",
+      "tool_categories": {
+        "ideation": ["spawn_specialist", "read_blocks", "update_understanding", "update_synthesis"],
+        "planner": ["add_step", "edit_step", "read_plan", "list_steps"],
+        "bridge": ["graduate_blocks", "start_execution"],
+        "interaction": ["ask_user_question", "spawn_agent", "release_agent"]
+      },
+      "forge_sse_subscription": {
+        "event_types": ["step_started", "step_completed", "step_failed", "agent_needs_input"],
+        "trickle_rules": [
+          "Surface milestones (major completions, failures)",
+          "Suppress routine (individual test passes, dependency installs)",
+          "Summarize completions (group related steps)",
+          "Immediately surface blocking events (agent_needs_input)"
+        ]
+      },
+      "system_prompt_structure": [
+        "Project state (name, initiative, current phase)",
+        "Pending events (forge updates queued for trickle)",
+        "Specialist insights (from spawned specialists)",
+        "Current focus (what user is looking at)",
+        "Rules (maintain one voice, never reveal internal agents)"
+      ]
+    }
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "feature_id": "tend-error-states",
+  "title": "Error & Failure State Handling",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["tend-project-tree", "tend-conversation-core", "tend-status-bar"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Handle all error and failure states with appropriate UI across tree, conversation, and status bar.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "Step failure: tree shows ✗ with error summary, conversation shows system event, Interviewer summarizes options, reply bar gets pending decision"
+      },
+      {
+        "id": "ac2",
+        "description": "Run failure: tree shows ⚠ (paused) on all running steps, conversation shows recovery options via MultipleChoiceInput ([Resume] [Restart from failed] [Cancel run])"
+      },
+      {
+        "id": "ac3",
+        "description": "SSE connection loss: tree shows stale indicator ('last updated X ago'), status bar shows connection indicator, exponential backoff reconnection for all 3 streams"
+      },
+      {
+        "id": "ac4",
+        "description": "On SSE reconnect: forge SSE replays via Last-Event-ID, tree reconciles from fresh API fetch"
+      },
+      {
+        "id": "ac5",
+        "description": "Agent stuck (normal): Interviewer asks agent what it needs, surfaces question through attention system"
+      },
+      {
+        "id": "ac6",
+        "description": "Agent stuck (system): forge detects via timeout, auto-restart attempted, escalated to user if retry fails"
+      },
+      {
+        "id": "ac7",
+        "description": "Status bar agent avatar turns red for blocked agents, fades after user acknowledges"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Error states span all three columns and the status bar",
+        "The existing SSE hooks (useSessionEvents, usePlanEvents, useRunEvents) already have exponential backoff with max 5 retries — keep this",
+        "Forge SSE supports Last-Event-ID for missed event replay",
+        "The Interviewer handles step failure communication — it summarizes the error and offers options conversationally",
+        "Two types of 'stuck': normal (needs info, handled via attention system) and system (looping/crashed, handled by forge timeout)",
+        "Visual indicators: tree uses symbols (✗ fail, ⚠ paused), status bar uses color (red avatar), connection indicator appears on disconnect"
+      ],
+      "questions": [
+        "Should step failures pause the entire run or just that step?",
+        "Do we auto-retry failed steps or always ask user?",
+        "Should connection loss show a toast or just inline indicators?"
+      ],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["frontend", "backend"],
+    "steps": [
+      {
+        "id": "err01",
+        "title": "Step failure UI",
+        "scope": "frontend",
+        "description": "Copy error state pattern from planner-ui step editor. When step_failed event received via useRunEvents: tree shows ✗ symbol with error summary tooltip (StepNode component), conversation receives system event ('┊ Step failed · [step title] · [error summary]'), Interviewer summarizes error and offers options ([Retry] [Skip] [Investigate]), reply bar adds pending decision item. Red status until acknowledged.",
+        "acceptance_criteria": ["ac1"]
+      },
+      {
+        "id": "err02",
+        "title": "Run failure UI",
+        "scope": "frontend",
+        "description": "When run_failed event received: tree shows ⚠ (paused) on all running steps (not failed — paused for recovery), conversation shows system event ('┊ Run paused due to failure'), Interviewer message with MultipleChoiceInput showing recovery options ([Resume] [Restart from failed] [Cancel run]). All agent avatars in status bar fade to paused state (gray).",
+        "acceptance_criteria": ["ac2", "ac7"]
+      },
+      {
+        "id": "err03",
+        "title": "Connection loss UI",
+        "scope": "frontend",
+        "description": "Copy SSE reconnection pattern from existing hooks (useSessionEvents, usePlanEvents, useRunEvents — all have exponential backoff max 5 retries). On disconnect: tree shows 'last updated X ago' indicator on running steps (subtle, level 1 attention), status bar shows connection indicator (normally hidden). Exponential backoff: 1s, 2s, 4s, 8s, 16s max. No toast, inline indicators only.",
+        "acceptance_criteria": ["ac3"]
+      },
+      {
+        "id": "err04",
+        "title": "SSE reconnect handling",
+        "scope": "frontend",
+        "description": "On SSE reconnect after disconnect: forge SSE supports Last-Event-ID header for missed event replay (copy pattern from existing forge integration). After receiving replayed events, fetch fresh state from GET /api/projects/:id to reconcile tree (steps, status, progress). Update ProjectTree state from fresh data. Ideation and planner SSE may not support Last-Event-ID — handle via fresh fetch.",
+        "acceptance_criteria": ["ac4"]
+      },
+      {
+        "id": "err05",
+        "title": "Agent stuck states",
+        "scope": "backend",
+        "description": "Two types: Normal stuck (agent needs info/decision) — agent sends question via relay, Interviewer receives, surfaces via attention system (copy question pipeline from planner-ui useQuestionNotifications). System stuck (looping, crashed) — forge detects via timeout (no progress for N seconds), auto-restart agent once via forge orchestrator, if restart fails escalate to user via Interviewer message. Status bar: normal stuck → yellow avatar (needs_input), system stuck → red avatar (blocked). Copy forge timeout detection pattern.",
+        "acceptance_criteria": ["ac5", "ac6", "ac7"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "sse_reconnect": "existing exponential backoff pattern with max 5 retries",
+      "forge_replay": "Last-Event-ID header for missed events",
+      "stuck_detection": "normal via agent question, system via forge timeout",
+      "visual_indicators": "tree: ✗ fail / ⚠ paused, status bar: red avatar, connection indicator",
+      "error_flows": {
+        "step_failure": {
+          "tree": "show ✗ with error summary tooltip",
+          "conversation": "system event: 'Step X failed: [error]'",
+          "interviewer": "summarizes error, offers [Resume] [Skip] [Cancel]",
+          "reply_bar": "adds pending decision item"
+        },
+        "run_failure": {
+          "tree": "show ⚠ on all running steps",
+          "conversation": "system event: 'Run paused due to failure'",
+          "interviewer": "offers [Resume] [Restart from failed] [Cancel run]",
+          "status_bar": "all agent avatars fade to paused state"
+        },
+        "sse_connection_loss": {
+          "tree": "show 'last updated X ago' indicator",
+          "status_bar": "show connection indicator",
+          "reconnection": "exponential backoff (1s, 2s, 4s, 8s, 16s max), max 5 retries",
+          "on_reconnect": "fetch fresh state from API, reconcile tree"
+        },
+        "agent_stuck_normal": {
+          "detection": "agent sends question via relay",
+          "interviewer": "receives question, surfaces via attention system",
+          "status_bar": "agent avatar turns yellow (needs_input)"
+        },
+        "agent_stuck_system": {
+          "detection": "forge timeout (no progress for N seconds)",
+          "forge_action": "auto-restart agent once",
+          "escalation": "if restart fails, surface to user via Interviewer",
+          "status_bar": "agent avatar turns red (blocked)"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "feature_id": "forge-task-queue",
+  "title": "Task Queue Integration",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-core",
+  "dependencies": ["forge-storage"],
+
+  "summary": {
+    "goal": "Redis/BullMQ integration for reliable task scheduling with concurrency limits, priority handling, and fair distribution across runs.",
+    "acceptance_criteria": [
+      { "id": "ftq-ac1", "description": "BullMQ queue 'forge:tasks' with configurable concurrency limit" },
+      { "id": "ftq-ac2", "description": "Priority field on jobs - higher priority tasks processed first" },
+      { "id": "ftq-ac3", "description": "Fair scheduling across runs via round-robin or weighted distribution" },
+      { "id": "ftq-ac4", "description": "Automatic retry on transient failures (configurable attempts)" },
+      { "id": "ftq-ac5", "description": "Dead letter queue 'forge:tasks:failed' for permanently failed tasks" },
+      { "id": "ftq-ac6", "description": "Job events trigger Forgemaster state updates" },
+      { "id": "ftq-ac7", "description": "Worker processor triggers agent spawn via AgentSpawner callback" },
+      { "id": "ftq-ac8", "description": "Redis connection failure throws explicit error with message: 'Redis is required for task scheduling. Ensure Redis is running at {REDIS_URL}'" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "BullMQ is battle-tested for job queues in Node.js",
+        "Redis provides persistence and pub/sub for real-time updates",
+        "Concurrency limit prevents overwhelming resources",
+        "Fair scheduling prevents one large run from starving others",
+        "Worker processor is the integration point with forge-relay-integration"
+      ],
+      "patterns": [
+        "Producer-consumer with BullMQ",
+        "Job data contains task_id, run_id - lookup from DB for full context",
+        "Worker processes dequeue and trigger agent spawn via callback"
+      ],
+      "concerns": [
+        "Redis is a REQUIRED dependency - Forgemaster must fail fast on startup if Redis is unavailable with clear error message. NO silent fallback to in-memory queue in production."
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "queue_name": "forge:tasks",
+      "dlq_name": "forge:tasks:failed",
+      "default_concurrency": 5,
+      "default_retries": 3,
+      "redis_requirement": "REQUIRED - no fallback in production. InMemoryTaskQueue only for automated tests."
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "ftq-s1",
+        "title": "Create TaskQueue interface",
+        "scope": "forge-core",
+        "description": "Define interface for task queue operations abstracting Redis/BullMQ details",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskQueue interface: enqueue(taskId, runId, priority), getQueueStats()" },
+          { "id": "ac2", "description": "JobHandle type: { jobId, taskId, runId, priority, attempts }" },
+          { "id": "ac3", "description": "QueueStats type: { pending, active, completed, failed, delayed }" },
+          { "id": "ac4", "description": "onTaskReady callback type: (job: JobHandle) => Promise<void>" }
+        ],
+        "specification": {
+          "pattern_reference": "src/storage/interface.ts",
+          "pattern_description": "Use same interface-first pattern for dependency injection"
+        }
+      },
+      {
+        "step_id": "ftq-s2",
+        "title": "Implement BullMQ task queue",
+        "scope": "forge-core",
+        "description": "Implement TaskQueue using BullMQ with Redis backend",
+        "dependencies": ["ftq-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BullMQTaskQueue class implements TaskQueue interface" },
+          { "id": "ac2", "description": "Constructor takes Redis connection options and queue name ('forge:tasks')" },
+          { "id": "ac3", "description": "Priority field on jobs (higher = processed first)" },
+          { "id": "ac4", "description": "Configurable retry attempts (default 3) with exponential backoff" },
+          { "id": "ac5", "description": "Dead letter queue 'forge:tasks:failed' for permanent failures" },
+          { "id": "ac6", "description": "Connection failure throws RedisConnectionError with actionable message: 'Failed to connect to Redis at {url}. Ensure Redis is running.'" }
+        ],
+        "specification": {
+          "architecture": {
+            "library": "bullmq",
+            "redis_client": "ioredis",
+            "queue_options": {
+              "defaultJobOptions": {
+                "attempts": 3,
+                "backoff": { "type": "exponential", "delay": 1000 }
+              }
+            },
+            "error_handling": "Throw RedisConnectionError on connection failure - do NOT fall back to in-memory"
+          }
+        }
+      },
+      {
+        "step_id": "ftq-s3",
+        "title": "Create queue worker processor",
+        "scope": "forge-core",
+        "description": "BullMQ Worker that dequeues tasks and triggers agent spawn via callback",
+        "dependencies": ["ftq-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createQueueWorker(queue, onTaskReady) factory function" },
+          { "id": "ac2", "description": "Configurable concurrency (default 5 parallel tasks)" },
+          { "id": "ac3", "description": "onTaskReady callback receives JobHandle, must return Promise<void>" },
+          { "id": "ac4", "description": "Worker events for 'completed', 'failed', 'error' logging" },
+          { "id": "ac5", "description": "onTaskReady callback is the integration point - caller provides agent spawn logic" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "BullMQ Worker with processor callback",
+            "concurrency": "Configurable via constructor options",
+            "integration": "onTaskReady callback provided by forge-relay-integration for agent spawning"
+          }
+        }
+      },
+      {
+        "step_id": "ftq-s4",
+        "title": "Implement fair scheduling across runs",
+        "scope": "forge-core",
+        "description": "Prevent single large run from starving others via fair distribution",
+        "dependencies": ["ftq-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TaskScheduler class manages task enqueueing with fairness" },
+          { "id": "ac2", "description": "Round-robin selection when multiple runs have ready tasks" },
+          { "id": "ac3", "description": "Per-run concurrency limits (configurable, default 2 tasks per run)" },
+          { "id": "ac4", "description": "scheduleReadyTasks(runId) finds and enqueues all ready tasks for a run" },
+          { "id": "ac5", "description": "Respects run.has_pending_gate flag - skips scheduling if gate pending" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Scheduler with per-run tracking",
+            "fairness": "Round-robin with soft limits",
+            "gate_awareness": "Check run.has_pending_gate before enqueueing"
+          }
+        }
+      },
+      {
+        "step_id": "ftq-s5",
+        "title": "Create in-memory queue for tests only",
+        "scope": "forge-core",
+        "description": "In-memory queue implementation ONLY for automated tests - NOT for production or development use",
+        "dependencies": ["ftq-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "InMemoryTaskQueue implements TaskQueue interface" },
+          { "id": "ac2", "description": "Priority queue using sorted array or heap" },
+          { "id": "ac3", "description": "Clearly documented as TEST-ONLY with JSDoc @internal tag" },
+          { "id": "ac4", "description": "Constructor logs warning: 'InMemoryTaskQueue is for tests only. Use BullMQ in production.'" },
+          { "id": "ac5", "description": "File path: src/queue/__tests__/InMemoryTaskQueue.ts (in test directory)" }
+        ],
+        "specification": {
+          "purpose": "TEST-ONLY implementation for unit/integration tests without Redis dependency",
+          "location": "Place in __tests__ directory to make test-only nature clear",
+          "warning": "Constructor emits console.warn if NODE_ENV is not 'test'"
+        }
+      },
+      {
+        "step_id": "ftq-s6",
+        "title": "Create task queue factory with explicit Redis requirement",
+        "scope": "forge-core",
+        "description": "Factory function that creates BullMQ queue with clear Redis requirement",
+        "dependencies": ["ftq-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createTaskQueue(config) returns BullMQTaskQueue - no fallback option" },
+          { "id": "ac2", "description": "Config: { redisUrl: string (REQUIRED), queueName?: string, concurrency?: number }" },
+          { "id": "ac3", "description": "Throws ConfigurationError if redisUrl not provided: 'REDIS_URL environment variable is required'" },
+          { "id": "ac4", "description": "Validates Redis connection at startup, throws if unavailable" },
+          { "id": "ac5", "description": "NO FORGE_QUEUE_TYPE env var - Redis is always required in production" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Factory with required configuration",
+            "env_vars": ["REDIS_URL (required)"],
+            "no_fallback": "No in-memory fallback. Redis is required. Fail fast with clear error."
+          }
+        }
+      },
+      {
+        "step_id": "ftq-s7",
+        "title": "Connect queue worker to Forgemaster orchestration",
+        "scope": "forge-core",
+        "description": "Wire up the queue worker's onTaskReady callback to trigger agent spawning",
+        "dependencies": ["ftq-s3"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ForgemasterService class orchestrates queue, storage, and spawner" },
+          { "id": "ac2", "description": "onTaskReady callback: load task from storage, prepare workspace, spawn agent" },
+          { "id": "ac3", "description": "Task status updated to 'running' when dequeued" },
+          { "id": "ac4", "description": "If task has gate (step.gate defined), create Gate instead of spawning agent" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Orchestration service composing queue, storage, and spawner",
+            "gate_detection": "Check forgeStep.gate before spawning - route to gate handling if present"
+          }
+        }
+      }
+    ]
+  }
+}

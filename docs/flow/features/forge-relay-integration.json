@@ -1,0 +1,216 @@
+{
+  "feature_id": "forge-relay-integration",
+  "title": "Relay Agent Integration",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "parent": "forge-core",
+  "dependencies": ["forge-workspace-manager", "forge-task-queue", "forge-mcp-tools"],
+
+  "summary": {
+    "goal": "Spawn and manage agents via Relay SDK for task execution. Workers produce artifacts, auditors verify them. Agents are short-lived: spawn -> work -> exit.",
+    "acceptance_criteria": [
+      { "id": "fri-ac1", "description": "spawnWorker(taskId, cli, workspacePath, mcpConfigPath) creates agent via relay.spawn()" },
+      { "id": "fri-ac2", "description": "Agent name pattern: run-{runId}-task-{taskId}" },
+      { "id": "fri-ac3", "description": "Receive agent messages via relay subscription (progress, completion, blocked)" },
+      { "id": "fri-ac4", "description": "Detect agent exit (normal completion or crash)" },
+      { "id": "fri-ac5", "description": "Handle agent timeout with graceful termination (SIGTERM -> wait -> SIGKILL)" },
+      { "id": "fri-ac6", "description": "Support multiple CLI providers: claude (default), codex, gemini, ollama" },
+      { "id": "fri-ac7", "description": "Agent receives MCP config for Forge tools at spawn time" },
+      { "id": "fri-ac8", "description": "Agent prompt includes task context from .forge/context.json" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Relay SDK spawn() returns handle for agent lifecycle",
+        "spawn -> work -> exit pattern: agents are task-scoped, not persistent",
+        "MCP context injected at spawn time via --mcp-config flag",
+        "Multiple providers via CLI abstraction in relay",
+        "Workspace context file provides full task info to agent"
+      ],
+      "patterns": [
+        "Spawn with working directory set to worktree path",
+        "Message subscription for status updates",
+        "Timeout with graceful shutdown sequence"
+      ],
+      "keywords": ["relay", "spawn", "agent", "MCP", "multi-provider"],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "agent_name_pattern": "run-{runId}-task-{taskId}",
+      "supported_clis": ["claude", "codex", "gemini", "ollama"],
+      "default_cli": "claude",
+      "timeout_default": "30 minutes"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fri-s1",
+        "title": "Create AgentSpawner interface",
+        "scope": "forge-core",
+        "description": "Define interface for agent spawning abstraction",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AgentSpawner interface: spawn(config), terminate(agentId), getStatus(agentId), listActiveAgents()" },
+          { "id": "ac2", "description": "SpawnConfig type: { taskId, runId, cli, workspacePath, mcpConfigPath, timeout, contextFile }" },
+          { "id": "ac3", "description": "SpawnResult type: { agentId, pid, spawned_at }" },
+          { "id": "ac4", "description": "AgentStatus type: { agentId, status: 'running' | 'completed' | 'failed' | 'terminated', exit_code?, last_heartbeat? }" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/spawner.ts",
+          "pattern_description": "Copy Spawner interface pattern from planner-core. See lines 46-50."
+        }
+      },
+      {
+        "step_id": "fri-s2",
+        "title": "Implement RelayAgentSpawner",
+        "scope": "forge-core",
+        "description": "AgentSpawner implementation using Relay SDK spawn()",
+        "dependencies": ["fri-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "spawn() calls relay.spawn() with agent name pattern: run-{runId}-task-{taskId}" },
+          { "id": "ac2", "description": "Working directory set to workspacePath" },
+          { "id": "ac3", "description": "MCP config injected via --mcp-config flag pointing to .forge/mcp-config.json" },
+          { "id": "ac4", "description": "terminate() sends SIGTERM, waits 5s, then SIGKILL if needed" },
+          { "id": "ac5", "description": "listActiveAgents() returns list of currently running agent IDs via relay API" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/spawner.ts:75-100",
+          "pattern_description": "Copy spawn implementation pattern, adapt for task-scoped agents"
+        }
+      },
+      {
+        "step_id": "fri-s3",
+        "title": "Implement agent message subscription",
+        "scope": "forge-core",
+        "description": "Subscribe to agent messages via relay for status updates",
+        "dependencies": ["fri-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "subscribeToAgent(agentId, callback) registers message handler" },
+          { "id": "ac2", "description": "Callback receives parsed agent messages (progress, completion, blocked)" },
+          { "id": "ac3", "description": "Unsubscribe on agent termination" },
+          { "id": "ac4", "description": "Message types mapped to trajectory events" }
+        ],
+        "specification": {
+          "pattern_reference": "src/relay/client.ts",
+          "pattern_description": "Use relay client message subscription pattern"
+        }
+      },
+      {
+        "step_id": "fri-s4",
+        "title": "Implement agent exit detection",
+        "scope": "forge-core",
+        "description": "Detect when agent process exits (normal or crash)",
+        "dependencies": ["fri-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "onAgentExit(agentId, callback) registers exit handler" },
+          { "id": "ac2", "description": "Callback receives exit_code, signal, and duration" },
+          { "id": "ac3", "description": "Exit triggers task status update (check if report_complete was called)" },
+          { "id": "ac4", "description": "Exit without report_complete: mark task 'failed' with AgentCrashError including exit_code and last message" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Process exit event from relay spawn handle",
+            "failure_detection": "Check task.status - if still 'running' after exit, it crashed",
+            "error_message": "Agent exited unexpectedly (exit_code={code}, signal={signal}). Last message: {lastMessage}"
+          }
+        }
+      },
+      {
+        "step_id": "fri-s5",
+        "title": "Implement agent timeout handling",
+        "scope": "forge-core",
+        "description": "Gracefully terminate agents that exceed timeout",
+        "dependencies": ["fri-s2", "fri-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Configurable timeout per task (default 30 minutes)" },
+          { "id": "ac2", "description": "Timer started on spawn, cancelled on exit" },
+          { "id": "ac3", "description": "On timeout: SIGTERM -> wait 5s -> SIGKILL" },
+          { "id": "ac4", "description": "Timeout triggers task 'failed' state with AgentTimeoutError: 'Agent timed out after {duration}'" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "setTimeout with graceful shutdown sequence",
+            "default_timeout": "30 minutes (configurable)"
+          }
+        }
+      },
+      {
+        "step_id": "fri-s6",
+        "title": "Support multiple CLI providers",
+        "scope": "forge-core",
+        "description": "Allow different CLI providers for agents (claude, codex, gemini, ollama)",
+        "dependencies": ["fri-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CLI provider configurable per task (default: claude)" },
+          { "id": "ac2", "description": "CLI command built based on provider (claude vs ollama run)" },
+          { "id": "ac3", "description": "Provider-specific flags handled (--mcp-config for claude)" },
+          { "id": "ac4", "description": "Validation that provider is in supported list - throws UnsupportedCLIError if not" }
+        ],
+        "specification": {
+          "architecture": {
+            "supported_clis": ["claude", "codex", "gemini", "ollama"],
+            "cli_builders": "Map of provider -> command builder function"
+          }
+        }
+      },
+      {
+        "step_id": "fri-s7",
+        "title": "Inject task context into agent prompt",
+        "scope": "forge-core",
+        "description": "Build agent prompt with task context from workspace files",
+        "dependencies": ["fri-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Read .forge/context.json from workspace for task details" },
+          { "id": "ac2", "description": "Build prompt including: task description, acceptance criteria, available MCP tools" },
+          { "id": "ac3", "description": "Include instructions for using report_progress and report_complete tools" },
+          { "id": "ac4", "description": "Prompt template configurable per project" }
+        ],
+        "specification": {
+          "architecture": {
+            "context_source": ".forge/context.json written by forge-workspace-manager",
+            "prompt_template": "Configurable with sensible defaults"
+          }
+        }
+      },
+      {
+        "step_id": "fri-s8",
+        "title": "Wire up queue worker callback with error propagation",
+        "scope": "forge-core",
+        "description": "Provide onTaskReady callback to task queue that spawns agents, with proper error handling",
+        "dependencies": ["fri-s2", "fri-s7"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createAgentSpawnCallback(spawner, storage, workspaceManager) returns queue callback" },
+          { "id": "ac2", "description": "Callback: loads task from storage, creates workspace, spawns agent" },
+          { "id": "ac3", "description": "Updates task.status to 'running' and task.agent_id after spawn" },
+          { "id": "ac4", "description": "Workspace creation failure (WorkspaceError) caught and task transitions to 'failed' with error details visible in task.error field" },
+          { "id": "ac5", "description": "Spawn failure (AgentSpawnError) caught and task transitions to 'failed' with error details" },
+          { "id": "ac6", "description": "No silent retries - failures are immediately visible in task status" }
+        ],
+        "specification": {
+          "architecture": {
+            "integration": "This callback is passed to forge-task-queue createQueueWorker()",
+            "sequence": "dequeue -> load task -> create workspace -> spawn agent -> update status",
+            "error_handling": "Catch workspace/spawn errors, update task to 'failed' with task.error = error.message"
+          }
+        }
+      }
+    ]
+  }
+}

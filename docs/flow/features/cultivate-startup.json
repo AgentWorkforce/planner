@@ -1,0 +1,94 @@
+{
+  "feature_id": "cultivate-startup",
+  "title": "Fail-Fast Startup Sequence",
+  "type": "feature",
+  "status": "verified",
+  "priority": "critical",
+  "dependencies": ["cultivate-api", "cultivate-jobs", "cultivate-filter-tier2", "cultivate-tuner"],
+  "parent": "cultivate-package",
+  "component": "cultivate",
+  "summary": {
+    "goal": "Implement the fail-fast startup sequence and plugin service wrapper for cultivate. startCultivate(config) initializes dependencies in order: Redis connection -> SQLite storage -> Transformers.js ML model -> Anthropic SDK health check -> Tuner config fetch -> SSE broadcaster -> BullMQ queues -> Scheduled jobs. Each step fails fast with a typed CultivateStartupError. createCultivateService() wraps everything in the standard plugin pattern: { router, initialize, shutdown }. Graceful shutdown stops workers, closes queues, closes Redis, closes SQLite.",
+    "acceptance_criteria": [
+      { "id": "cs-ac1", "description": "startCultivate(config) initializes all dependencies in the specified order" },
+      { "id": "cs-ac2", "description": "Redis unavailable throws CultivateStartupError('REDIS_UNAVAILABLE')" },
+      { "id": "cs-ac3", "description": "Transformers.js model load failure throws CultivateStartupError('ML_MODEL_LOAD_FAILED')" },
+      { "id": "cs-ac4", "description": "Anthropic API check failure throws CultivateStartupError('ANTHROPIC_UNAVAILABLE')" },
+      { "id": "cs-ac5", "description": "createCultivateService() returns { router, initialize, shutdown } matching plugin pattern" },
+      { "id": "cs-ac6", "description": "Graceful shutdown stops workers, closes queues, closes Redis, closes SQLite in reverse order" }
+    ]
+  },
+  "audit": {
+    "last_run": "2026-02-14",
+    "result": "pass",
+    "criteria": [
+      { "id": "cs-ac1", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac2", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac3", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac4", "status": "satisfied", "evidence": "src/startup.ts" },
+      { "id": "cs-ac5", "status": "satisfied", "evidence": "src/service.ts" },
+      { "id": "cs-ac6", "status": "satisfied", "evidence": "src/service.ts" }
+    ],
+    "drift": []
+  },
+  "plan_implementation": {
+    "scopes": ["cultivate"],
+    "steps": [
+      {
+        "step_id": "cs-s1",
+        "title": "Implement startCultivate() with ordered dependency checks",
+        "scope": "cultivate",
+        "description": "Create src/startup.ts. Implement startCultivate(config: CultivateStartupConfig) as an async function that initializes each dependency in sequence: 1) Connect to Redis (ioredis), 2) Initialize SQLite storage (run migrations), 3) Load Transformers.js zero-shot classifier model, 4) Verify Anthropic API key and health, 5) Fetch initial Tuner config (or use defaults), 6) Create SSE broadcaster, 7) Create BullMQ queues with Redis connection, 8) Start scheduled job repeaters. Each step must succeed before the next. Return a CultivateContext object containing all initialized dependencies for injection into the router and workers.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Dependencies initialized in strict order" },
+          { "id": "ac2", "description": "Each step fails fast if dependency unavailable" },
+          { "id": "ac3", "description": "Returns CultivateContext with all initialized services" },
+          { "id": "ac4", "description": "Default Greenhouse auto-created if none exist after storage init" }
+        ]
+      },
+      {
+        "step_id": "cs-s2",
+        "title": "Add fail-fast for each dependency (CultivateStartupError codes)",
+        "scope": "cultivate",
+        "description": "Implement typed error handling for each startup step. CultivateStartupError (from cultivate-errors) includes a code field with specific values: REDIS_UNAVAILABLE (Redis connection refused or timeout), SQLITE_INIT_FAILED (migration or file access error), ML_MODEL_LOAD_FAILED (Transformers.js model download or load failure), ANTHROPIC_UNAVAILABLE (API key missing or health check failed), TUNER_UNAVAILABLE (logged as warning only — falls back to defaults, does not throw), QUEUE_INIT_FAILED (BullMQ queue creation error). Each error includes the underlying cause for diagnostics.",
+        "dependencies": ["cs-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Each dependency failure produces a typed CultivateStartupError with specific code" },
+          { "id": "ac2", "description": "Tuner unavailability is a warning, not a fatal error" },
+          { "id": "ac3", "description": "Error includes underlying cause for diagnostics" },
+          { "id": "ac4", "description": "Startup aborts immediately on first fatal error (no partial initialization)" }
+        ]
+      },
+      {
+        "step_id": "cs-s3",
+        "title": "Implement createCultivateService() plugin pattern",
+        "scope": "cultivate",
+        "description": "Create the main service factory in src/service.ts. Implement createCultivateService(config) that returns { router, initialize, shutdown }. The initialize() method calls startCultivate() and creates the router via createCultivateRouter() with the resulting context. The router is an Express Router ready for mounting. This follows the exact same pattern as planner (createPlannerService), ideation (createIdeationService), and forge (createForgeService). Export from package root.",
+        "dependencies": ["cs-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Returns { router, initialize, shutdown } matching existing plugin pattern" },
+          { "id": "ac2", "description": "initialize() calls startCultivate() and sets up router" },
+          { "id": "ac3", "description": "Exported from package root: import { createCultivateService } from '@plannr/cultivate'" }
+        ]
+      },
+      {
+        "step_id": "cs-s4",
+        "title": "Implement graceful shutdown",
+        "scope": "cultivate",
+        "description": "Implement the shutdown() method on the cultivate service. Shutdown sequence reverses startup: 1) Stop all BullMQ workers (wait for active jobs to complete with timeout), 2) Close all BullMQ queues, 3) Stop Tuner polling interval, 4) Close SSE connections, 5) Close Redis connection, 6) Close SQLite database. Each step logs its progress. Set a maximum shutdown timeout (30 seconds) after which force-close remaining connections. Handle errors during shutdown gracefully (log but continue with remaining steps).",
+        "dependencies": ["cs-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Shutdown reverses startup order" },
+          { "id": "ac2", "description": "Active BullMQ jobs are given time to complete before force-close" },
+          { "id": "ac3", "description": "30-second maximum shutdown timeout" },
+          { "id": "ac4", "description": "Errors during shutdown are logged but don't prevent remaining cleanup" }
+        ]
+      }
+    ]
+  }
+}

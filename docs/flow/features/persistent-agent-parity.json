@@ -1,0 +1,355 @@
+{
+  "feature_id": "persistent-agent-parity",
+  "title": "Persistent Agent Parity with Spawned Agents",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "dependencies": ["planner-lead-service", "ui-agent-orchestration"],
+  "superseded_by": "relay-agent-integration",
+  "note": "V1 completed with direct emit. V2 (relay-agent-integration step-5) will migrate to MCP tools for full parity.",
+
+  "summary": {
+    "goal": "Ensure persistent agents (like PlannerLead) function identically to spawned agents from the UI and integration perspective: same status updates emitted to relay, same integration with questions/trajectories system, same visibility in the status bar and agent orchestration UI.",
+
+    "context": "PlannerLead runs as a persistent service inside planner-core, connected via RelayClient. This feature established parity via direct emit functions. The relay-agent-integration feature will complete the vision by having PlannerLead use the same MCP tools as spawned agents.",
+
+    "implementation_status": {
+      "v1_complete": "PlannerLead emits agent_joined/status_update/left via direct function calls",
+      "v2_pending": "relay-agent-integration step-5 will migrate to MCP tools (report_agent_status, ask_user_question)"
+    },
+
+    "problem_evidence": [
+      "Status bar shows '0 agents' even when PlannerLead is active and responding",
+      "PlannerLead uses its own conversation-history.ts instead of relay trajectories",
+      "useAgentOrchestration.ts listens for agent_status_update messages that PlannerLead never emits",
+      "No way for UI to know PlannerLead is 'working' vs 'idle' vs 'needs_input'"
+    ],
+
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "PlannerLead emits `agent_status_update` messages when its state changes (idle, working, needs_input)", "status": "v1:direct_emit, v2:mcp_tool" },
+      { "id": "ac2", "description": "PlannerLead appears in status bar agent avatars section when active", "status": "complete" },
+      { "id": "ac3", "description": "PlannerLead state is visually reflected: green pulse when generating response, idle when waiting", "status": "complete" },
+      { "id": "ac4", "description": "When PlannerLead needs human input (e.g., asks @user a question), it transitions to 'needs_input' state", "status": "v1:direct_emit, v2:ask_user_question_tool" },
+      { "id": "ac5", "description": "PlannerLead questions integrate with the question queue system (not just inline chat)", "status": "complete" },
+      { "id": "ac6", "description": "Answers to PlannerLead questions are stored in user trajectory (same as spawned agents)", "status": "complete" },
+      { "id": "ac7", "description": "PlannerLead can query user trajectory before asking questions (deduplication)", "status": "complete" },
+      { "id": "ac8", "description": "Activity popover shows PlannerLead's current activity when clicked", "status": "complete" },
+      { "id": "ac9", "description": "PlannerLead registers itself as an agent on startup (agent_joined event)", "status": "v1:direct_emit, v2:mcp_tool" },
+      { "id": "ac10", "description": "PlannerLead unregisters on shutdown (agent_left event)", "status": "v1:direct_emit, v2:mcp_tool" }
+    ],
+
+    "out_of_scope": [
+      "Converting PlannerLead to a spawned agent (it remains persistent)",
+      "Full trajectory persistence to database (can remain in-memory for v1)",
+      "Cross-plan trajectory queries (plan-scoped only for v1)",
+      "Multiple persistent agents (only PlannerLead for now)"
+    ],
+
+    "approaches": [
+      {
+        "id": "A",
+        "name": "Emit relay events from PlannerLead (V1 - IMPLEMENTED)",
+        "description": "PlannerLead directly emits agent_status_update, agent_joined, agent_left messages via relay. Questions sent via relay protocol same as spawned agents.",
+        "pros": [
+          "Quick to implement",
+          "UI code needs no changes (already listens for these events)"
+        ],
+        "cons": [
+          "Persistent and spawned agents use different code paths",
+          "Not unified - two ways of doing the same thing"
+        ],
+        "status": "implemented"
+      },
+      {
+        "id": "B",
+        "name": "MCP tools as unified interface (V2 - PLANNED)",
+        "description": "PlannerLead uses same MCP tools (report_agent_status, ask_user_question) as spawned agents. MCP tools internally call the emit functions.",
+        "pros": [
+          "Truly identical interface for all agents",
+          "Dogfooding - proves MCP tools work",
+          "Single code path for agent→system interaction"
+        ],
+        "cons": [
+          "Requires MCP tools to be implemented first"
+        ],
+        "status": "planned - see relay-agent-integration step-5"
+      }
+    ],
+
+    "recommended_approach": "B (V2)",
+    "approach_rationale": "V1 (approach A) is implemented and working. V2 (approach B) is the target state where MCP is the unified interface. relay-agent-integration will implement MCP tools, then step-5 migrates PlannerLead to use them."
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "notes": [
+      "Cross-scope contract: Events are broadcast via relay direct messages (not channels) so all connected clients receive them.",
+      "AgentState aligns with frontend: 'idle' | 'working' | 'needs_input' | 'error' (frontend 'normal' state is deprecated/unused)"
+    ],
+    "steps": [
+      {
+        "step_id": "pap-001",
+        "title": "Define agent status event types and helpers",
+        "scope": "planner-core",
+        "description": "Create src/relay/agent-status.ts with type definitions and helper functions for emitting standardized agent status events. This establishes the protocol that persistent agents use to broadcast their state.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports AgentState type: 'idle' | 'working' | 'needs_input' | 'error'" },
+          { "id": "ac2", "description": "Exports AgentRole type: 'planner-lead' | 'architect' | 'ui-designer' | 'data-modeler' | 'coder' | 'tester' | 'security'" },
+          { "id": "ac3", "description": "Exports emitAgentJoined() that sends: { type: 'agent_joined', agentId: string, role: AgentRole, displayName: string, state: 'idle', timestamp: string }" },
+          { "id": "ac4", "description": "Exports emitAgentStatusUpdate() that sends: { type: 'agent_status_update', agentId: string, state: AgentState, activity?: string, step?: string, thought?: string, timestamp: string }" },
+          { "id": "ac5", "description": "Exports emitAgentLeft() that sends: { type: 'agent_left', agentId: string, reason?: string, timestamp: string }" },
+          { "id": "ac6", "description": "Events broadcast via sendMessage() to all connected clients (using relay broadcast, not channel-specific)" }
+        ]
+      },
+      {
+        "step_id": "pap-002",
+        "title": "Emit agent_joined on PlannerLead startup",
+        "scope": "planner-core",
+        "description": "Modify planner-lead.ts to emit agent_joined event when PlannerLead connects to relay. This makes PlannerLead visible in the status bar immediately.",
+        "dependencies": ["pap-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "After successful relay connection and #planner join, emitAgentJoined is called" },
+          { "id": "ac2", "description": "Agent details include: agentId='PlannerLead', role='planner-lead', displayName='Planning Assistant'" },
+          { "id": "ac3", "description": "Initial state is 'idle'" },
+          { "id": "ac4", "description": "On reconnection, agent_joined is re-emitted (relay may have lost presence info)" }
+        ]
+      },
+      {
+        "step_id": "pap-003",
+        "title": "Emit status updates during message handling",
+        "scope": "planner-core",
+        "description": "Modify handleMessage in planner-lead.ts to emit status updates at key points: 'working' when starting to generate response, 'idle' when response sent.",
+        "dependencies": ["pap-001", "pap-002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When handleMessage starts processing, emit state='working' with activity='Generating response'" },
+          { "id": "ac2", "description": "If tool use occurs, update activity to 'Using tool: {toolName}'" },
+          { "id": "ac3", "description": "When response is sent, emit state='idle'" },
+          { "id": "ac4", "description": "If API error occurs, emit state='error' with activity describing the error" },
+          { "id": "ac5", "description": "Status updates include channelId context when available" }
+        ]
+      },
+      {
+        "step_id": "pap-004",
+        "title": "Emit agent_left on PlannerLead shutdown",
+        "scope": "planner-core",
+        "description": "Modify stopPlannerLead() to emit agent_left event before disconnecting. This cleanly removes PlannerLead from status bar.",
+        "dependencies": ["pap-001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "stopPlannerLead() emits agent_left before cleanup" },
+          { "id": "ac2", "description": "Event includes reason='shutdown'" },
+          { "id": "ac3", "description": "Graceful handling if relay is already disconnected (no error thrown)" }
+        ]
+      },
+      {
+        "step_id": "pap-005",
+        "title": "Update useAgentOrchestration to handle agent_joined/left",
+        "scope": "planner-ui",
+        "description": "Extend useAgentOrchestration hook to listen for agent_joined and agent_left events, maintaining the full agent list (not just status updates for existing agents).",
+        "dependencies": ["pap-002", "pap-004"],
+        "owner_role": "frontend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Add displayName field to Agent interface: { id, role, state, displayName, currentActivity?, currentStep?, currentThought?, hasQuestion }" },
+          { "id": "ac2", "description": "Update AgentRole type to include 'planner-lead': 'planner-lead' | 'architect' | 'ui-designer' | 'data-modeler' | 'coder' | 'tester' | 'security'" },
+          { "id": "ac3", "description": "On agent_joined event { type: 'agent_joined', agentId, role, displayName, state }, add new Agent to array" },
+          { "id": "ac4", "description": "On agent_left event { type: 'agent_left', agentId }, remove Agent from array" },
+          { "id": "ac5", "description": "Existing agent_status_update handling continues to work (updates existing agent, doesn't create new)" }
+        ]
+      },
+      {
+        "step_id": "pap-006",
+        "title": "Maintain agent registry and broadcast snapshot",
+        "scope": "planner-core",
+        "description": "Maintain in-memory registry of active agents. When a new UI client connects (sends request_agents_snapshot message), respond with agents_snapshot containing all active agents.",
+        "dependencies": ["pap-002"],
+        "owner_role": "backend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "agent-status.ts maintains Map<agentId, AgentInfo> registry, updated by emitAgentJoined/Left" },
+          { "id": "ac2", "description": "Exports getActiveAgents() returning [{ agentId, role, displayName, state, activity?, step?, thought? }]" },
+          { "id": "ac3", "description": "Listen for { type: 'request_agents_snapshot' } message, respond with { type: 'agents_snapshot', agents: [...] }" },
+          { "id": "ac4", "description": "agents_snapshot shape: { type: 'agents_snapshot', agents: [{ agentId, role, displayName, state, ... }] }" }
+        ]
+      },
+      {
+        "step_id": "pap-007",
+        "title": "Request agents_snapshot on hook mount",
+        "scope": "planner-ui",
+        "description": "Modify useAgentOrchestration to request agents_snapshot when mounting (or when relay connects). This ensures UI shows correct state even if it loaded after agents started.",
+        "dependencies": ["pap-005", "pap-006"],
+        "owner_role": "frontend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "On relay connect, send { type: 'request_agents_snapshot' } message via relay" },
+          { "id": "ac2", "description": "Handle { type: 'agents_snapshot', agents: [...] } response, populate agents array" },
+          { "id": "ac3", "description": "Map snapshot agents to Agent interface: { id: agentId, role, state, displayName, hasQuestion: state === 'needs_input' }" },
+          { "id": "ac4", "description": "Subsequent agent_joined/left/status_update events update incrementally" }
+        ]
+      },
+      {
+        "step_id": "pap-008",
+        "title": "Add PlannerLead visual representation in AgentAvatar",
+        "scope": "planner-ui",
+        "description": "Update AgentAvatar component to display 'planner-lead' role with appropriate icon/color. Note: AgentRole type update is in pap-005.",
+        "dependencies": ["pap-005"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "AgentAvatar has icon mapping for 'planner-lead' role (brain/lightbulb icon or similar)" },
+          { "id": "ac2", "description": "PlannerLead uses accent-cyan color (matches design system)" },
+          { "id": "ac3", "description": "Status bar correctly shows PlannerLead avatar with state indicator (green pulse when working, red ring when needs_input)" },
+          { "id": "ac4", "description": "Tooltip on hover shows displayName ('Planning Assistant')" }
+        ]
+      },
+      {
+        "step_id": "pap-009",
+        "title": "Implement needs_input state for @user questions",
+        "scope": "planner-core",
+        "description": "When PlannerLead detects it needs human input (e.g., generates a question for @user), transition to 'needs_input' state. This triggers the red ring indicator in UI.",
+        "dependencies": ["pap-003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "When response contains @user mention or is a direct question, emit state='needs_input'" },
+          { "id": "ac2", "description": "Question details included in status update (questionId, questionText preview)" },
+          { "id": "ac3", "description": "When user responds, transition back to 'working' then 'idle'" },
+          { "id": "ac4", "description": "needs_input state persists until answered or timeout" }
+        ]
+      },
+      {
+        "step_id": "pap-010",
+        "title": "Integrate with question queue system",
+        "scope": "planner-core",
+        "description": "When PlannerLead asks a question (needs_input), also emit question_added event so it integrates with the question queue UI (not just inline chat).",
+        "dependencies": ["pap-009"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "question_added event emitted with: questionId, agentId, questionText, options (if any), priority" },
+          { "id": "ac2", "description": "Question includes context from conversation history" },
+          { "id": "ac3", "description": "When answered, emit question_answered event" },
+          { "id": "ac4", "description": "Question queue UI can display and triage PlannerLead questions same as spawned agent questions" }
+        ]
+      },
+      {
+        "step_id": "pap-011",
+        "title": "Store answers in user trajectory",
+        "scope": "planner-core",
+        "description": "When a PlannerLead question is answered, store the answer in user trajectory format (same as spawned agents). This enables future deduplication.",
+        "dependencies": ["pap-010"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Create src/relay/user-trajectory.ts with QuestionAnsweredEvent type" },
+          { "id": "ac2", "description": "Store events in memory (Map<planId, UserTrajectoryEvent[]>)" },
+          { "id": "ac3", "description": "Record: questionId, askingAgent, questionText, selectedOption, reasoning, timestamp" },
+          { "id": "ac4", "description": "Exports addTrajectoryEvent(planId, event) and getTrajectory(planId) functions" }
+        ]
+      },
+      {
+        "step_id": "pap-012",
+        "title": "Query trajectory before asking questions",
+        "scope": "planner-core",
+        "description": "Before PlannerLead asks a question (adds to queue), check user trajectory for similar past answers. If found, use existing answer instead of asking again.",
+        "dependencies": ["pap-011"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Exports findSimilarAnswer(planId, questionText) that searches trajectory" },
+          { "id": "ac2", "description": "Simple string similarity check (can be enhanced with embeddings later)" },
+          { "id": "ac3", "description": "If similar answer found with >0.8 similarity, use that answer" },
+          { "id": "ac4", "description": "Log when deduplication occurs: 'Using previous answer for similar question'" }
+        ]
+      },
+      {
+        "step_id": "pap-013",
+        "title": "Activity popover data for PlannerLead",
+        "scope": "planner-core",
+        "description": "Include currentActivity, currentStep, and currentThought in status updates so the activity popover has content to display when user clicks PlannerLead avatar.",
+        "dependencies": ["pap-003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "status_update includes activity field (e.g., 'Analyzing plan structure', 'Using tool: read_plan')" },
+          { "id": "ac2", "description": "When working on specific plan channel (#plan-xxx), include step field with channelId" },
+          { "id": "ac3", "description": "Optional thought field for 'current thinking' preview (first 100 chars of response being generated)" }
+        ]
+      },
+      {
+        "step_id": "pap-013b",
+        "title": "Display activity popover for agents",
+        "scope": "planner-ui",
+        "description": "Ensure AgentAvatar activity popover displays currentActivity, currentStep, and currentThought from status updates.",
+        "dependencies": ["pap-008", "pap-013"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Clicking agent avatar opens popover showing: displayName, role, state, currentActivity" },
+          { "id": "ac2", "description": "If currentThought exists, show truncated preview with 'View full trajectory' link" },
+          { "id": "ac3", "description": "If agent state is 'error', show error activity in red" }
+        ]
+      },
+      {
+        "step_id": "pap-014",
+        "title": "Write unit tests for agent-status module",
+        "scope": "planner-core",
+        "description": "Create src/relay/agent-status.test.ts with tests for the agent status helpers and registry.",
+        "dependencies": ["pap-001", "pap-006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test emitAgentJoined adds to registry and emits event with correct shape" },
+          { "id": "ac2", "description": "Test emitAgentLeft removes from registry and emits event" },
+          { "id": "ac3", "description": "Test getActiveAgents returns current registry state" },
+          { "id": "ac4", "description": "Test request_agents_snapshot triggers agents_snapshot response" },
+          { "id": "ac5", "description": "Test emitAgentStatusUpdate does NOT affect registry (only broadcasts)" }
+        ]
+      },
+      {
+        "step_id": "pap-015",
+        "title": "Write integration test for PlannerLead visibility",
+        "scope": "planner-core",
+        "description": "Add integration test that verifies PlannerLead emits correct lifecycle events and appears in agents list.",
+        "dependencies": ["pap-002", "pap-003", "pap-004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: initPlannerLead emits agent_joined with agentId='PlannerLead', role='planner-lead'" },
+          { "id": "ac2", "description": "Test: message handling emits working -> idle sequence" },
+          { "id": "ac3", "description": "Test: stopPlannerLead emits agent_left" },
+          { "id": "ac4", "description": "Test: getActiveAgents includes PlannerLead after init, excludes after stop" }
+        ]
+      },
+      {
+        "step_id": "pap-016",
+        "title": "Write tests for useAgentOrchestration hook",
+        "scope": "planner-ui",
+        "description": "Add tests for the updated useAgentOrchestration hook to verify it correctly handles agent lifecycle events.",
+        "dependencies": ["pap-005", "pap-007"],
+        "owner_role": "frontend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: agent_joined event adds agent to agents array" },
+          { "id": "ac2", "description": "Test: agent_left event removes agent from agents array" },
+          { "id": "ac3", "description": "Test: agents_snapshot populates initial agents" },
+          { "id": "ac4", "description": "Test: agent_status_update updates existing agent state" },
+          { "id": "ac5", "description": "Test: 'planner-lead' role is recognized" }
+        ]
+      }
+    ]
+  },
+
+  "design_decisions": [
+    {
+      "decision": "Emit same events as spawned agents rather than create separate API",
+      "rationale": "UI already listens for agent_status_update via relay. Emitting the same events means zero UI changes for basic visibility. Consistent protocol for all agent types.",
+      "alternatives_considered": ["REST endpoint for agent list", "SSE stream for persistent agents only"]
+    },
+    {
+      "decision": "Maintain in-memory agent registry in planner-core",
+      "rationale": "Needed for agents_snapshot on new connections. Simple Map is sufficient for single persistent agent. Can evolve to SQLite if multi-agent support needed.",
+      "alternatives_considered": ["Rely solely on relay presence", "Store in SQLite from start"]
+    },
+    {
+      "decision": "Simple string similarity for trajectory deduplication",
+      "rationale": "MVP approach - more sophisticated semantic matching can be added later with embeddings. For now, exact/near-exact matches are the common case.",
+      "alternatives_considered": ["Embedding-based similarity from start", "Manual question tagging"]
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "feature_id": "tend-multiple-choice-input",
+  "title": "Add discrete option selection to conversation input",
+  "type": "feature",
+  "status": "draft",
+  "priority": "medium",
+  "dependencies": ["tend-conversation-core"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Add discrete option selection to the conversation input area for direct AI questions.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "MultipleChoiceInput component renders above ConversationInput when AI message has metadata.choices"
+      },
+      {
+        "id": "ac2",
+        "description": "Max ~4 text options displayed, styled as text (not chunky buttons)"
+      },
+      {
+        "id": "ac3",
+        "description": "Last option is always freeform ('or type your own')"
+      },
+      {
+        "id": "ac4",
+        "description": "Clicking an option sends it as a user message"
+      },
+      {
+        "id": "ac5",
+        "description": "Options disappear after selection"
+      },
+      {
+        "id": "ac6",
+        "description": "Component renders nothing when no pending choices exist"
+      },
+      {
+        "id": "ac7",
+        "description": "Dashboard-level and project-level questions both use this pattern"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "This is a new component — neither ideation-ui nor planner-ui has it.",
+        "The pattern is simple: AI messages can include a choices array in metadata. When present, the input area shows clickable text options.",
+        "Styled minimally, consistent with text-first aesthetic.",
+        "Selection sends as regular user message.",
+        "The status bar bubble system handles agent blocking questions separately."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "mci01",
+        "title": "Create MultipleChoiceInput component",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/conversation/MultipleChoiceInput.tsx. Renders above ConversationInput when AI message has metadata.choices array. Display max ~4 text-styled options (not chunky buttons). Last option is freeform fallback ('or type your own'). Clicking option sends as user message, options disappear. Renders nothing when no choices.",
+        "acceptance_criteria": ["ac1", "ac2", "ac3", "ac4", "ac5", "ac6"]
+      },
+      {
+        "id": "mci02",
+        "title": "Wire to AI message metadata",
+        "scope": "tend",
+        "description": "In ConversationPane: detect latest AI message with metadata.choices. Pass choices to MultipleChoiceInput. On option selection, call sendMessage with selected text, clear choices state. Support both dashboard-level and project-level questions.",
+        "dependencies": ["mci01"],
+        "acceptance_criteria": ["ac7"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "trigger": "AI message metadata.choices array",
+      "pattern": "text-styled options above chat input",
+      "interaction": "click sends as user message, options disappear",
+      "new_components": [
+        "MultipleChoiceInput"
+      ],
+      "styling": {
+        "max_options": 4,
+        "style": "text, not chunky buttons",
+        "last_option": "or type your own (freeform)"
+      },
+      "behavior": {
+        "render_when": "AI message has metadata.choices",
+        "click": "sends as user message",
+        "post_selection": "options disappear",
+        "no_choices": "component renders nothing"
+      },
+      "scope": "dashboard-level and project-level questions",
+      "data_structure": {
+        "ai_message_metadata": {
+          "choices": ["option1", "option2", "option3"]
+        }
+      }
+    }
+  }
+}

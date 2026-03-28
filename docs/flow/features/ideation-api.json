@@ -1,0 +1,168 @@
+{
+  "feature_id": "ideation-api",
+  "title": "Ideation REST API",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "high",
+  "dependencies": ["ideation-storage"],
+  "parent": "ideation-package",
+  "summary": {
+    "goal": "Expose REST endpoints for session management, enabling programmatic access to the ideation workflow.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "POST /api/ideation/sessions creates a new session with initial intent and optional initiative_id" },
+      { "id": "ac2", "description": "GET /api/ideation/sessions lists sessions with optional status and initiative_id filters" },
+      { "id": "ac3", "description": "GET /api/ideation/sessions/:id returns session details with transcript and understanding" },
+      { "id": "ac4", "description": "POST /api/ideation/sessions/:id/messages appends a message to transcript" },
+      { "id": "ac5", "description": "PUT /api/ideation/sessions/:id/understanding/:specialist updates specialist observations (freeform)" },
+      { "id": "ac6", "description": "POST /api/ideation/sessions/:id/send-to-planner creates or updates plan from session" },
+      { "id": "ac7", "description": "POST /api/ideation/sessions/:id/abandon marks session as abandoned" },
+      { "id": "ac8", "description": "GET /api/ideation/sessions/:id/events SSE endpoint for real-time updates" },
+      { "id": "ac9", "description": "GET /api/ideation/sessions/:id/confidence returns aggregate confidence score" },
+      { "id": "ac10", "description": "All endpoints validate input with Zod schemas" },
+      { "id": "ac11", "description": "Error responses follow existing API patterns (ApiError)" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["ideation-core"],
+    "steps": [
+      {
+        "step_id": "api001",
+        "title": "Define API request/response schemas",
+        "scope": "ideation-core",
+        "description": "Create minimal Zod schemas for API endpoints (structure, not content validation)",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreateSessionRequest = { initial_intent: string, initiative_id?: string }" },
+          { "id": "ac2", "description": "ListSessionsQuery = { status?: SessionStatus, initiative_id?: string }" },
+          { "id": "ac3", "description": "AppendMessageRequest = { role: TranscriptRole, content: string }" },
+          { "id": "ac4", "description": "UpdateUnderstandingRequest = z.record(z.string(), z.unknown()) - freeform observations" },
+          { "id": "ac5", "description": "SendToPlannerRequest = { goal?: string, context?: string } (optional overrides)" },
+          { "id": "ac6", "description": "All response types match domain entities" }
+        ]
+      },
+      {
+        "step_id": "api002",
+        "title": "Implement session CRUD endpoints",
+        "scope": "ideation-core",
+        "description": "Create Express handlers for session CRUD",
+        "dependencies": ["api001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /sessions returns { id, status, initiative_id?, source, transcript: [], understanding: {}, planner_sends: [], created_at, updated_at }" },
+          { "id": "ac2", "description": "GET /sessions returns Session[] sorted by updated_at DESC" },
+          { "id": "ac3", "description": "GET /sessions/:id returns full Session or 404" },
+          { "id": "ac4", "description": "POST /sessions/:id/abandon updates status to 'abandoned', returns updated Session" }
+        ]
+      },
+      {
+        "step_id": "api003",
+        "title": "Implement message and understanding endpoints",
+        "scope": "ideation-core",
+        "description": "Create handlers for transcript and observations updates",
+        "dependencies": ["api002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /sessions/:id/messages appends message with auto-generated id and timestamp" },
+          { "id": "ac2", "description": "PUT /sessions/:id/understanding/:specialist accepts any specialist name (no enum validation)" },
+          { "id": "ac3", "description": "PUT /sessions/:id/understanding/:specialist accepts freeform observations Record<string, unknown>" },
+          { "id": "ac4", "description": "Both return updated Session" }
+        ]
+      },
+      {
+        "step_id": "api004",
+        "title": "Implement send-to-planner endpoint",
+        "scope": "ideation-core",
+        "description": "Create handler to send session understanding to planner",
+        "dependencies": ["api003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "POST /sessions/:id/send-to-planner works on active sessions" },
+          { "id": "ac2", "description": "If planner_sends is empty: creates new plan via planner-core API" },
+          { "id": "ac3", "description": "If planner_sends has entries: creates new plan version with updated understanding" },
+          { "id": "ac4", "description": "Goal defaults to initial_intent, can be overridden in request" },
+          { "id": "ac5", "description": "Appends PlannerSend to session.planner_sends (full payload snapshot)" },
+          { "id": "ac6", "description": "Returns { session, plan_id, plan_version, plan_channel }" }
+        ],
+        "integration": true,
+        "cross_scope_contract": {
+          "target": "planner-core",
+          "endpoint": "POST /api/plans",
+          "request": "{ goal: string, context?: string, source: { type: 'ideation', session_id: string }, understanding?: Understanding, initiative_id?: string }",
+          "response": "{ id: string, ... }"
+        }
+      },
+      {
+        "step_id": "api005",
+        "title": "Implement confidence endpoint",
+        "scope": "ideation-core",
+        "description": "Return aggregate confidence score from all specialists",
+        "dependencies": ["api002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /sessions/:id/confidence returns { score: 0-100, breakdown: { Architect: 'confident', ... } }" },
+          { "id": "ac2", "description": "Score is computed from computeAggregateConfidence(understanding)" },
+          { "id": "ac3", "description": "Breakdown shows each specialist's confidence level" }
+        ]
+      },
+      {
+        "step_id": "api006",
+        "title": "Implement SSE events endpoint",
+        "scope": "ideation-core",
+        "description": "Create Server-Sent Events endpoint for real-time session updates",
+        "dependencies": ["api003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "GET /sessions/:id/events returns SSE stream" },
+          { "id": "ac2", "description": "Events: transcript_updated, understanding_updated, status_changed, confidence_changed" },
+          { "id": "ac3", "description": "Event format: { event: string, data: { session_id, ...changes } }" },
+          { "id": "ac4", "description": "Connection kept alive with heartbeat" }
+        ]
+      },
+      {
+        "step_id": "api007",
+        "title": "Create event emitter for session changes",
+        "scope": "ideation-core",
+        "description": "Create IdeationEvents emitter that API handlers and SSE endpoint use",
+        "dependencies": ["api006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "IdeationEvents extends EventEmitter" },
+          { "id": "ac2", "description": "Events: 'transcript', 'understanding', 'status', 'confidence'" },
+          { "id": "ac3", "description": "API handlers emit events after successful operations" },
+          { "id": "ac4", "description": "SSE endpoint subscribes to events for specific session_id" }
+        ]
+      },
+      {
+        "step_id": "api008",
+        "title": "Wire up routes and middleware",
+        "scope": "ideation-core",
+        "description": "Create routes.ts, integrate with Express app",
+        "dependencies": ["api007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "All routes under /api/ideation prefix" },
+          { "id": "ac2", "description": "JSON body parsing middleware applied" },
+          { "id": "ac3", "description": "Error handling middleware converts ApiError to JSON response" }
+        ]
+      },
+      {
+        "step_id": "api009",
+        "title": "Write API tests",
+        "scope": "ideation-core",
+        "description": "Integration tests for all endpoints",
+        "dependencies": ["api008"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test session creation and listing with filters" },
+          { "id": "ac2", "description": "Test message append and understanding update" },
+          { "id": "ac3", "description": "Test send-to-planner (mock planner-core)" },
+          { "id": "ac4", "description": "Test send-to-planner updates existing plan" },
+          { "id": "ac5", "description": "Test confidence endpoint" },
+          { "id": "ac6", "description": "Test SSE connection and events" },
+          { "id": "ac7", "description": "Test error cases (404, validation)" }
+        ]
+      }
+    ]
+  }
+}

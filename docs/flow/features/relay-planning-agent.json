@@ -1,0 +1,161 @@
+{
+  "feature_id": "relay-planning-agent",
+  "title": "Planning Agent Spawning",
+  "type": "feature",
+  "status": "approved",
+  "priority": "critical",
+  "dependencies": ["relay-core"],
+
+  "summary": {
+    "goal": "Enable spawning planning agents via relay-pty when a plan is created or needs AI assistance",
+    "context": "Planning agents are Claude instances running in pseudo-terminals, spawned via relay-pty. They receive a system prompt instructing them to use MCP tools to build plans. The agent works continuously on draft plans until the human approves.",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Planning agent spawns when plan created with AI assistance requested" },
+      { "id": "ac2", "description": "Agent receives system prompt with planning instructions" },
+      { "id": "ac3", "description": "Agent receives context: goal, attachments, constraints" },
+      { "id": "ac4", "description": "Agent appears in relay-dashboard for observability" },
+      { "id": "ac5", "description": "Agent can be explicitly terminated" },
+      { "id": "ac6", "description": "Mock agent behavior when relay unavailable" }
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "rpa001",
+        "title": "Define planning agent system prompt",
+        "description": "Create src/relay/prompts/planning-agent.ts with the system prompt that instructs Claude how to behave as a planning agent. Include: MCP tool usage patterns, plan structure expectations, collaboration with human editors.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "System prompt defines planning agent role" },
+          { "id": "ac2", "description": "Prompt includes MCP tool usage instructions" },
+          { "id": "ac3", "description": "Prompt describes collaboration with humans" },
+          { "id": "ac4", "description": "Prompt instructs periodic plan analysis for improvements (used by relay-ai-improvements)" }
+        ]
+      },
+      {
+        "step_id": "rpa002",
+        "title": "Create agent spawner module",
+        "description": "Create src/relay/spawner.ts that uses relay-pty to spawn Claude instances. Function: spawnPlanningAgent(planId, goal, context) returns { agentId, sessionToken }.",
+        "scope": "planner-core",
+        "dependencies": ["rpa001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Spawner creates Claude process via relay-pty" },
+          { "id": "ac2", "description": "Agent registered with relay-daemon" },
+          { "id": "ac3", "description": "Returns { agentId: string, sessionToken: string }" },
+          { "id": "ac4", "description": "Agent receives plan_id and goal in initial context" }
+        ]
+      },
+      {
+        "step_id": "rpa003",
+        "title": "Configure agent MCP connection",
+        "description": "Pass MCP server connection details to spawned agent. Agent should connect back to Planner's MCP HTTP endpoints (from relay-mcp-bridge) to use planning tools.",
+        "scope": "planner-core",
+        "dependencies": ["rpa002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Agent receives MCP server URL in environment (MCP_SERVER_URL)" },
+          { "id": "ac2", "description": "Agent receives session token for authentication (MCP_SESSION_TOKEN)" },
+          { "id": "ac3", "description": "Agent can list and call MCP tools via HTTP" }
+        ],
+        "note": "Depends on relay-mcp-bridge providing HTTP transport - coordinate implementation order"
+      },
+      {
+        "step_id": "rpa004",
+        "title": "Create mock spawner for fallback",
+        "description": "Create src/relay/mock-spawner.ts that provides mock agent behavior when relay unavailable. Returns mock responses with realistic delays for testing UI without relay.",
+        "scope": "planner-core",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Mock spawner matches spawner interface" },
+          { "id": "ac2", "description": "Returns mock agentId and sessionToken" },
+          { "id": "ac3", "description": "Mock agent provides canned responses" },
+          { "id": "ac4", "description": "Configurable response delay for realistic UX" }
+        ]
+      },
+      {
+        "step_id": "rpa005",
+        "title": "Integrate spawn into plan creation",
+        "description": "Modify POST /plans handler: if relay available and AI assistance requested, spawn planning agent after creating plan record. If relay unavailable, use mock spawner.",
+        "scope": "planner-core",
+        "dependencies": ["rpa002", "rpa003", "rpa004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Agent spawned on plan creation when ai_assist=true" },
+          { "id": "ac2", "description": "Plan record includes agent_id and session_id references" },
+          { "id": "ac3", "description": "Falls back to mock spawner when relay unavailable" },
+          { "id": "ac4", "description": "Spawn errors logged but don't fail plan creation" }
+        ]
+      },
+      {
+        "step_id": "rpa006",
+        "title": "Add agent termination",
+        "description": "Create terminateAgent(agentId) function. Call when plan is approved or explicitly requested. Also used by session timeout (relay-session-management).",
+        "scope": "planner-core",
+        "dependencies": ["rpa002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Agent process terminated cleanly" },
+          { "id": "ac2", "description": "Relay-daemon notified of termination" },
+          { "id": "ac3", "description": "Termination is idempotent (no error if already terminated)" }
+        ]
+      },
+      {
+        "step_id": "rpa007",
+        "title": "Add unit tests for spawner",
+        "scope": "planner-core",
+        "description": "Create tests for spawner module: successful spawn, spawn failure handling, termination, mock fallback behavior.",
+        "dependencies": ["rpa002", "rpa004", "rpa006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Tests for successful agent spawn with mocked relay-pty" },
+          { "id": "ac2", "description": "Tests for spawn failure graceful handling" },
+          { "id": "ac3", "description": "Tests for agent termination" },
+          { "id": "ac4", "description": "Tests for mock spawner fallback" }
+        ]
+      }
+    ]
+  },
+
+  "plan_tests": {
+    "coverage": "integration",
+    "priority": "critical",
+    "cases": [
+      { "type": "happy", "description": "System prompt exports valid string with planning agent role definition" },
+      { "type": "happy", "description": "System prompt includes MCP tool usage patterns" },
+      { "type": "happy", "description": "System prompt includes human collaboration instructions" },
+      { "type": "happy", "description": "System prompt includes improvement analysis instructions" },
+      { "type": "happy", "description": "spawnPlanningAgent(planId, goal, context) returns { agentId, sessionToken }" },
+      { "type": "happy", "description": "Spawned agent receives plan_id and goal in initial context" },
+      { "type": "happy", "description": "Agent receives MCP_SERVER_URL and MCP_SESSION_TOKEN in environment" },
+      { "type": "happy", "description": "Mock spawner returns mock agentId and sessionToken" },
+      { "type": "happy", "description": "Mock spawner provides canned responses with configurable delay" },
+      { "type": "happy", "description": "POST /plans with ai_assist=true spawns agent when relay available" },
+      { "type": "happy", "description": "Plan record includes agent_id and session_id after spawn" },
+      { "type": "happy", "description": "terminateAgent(agentId) terminates agent process cleanly" },
+      { "type": "happy", "description": "terminateAgent notifies relay-daemon of termination" },
+      { "type": "edge", "description": "Mock spawner interface matches real spawner interface" },
+      { "type": "edge", "description": "POST /plans with ai_assist=true falls back to mock when relay unavailable" },
+      { "type": "edge", "description": "POST /plans with ai_assist=false does not spawn agent" },
+      { "type": "edge", "description": "terminateAgent is idempotent - no error if agent already terminated" },
+      { "type": "edge", "description": "terminateAgent handles non-existent agentId gracefully" },
+      { "type": "edge", "description": "Spawned agent appears in relay-daemon registry (verified via relay API)" },
+      { "type": "error", "description": "Spawn error logged but plan creation succeeds" },
+      { "type": "error", "description": "relay-pty spawn timeout handled gracefully" },
+      { "type": "error", "description": "relay-daemon connection error during spawn uses mock fallback" },
+      { "type": "error", "description": "terminateAgent error logged but does not throw" },
+      { "type": "error", "description": "Invalid planId to spawnPlanningAgent returns error" }
+    ],
+    "data_requirements": [
+      "Mocked relay-pty module for spawn tests",
+      "Test plan records with valid plan_id, goal, and context",
+      "Mocked relay-daemon for agent registration verification",
+      "Configurable mock response delays (0ms for unit tests, 100-500ms for UX tests)"
+    ]
+  }
+}

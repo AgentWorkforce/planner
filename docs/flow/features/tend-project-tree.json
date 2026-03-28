@@ -1,0 +1,150 @@
+{
+  "feature_id": "tend-project-tree",
+  "title": "Replace CuratedBlocksColumn with zoomable project tree",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["tend-theming"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Replace the right column's CuratedBlocksColumn with a zoomable project tree showing work organized by scope.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "CuratedBlocksColumn removed from TendLayout right column"
+      },
+      {
+        "id": "ac2",
+        "description": "ProjectTree component renders steps grouped by scope (WorkSection per scope)"
+      },
+      {
+        "id": "ac3",
+        "description": "Three zoom levels work: OVERVIEW (scope headers with progress bars), SCOPE (one expanded with StepNode list), STEP (full step detail visible)"
+      },
+      {
+        "id": "ac4",
+        "description": "TreeBreadcrumb shows current zoom path and clicking segments zooms out"
+      },
+      {
+        "id": "ac5",
+        "description": "URL params sync with zoom state: ?zoom=overview|scope|step&focus=scope-id.step-id"
+      },
+      {
+        "id": "ac6",
+        "description": "StepNode (adapted from planner-ui StepEditor) shows compact view: title + status indicator (○ pending, ⟳ running, ✓ done)"
+      },
+      {
+        "id": "ac7",
+        "description": "ScopeHeader shows scope name + progress bar (done/total steps)"
+      },
+      {
+        "id": "ac8",
+        "description": "ArtifactsSection exists (empty initially, populated when forge reports artifacts)"
+      },
+      {
+        "id": "ac9",
+        "description": "ProjectContext (adapted from planner-ui PlanEditorContext) provides step data + real-time SSE sync"
+      },
+      {
+        "id": "ac10",
+        "description": "Clicking a step at OVERVIEW zoom → zooms to SCOPE. Clicking at SCOPE → zooms to STEP."
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The right column is the biggest structural change. CuratedBlocksColumn is a flat vertical list of curated blocks. Replacing with a hierarchical, zoomable tree.",
+        "Key components to copy from planner-ui: StepEditor (simplify to compact StepNode), SwimlaneView + useTopologicalSort (adapt from horizontal to vertical), DependencyIndicator (reuse as-is), PlanEditorContext (adapt to ProjectContext).",
+        "New: ProjectTree container, TreeBreadcrumb, WorkSection, ScopeHeader, ArtifactsSection."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "ptr01",
+        "title": "Remove CuratedBlocksColumn and create ProjectTree container",
+        "scope": "tend",
+        "description": "Delete packages/tend/src/components/dashboard/CuratedBlocksColumn.tsx. Create packages/tend/src/components/tree/ProjectTree.tsx with zoom state management (OVERVIEW/SCOPE/STEP). Add URL param sync: ?zoom=overview|scope|step&focus=scope-id.step-id.",
+        "acceptance_criteria": ["ac1", "ac3", "ac5"]
+      },
+      {
+        "id": "ptr02",
+        "title": "Copy and adapt StepEditor from planner-ui to StepNode",
+        "scope": "tend",
+        "description": "Copy packages/planner-ui/src/components/steps/StepEditor.tsx → packages/tend/src/components/tree/StepNode.tsx. Simplify to compact view: title + status indicator only (○ pending, ⟳ running, ✓ done). Remove inline editing (editing moves to sheets later).",
+        "dependencies": ["ptr01"],
+        "acceptance_criteria": ["ac6"]
+      },
+      {
+        "id": "ptr03",
+        "title": "Create WorkSection and ScopeHeader components",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/tree/WorkSection.tsx — groups StepNode list by scope. Create packages/tend/src/components/tree/ScopeHeader.tsx — renders scope name + progress bar (done/total steps). Copy progress calculation logic from planner-ui StepList.",
+        "dependencies": ["ptr02"],
+        "acceptance_criteria": ["ac2", "ac7"]
+      },
+      {
+        "id": "ptr04",
+        "title": "Create TreeBreadcrumb with URL param sync",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/tree/TreeBreadcrumb.tsx. Render zoom path as clickable segments (Project > Scope > Step). Wire to URL params. Clicking segments zooms out. Reference planner-ui breadcrumb patterns if any exist.",
+        "dependencies": ["ptr01"],
+        "acceptance_criteria": ["ac4", "ac5"]
+      },
+      {
+        "id": "ptr05",
+        "title": "Create ArtifactsSection shell",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/tree/ArtifactsSection.tsx — empty component, renders 'No artifacts yet'. Will be populated later by forge integration. Hidden when empty.",
+        "dependencies": ["ptr01"],
+        "acceptance_criteria": ["ac8"]
+      },
+      {
+        "id": "ptr06",
+        "title": "Adapt PlanEditorContext to ProjectContext",
+        "scope": "tend",
+        "description": "Copy packages/planner-ui/src/contexts/PlanEditorContext.tsx → packages/tend/src/contexts/ProjectContext.tsx. Adapt for project-scoped data (steps + blocks + project config). Wire SSE sync using existing usePlanEvents pattern. Provide step data to tree components.",
+        "dependencies": ["ptr01"],
+        "acceptance_criteria": ["ac9"]
+      },
+      {
+        "id": "ptr07",
+        "title": "Wire zoom interaction click handlers",
+        "scope": "tend",
+        "description": "In StepNode: add onClick handler. At OVERVIEW zoom → click ScopeHeader → set zoom to SCOPE, focus to scope-id. At SCOPE zoom → click StepNode → set zoom to STEP, focus to step-id. Update URL params on each transition.",
+        "dependencies": ["ptr02", "ptr03", "ptr04", "ptr06"],
+        "acceptance_criteria": ["ac10"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_components": "planner-ui: StepEditor, SwimlaneView, DependencyIndicator, PlanEditorContext",
+      "zoom_model": "OVERVIEW → SCOPE → STEP via click",
+      "url_params": "?zoom=overview|scope|step&focus=scope-id.step-id",
+      "components_to_copy": [
+        "planner-ui StepEditor → adapt to StepNode (compact)",
+        "planner-ui SwimlaneView → adapt from horizontal to vertical",
+        "planner-ui DependencyIndicator → reuse as-is",
+        "planner-ui PlanEditorContext → adapt to ProjectContext"
+      ],
+      "new_components": [
+        "ProjectTree (container)",
+        "TreeBreadcrumb (zoom navigation)",
+        "WorkSection (scope grouping)",
+        "ScopeHeader (name + progress)",
+        "ArtifactsSection (forge output)"
+      ],
+      "status_indicators": {
+        "pending": "○",
+        "running": "⟳",
+        "done": "✓"
+      }
+    }
+  }
+}

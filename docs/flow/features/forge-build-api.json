@@ -1,0 +1,141 @@
+{
+  "feature_id": "forge-build-api",
+  "title": "Build REST API Endpoints",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "component": "forge-core",
+  "parent": "forge-builds",
+  "dependencies": ["forge-build-coordinator"],
+
+  "summary": {
+    "goal": "Add REST API endpoints for build lifecycle: create, list, get status, pause/resume/cancel, and SSE event streaming. Mounted under /api/forge/builds.",
+    "acceptance_criteria": [
+      { "id": "fba-ac1", "description": "POST /builds creates a build from BuildRequest, starts execution, returns build_id + initial status" },
+      { "id": "fba-ac2", "description": "GET /builds lists builds with optional status filter and pagination" },
+      { "id": "fba-ac3", "description": "GET /builds/:id returns full build state: status, tiers with run progress, aggregate counts" },
+      { "id": "fba-ac4", "description": "POST /builds/:id/pause pauses a running build" },
+      { "id": "fba-ac5", "description": "POST /builds/:id/resume resumes a paused build" },
+      { "id": "fba-ac6", "description": "POST /builds/:id/cancel cancels a build and all its runs" },
+      { "id": "fba-ac7", "description": "GET /builds/:id/events streams SSE events: build_started, tier_started, run_started, run_completed, run_failed, tier_completed, build_completed, build_failed" },
+      { "id": "fba-ac8", "description": "All request bodies validated with Zod schemas" },
+      { "id": "fba-ac9", "description": "Error responses use @plannr/errors pattern (404 for missing build, 409 for invalid state transitions)" },
+      { "id": "fba-ac10", "description": "Routes registered via registerBuildRoutes() following existing Forge route pattern" }
+    ]
+  },
+
+  "context": {
+    "architect": {
+      "endpoints": {
+        "POST /builds": "{ tiers: [{ tier: 0, plan_ids: ['a','b'] }, { tier: 1, plan_ids: ['c'] }], mode?: 'test'|'real', workspace_path?: string, concurrency_limit?: number, skip_completed?: boolean }",
+        "GET /builds": "?status=running&limit=20&offset=0",
+        "GET /builds/:id": "Returns { build_id, status, tiers: [{ tier, plan_ids, runs: [{ run_id, plan_id, status }] }], progress: { total_plans, completed, failed, running, pending } }",
+        "POST /builds/:id/pause": "No body. Returns { build_id, status: 'paused' }",
+        "POST /builds/:id/resume": "No body. Returns { build_id, status: 'running' }",
+        "POST /builds/:id/cancel": "No body. Returns { build_id, status: 'cancelled' }",
+        "GET /builds/:id/events": "SSE stream. Events: { type: 'build_started'|'tier_started'|'run_completed'|..., data: {...} }"
+      },
+      "pattern": "Follows existing registerRunRoutes() pattern: handler factories with deps injection, Zod validation, @plannr/errors"
+    }
+  },
+
+  "plan_implementation": {
+    "scopes": ["forge-core"],
+    "steps": [
+      {
+        "step_id": "fba-i001",
+        "title": "Define Zod request/response schemas for build endpoints",
+        "scope": "forge-core",
+        "description": "Add build-specific request and response Zod schemas to the API layer. Reuses BuildRequestSchema from domain for POST /builds body. Adds query schemas for listing and response shapes for API consumers.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "CreateBuildRequestSchema: reuses BuildRequestSchema from domain (tiers, mode, workspace_path, concurrency_limit, skip_completed)" },
+          { "id": "ac2", "description": "ListBuildsQuerySchema: z.object({ status: BuildStatusSchema.optional(), limit: z.coerce.number().int().positive().max(100).default(50), offset: z.coerce.number().int().nonnegative().default(0) })" },
+          { "id": "ac3", "description": "BuildResponseSchema: z.object({ build_id, status, tiers: [{ tier, plan_ids, runs: [{ run_id, plan_id, status }] }], progress: { total_plans, completed, failed, running, pending, skipped }, created_at, started_at, completed_at, error })" },
+          { "id": "ac4", "description": "BuildSummarySchema for list endpoint (omits per-run details): z.object({ build_id, status, mode, total_plans, progress: { completed, failed, running, pending, skipped }, created_at, updated_at })" },
+          { "id": "ac5", "description": "All schemas exported with inferred TypeScript types" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/forge-core/src/api/schemas/build-schemas.ts",
+            "pattern": "Same as existing schemas.ts — Zod schemas with z.coerce for query params, z.infer for types. Separate file to keep build concerns isolated."
+          }
+        }
+      },
+      {
+        "step_id": "fba-i002",
+        "title": "Implement build handler factories",
+        "scope": "forge-core",
+        "description": "Create handler factory functions for all build endpoints: create, list, get, pause, resume, cancel. Follow the RunHandlerDeps pattern with BuildHandlerDeps interface.",
+        "dependencies": ["fba-i001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BuildHandlerDeps interface: { storage: ForgeStorage, coordinator: BuildCoordinator }" },
+          { "id": "ac2", "description": "createBuildHandler(deps): validates body with CreateBuildRequestSchema.safeParse(), calls createBuild() factory, storage.createBuild(), coordinator.startBuild(), returns 201 with { build }" },
+          { "id": "ac3", "description": "listBuildsHandler(deps): validates query with ListBuildsQuerySchema.safeParse(), calls storage.listBuilds(), returns { builds, total }" },
+          { "id": "ac4", "description": "getBuildHandler(deps): calls storage.getBuild(id), enriches with build_runs per tier grouped into tiers array with run details, computes progress aggregates, returns { build } or 404" },
+          { "id": "ac5", "description": "pauseBuildHandler(deps): calls coordinator.pauseBuild(id), returns { build } or 404/409" },
+          { "id": "ac6", "description": "resumeBuildHandler(deps): calls coordinator.resumeBuild(id), returns { build } or 404/409" },
+          { "id": "ac7", "description": "cancelBuildHandler(deps): calls coordinator.cancelBuild(id), returns { build } or 404/409" },
+          { "id": "ac8", "description": "State transition errors (e.g., pause a completed build) return 409 Conflict via conflict() from @plannr/errors" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/forge-core/src/api/handlers/builds.ts",
+            "pattern": "Same factory pattern as handlers/runs.ts — functions return Express (req, res) => void handlers. Deps injected via closure. .safeParse() for validation with 400 error details."
+          }
+        }
+      },
+      {
+        "step_id": "fba-i003",
+        "title": "Implement build SSE event handler",
+        "scope": "forge-core",
+        "description": "Create SSE streaming handler for build events. The coordinator emits events as it progresses through tiers and runs. Handler streams these to connected clients.",
+        "dependencies": ["fba-i002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "BuildSSEEventTypes const: { BuildStarted, TierStarted, RunStarted, RunCompleted, RunFailed, TierCompleted, BuildCompleted, BuildFailed, BuildPaused, BuildCancelled, Heartbeat, Connected }" },
+          { "id": "ac2", "description": "buildEventsSSEHandler(deps): sets SSE headers (Content-Type: text/event-stream, Cache-Control: no-cache, X-Accel-Buffering: no), flushes headers" },
+          { "id": "ac3", "description": "Subscribes to BuildCoordinator event emitter for the specific build_id" },
+          { "id": "ac4", "description": "Heartbeat every 30s to keep connection alive" },
+          { "id": "ac5", "description": "Cleanup on req close: clear heartbeat interval, unsubscribe from coordinator events" },
+          { "id": "ac6", "description": "Each event sent with incrementing event ID for Last-Event-ID reconnection support" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/forge-core/src/api/handlers/build-sse.ts",
+            "pattern": "Same SSE pattern as handlers/sse.ts — sendSSEMessageWithId(), generateEventId(), heartbeat interval, cleanup on close. BuildCoordinator needs to extend EventEmitter or expose an on()/off() API for event subscription.",
+            "events": "Coordinator emits typed events: { type: BuildSSEEventType, buildId: string, data: { tier?, runId?, planId?, status?, error? } }"
+          }
+        }
+      },
+      {
+        "step_id": "fba-i004",
+        "title": "Implement registerBuildRoutes() and wire into router",
+        "scope": "forge-core",
+        "description": "Create route registration function following the registerRunRoutes() pattern. Wire into createForgeRouter() via ForgeRouterDeps.",
+        "dependencies": ["fba-i003"],
+        "owner_role": "backend:Coder",
+        "integration": true,
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RegisterBuildRoutesOptions interface: { coordinator: BuildCoordinator }" },
+          { "id": "ac2", "description": "registerBuildRoutes(router, storage, options): registers POST /builds, GET /builds, GET /builds/:id, POST /builds/:id/pause, POST /builds/:id/resume, POST /builds/:id/cancel, GET /builds/:id/events" },
+          { "id": "ac2b", "description": "Update existing listRunsHandler to pass plan_id and limit/offset query params to storage.listRuns() — enables GET /api/forge/runs?plan_id=X&status=completed used by Planner's ForgeClient" },
+          { "id": "ac3", "description": "ForgeRouterDeps extended with coordinator?: BuildCoordinator" },
+          { "id": "ac4", "description": "createForgeRouter() calls registerBuildRoutes() when deps.coordinator is provided" },
+          { "id": "ac5", "description": "Route file: packages/forge-core/src/api/routes/builds.ts following existing routes/runs.ts pattern" }
+        ],
+        "specification": {
+          "architecture": {
+            "file_new": "packages/forge-core/src/api/routes/builds.ts",
+            "file_edit": [
+              "packages/forge-core/src/api/routes.ts — add coordinator to ForgeRouterDeps, call registerBuildRoutes()"
+            ],
+            "pattern": "Same conditional registration as gates/questions — only mount build routes if coordinator provided in deps"
+          }
+        }
+      }
+    ]
+  }
+}

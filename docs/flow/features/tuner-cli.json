@@ -1,0 +1,41 @@
+{
+  "title": "Tuner CLI",
+  "summary": {
+    "goal": "Command-line interface for operators to inspect and override tuner state",
+    "acceptance_criteria": [
+      {
+        "id": "cli1",
+        "description": "tuner status shows current baselines summary"
+      },
+      {
+        "id": "cli2",
+        "description": "tuner status shows active drift alerts"
+      },
+      {
+        "id": "cli3",
+        "description": "tuner config show displays current ForgeExecutionConfig"
+      },
+      {
+        "id": "cli4",
+        "description": "tuner override --model opus --duration 2h sets temporary override"
+      },
+      {
+        "id": "cli5",
+        "description": "tuner history shows recent config changes"
+      },
+      {
+        "id": "cli6",
+        "description": "tuner drift ack <id> acknowledges a drift alert"
+      }
+    ]
+  },
+  "feature_id": "tuner-cli",
+  "type": "feature",
+  "status": "implemented",
+  "priority": "medium",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-api"
+  ]
+}

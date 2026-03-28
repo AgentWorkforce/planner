@@ -1,0 +1,857 @@
+{
+  "feature_id": "testbench",
+  "title": "End-to-End Pipeline Testbench",
+  "type": "epic",
+  "status": "draft",
+  "priority": "high",
+  "component": "testbench",
+
+  "summary": {
+    "goal": "Automated end-to-end testing of the Planner → Forge → Tuner pipeline. Runs predefined scenarios to verify integration, train Tuner with real execution data, measure complexity estimation accuracy, and track system reliability over time.",
+    "rationale": "The three-tier architecture (Planner, Forge, Tuner) needs integration testing that exercises the full feedback loop. Manual testing is slow and inconsistent. Automated scenarios enable regression detection, Tuner training, and complexity accuracy measurement.",
+    "in_scope": [
+      "Scenario definition format (goal, expected characteristics, verification)",
+      "Scenario runner with isolated workspaces",
+      "Verification strategies (script, test, HTTP, file)",
+      "Training mode (multi-iteration execution for Tuner learning)",
+      "Verification mode (single-run checks that pipeline works)",
+      "Mock execution mode (simulate outcomes without Claude agents)",
+      "Real execution mode (spawn actual agents, costs money)",
+      "Metrics collection (success rate, complexity accuracy, cost, time)",
+      "Results output (JSON, reports)",
+      "CLI interface (run, train, report commands)",
+      "Starter scenario library (trivial, simple, moderate)"
+    ],
+    "out_of_scope": [
+      "Dashboard UI for results visualization (future)",
+      "CI/CD integration (future phase)",
+      "Parallel scenario execution (start sequential)",
+      "Complex scenarios requiring external services (chat servers, etc.)",
+      "Regression alerting (future phase)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "testbench run <scenario> executes a single scenario and outputs pass/fail with metrics" },
+      { "id": "ac2", "description": "testbench train --iterations N runs scenarios N times and tracks learning curve" },
+      { "id": "ac3", "description": "testbench report <results.json> displays human-readable summary" },
+      { "id": "ac4", "description": "--mock flag simulates execution without spawning Claude agents" },
+      { "id": "ac5", "description": "Each scenario runs in an isolated temp directory that is cleaned up" },
+      { "id": "ac6", "description": "Metrics collected: success, plan_step_count, estimated_complexity, actual_time, actual_tokens, actual_cost" },
+      { "id": "ac7", "description": "At least 5 starter scenarios included (2 trivial, 2 simple, 1 moderate)" },
+      { "id": "ac8", "description": "Script verification works (run commands, check output/exit code)" },
+      { "id": "ac9", "description": "Test verification works (run npm test, check exit code)" },
+      { "id": "ac10", "description": "Training mode calculates and displays complexity_accuracy (correlation between estimated and actual)" },
+      { "id": "ac11", "description": "Results persisted to JSON file for later analysis" },
+      { "id": "ac12", "description": "100+ iterations can run without crashing (reliability)" }
+    ]
+  },
+
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Testbench orchestrates three separate services: Planner (creates plans), Forge (executes tasks), Tuner (collects outcomes)",
+        "Each scenario needs its own isolated workspace to prevent cross-contamination",
+        "Mock mode is critical for fast iteration during testbench development",
+        "Real mode requires ANTHROPIC_API_KEY and will incur costs",
+        "Verification is scenario-specific - different goals need different verification strategies",
+        "Metrics feed back into Tuner for learning, so testbench IS the training loop"
+      ],
+      "keywords": ["E2E testing", "integration testing", "scenario runner", "isolated workspace", "mock execution", "metrics collection"],
+      "questions": [],
+      "concerns": [
+        "Cost control in real mode - need per-scenario budget limits",
+        "Flaky scenarios - some randomness in LLM output could cause false failures",
+        "Workspace cleanup on crash - need to handle interrupts gracefully",
+        "Forge workspace API - assumes Forge accepts workspace_path in run creation; verify this exists or add to forge-dot-enhancements"
+      ],
+      "confidence": "confident"
+    }
+  },
+
+  "context": {
+    "architect": {
+      "approach": "New package: packages/testbench with TypeScript CLI",
+      "rationale": "Separate package keeps testbench independent from core services. CLI-first for automation.",
+      "service_integration": {
+        "planner": "HTTP API - POST /api/plans, POST /api/plans/:id/approve, POST /api/plans/:id/publish",
+        "forge": "HTTP API - POST /api/runs, GET /api/runs/:id (poll for completion)",
+        "tuner": "HTTP API - GET /api/outcomes?run_id=..."
+      },
+      "execution_modes": {
+        "mock": "Forge returns fake outcomes without spawning agents. Fast, free, good for testing testbench itself.",
+        "real": "Forge spawns actual Claude agents. Slower, costs money, realistic."
+      }
+    }
+  },
+
+  "sub_features": [
+    {
+      "id": "testbench-core",
+      "title": "Testbench Core Infrastructure",
+      "summary": {
+        "goal": "Package scaffolding, configuration, workspace management",
+        "acceptance_criteria": [
+          { "id": "tc1", "description": "packages/testbench created with TypeScript, Zod, commander" },
+          { "id": "tc2", "description": "TestbenchConfig schema with service URLs, timeouts, workspace settings" },
+          { "id": "tc3", "description": "WorkspaceManager creates/cleans isolated temp directories" },
+          { "id": "tc4", "description": "testbench.config.ts loaded from cwd or defaults used" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-scenarios",
+      "title": "Scenario Definition & Library",
+      "summary": {
+        "goal": "Define scenario format and implement starter scenarios",
+        "acceptance_criteria": [
+          { "id": "ts1", "description": "Scenario schema: id, name, difficulty, goal, expected, verification" },
+          { "id": "ts2", "description": "Expected schema: language_tier, complexity_level, step_count range, time range" },
+          { "id": "ts3", "description": "Verification schema: type (script|test|http|file), commands, expectations" },
+          { "id": "ts4", "description": "Scenarios loadable from scenarios/ directory" },
+          { "id": "ts5", "description": "5+ starter scenarios: fizzbuzz, hello-cli, tic-tac-toe, todo-cli, calculator" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-runner",
+      "title": "Scenario Runner",
+      "summary": {
+        "goal": "Execute scenarios through Planner → Forge → Tuner pipeline",
+        "acceptance_criteria": [
+          { "id": "tr1", "description": "ScenarioRunner.run(scenario, options) returns RunResult" },
+          { "id": "tr2", "description": "Creates plan via Planner API with scenario.goal" },
+          { "id": "tr3", "description": "Auto-approves and publishes plan" },
+          { "id": "tr4", "description": "Creates Forge run from plan_ref" },
+          { "id": "tr5", "description": "Polls run status until complete or timeout" },
+          { "id": "tr6", "description": "Runs verification after execution completes" },
+          { "id": "tr7", "description": "Collects outcomes from Tuner API" },
+          { "id": "tr8", "description": "Returns structured RunResult with all metrics" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-verification",
+      "title": "Verification Strategies",
+      "summary": {
+        "goal": "Implement verification types to check if generated code works",
+        "acceptance_criteria": [
+          { "id": "tv1", "description": "ScriptVerifier: runs commands, checks output patterns, exit codes" },
+          { "id": "tv2", "description": "TestVerifier: runs npm test (or specified command), checks exit code" },
+          { "id": "tv3", "description": "Verification returns { passed: boolean, details: string }" },
+          { "id": "tv4", "description": "Timeout handling for hung processes" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-mock",
+      "title": "Mock Execution Mode",
+      "summary": {
+        "goal": "Simulate execution without spawning agents for fast iteration",
+        "acceptance_criteria": [
+          { "id": "tm1", "description": "--mock flag enables mock mode" },
+          { "id": "tm2", "description": "Mock mode creates plan but skips Forge execution" },
+          { "id": "tm3", "description": "Generates synthetic outcomes based on scenario.expected" },
+          { "id": "tm4", "description": "Verification still runs against mock-generated files (or skipped)" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-metrics",
+      "title": "Metrics Collection & Analysis",
+      "summary": {
+        "goal": "Collect and aggregate metrics across runs",
+        "acceptance_criteria": [
+          { "id": "tm1", "description": "MetricsCollector tracks per-run metrics: success, time, tokens, cost, steps" },
+          { "id": "tm2", "description": "Aggregate metrics: success_rate, mean_cost, p95_time, complexity_accuracy" },
+          { "id": "tm3", "description": "Complexity accuracy = correlation(estimated_complexity, actual_time)" },
+          { "id": "tm4", "description": "Learning curve tracking across iterations" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-cli",
+      "title": "CLI Interface",
+      "summary": {
+        "goal": "Command-line interface for running scenarios",
+        "acceptance_criteria": [
+          { "id": "tcli1", "description": "testbench run <scenario> - run single scenario" },
+          { "id": "tcli2", "description": "testbench run --category <cat> - run all scenarios in category" },
+          { "id": "tcli3", "description": "testbench run --all - run all scenarios" },
+          { "id": "tcli4", "description": "testbench train --iterations N - training mode" },
+          { "id": "tcli5", "description": "testbench report <file.json> - display results" },
+          { "id": "tcli6", "description": "--mock flag for mock execution" },
+          { "id": "tcli7", "description": "--output <file> to save results" },
+          { "id": "tcli8", "description": "--timeout <minutes> to set execution timeout" }
+        ]
+      }
+    },
+    {
+      "id": "testbench-reporting",
+      "title": "Results Reporting",
+      "summary": {
+        "goal": "Output results in usable formats",
+        "acceptance_criteria": [
+          { "id": "trep1", "description": "Results saved to JSON file with full run data" },
+          { "id": "trep2", "description": "Console output shows pass/fail summary" },
+          { "id": "trep3", "description": "testbench report generates human-readable summary" },
+          { "id": "trep4", "description": "Training mode shows learning curve (accuracy over iterations)" }
+        ]
+      }
+    }
+  ],
+
+  "new_features": [
+    { "id": "testbench-core", "title": "Testbench Core Infrastructure", "priority": "critical" },
+    { "id": "testbench-scenarios", "title": "Scenario Definition & Library", "priority": "critical" },
+    { "id": "testbench-runner", "title": "Scenario Runner", "priority": "critical" },
+    { "id": "testbench-verification", "title": "Verification Strategies", "priority": "high" },
+    { "id": "testbench-mock", "title": "Mock Execution Mode", "priority": "high" },
+    { "id": "testbench-metrics", "title": "Metrics Collection & Analysis", "priority": "high" },
+    { "id": "testbench-cli", "title": "CLI Interface", "priority": "critical" },
+    { "id": "testbench-reporting", "title": "Results Reporting", "priority": "medium" }
+  ],
+
+  "related_features": [
+    { "id": "tuner-package", "relationship": "depends_on", "description": "Testbench collects outcomes from Tuner" },
+    { "id": "forge-dot-enhancements", "relationship": "depends_on", "description": "Testbench executes plans via Forge" },
+    { "id": "dot-planner-enhancements", "relationship": "depends_on", "description": "Testbench creates plans via Planner with complexity estimates" }
+  ],
+
+  "implementation_notes": {
+    "package_structure": "packages/testbench/ with src/scenarios/, src/runner/, src/verification/, src/cli.ts",
+    "dependencies": "commander for CLI, zod for schemas, node-fetch for HTTP calls",
+    "starter_scenarios": [
+      "fizzbuzz: Print FizzBuzz 1-100 (trivial)",
+      "hello-cli: Greet user by name (trivial)",
+      "tic-tac-toe: Self-play CLI game (simple)",
+      "todo-cli: CRUD todo list (simple)",
+      "calculator: CLI calculator with tests (moderate)"
+    ]
+  },
+
+  "plan_implementation": {
+    "scopes": ["testbench"],
+    "phases": [
+      { "id": "phase-1", "title": "Core Infrastructure", "features": ["testbench-core"] },
+      { "id": "phase-2", "title": "Scenario System", "features": ["testbench-scenarios"] },
+      { "id": "phase-3", "title": "Execution Engine", "features": ["testbench-runner", "testbench-verification", "testbench-mock"] },
+      { "id": "phase-4", "title": "Metrics & Reporting", "features": ["testbench-metrics", "testbench-reporting"] },
+      { "id": "phase-5", "title": "CLI Integration", "features": ["testbench-cli"] }
+    ],
+    "steps": [
+      {
+        "step_id": "tb001",
+        "title": "Create testbench package scaffold",
+        "scope": "testbench",
+        "phase": "phase-1",
+        "description": "Initialize packages/testbench with TypeScript, Zod, commander. Setup package.json with bin entry for testbench CLI.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/testbench/package.json exists with name @plannr/testbench" },
+          { "id": "ac2", "description": "TypeScript configured with tsconfig.json extending root" },
+          { "id": "ac3", "description": "Dependencies: commander, zod, node-fetch (or native fetch)" },
+          { "id": "ac4", "description": "bin entry points to dist/cli.js" },
+          { "id": "ac5", "description": "npm run build produces dist/ output" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "CLI application",
+            "tech": ["TypeScript", "commander", "Zod"],
+            "structure": "src/cli.ts as entry, src/config/, src/runner/, src/scenarios/, src/verification/, src/metrics/"
+          }
+        }
+      },
+      {
+        "step_id": "tb002",
+        "title": "Define TestbenchConfig schema",
+        "scope": "testbench",
+        "phase": "phase-1",
+        "description": "Create Zod schema for testbench configuration including service URLs, timeouts, workspace settings.",
+        "dependencies": ["tb001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TestbenchConfig schema in src/config/schema.ts" },
+          { "id": "ac2", "description": "Fields: planner_url, forge_url, tuner_url (strings, default localhost ports)" },
+          { "id": "ac3", "description": "Fields: workspace_base (string, default /tmp/testbench)" },
+          { "id": "ac4", "description": "Fields: default_timeout_minutes (number, default 30)" },
+          { "id": "ac5", "description": "Fields: auto_approve_plans (boolean, default true)" },
+          { "id": "ac6", "description": "Fields: cleanup_on_success, cleanup_on_failure (booleans)" },
+          { "id": "ac7", "description": "Fields: results_dir (string, default ./results)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Zod schema with defaults",
+            "defaults": {
+              "planner_url": "http://localhost:3001",
+              "forge_url": "http://localhost:3002",
+              "tuner_url": "http://localhost:4002",
+              "workspace_base": "/tmp/testbench",
+              "default_timeout_minutes": 30,
+              "auto_approve_plans": true,
+              "cleanup_on_success": true,
+              "cleanup_on_failure": false,
+              "results_dir": "./results"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "tb003",
+        "title": "Implement config loader",
+        "scope": "testbench",
+        "phase": "phase-1",
+        "description": "Load testbench.config.ts from cwd if present, otherwise use defaults. Support environment variable overrides.",
+        "dependencies": ["tb002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "loadConfig() in src/config/loader.ts" },
+          { "id": "ac2", "description": "Loads testbench.config.ts from process.cwd() if exists" },
+          { "id": "ac3", "description": "Falls back to defaults if no config file" },
+          { "id": "ac4", "description": "Environment variables override: PLANNER_URL, FORGE_URL, TUNER_URL" },
+          { "id": "ac5", "description": "Validates loaded config against schema" }
+        ]
+      },
+      {
+        "step_id": "tb004",
+        "title": "Implement WorkspaceManager",
+        "scope": "testbench",
+        "phase": "phase-1",
+        "description": "Create/cleanup isolated temp directories for each scenario run. Handle crash cleanup gracefully.",
+        "dependencies": ["tb002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "WorkspaceManager class in src/workspace/manager.ts" },
+          { "id": "ac2", "description": "create(scenarioId: string) returns unique workspace path" },
+          { "id": "ac3", "description": "Workspace path format: {workspace_base}/{scenarioId}-{timestamp}" },
+          { "id": "ac4", "description": "cleanup(path: string) removes directory recursively" },
+          { "id": "ac5", "description": "cleanupAll() removes all workspaces in workspace_base" },
+          { "id": "ac6", "description": "Handles SIGINT/SIGTERM to cleanup on crash" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Resource manager with cleanup hooks",
+            "tech": "Node.js fs/promises, process.on('SIGINT')"
+          }
+        }
+      },
+      {
+        "step_id": "tb005",
+        "title": "Define Scenario schema",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Create Zod schema for scenario definition including goal, expected characteristics, and verification.",
+        "dependencies": ["tb001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Scenario schema in src/scenarios/schema.ts" },
+          { "id": "ac2", "description": "Fields: id, name, difficulty (trivial|simple|moderate|complex)" },
+          { "id": "ac3", "description": "Fields: goal (string - natural language for Planner)" },
+          { "id": "ac4", "description": "Fields: expected { language_tier, complexity_level, step_count: {min, max}, time_minutes: {min, max} }" },
+          { "id": "ac5", "description": "Fields: verification (ScriptVerification | TestVerification | HttpVerification | FileVerification)" }
+        ],
+        "specification": {
+          "model": {
+            "entities": ["Scenario", "Expected", "Verification"],
+            "difficulty_enum": ["trivial", "simple", "moderate", "complex"],
+            "verification_discriminator": "type field (script|test|http|file)"
+          }
+        }
+      },
+      {
+        "step_id": "tb006",
+        "title": "Define verification schemas",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Create Zod schemas for each verification type: script, test, http, file.",
+        "dependencies": ["tb005"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ScriptVerification: { type: 'script', commands: string[], expect_output?: RegExp, expect_exit_code?: number }" },
+          { "id": "ac2", "description": "TestVerification: { type: 'test', command?: string (default 'npm test'), expect_exit_code?: number }" },
+          { "id": "ac3", "description": "HttpVerification: { type: 'http', setup?: string, requests: HttpRequest[], teardown?: string }" },
+          { "id": "ac4", "description": "FileVerification: { type: 'file', checks: FileCheck[] } where FileCheck = { path, exists?, contains? }" },
+          { "id": "ac5", "description": "Verification union type exported" }
+        ]
+      },
+      {
+        "step_id": "tb007",
+        "title": "Implement scenario loader",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Load scenarios from scenarios/ directory. Support both .ts and .json formats.",
+        "dependencies": ["tb005", "tb006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ScenarioLoader class in src/scenarios/loader.ts" },
+          { "id": "ac2", "description": "loadAll() returns all scenarios from scenarios/ directory" },
+          { "id": "ac3", "description": "load(id: string) returns single scenario by id" },
+          { "id": "ac4", "description": "loadByDifficulty(difficulty: Difficulty) returns filtered list" },
+          { "id": "ac5", "description": "Validates loaded scenarios against schema" },
+          { "id": "ac6", "description": "Supports .ts (default export) and .json formats" }
+        ]
+      },
+      {
+        "step_id": "tb008",
+        "title": "Create starter scenario: fizzbuzz",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Trivial scenario: Print FizzBuzz 1-100. Script verification checks output.",
+        "dependencies": ["tb007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "scenarios/fizzbuzz.ts exports Scenario" },
+          { "id": "ac2", "description": "goal: 'Create a CLI that prints FizzBuzz from 1 to 100'" },
+          { "id": "ac3", "description": "difficulty: 'trivial', expected.language_tier: 's', expected.complexity_level: 'trivial'" },
+          { "id": "ac4", "description": "verification: script type, runs 'node index.js', expects output containing 'Fizz', 'Buzz', 'FizzBuzz'" }
+        ]
+      },
+      {
+        "step_id": "tb009",
+        "title": "Create starter scenario: hello-cli",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Trivial scenario: Greet user by name from CLI argument.",
+        "dependencies": ["tb007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "scenarios/hello-cli.ts exports Scenario" },
+          { "id": "ac2", "description": "goal: 'Create a CLI that greets the user by name from the first argument'" },
+          { "id": "ac3", "description": "difficulty: 'trivial'" },
+          { "id": "ac4", "description": "verification: script type, runs 'node index.js Alice', expects output containing 'Hello, Alice'" }
+        ]
+      },
+      {
+        "step_id": "tb010",
+        "title": "Create starter scenario: tic-tac-toe",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Simple scenario: Self-play tic-tac-toe CLI with win detection.",
+        "dependencies": ["tb007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "scenarios/tic-tac-toe.ts exports Scenario" },
+          { "id": "ac2", "description": "goal describes self-play CLI with board display, win/draw detection" },
+          { "id": "ac3", "description": "difficulty: 'simple', expected.complexity_level: 'simple'" },
+          { "id": "ac4", "description": "verification: script type with stdin input to simulate game, expects win detection" }
+        ]
+      },
+      {
+        "step_id": "tb011",
+        "title": "Create starter scenario: todo-cli",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Simple scenario: CRUD todo list CLI.",
+        "dependencies": ["tb007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "scenarios/todo-cli.ts exports Scenario" },
+          { "id": "ac2", "description": "goal: 'Create a CLI for managing todos with add, list, complete, delete commands'" },
+          { "id": "ac3", "description": "difficulty: 'simple'" },
+          { "id": "ac4", "description": "verification: script type testing CRUD operations" }
+        ]
+      },
+      {
+        "step_id": "tb012",
+        "title": "Create starter scenario: calculator",
+        "scope": "testbench",
+        "phase": "phase-2",
+        "description": "Moderate scenario: CLI calculator with tests.",
+        "dependencies": ["tb007"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "scenarios/calculator.ts exports Scenario" },
+          { "id": "ac2", "description": "goal: 'Create a CLI calculator supporting +, -, *, / with unit tests'" },
+          { "id": "ac3", "description": "difficulty: 'moderate', expected.complexity_level: 'moderate'" },
+          { "id": "ac4", "description": "verification: test type, runs 'npm test'" }
+        ]
+      },
+      {
+        "step_id": "tb013",
+        "title": "Implement HTTP client for services",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Create typed HTTP clients for Planner, Forge, and Tuner APIs.",
+        "dependencies": ["tb002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlannerClient in src/clients/planner.ts" },
+          { "id": "ac2", "description": "PlannerClient.createPlan(goal: string) returns { plan_id, version }" },
+          { "id": "ac3", "description": "PlannerClient.approvePlan(planId: string) approves plan" },
+          { "id": "ac4", "description": "PlannerClient.publishPlan(planId: string) publishes and returns plan_ref" },
+          { "id": "ac5", "description": "ForgeClient in src/clients/forge.ts with createRun(), getRun(), pollUntilComplete()" },
+          { "id": "ac6", "description": "TunerClient in src/clients/tuner.ts with getOutcomes(runId: string)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Typed HTTP client wrapper",
+            "tech": "native fetch or node-fetch",
+            "error_handling": "Throw typed errors on non-2xx responses"
+          }
+        }
+      },
+      {
+        "step_id": "tb014",
+        "title": "Implement ScenarioRunner core",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Orchestrate scenario execution through Planner → Forge → Tuner pipeline.",
+        "dependencies": ["tb004", "tb007", "tb013", "tb015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ScenarioRunner class in src/runner/runner.ts" },
+          { "id": "ac2", "description": "run(scenario, options) returns Promise<RunResult>" },
+          { "id": "ac3", "description": "Creates workspace via WorkspaceManager" },
+          { "id": "ac4", "description": "Creates plan via PlannerClient with scenario.goal" },
+          { "id": "ac5", "description": "Auto-approves and publishes plan" },
+          { "id": "ac6", "description": "Creates Forge run with plan_ref and workspace_path (requires Forge API to accept workspace_path)" },
+          { "id": "ac7", "description": "Polls run status until complete or timeout" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Pipeline orchestrator",
+            "flow": "workspace → plan → approve → publish → forge run → poll → verify → outcomes → cleanup"
+          }
+        }
+      },
+      {
+        "step_id": "tb015",
+        "title": "Define RunResult schema",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Define structure for scenario run results including all metrics. This is a type definition used by the runner.",
+        "dependencies": ["tb001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "RunResult schema in src/runner/types.ts" },
+          { "id": "ac2", "description": "Fields: scenario_id, run_id, success (boolean), started_at, completed_at" },
+          { "id": "ac3", "description": "Fields: plan_step_count, estimated_complexity, estimated_time" },
+          { "id": "ac4", "description": "Fields: actual_time_seconds, actual_tokens, actual_cost_usd" },
+          { "id": "ac5", "description": "Fields: verification_result { passed, details }" },
+          { "id": "ac6", "description": "Fields: error (optional, if run failed)" }
+        ]
+      },
+      {
+        "step_id": "tb016",
+        "title": "Implement ScriptVerifier",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Run shell commands and check output patterns and exit codes.",
+        "dependencies": ["tb006"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ScriptVerifier class in src/verification/script.ts" },
+          { "id": "ac2", "description": "verify(config, workspacePath) returns VerificationResult" },
+          { "id": "ac3", "description": "Runs commands sequentially in workspace directory" },
+          { "id": "ac4", "description": "Checks stdout against expect_output regex if provided" },
+          { "id": "ac5", "description": "Checks exit code against expect_exit_code if provided" },
+          { "id": "ac6", "description": "Handles timeout (kills process after configured seconds)" }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Verification strategy",
+            "tech": "child_process.spawn with cwd option",
+            "timeout": "Use AbortController with signal"
+          }
+        }
+      },
+      {
+        "step_id": "tb017",
+        "title": "Implement TestVerifier",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Run test command (default npm test) and check exit code.",
+        "dependencies": ["tb006", "tb016"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "TestVerifier class in src/verification/test.ts" },
+          { "id": "ac2", "description": "verify(config, workspacePath) returns VerificationResult" },
+          { "id": "ac3", "description": "Runs npm install first if package.json exists" },
+          { "id": "ac4", "description": "Runs test command (default 'npm test')" },
+          { "id": "ac5", "description": "Pass if exit code is 0 (or configured value)" }
+        ]
+      },
+      {
+        "step_id": "tb018",
+        "title": "Implement VerificationRouter",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Route verification to appropriate verifier based on type.",
+        "dependencies": ["tb016", "tb017"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "VerificationRouter in src/verification/router.ts" },
+          { "id": "ac2", "description": "verify(verification, workspacePath) delegates to correct verifier" },
+          { "id": "ac3", "description": "Supports: script, test (http and file deferred to future)" },
+          { "id": "ac4", "description": "Returns uniform VerificationResult { passed, details }" }
+        ]
+      },
+      {
+        "step_id": "tb019",
+        "title": "Integrate verification into runner",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Wire VerificationRouter into ScenarioRunner after Forge completion.",
+        "dependencies": ["tb014", "tb018"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ScenarioRunner calls VerificationRouter.verify() after Forge run completes" },
+          { "id": "ac2", "description": "Verification result included in RunResult" },
+          { "id": "ac3", "description": "success = forge_success && verification.passed" }
+        ]
+      },
+      {
+        "step_id": "tb019b",
+        "title": "Wire TunerClient into ScenarioRunner",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Connect TunerClient to runner to collect outcomes after Forge completion. Completes the feedback loop.",
+        "dependencies": ["tb013", "tb014"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ScenarioRunner calls TunerClient.getOutcomes(runId) after Forge run completes" },
+          { "id": "ac2", "description": "Outcomes populated in RunResult (actual_tokens, actual_cost from Tuner)" },
+          { "id": "ac3", "description": "Graceful handling if Tuner is unavailable (use Forge metrics as fallback)" }
+        ]
+      },
+      {
+        "step_id": "tb020",
+        "title": "Implement mock execution mode",
+        "scope": "testbench",
+        "phase": "phase-3",
+        "description": "Simulate execution without spawning agents for fast iteration. Full mock skips ALL external services.",
+        "dependencies": ["tb014", "tb015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "MockExecutor class in src/runner/mock.ts" },
+          { "id": "ac2", "description": "run(scenario, options) returns synthetic RunResult" },
+          { "id": "ac3", "description": "Full mock mode: skips Planner, Forge, and Tuner calls entirely" },
+          { "id": "ac4", "description": "Generates synthetic plan metrics based on scenario.expected (step_count, complexity)" },
+          { "id": "ac5", "description": "Generates synthetic execution metrics (time, tokens, cost) with configurable variance" },
+          { "id": "ac6", "description": "Optionally generates mock files in workspace for verification testing" },
+          { "id": "ac7", "description": "ScenarioRunner uses MockExecutor when options.mock = true" }
+        ],
+        "specification": {
+          "architecture": {
+            "mock_modes": {
+              "full_mock": "Skip all external services, pure synthetic data",
+              "planner_only": "Call Planner, skip Forge/Tuner (future)"
+            },
+            "synthetic_metrics": {
+              "actual_time": "random within expected.time_minutes range",
+              "actual_tokens": "estimated from complexity",
+              "actual_cost": "tokens * model_rate",
+              "success": "80% success rate with random variation"
+            }
+          }
+        }
+      },
+      {
+        "step_id": "tb021",
+        "title": "Implement MetricsCollector",
+        "scope": "testbench",
+        "phase": "phase-4",
+        "description": "Collect and aggregate metrics across multiple runs.",
+        "dependencies": ["tb015"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "MetricsCollector class in src/metrics/collector.ts" },
+          { "id": "ac2", "description": "add(result: RunResult) adds result to collection" },
+          { "id": "ac3", "description": "getAggregate() returns AggregateMetrics" },
+          { "id": "ac4", "description": "AggregateMetrics includes: success_rate, mean_cost, p95_time, total_runs" }
+        ]
+      },
+      {
+        "step_id": "tb022",
+        "title": "Implement complexity accuracy calculation",
+        "scope": "testbench",
+        "phase": "phase-4",
+        "description": "Calculate correlation between estimated complexity and actual execution metrics.",
+        "dependencies": ["tb021"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "calculateComplexityAccuracy() in src/metrics/accuracy.ts" },
+          { "id": "ac2", "description": "Computes Pearson correlation between estimated_complexity and actual_time" },
+          { "id": "ac3", "description": "Returns correlation coefficient (-1 to 1)" },
+          { "id": "ac4", "description": "Handles edge cases (< 2 samples returns null)" }
+        ],
+        "specification": {
+          "architecture": {
+            "algorithm": "Pearson correlation coefficient",
+            "formula": "r = Σ((x-x̄)(y-ȳ)) / √(Σ(x-x̄)² × Σ(y-ȳ)²)"
+          }
+        }
+      },
+      {
+        "step_id": "tb023",
+        "title": "Implement learning curve tracking",
+        "scope": "testbench",
+        "phase": "phase-4",
+        "description": "Track how accuracy improves over iterations in training mode.",
+        "dependencies": ["tb022"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "LearningCurve class in src/metrics/learning.ts" },
+          { "id": "ac2", "description": "addIteration(metrics: AggregateMetrics) records iteration data" },
+          { "id": "ac3", "description": "getCurve() returns array of { iteration, success_rate, complexity_accuracy }" },
+          { "id": "ac4", "description": "getImprovement() calculates change from first to last iteration" }
+        ]
+      },
+      {
+        "step_id": "tb024",
+        "title": "Implement JSON results writer",
+        "scope": "testbench",
+        "phase": "phase-4",
+        "description": "Persist run results to JSON file for later analysis.",
+        "dependencies": ["tb015", "tb021"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ResultsWriter class in src/reporting/writer.ts" },
+          { "id": "ac2", "description": "write(results: RunResult[], aggregate: AggregateMetrics, path: string)" },
+          { "id": "ac3", "description": "Output includes: metadata (timestamp, config), results array, aggregate" },
+          { "id": "ac4", "description": "Creates directory if doesn't exist" },
+          { "id": "ac5", "description": "Default filename: results-{timestamp}.json" }
+        ]
+      },
+      {
+        "step_id": "tb025",
+        "title": "Implement console reporter",
+        "scope": "testbench",
+        "phase": "phase-4",
+        "description": "Display pass/fail summary and metrics to console.",
+        "dependencies": ["tb021"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ConsoleReporter class in src/reporting/console.ts" },
+          { "id": "ac2", "description": "reportRun(result: RunResult) prints single run summary" },
+          { "id": "ac3", "description": "reportAggregate(metrics: AggregateMetrics) prints aggregate stats" },
+          { "id": "ac4", "description": "Uses color (green/red) for pass/fail" },
+          { "id": "ac5", "description": "Shows: ✓ scenario_id (time, cost) or ✗ scenario_id (error)" }
+        ]
+      },
+      {
+        "step_id": "tb026",
+        "title": "Implement report command formatter",
+        "scope": "testbench",
+        "phase": "phase-4",
+        "description": "Generate human-readable report from saved JSON results.",
+        "dependencies": ["tb024", "tb025"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "ReportFormatter in src/reporting/formatter.ts" },
+          { "id": "ac2", "description": "format(resultsPath: string) reads JSON and generates report" },
+          { "id": "ac3", "description": "Report includes: summary table, per-scenario breakdown, aggregate metrics" },
+          { "id": "ac4", "description": "Training mode report includes learning curve visualization (ASCII)" }
+        ]
+      },
+      {
+        "step_id": "tb027",
+        "title": "Implement CLI entry point",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "Create CLI with commander. Wire up all commands.",
+        "dependencies": ["tb003"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "src/cli.ts as CLI entry point" },
+          { "id": "ac2", "description": "Uses commander for argument parsing" },
+          { "id": "ac3", "description": "Commands: run, train, report" },
+          { "id": "ac4", "description": "Global options: --config <path>, --verbose" },
+          { "id": "ac5", "description": "npm run build produces executable dist/cli.js" }
+        ]
+      },
+      {
+        "step_id": "tb028",
+        "title": "Implement 'run' command",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "Run single scenario or category of scenarios.",
+        "dependencies": ["tb014", "tb024", "tb025", "tb027"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "testbench run <scenario> runs single scenario by id" },
+          { "id": "ac2", "description": "testbench run --category <cat> runs all scenarios in difficulty category" },
+          { "id": "ac3", "description": "testbench run --all runs all scenarios" },
+          { "id": "ac4", "description": "Options: --mock, --output <file>, --timeout <minutes>" },
+          { "id": "ac5", "description": "Prints results to console and saves to file if --output" }
+        ]
+      },
+      {
+        "step_id": "tb029",
+        "title": "Implement 'train' command",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "Training mode with multiple iterations for Tuner learning.",
+        "dependencies": ["tb014", "tb023", "tb024", "tb025", "tb027"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "testbench train --iterations N runs scenarios N times" },
+          { "id": "ac2", "description": "testbench train --scenarios <ids> filters which scenarios" },
+          { "id": "ac3", "description": "testbench train --category <cat> filters by difficulty" },
+          { "id": "ac4", "description": "Tracks learning curve across iterations" },
+          { "id": "ac5", "description": "Displays progress: Iteration 1/10... Iteration 2/10..." },
+          { "id": "ac6", "description": "Saves results with learning curve data" }
+        ]
+      },
+      {
+        "step_id": "tb030",
+        "title": "Implement 'report' command",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "Display human-readable report from saved results.",
+        "dependencies": ["tb026", "tb027"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "testbench report <file.json> reads and displays results" },
+          { "id": "ac2", "description": "Shows summary table with pass/fail, metrics" },
+          { "id": "ac3", "description": "Shows aggregate statistics" },
+          { "id": "ac4", "description": "If training results, shows learning curve" }
+        ]
+      },
+      {
+        "step_id": "tb031",
+        "title": "Add testbench to monorepo build",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "Wire testbench package into monorepo build system.",
+        "dependencies": ["tb027"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/testbench added to root turbo.json pipeline" },
+          { "id": "ac2", "description": "npm run build from root builds testbench" },
+          { "id": "ac3", "description": "testbench executable via npx @plannr/testbench or bin symlink" }
+        ]
+      },
+      {
+        "step_id": "tb032",
+        "title": "Integration test: mock run",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "End-to-end test running fizzbuzz in full mock mode (no external services).",
+        "dependencies": ["tb020", "tb028"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test in src/__tests__/integration.test.ts" },
+          { "id": "ac2", "description": "Runs: testbench run fizzbuzz --mock" },
+          { "id": "ac3", "description": "Test passes without Planner/Forge/Tuner services running (full mock)" },
+          { "id": "ac4", "description": "Verifies: exit code 0, synthetic results contain expected fields" },
+          { "id": "ac5", "description": "Verifies: scenario_id, success, plan_step_count, actual_time_seconds present" }
+        ]
+      },
+      {
+        "step_id": "tb033",
+        "title": "Write testbench README",
+        "scope": "testbench",
+        "phase": "phase-5",
+        "description": "Document usage, configuration, and scenario authoring.",
+        "dependencies": ["tb028", "tb029", "tb030"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "packages/testbench/README.md exists" },
+          { "id": "ac2", "description": "Documents: installation, commands, configuration" },
+          { "id": "ac3", "description": "Documents: how to create new scenarios" },
+          { "id": "ac4", "description": "Documents: mock vs real mode" }
+        ]
+      }
+    ]
+  }
+}

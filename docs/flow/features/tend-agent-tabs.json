@@ -1,0 +1,147 @@
+{
+  "feature_id": "tend-agent-tabs",
+  "title": "Add agent tab bar above conversation for per-agent message streams",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["tend-conversation-core"],
+  "parent": "tend-app",
+  "summary": {
+    "goal": "Add agent tab bar above conversation for per-agent message streams.",
+    "acceptance_criteria": [
+      {
+        "id": "ac1",
+        "description": "AgentTabBar renders above ConversationPane with Main tab always present"
+      },
+      {
+        "id": "ac2",
+        "description": "Agent tabs spawn when forge creates tasks (one tab per agent)"
+      },
+      {
+        "id": "ac3",
+        "description": "Messages are tagged with channel_id ('main' or 'agent-{agentId}'), tabs filter by channel"
+      },
+      {
+        "id": "ac4",
+        "description": "Main tab shows user messages, AI messages, system events. Agent tabs show tool calls, reasoning trace, progress."
+      },
+      {
+        "id": "ac5",
+        "description": "Completed agent tabs show a completion indicator and auto-collapse after delay"
+      },
+      {
+        "id": "ac6",
+        "description": "Blocked agent tabs show red indicator"
+      },
+      {
+        "id": "ac7",
+        "description": "Clicking a system event in main tab that references an agent opens that agent's tab"
+      },
+      {
+        "id": "ac8",
+        "description": "Tab state persists across navigation (restored from active forge tasks on return)"
+      },
+      {
+        "id": "ac9",
+        "description": "ProjectMessage interface implemented with channel_id, role, content, metadata (attention_level, block_refs, step_refs, event_type)"
+      }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "Tabs are a UI filter, not separate conversations. All messages belong to the project.",
+        "The AgentTab component adapts planner-ui's ChannelView pattern.",
+        "The key data structure is ProjectMessage with channel_id field.",
+        "Tab lifecycle: spawned → active → completed/collapsed.",
+        "This is Phase 2 of conversation tabs (Phase 1 is one thread with inline events, which tend-conversation-core handles)."
+      ],
+      "questions": [],
+      "confidence": "forming"
+    }
+  },
+  "plan_implementation": {
+    "scopes": ["tend"],
+    "steps": [
+      {
+        "id": "tab01",
+        "title": "Implement ProjectMessage interface with channel_id and metadata",
+        "scope": "tend",
+        "description": "Create packages/tend/src/types/message.ts. Define ProjectMessage interface: id, project_id, channel_id ('main' | 'agent-{agentId}'), role ('user' | 'assistant' | 'system'), content, metadata (attention_level, block_refs, step_refs, event_type), created_at. Export type.",
+        "acceptance_criteria": ["ac3", "ac9"]
+      },
+      {
+        "id": "tab02",
+        "title": "Create AgentTabBar above ConversationPane",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/conversation/AgentTabBar.tsx. Renders tabs horizontally above conversation. Main tab always present. Agent tabs spawn when forge creates tasks. Active tab highlighted. Reference planner-ui tab patterns if any exist.",
+        "dependencies": ["tab01"],
+        "acceptance_criteria": ["ac1", "ac2"]
+      },
+      {
+        "id": "tab03",
+        "title": "Create AgentTab component for agent message streams",
+        "scope": "tend",
+        "description": "Create packages/tend/src/components/conversation/AgentTab.tsx. Adapt planner-ui ChannelView pattern. Filter messages by channel_id. Show tool calls, reasoning trace, progress. Add completion indicator (green checkmark). Add blocked indicator (red dot). Auto-collapse after delay when completed.",
+        "dependencies": ["tab01"],
+        "acceptance_criteria": ["ac5", "ac6"]
+      },
+      {
+        "id": "tab04",
+        "title": "Wire tab filtering by channel_id",
+        "scope": "tend",
+        "description": "In ConversationMessages: filter messages by active tab's channel_id. Main tab shows channel_id='main' (user/AI/system events). Agent tabs show channel_id='agent-{agentId}' (tool calls/reasoning). Update ConversationPane to manage active tab state.",
+        "dependencies": ["tab02", "tab03"],
+        "acceptance_criteria": ["ac3", "ac4"]
+      },
+      {
+        "id": "tab05",
+        "title": "Implement tab lifecycle and interaction",
+        "scope": "tend",
+        "description": "Wire tab spawning: on forge task creation, create new agent tab. Wire tab reopening: clicking system event with agent reference opens that agent's tab (or switches if already open). Persist tab state in ProjectContext. On navigation, restore tabs from active forge tasks.",
+        "dependencies": ["tab02", "tab03", "tab04"],
+        "acceptance_criteria": ["ac7", "ac8"]
+      }
+    ]
+  },
+  "context": {
+    "architect": {
+      "source_pattern": "planner-ui ChannelView adapted to per-agent filtering",
+      "message_model": "ProjectMessage with channel_id, metadata",
+      "tab_lifecycle": "spawned → active → completed/collapsed",
+      "components_to_adapt": [
+        "planner-ui ChannelView → AgentTab (filtering by channel_id)"
+      ],
+      "new_components": [
+        "AgentTabBar (tab container)",
+        "AgentTab (tab component)"
+      ],
+      "channel_ids": {
+        "main": "main",
+        "agent": "agent-{agentId}"
+      },
+      "tab_types": {
+        "main": "user messages, AI messages, system events",
+        "agent": "tool calls, reasoning trace, progress"
+      },
+      "indicators": {
+        "completed": "completion indicator + auto-collapse",
+        "blocked": "red indicator"
+      },
+      "interactions": {
+        "spawn": "forge creates task → tab appears",
+        "click_system_event": "opens referenced agent tab",
+        "navigation": "state persists, restored from forge tasks"
+      },
+      "data_structure": {
+        "interface": "ProjectMessage",
+        "fields": [
+          "channel_id",
+          "role",
+          "content",
+          "metadata: { attention_level, block_refs, step_refs, event_type }"
+        ]
+      }
+    }
+  }
+}

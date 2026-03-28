@@ -1,0 +1,226 @@
+{
+  "title": "Ideation Integration Helper",
+  "summary": {
+    "goal": "Create IdeationIntegration class (like ForgeIntegration/PlannerIntegration) and extend TunerClient for ideation consumers",
+    "acceptance_criteria": [
+      {
+        "id": "iih1",
+        "description": "IdeationIntegration class with: initialize(), getConfig(), isAvailable(), recordIdeationOutcome(), refreshConfig(), shutdown()"
+      },
+      {
+        "id": "iih2",
+        "description": "getConfig() returns DEFAULT_IDEATION_CONFIG when Tuner unavailable"
+      },
+      {
+        "id": "iih3",
+        "description": "recordIdeationOutcome() is fire-and-forget (logs warning on failure, never throws)"
+      },
+      {
+        "id": "iih4",
+        "description": "Auto-refresh config every 5 minutes (matching Forge/Planner pattern)"
+      },
+      {
+        "id": "iih5",
+        "description": "TunerClient extended with: getIdeationConfig(), submitIdeationOutcome(), submitPlanQualitySignal()"
+      },
+      {
+        "id": "iih6",
+        "description": "Exported from tuner package for ideation to import"
+      }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": [
+      "tuner"
+    ],
+    "steps": [
+      {
+        "step_id": "iih001",
+        "title": "Extend TunerClient with ideation methods",
+        "scope": "tuner",
+        "description": "Add getIdeationConfig(), submitIdeationOutcome(), submitPlanQualitySignal() to packages/tuner/src/client/tuner-client.ts",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "async getIdeationConfig(): Promise<IdeationConfig> calls GET /api/tuner/config/ideation"
+          },
+          {
+            "id": "ac2",
+            "description": "async submitIdeationOutcome(outcome): Promise<OutcomeResponse> POSTs to /outcomes/ideation"
+          },
+          {
+            "id": "ac3",
+            "description": "async submitPlanQualitySignal(signal): Promise<OutcomeResponse> POSTs to /outcomes/plan-quality"
+          },
+          {
+            "id": "ac4",
+            "description": "Uses this.get() / this.post() with AbortController timeout"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/client/tuner-client.ts",
+            "pattern": "Follow existing getForgeConfig / submitTaskOutcome pattern",
+            "reference": "Plan section 3.2"
+          }
+        }
+      },
+      {
+        "step_id": "iih002",
+        "title": "Create IdeationIntegration class",
+        "scope": "tuner",
+        "description": "Create packages/tuner/src/integrations/ideation-integration.ts following ForgeIntegration/PlannerIntegration pattern",
+        "dependencies": [
+          "iih001"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "constructor(options?: { tunerUrl?: string; refreshIntervalMs?: number })"
+          },
+          {
+            "id": "ac2",
+            "description": "async initialize() fetches config, sets available=true on success"
+          },
+          {
+            "id": "ac3",
+            "description": "getConfig() returns this.config ?? DEFAULT_IDEATION_CONFIG"
+          },
+          {
+            "id": "ac4",
+            "description": "isAvailable() returns this.available"
+          },
+          {
+            "id": "ac5",
+            "description": "async recordIdeationOutcome(outcome) is fire-and-forget (try/catch, log warning, never throw)"
+          },
+          {
+            "id": "ac6",
+            "description": "async refreshConfig() fetches and updates this.config"
+          },
+          {
+            "id": "ac7",
+            "description": "shutdown() clears this.refreshInterval"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/integrations/ideation-integration.ts",
+            "pattern": "Match ForgeIntegration structure exactly",
+            "reference": "Plan section 3.1"
+          }
+        }
+      },
+      {
+        "step_id": "iih003",
+        "title": "Start refresh interval on initialize",
+        "scope": "tuner",
+        "description": "In IdeationIntegration.initialize(), start setInterval to call refreshConfig() every 5 minutes (default)",
+        "dependencies": [
+          "iih002"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "Default refreshIntervalMs = 5 * 60 * 1000"
+          },
+          {
+            "id": "ac2",
+            "description": "this.refreshInterval = setInterval(() => this.refreshConfig(), ...)"
+          },
+          {
+            "id": "ac3",
+            "description": "Errors in refreshConfig logged but don't kill interval"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "pattern": "Auto-refresh matching Forge/Planner integration",
+            "reference": "Plan section 3.1"
+          }
+        }
+      },
+      {
+        "step_id": "iih004",
+        "title": "Export IdeationIntegration from tuner package",
+        "scope": "tuner",
+        "description": "Add export to packages/tuner/src/index.ts for IdeationIntegration and related types",
+        "dependencies": [
+          "iih002"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "export { IdeationIntegration } from './integrations/ideation-integration';"
+          },
+          {
+            "id": "ac2",
+            "description": "export { IdeationConfig, IdeationOutcome, PlanQualitySignal, DEFAULT_IDEATION_CONFIG } from './domain/...';"
+          },
+          {
+            "id": "ac3",
+            "description": "Ideation package can import via: import { IdeationIntegration } from '@planner/tuner';"
+          }
+        ],
+        "specification": {
+          "architecture": {
+            "file": "packages/tuner/src/index.ts",
+            "pattern": "Public API exports"
+          }
+        }
+      },
+      {
+        "step_id": "iih005",
+        "title": "Test IdeationIntegration",
+        "scope": "tuner",
+        "description": "Unit tests for IdeationIntegration covering graceful fallback, fire-and-forget, auto-refresh",
+        "dependencies": [
+          "iih003"
+        ],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          {
+            "id": "ac1",
+            "description": "initialize() succeeds when Tuner reachable, sets available=true"
+          },
+          {
+            "id": "ac2",
+            "description": "initialize() fails gracefully when Tuner unreachable, available=false, getConfig returns defaults"
+          },
+          {
+            "id": "ac3",
+            "description": "recordIdeationOutcome() logs warning on network failure but doesn't throw"
+          },
+          {
+            "id": "ac4",
+            "description": "Auto-refresh updates config periodically"
+          },
+          {
+            "id": "ac5",
+            "description": "shutdown() clears interval"
+          }
+        ],
+        "specification": {
+          "testing": {
+            "framework": "vitest",
+            "file": "packages/tuner/src/integrations/ideation-integration.test.ts"
+          }
+        }
+      }
+    ]
+  },
+  "status": "approved",
+  "feature_id": "tuner-ideation-integration-helper",
+  "type": "feature",
+  "priority": "high",
+  "parent": "tuner-package",
+  "component": "tuner",
+  "dependencies": [
+    "tuner-ideation-api"
+  ]
+}

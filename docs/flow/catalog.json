@@ -1,0 +1,479 @@
+{
+  "project_id": "planner",
+  "status": "approved",
+
+  "design_system": {
+    "feel": "Mission Control - professional dark theme with neon accents, holographic effects for status-critical items, clean functional areas for editing",
+    "library": {
+      "name": "shadcn/ui + Tailwind CSS 4",
+      "source": "relay-dashboard design system + shadcn/ui components",
+      "docs": "https://ui.shadcn.com",
+      "notes": "shadcn/ui for complex components (sidebar, dialogs, dropdowns), custom components for domain-specific UI. All themed to Mission Control."
+    },
+    "typography": {
+      "display": "Outfit (400-800)",
+      "body": "Inter (400-600)",
+      "mono": "IBM Plex Mono (400-600)",
+      "scale": "xs:11px, sm:13px, base:14px, lg:15px, xl:16px, 2xl:18px, 3xl:24px, 4xl:32px"
+    },
+    "colors": {
+      "bg-deep": "#0a0a0f",
+      "bg-primary": "#0d0d14",
+      "bg-secondary": "#12121c",
+      "bg-tertiary": "#181824",
+      "bg-card": "#1a1a28",
+      "bg-elevated": "#202030",
+      "text-primary": "#f0f0f5",
+      "text-secondary": "#a0a0b0",
+      "text-muted": "#606070",
+      "accent-cyan": "#00d9ff",
+      "accent-orange": "#ff6b35",
+      "accent-purple": "#a855f7",
+      "accent-green": "#00ffc8",
+      "success": "#00ffc8",
+      "warning": "#ff6b35",
+      "error": "#ff4757",
+      "border-default": "rgba(255,255,255,0.1)",
+      "border-subtle": "rgba(255,255,255,0.06)"
+    },
+    "shadows": {
+      "glow-cyan": "0 0 20px rgba(0,217,255,0.3)",
+      "glow-orange": "0 0 20px rgba(255,107,53,0.3)",
+      "glow-green": "0 0 20px rgba(0,255,200,0.3)",
+      "modal": "0 16px 70px rgba(0,0,0,0.7)"
+    },
+    "patterns": {
+      "two_row_toolbar": {
+        "row1": "breadcrumb + primary action",
+        "row2": "filter tabs/pills + status filter + view toggle",
+        "layout": {
+          "row1": "flex justify-between items-center h-12 px-4 border-b border-border-subtle",
+          "row2": "flex justify-between items-center h-12 px-4 gap-4"
+        },
+        "usage": ["ui-pipeline-view", "ui-plans-view-rework"]
+      },
+      "cards-clean": "bg-bg-card border-border-subtle rounded-xl, hover:border-border-default transition-colors",
+      "cards-holographic": "bg-gradient-to-br from-bg-card to-bg-elevated border-border-subtle rounded-xl, status glow effect",
+      "buttons-primary": "bg-accent-cyan text-bg-deep font-medium rounded-lg hover:shadow-glow-cyan transition-all",
+      "buttons-secondary": "bg-bg-tertiary text-text-primary border-border-default rounded-lg hover:border-accent-cyan/50",
+      "buttons-danger": "bg-error text-white rounded-lg hover:shadow-[0_0_20px_rgba(255,71,87,0.3)]",
+      "badges": "inline-flex px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide",
+      "forms": "bg-bg-secondary border-border-default rounded-md focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/50",
+      "modals": "bg-bg-tertiary border-border-subtle rounded-2xl shadow-modal, overlay bg-black/50",
+      "panels": "fixed right-0 w-[420px] h-full bg-bg-secondary border-l border-border-subtle z-40 animate-slide-in-right",
+      "focus": "focus-visible:outline-2 focus-visible:outline-accent-cyan focus-visible:outline-offset-2",
+      "status-bar": {
+        "layout": "fixed bottom-0 left-0 right-0 h-12 bg-bg-secondary border-t border-border-subtle z-50 flex items-center px-4 gap-6",
+        "collapsed": "h-6 justify-center gap-2",
+        "sections": ["context (shrink-0)", "agents (flex-1 centered)", "stats (shrink-0)", "meta (shrink-0)"],
+        "usage": ["ui-status-bar", "ui-agent-orchestration"]
+      },
+      "agent-avatar": {
+        "sizes": { "sm": "w-5 h-5 text-xs", "md": "w-8 h-8 text-base", "lg": "w-10 h-10 text-lg" },
+        "states": {
+          "working": "green pulsing dot (accent-green)",
+          "needs_input": "red ring (error)",
+          "idle": "opacity-50",
+          "error": "warning icon"
+        },
+        "usage": ["ui-agent-avatars", "ui-status-bar"]
+      },
+      "question-type-badges": {
+        "blocking": "bg-error/20 text-error text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+        "preference": "bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+        "fyi": "bg-accent-cyan/20 text-accent-cyan text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+        "usage": ["ui-question-queue", "ui-chat-bubbles"]
+      },
+      "triage-panel": {
+        "layout": "fixed right-4 bottom-16 w-80 max-h-[60vh] bg-bg-tertiary border border-border-subtle rounded-xl shadow-modal overflow-hidden z-50",
+        "header": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border-subtle",
+        "list": "overflow-y-auto max-h-[45vh] divide-y divide-border-subtle",
+        "footer": "flex items-center justify-between px-3 py-2 bg-bg-secondary border-t border-border-subtle",
+        "usage": ["ui-question-queue"]
+      },
+      "step-spec-tabs": {
+        "description": "Tabbed interface inside expanded step for spec domains",
+        "tabs": ["Details", "Architecture", "Design", "Testing", "Security"],
+        "tab_list": "flex gap-1 bg-transparent border-b border-border-subtle px-4",
+        "tab_trigger": "px-3 py-2 text-sm text-text-muted hover:text-text-secondary data-[state=active]:text-text-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-cyan",
+        "tab_content": "p-4",
+        "indicator_dot": "w-1.5 h-1.5 rounded-full bg-accent-cyan ml-1.5",
+        "usage": ["schema-ui-specification"]
+      },
+      "agent-observation-card": {
+        "description": "Collapsible card showing agent observations",
+        "card": "bg-bg-card border border-border-subtle rounded-lg overflow-hidden",
+        "header": "flex items-center justify-between px-4 py-3 bg-bg-tertiary border-b border-border-subtle cursor-pointer hover:bg-bg-secondary/50",
+        "body": "p-4 space-y-4",
+        "confidence_badges": {
+          "exploring": "bg-accent-purple/20 text-accent-purple",
+          "forming": "bg-warning/20 text-warning",
+          "confident": "bg-success/20 text-success"
+        },
+        "keyword_chip": "px-2 py-0.5 bg-accent-cyan/10 text-accent-cyan text-xs rounded",
+        "usage": ["schema-ui-understanding"]
+      }
+    },
+    "icons": "Inline SVG, stroke-based, strokeWidth=2, currentColor, sizes: 14/16/20/24px"
+  },
+
+  "components": [
+    {
+      "id": "ideation-core",
+      "name": "Ideation Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod", "Relay"],
+      "path": "packages/ideation/",
+      "description": "Backend service for brainstorming facilitation, session management, and nugget crystallization. Transforms raw intent into refined understanding ready for planning."
+    },
+    {
+      "id": "ideation-ui",
+      "name": "Ideation UI",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui"],
+      "path": "packages/ideation-ui/",
+      "description": "Frontend application for human-initiated brainstorming sessions with Interviewer agent and real-time specialist observations."
+    },
+    {
+      "id": "planner-core",
+      "name": "Planner Core API",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "src/",
+      "description": "Backend service providing REST API, MCP tools, domain model, and storage for plan management"
+    },
+    {
+      "id": "planner-ui",
+      "name": "Planner UI",
+      "tech": ["TypeScript", "React"],
+      "path": "packages/planner-ui/",
+      "description": "Frontend application for plan creation, editing, approval workflow, and execution visibility"
+    },
+    {
+      "id": "tuner",
+      "name": "Tuner",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/tuner/",
+      "description": "Adaptive learning loop that observes Forge outcomes, builds baselines, detects drift, and learns optimal model selection via Thompson sampling. CLI-only, no UI."
+    },
+    {
+      "id": "forge-core",
+      "name": "Forge Core",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod"],
+      "path": "packages/forge-core/",
+      "description": "Orchestration engine for plan execution with budget enforcement, model selection, recovery strategies, and Tuner integration. Executes plans from Planner with observability via Trajectories."
+    },
+    {
+      "id": "testbench",
+      "name": "Testbench",
+      "tech": ["TypeScript", "Node.js", "commander", "Zod"],
+      "path": "packages/testbench/",
+      "description": "End-to-end pipeline testing for Planner → Forge → Tuner. Runs predefined scenarios, collects metrics, supports training mode for Tuner learning. CLI-only."
+    },
+    {
+      "id": "tend",
+      "name": "tend",
+      "tech": ["TypeScript", "React", "Vite", "Tailwind CSS 4", "shadcn/ui", "Matter.js"],
+      "path": "packages/tend/",
+      "description": "Unified AI-native workspace merging ideation-ui, planner-ui, and forge-ui into a single three-column layout (The Now / Conversation / The Tree). Forked from ideation-ui. Earth-tone zen garden aesthetic."
+    },
+    {
+      "id": "mull",
+      "name": "Mull",
+      "tech": ["TypeScript", "Node.js", "compromise.js", "commander", "gray-matter", "Zod"],
+      "path": "packages/mull/",
+      "description": "Cross-agent, cross-session shared memory. Extracts the 5-10% of session data that is actual knowledge and writes structured markdown topic files to memory/. Generic core with adapter pattern — reads from trajectory files, relay logs, transcripts, or any custom source. Two-stage pipeline: deterministic extraction ($0) + selective LLM synthesis. Built portable for standalone extraction."
+    },
+    {
+      "id": "cultivate",
+      "name": "Cultivate",
+      "tech": ["TypeScript", "Node.js", "SQLite", "Express", "Zod", "BullMQ", "Redis", "Transformers.js", "Anthropic SDK"],
+      "path": "packages/cultivate/",
+      "description": "Signal intake and processing system. Watches external channels, filters through three tiers (rules → local ML → LLM), scores with 8 weighted factors, clusters via grounded theory, and surfaces what matters. Greenhouses control focus. Tuner manages weights. No fallbacks — fail fast everywhere."
+    }
+  ],
+
+  "features": [
+    { "id": "ideation-package", "title": "Ideation Package", "type": "epic", "status": "approved", "priority": "critical", "component": "ideation-core", "design_reference": "docs/flow/features/ideation-package.json" },
+    { "id": "ideation-domain", "title": "Ideation Domain Model", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": [], "parent": "ideation-package" },
+    { "id": "ideation-storage", "title": "Ideation Storage Layer", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["ideation-domain"], "parent": "ideation-package" },
+    { "id": "ideation-api", "title": "Ideation REST API", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-storage"], "parent": "ideation-package" },
+    { "id": "ideation-lead", "title": "Interviewer Persistent Agent", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["ideation-api"], "parent": "ideation-package", "audit_note": "13/14 AC met. Gap: spawnAgent not wired to Interviewer initialization (int005a/int008a steps pending)" },
+    { "id": "ideation-specialists", "title": "Guardian Specialist Agents", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-lead"], "parent": "ideation-package" },
+    { "id": "ideation-planner-handoff", "title": "Planner Handoff Integration", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["ideation-lead", "ideation-specialists"], "parent": "ideation-package", "audit_note": "7/8 AC met. Gap: PlannerLead notification not implemented (hnd006 step pending)" },
+
+    { "id": "ideation-ui", "title": "Ideation UI Package", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-ui", "dependencies": ["ideation-api"], "design_reference": "docs/flow/features/ideation-ui.json" },
+    { "id": "ideation-ui-layout", "title": "Ideation Layout & Navigation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-list", "title": "Session List & Management", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-chat", "title": "Chat Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-specialists-panel", "title": "Specialists Panel", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-ui-layout"], "parent": "ideation-ui" },
+    { "id": "ideation-ui-session-tabs", "title": "Session View Tab Navigation", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-ui-chat", "ideation-ui-specialists-panel"], "parent": "ideation-ui" },
+    { "id": "ideation-concrete-blocks", "title": "[SUPERSEDED] Concrete Blocks", "type": "feature", "status": "superseded", "priority": "archived", "superseded_by": "ideation-canvas-v2", "dependencies": ["ideation-specialists", "ideation-ui-specialists-panel"], "parent": "ideation-package" },
+    { "id": "ideation-canvas-v2", "title": "Ideation Canvas - Physics-Based Blocks", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-specialists", "ideation-domain", "ideation-api"], "parent": "ideation-package", "design_reference": "docs/design/ideation-canvas-ux.md", "note": "Supersedes ideation-concrete-blocks. Physics canvas, three-column layout, focus mode, dashboard with Navigator." },
+
+    { "id": "domain-model", "title": "Domain Model", "type": "epic", "status": "approved" },
+    { "id": "domain-plan", "title": "Plan Entity", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment", "dot-planner-enhancements"] },
+    { "id": "domain-step", "title": "Step Entity", "type": "feature", "status": "approved", "extended_by": ["dot-planner-enhancements"] },
+    { "id": "domain-versioning", "title": "Versioning and Diffs", "type": "feature", "status": "approved" },
+
+    { "id": "storage", "title": "Storage Layer", "type": "epic", "status": "approved" },
+    { "id": "storage-sqlite", "title": "SQLite Storage", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
+
+    { "id": "rest-api", "title": "REST API", "type": "epic", "status": "approved" },
+    { "id": "api-plan-crud", "title": "Plan CRUD Endpoints", "type": "feature", "status": "approved", "extended_by": ["schema-org-initiative", "schema-enrichment"] },
+    { "id": "api-workflow", "title": "Workflow Endpoints", "type": "feature", "status": "approved" },
+    { "id": "api-change-requests", "title": "Change Request Endpoint", "type": "feature", "status": "approved" },
+
+    { "id": "mcp-server", "title": "MCP Server", "type": "epic", "status": "approved" },
+    { "id": "mcp-tools", "title": "MCP Planning Tools", "type": "feature", "status": "approved" },
+
+    { "id": "ui-plan-creation", "title": "Plan Creation", "type": "epic", "status": "approved" },
+    { "id": "ui-plan-create-goal", "title": "Create from Goal", "type": "feature", "status": "approved" },
+    { "id": "ui-plan-create-import", "title": "Import from Document", "type": "feature", "status": "completed", "audit_note": "Complete - TabNavigation, DocumentTextarea, UploadDropZone, FormatDetectionBadge, ExtractionPreview integrated. PDF not supported (only .md/.txt/.yaml/.json)" },
+
+    { "id": "ui-plan-editor", "title": "Plan Editor", "type": "epic", "status": "approved" },
+    { "id": "ui-editor-inline", "title": "Inline Editing", "type": "feature", "status": "approved" },
+    { "id": "ui-editor-steps", "title": "Step Editor", "type": "feature", "status": "approved" },
+    { "id": "ui-editor-multiscope", "title": "Multi-Scope Visualization", "type": "feature", "status": "approved", "audit_note": "SwimlaneView integrated - 8/11 criteria met. Missing: collapsible sections, zoom levels, per-scope add button" },
+    { "id": "ui-subplan-navigation", "title": "Sub-Plan Navigation", "type": "feature", "status": "approved" },
+
+    { "id": "ui-approval-workflow", "title": "Approval Workflow", "type": "epic", "status": "approved" },
+    { "id": "ui-submit-review", "title": "Submit for Review", "type": "feature", "status": "approved" },
+    { "id": "ui-review-comments", "title": "Review Comments", "type": "feature", "status": "approved" },
+    { "id": "ui-approve", "title": "Approval Ceremony", "type": "feature", "status": "approved" },
+    { "id": "ui-publish", "title": "Publish to Orchestrator", "type": "feature", "status": "approved" },
+    { "id": "ui-workflow-integration", "title": "Workflow Actions Integration", "type": "feature", "status": "approved" },
+
+    { "id": "ui-execution", "title": "Execution Visibility", "type": "epic", "status": "approved" },
+    { "id": "ui-execution-status", "title": "Execution Status Overlay", "type": "feature", "status": "approved" },
+    { "id": "ui-gate-approval", "title": "Gate Approval UI", "type": "feature", "status": "approved" },
+    { "id": "ui-change-request-ui", "title": "Change Request Handling", "type": "feature", "status": "approved" },
+
+    { "id": "ui-ai-integration", "title": "AI Integration", "type": "epic", "status": "approved" },
+    { "id": "ui-ai-chat", "title": "AI Chat (Legacy)", "type": "feature", "status": "deprecated", "superseded_by": ["ui-relay-messaging", "ui-direct-messaging", "planner-lead-service"], "note": "ChatPanel removed - functionality now in MessagingSidebar" },
+    { "id": "ui-ai-improvements", "title": "Silent AI Improvements", "type": "feature", "status": "approved" },
+
+    { "id": "relay-integration", "title": "Agent Relay Integration", "type": "epic", "status": "approved" },
+    { "id": "relay-core", "title": "Relay Core Infrastructure", "type": "feature", "status": "approved" },
+    { "id": "relay-planning-agent", "title": "Planning Agent Spawning", "type": "feature", "status": "approved" },
+    { "id": "relay-mcp-bridge", "title": "MCP Bridge for Planning Agents", "type": "feature", "status": "approved" },
+    { "id": "relay-session-management", "title": "Planning Session Management", "type": "feature", "status": "approved" },
+    { "id": "relay-ai-chat", "title": "Connect AI Chat to Planning Agent", "type": "feature", "status": "approved" },
+    { "id": "relay-ai-improvements", "title": "Connect Silent Improvements to Planning Agent", "type": "feature", "status": "approved" },
+    { "id": "relay-change-request-agent", "title": "Change Request Agent Handling", "type": "feature", "status": "approved" },
+    { "id": "relay-session-connect", "title": "On-Demand AI Session Connection", "type": "feature", "status": "approved", "audit_note": "All 8 implementation tasks completed - hook, badge, API, tests all implemented" },
+    { "id": "relay-plan-channel-hook", "title": "Plan Channel Creation Hook", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["relay-core", "ui-relay-messaging-backend"], "audit_note": "Implemented: Express middleware intercepts POST /api/plans, calls createPlanChannel + notifyNewPlan. 12 tests." },
+    { "id": "relay-dead-code-cleanup", "title": "Relay Module Dead Code Cleanup", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "component": "planner-core", "note": "Technical debt cleanup - remove ~20 unused exported functions from relay module" },
+
+    { "id": "ui-realtime-sync", "title": "Real-Time Plan Sync", "type": "feature", "status": "completed", "audit_note": "All 8 implementation steps complete. SSE endpoint, usePlanEvents hook with auto-reconnect, integrated into PlanEditorPage. 22 tests passing." },
+
+    { "id": "ui-design-system-migration", "title": "Design System Migration", "type": "epic", "status": "completed", "audit_note": "59 components migrated to Tailwind CSS 4, 18 SVG icon components, globals.css with full CSS variable system. All acceptance criteria met." },
+    { "id": "ui-dsm-audit-relay", "title": "Audit relay-dashboard Design System", "type": "feature", "status": "completed" },
+    { "id": "ui-dsm-audit-planner", "title": "Audit planner-ui Components", "type": "feature", "status": "completed" },
+    { "id": "ui-dsm-gap-analysis", "title": "Gap Analysis & Migration Plan", "type": "feature", "status": "completed" },
+    { "id": "ui-dsm-library-selection", "title": "Component Library Selection (Human Gate)", "type": "feature", "status": "completed", "decision": "Adopt Tailwind CSS 4, relay-dashboard CSS vars, dark theme, inline SVG icons. Greenfield - replace all existing planner-ui styles." },
+    { "id": "ui-dsm-migrate-buttons", "title": "Migrate Button Components", "type": "feature", "status": "completed", "audit_note": "Button.tsx with 6 variants (primary, secondary, danger, success, ghost, link)" },
+    { "id": "ui-dsm-migrate-forms", "title": "Migrate Form Components", "type": "feature", "status": "completed", "audit_note": "EditableText, EditableTextarea, inputs, selects all using Tailwind" },
+    { "id": "ui-dsm-migrate-modals", "title": "Migrate Modal/Dialog Components", "type": "feature", "status": "completed", "audit_note": "AnimatedModal pattern, overlay patterns implemented" },
+    { "id": "ui-dsm-migrate-cards", "title": "Migrate Card/Layout Components", "type": "feature", "status": "completed", "audit_note": "PlanCard, AttentionItem, ScopeGroup, step cards all using bg-bg-card pattern" },
+    { "id": "ui-dsm-migrate-utilities", "title": "Migrate Utility Components", "type": "feature", "status": "completed", "audit_note": "LoadingSpinner, ExecutionProgress, badges, icons all migrated" },
+    { "id": "ui-dsm-testing", "title": "Visual Regression Testing", "type": "feature", "status": "completed", "audit_note": "Manual verification - build succeeds, components render correctly" },
+    { "id": "ui-dsm-cleanup", "title": "Cleanup Deprecated Components", "type": "feature", "status": "completed", "audit_note": "Old index.css removed, globals.css only (306 lines)" },
+    { "id": "ui-dsm-final-review", "title": "Final Review (Human Gate)", "type": "feature", "status": "completed", "audit_note": "Audit passed - all 59 components migrated, design system consistent" },
+
+    { "id": "ui-attention-navigation", "title": "Attention-Based Plan Navigation", "type": "epic", "status": "completed" },
+    { "id": "ui-attention-signals", "title": "Attention Signal Computation", "type": "feature", "status": "completed" },
+    { "id": "ui-attention-sections", "title": "Attention Section Components", "type": "feature", "status": "completed" },
+    { "id": "ui-scope-grouping", "title": "Scope-Based Grouping", "type": "feature", "status": "completed" },
+    { "id": "ui-command-palette", "title": "Command Palette Navigation", "type": "feature", "status": "completed" },
+
+    { "id": "ui-relay-messaging", "title": "Relay Channel Messaging", "type": "epic", "status": "in_progress", "audit_note": "Core messaging implemented. Architecture fix in progress: adding RelayProvider context for single shared connection with persistent user identity (ac11-ac13, urm-ui013-015)." },
+    { "id": "ui-relay-messaging-backend", "title": "Relay Messaging Backend Bridge", "type": "feature", "status": "completed", "audit_note": "All 5 backend tasks completed - ws-proxy.ts, channels.ts, planner-lead.ts, channel REST endpoints, mock mode support" },
+    { "id": "ui-relay-messaging-sidebar", "title": "Messaging Sidebar Component", "type": "feature", "status": "completed", "audit_note": "All 12 frontend tasks completed - hooks, components, Layout integration. @mentions not implemented (v2 scope)." },
+
+    { "id": "ui-mentions", "title": "@Mentions in Messaging", "type": "feature", "status": "approved", "dependencies": ["ui-relay-messaging"] },
+    { "id": "ui-active-channels-sidebar", "title": "Active Channels in Sidebar", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-sidebar-layout", "relay-core"], "audit_note": "All 12 implementation steps complete. CHANNELS section in sidebar with 5-min activity filter, useActiveChannels hook, ChannelView composite (Header/MessageList/Input), ChannelPage route, auto-join on plan view." },
+
+    { "id": "planner-lead-service", "title": "PlannerLead Persistent Agent Service", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["relay-core"], "audit_note": "All 15 implementation steps complete. PlannerLead runs as persistent RelayClient service, Anthropic API integration, tool execution, conversation history, mock mode support." },
+    { "id": "persistent-agent-parity", "title": "Persistent Agent Parity", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["planner-lead-service", "ui-agent-orchestration"], "superseded_by": "relay-agent-integration", "note": "V1 complete (direct emit). V2 will migrate to MCP tools per relay-agent-integration step-5." },
+
+    { "id": "standalone-app", "title": "Standalone App Foundation", "type": "epic", "status": "approved", "priority": "high" },
+    { "id": "schema-org-initiative", "title": "Organization & Initiative Schema", "type": "feature", "status": "approved", "priority": "high", "dependencies": [] },
+    { "id": "ui-sidebar-layout", "title": "Left Sidebar Layout", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["schema-org-initiative"] },
+    { "id": "ui-initiatives-view", "title": "Initiatives View", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"], "audit_note": "All 14 implementation steps complete. Full CRUD API client, TypeScript types, ColorPicker (6 presets), IconPicker (emoji grid), InitiativeCard (icon, name, description, status, stats), InitiativeModal (create/edit), InitiativesListPage (drag-drop reorder, filtering, empty state), InitiativeDetailPage (details, actions, plans list), routes added, skeleton loading, all tests passing." },
+    { "id": "ui-plans-view-rework", "title": "Plans View Rework", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"] },
+    { "id": "ui-pipeline-view", "title": "Pipeline View", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["schema-org-initiative", "ui-sidebar-layout"], "replaces": "ui-roadmap-view" },
+
+    { "id": "ui-agent-orchestration", "title": "Agent Orchestration UX", "type": "epic", "status": "approved", "priority": "high", "dependencies": ["ui-relay-messaging", "planner-lead-service"], "design_reference": "docs/ux-agent-orchestration.md" },
+    { "id": "ui-status-bar", "title": "Agent Status Bar", "type": "feature", "status": "completed", "priority": "high", "dependencies": [] },
+    { "id": "ui-agent-avatars", "title": "Agent Avatar Components", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
+    { "id": "ui-chat-bubbles", "title": "Agent Chat Bubbles", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-agent-avatars", "ui-question-queue"] },
+    { "id": "ui-question-queue", "title": "Question Queue Management", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-status-bar"] },
+    { "id": "ui-question-notification-bubble", "title": "Mini Question Notification Bubble", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["ui-question-queue", "ui-agent-avatars", "ui-status-bar"] },
+    { "id": "ui-user-trajectory", "title": "User Trajectory Integration", "type": "feature", "status": "in_progress", "priority": "medium", "dependencies": ["ui-question-queue", "ui-chat-bubbles"] },
+
+    { "id": "relay-agent-integration", "title": "Relay Agent Integration", "type": "feature", "status": "completed", "priority": "critical", "dependencies": ["relay-core"], "note": "MCP as unified interface for all agents. Relay for presence, planner-core for state.", "audit_note": "3 MCP tools (report_agent_status, ask_user_question, join_plan_channel), spawn flow updated with MCP context, /api/agents endpoint for merged presence+state, frontend hook updated." },
+
+    { "id": "qa-channel-broadcast", "title": "Q&A Channel Broadcast", "type": "feature", "status": "completed", "priority": "high", "dependencies": ["ui-question-queue", "ui-relay-messaging"] },
+
+    { "id": "ui-direct-messaging", "title": "Direct Messaging Agents", "type": "feature", "status": "completed", "priority": "medium", "dependencies": ["ui-relay-messaging", "ui-status-bar", "ui-agent-avatars"] },
+
+    { "id": "schema-enrichment", "title": "PlanVersion Schema Enrichment", "type": "epic", "status": "draft", "priority": "critical", "dependencies": [], "extends": ["domain-plan", "storage-sqlite", "api-plan-crud"], "design_reference": ".context/planner-schema-enrichment.md" },
+    { "id": "schema-understanding", "title": "Understanding Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-specification", "title": "Specification Schema & Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [] },
+    { "id": "schema-db-migration", "title": "Database Migration for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-understanding", "schema-specification"] },
+    { "id": "schema-api-endpoints", "title": "API Endpoints for Understanding & Specification", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["schema-db-migration"] },
+    { "id": "schema-ui-understanding", "title": "Understanding Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-ui-specification", "title": "Specification Section UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+    { "id": "schema-mcp-tools", "title": "MCP Tools for Understanding & Specification", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["schema-api-endpoints"] },
+
+    { "id": "ideation-documents", "title": "Document Upload & Analysis", "type": "epic", "status": "draft", "priority": "high", "component": "ideation-core", "dependencies": ["ideation-package"], "design_reference": "docs/flow/features/ideation-documents.json" },
+    { "id": "ideation-doc-domain", "title": "Document Domain Model", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "ideation-documents" },
+    { "id": "ideation-doc-storage", "title": "Document Storage Layer", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-domain"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-api", "title": "Document Upload API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-chunking", "title": "Document Chunking Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-domain"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-analysis", "title": "Chunk Analysis Agents", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-chunking"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-synthesis", "title": "Document Insight Synthesis", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-analysis"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-agent-tool", "title": "cite_document Agent Tool", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-storage", "ideation-doc-analysis"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-interviewer-integration", "title": "Interviewer Document Integration", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-synthesis", "ideation-doc-agent-tool", "ideation-lead"], "parent": "ideation-documents" },
+    { "id": "ideation-doc-ui-upload", "title": "Document Upload UI", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["ideation-doc-api"], "parent": "ideation-documents", "component": "ideation-ui" },
+    { "id": "ideation-doc-ui-progress", "title": "Analysis Progress UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["ideation-doc-ui-upload", "ideation-doc-analysis"], "parent": "ideation-documents", "component": "ideation-ui" },
+
+    { "id": "tuner-package", "title": "Tuner Package", "type": "epic", "status": "approved", "priority": "high", "component": "tuner", "design_reference": "docs/flow/features/tuner-package.json" },
+    { "id": "tuner-domain", "title": "Tuner Domain Model", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": [], "parent": "tuner-package" },
+    { "id": "tuner-storage", "title": "Tuner Storage Layer", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["tuner-domain"], "parent": "tuner-package" },
+    { "id": "tuner-api", "title": "Tuner REST API", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-storage"], "parent": "tuner-package" },
+    { "id": "tuner-outcome-collector", "title": "Outcome Collector Service", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["tuner-storage"], "parent": "tuner-package" },
+    { "id": "tuner-baseline-service", "title": "Baseline Service", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-outcome-collector"], "parent": "tuner-package" },
+    { "id": "tuner-drift-detector", "title": "Drift Detector Service", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-baseline-service"], "parent": "tuner-package" },
+    { "id": "tuner-model-selector", "title": "Model Selector (Thompson Sampling)", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-outcome-collector"], "parent": "tuner-package" },
+    { "id": "tuner-stability-controls", "title": "Stability Controls", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-model-selector"], "parent": "tuner-package", "note": "Burn-in, min samples, rate limiting, hysteresis, CI checks to prevent flapping" },
+    { "id": "tuner-config-writer", "title": "Config Writer Service", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-baseline-service", "tuner-model-selector", "tuner-stability-controls"], "parent": "tuner-package" },
+    { "id": "tuner-cli", "title": "Tuner CLI", "type": "feature", "status": "implemented", "priority": "medium", "dependencies": ["tuner-api"], "parent": "tuner-package", "audit_note": "CLI override command not fully implemented" },
+    { "id": "tuner-forge-integration", "title": "Forge Integration", "type": "feature", "status": "implemented", "priority": "critical", "dependencies": ["tuner-api", "tuner-outcome-collector"], "parent": "tuner-package", "note": "Forge reads config, emits outcomes" },
+    { "id": "tuner-planner-integration", "title": "Planner Integration", "type": "feature", "status": "implemented", "priority": "high", "dependencies": ["tuner-api", "tuner-config-writer"], "parent": "tuner-package", "note": "Planner reads decomposition config" },
+
+    { "id": "tuner-ideation-domain", "title": "Ideation Domain Types", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-domain", "tuner-stability-controls"], "parent": "tuner-package", "component": "tuner", "note": "IdeationConfig, IdeationOutcome, PlanQualitySignal, IdeationBaseline schemas + ideation-specific stability constants" },
+    { "id": "tuner-ideation-storage", "title": "Ideation Storage Tables", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-domain", "tuner-storage"], "parent": "tuner-package", "component": "tuner", "note": "3 new tables + config_versions column extension" },
+    { "id": "tuner-ideation-api", "title": "Ideation API Endpoints", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-storage", "tuner-api"], "parent": "tuner-package", "component": "tuner", "note": "GET config/ideation, POST outcomes/ideation, POST outcomes/plan-quality, GET insights/ideation" },
+    { "id": "tuner-ideation-collector", "title": "Ideation Outcome Collection", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-storage", "tuner-outcome-collector"], "parent": "tuner-package", "component": "tuner", "note": "Extend OutcomeCollector with ideation/plan-quality ingestion + events" },
+    { "id": "tuner-ideation-baseline-service", "title": "Ideation Baseline Service", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-collector", "tuner-baseline-service"], "parent": "tuner-package", "component": "tuner", "note": "Correlates IdeationOutcome + PlanQualitySignal, builds baselines with Welford's algorithm" },
+    { "id": "tuner-ideation-config-generation", "title": "Ideation Config Generation", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-baseline-service", "tuner-config-writer", "tuner-stability-controls"], "parent": "tuner-package", "component": "tuner", "note": "ConfigWriter generates IdeationConfig from baselines, gated by stability controls" },
+    { "id": "tuner-ideation-integration-helper", "title": "Ideation Integration Helper", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-api"], "parent": "tuner-package", "component": "tuner", "note": "IdeationIntegration class + TunerClient extensions for ideation consumers" },
+    { "id": "tuner-ideation-consumption", "title": "Ideation Config Consumption", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-integration-helper", "ideation-lead"], "parent": "tuner-package", "component": "ideation-core", "note": "Wire ideation to read config, replace hardcoded values, emit outcomes on handoff" },
+    { "id": "tuner-planner-quality-signal", "title": "Planner Quality Signal Emission", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["tuner-ideation-api", "ideation-planner-handoff"], "parent": "tuner-package", "component": "planner-core", "note": "Planner emits PlanQualitySignal to Tuner on approval of ideation-sourced plans" },
+
+    { "id": "forge-builds", "title": "Forge Builds: Multi-Plan Execution Coordination", "type": "epic", "status": "draft", "priority": "critical", "component": "forge-core", "design_reference": "docs/flow/features/forge-builds.json", "note": "Generic multi-plan execution layer. Accepts pre-computed DAG of plan tiers, executes tier-by-tier with parallel runs, tracks aggregate build state." },
+    { "id": "forge-build-domain", "title": "Build Domain Types & Schemas", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "forge-builds", "component": "forge-core" },
+    { "id": "forge-build-storage", "title": "Build Storage Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-build-domain"], "parent": "forge-builds", "component": "forge-core" },
+    { "id": "forge-build-coordinator", "title": "Build Coordinator Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-build-domain", "forge-build-storage"], "parent": "forge-builds", "component": "forge-core" },
+    { "id": "forge-build-api", "title": "Build REST API Endpoints", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-build-coordinator"], "parent": "forge-builds", "component": "forge-core" },
+
+    { "id": "planner-build-resolver", "title": "Build Resolver: Dependency Resolution & Proposal", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-builds"], "component": "planner-core", "design_reference": "docs/flow/features/planner-build-resolver.json", "note": "Resolves initiative/plan_ids into topological tiers, checks Forge for previous completions, returns BuildProposal for user review." },
+
+    { "id": "forge-dot-enhancements", "title": "Forge DOT Framework Enhancements", "type": "epic", "status": "draft", "priority": "critical", "component": "forge-core", "design_reference": "docs/flow/features/forge-dot-enhancements.json", "note": "Budget enforcement, model routing, retry ladder, confidence handling, parallelism, Tuner integration" },
+    { "id": "forge-execution-policy", "title": "Execution Policy Schema", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-budget-enforcement", "title": "Budget Enforcement Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-retry-ladder", "title": "Recovery Strategy Ladder", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-confidence-handling", "title": "Confidence Threshold Handling", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-parallelism-control", "title": "Parallelism Control Service", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-model-routing", "title": "Model Routing Rules", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-dependency-resolution", "title": "Dependency Resolution Enhancement", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-tuner-integration", "title": "Forge Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["forge-execution-policy", "tuner-api", "tuner-outcome-collector"], "parent": "forge-dot-enhancements", "component": "forge-core", "note": "Reads config from Tuner, emits outcomes for learning" },
+    { "id": "forge-timeout-enforcement", "title": "Timeout Enforcement", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+    { "id": "forge-execution-metrics", "title": "Task Execution Metrics Storage", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-execution-policy"], "parent": "forge-dot-enhancements", "component": "forge-core" },
+
+    { "id": "dot-planner-enhancements", "title": "DOT Framework - Planner Enhancements", "type": "epic", "status": "draft", "priority": "critical", "component": "planner-core", "design_reference": "docs/flow/features/dot-planner-enhancements.json", "note": "Complexity estimation, language tier detection, step/depth limits, acceptance criteria generation, Tuner integration", "dependencies": ["tuner-package"] },
+    { "id": "planner-complexity-estimator", "title": "Complexity Estimator Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-language-detector", "title": "Language/Domain Tier Detector", "type": "feature", "status": "draft", "priority": "high", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-limits-enforcer", "title": "Step & Depth Limits Enforcer", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["planner-tuner-integration"], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-contract-validator", "title": "Task Contract Validator", "type": "feature", "status": "draft", "priority": "medium", "dependencies": [], "parent": "dot-planner-enhancements", "component": "planner-core" },
+    { "id": "planner-tuner-integration", "title": "Planner Tuner Integration", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tuner-api", "tuner-config-writer"], "parent": "dot-planner-enhancements", "component": "planner-core", "note": "Read PlannerConfig from Tuner for complexity weights and decomposition limits" },
+
+    { "id": "planner-guardrails", "title": "Planning-Time Guardrails", "type": "epic", "status": "backlog", "priority": "medium", "component": "planner-core", "note": "Catches missing requirements BEFORE execution (security, testing, scope). Separate from Tuner which measures AFTER execution. See docs/architecture/02-decomposition-planner.md" },
+    { "id": "guardrails-schema", "title": "Guardrail Schema & Types", "type": "feature", "status": "backlog", "priority": "high", "dependencies": [], "parent": "planner-guardrails", "component": "planner-core" },
+    { "id": "guardrails-security", "title": "Security Guardrails", "type": "feature", "status": "backlog", "priority": "high", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "No auth on API, secrets in code, encryption missing" },
+    { "id": "guardrails-testing", "title": "Testing Guardrails", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "No tests for critical path, missing integration tests" },
+    { "id": "guardrails-scope", "title": "Scope Guardrails", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "Large blast radius, production data changes, many repos" },
+    { "id": "guardrails-approval-integration", "title": "Guardrails Approval Workflow Integration", "type": "feature", "status": "backlog", "priority": "medium", "dependencies": ["guardrails-schema"], "parent": "planner-guardrails", "component": "planner-core", "note": "Wire guardrails into plan approval flow" },
+
+    { "id": "testbench", "title": "End-to-End Pipeline Testbench", "type": "epic", "status": "draft", "priority": "high", "component": "testbench", "design_reference": "docs/flow/features/testbench.json", "dependencies": ["tuner-package", "forge-dot-enhancements", "dot-planner-enhancements"], "note": "Automated E2E testing of Planner → Forge → Tuner pipeline with scenario library and training mode" },
+    { "id": "testbench-core", "title": "Testbench Core Infrastructure", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-scenarios", "title": "Scenario Definition & Library", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-core"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-runner", "title": "Scenario Runner", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-core", "testbench-scenarios"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-verification", "title": "Verification Strategies", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-mock", "title": "Mock Execution Mode", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-metrics", "title": "Metrics Collection & Analysis", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["testbench-runner"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-cli", "title": "CLI Interface", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["testbench-runner", "testbench-verification", "testbench-metrics"], "parent": "testbench", "component": "testbench" },
+    { "id": "testbench-reporting", "title": "Results Reporting", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["testbench-metrics", "testbench-cli"], "parent": "testbench", "component": "testbench" },
+
+    { "id": "forge-relay-integration", "title": "Forge Relay Integration (E2E Gaps)", "type": "feature", "status": "in_progress", "priority": "critical", "component": "forge-core", "parent": "forge-dot-enhancements", "note": "Wire MCP endpoints on main server, add forge MCP instructions to agent prompt, propagate workspace_path, fix RunOutcomeEmission schema, fix orchestrator TODOs. Plan: .claude/plans/merry-spinning-willow.md" },
+    { "id": "forge-prompt-engineering", "title": "Agent Prompt Engineering Refinement", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-relay-integration"], "parent": "forge-dot-enhancements", "component": "forge-core", "design_reference": "docs/flow/features/forge-prompt-engineering.json" },
+    { "id": "forge-agent-metrics", "title": "Real Agent Usage Metrics from Relay", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["forge-relay-integration", "forge-execution-metrics"], "parent": "forge-dot-enhancements", "component": "forge-core", "design_reference": "docs/flow/features/forge-agent-metrics.json" },
+    { "id": "forge-replan-escalation-tracking", "title": "Replan & Escalation Count Tracking", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["forge-retry-ladder", "forge-confidence-handling"], "parent": "forge-dot-enhancements", "component": "forge-core", "design_reference": "docs/flow/features/forge-replan-escalation-tracking.json" },
+
+    { "id": "trajectory-integration", "title": "Trajectory Integration Across Pipeline", "type": "epic", "status": "approved", "priority": "high", "dependencies": ["ideation-lead", "planner-lead-service"], "design_reference": "docs/flow/features/trajectory-integration.json", "note": "Record agent reasoning + use retrospectives as context for downstream agents" },
+    { "id": "trajectory-service", "title": "Shared Trajectory Service", "type": "feature", "status": "approved", "priority": "critical", "dependencies": [], "parent": "trajectory-integration", "component": "planner-core" },
+    { "id": "trajectory-interviewer-write", "title": "Interviewer Trajectory Recording", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["trajectory-service", "ideation-lead"], "parent": "trajectory-integration", "component": "ideation-core" },
+    { "id": "trajectory-planner-read-write", "title": "PlannerLead Trajectory Read + Write", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["trajectory-service", "trajectory-interviewer-write", "planner-lead-service"], "parent": "trajectory-integration", "component": "planner-core" },
+    { "id": "trajectory-forge-read", "title": "Forge Workers Read Planning Context", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["trajectory-service", "trajectory-planner-read-write"], "parent": "trajectory-integration", "component": "forge-core" },
+    { "id": "trajectory-spawned-agents", "title": "Spawned Agent Trajectory (Best-Effort)", "type": "feature", "status": "approved", "priority": "low", "dependencies": ["trajectory-service", "trajectory-forge-read"], "parent": "trajectory-integration", "component": "ideation-core" },
+    { "id": "trajectory-testbench-verification", "title": "Testbench Trajectory Verification", "type": "feature", "status": "approved", "priority": "medium", "dependencies": ["trajectory-service", "testbench-runner"], "parent": "trajectory-integration", "component": "testbench" },
+
+    { "id": "tend-app", "title": "tend: Unified Workspace App", "type": "epic", "status": "draft", "priority": "critical", "component": "tend", "design_reference": "docs/tend-implementation.md", "note": "Merges ideation-ui + planner-ui + forge-ui into single three-column workspace. Forked from ideation-ui. 8 build stages." },
+
+    { "id": "tend-scaffold", "title": "Fork & Scaffold tend Package", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "tend-app", "component": "tend", "note": "Stage 1a: Fork ideation-ui → packages/tend, update package.json, port, routing" },
+    { "id": "tend-theming", "title": "Earth-Tone Palette & Theming", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-scaffold"], "parent": "tend-app", "component": "tend", "note": "Stage 1b: Replace Mission Control tokens with sand/stone/moss/clay" },
+    { "id": "tend-project-tree", "title": "Right Column: Project Tree", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 2: Replace CuratedBlocksColumn with zoomable tree. Copy StepEditor from planner-ui." },
+    { "id": "tend-sheets", "title": "Detail Sheets (Slide-In Panels)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-project-tree"], "parent": "tend-app", "component": "tend", "note": "Stage 3: StepSheet + SheetContainer. Click step at STEP zoom → sheet slides in." },
+    { "id": "tend-conversation-core", "title": "Center Column: Conversation Pane", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 4a: Rename chat → conversation, add SystemEvent + ContextMarker, wire relay" },
+    { "id": "tend-agent-tabs", "title": "Conversation Agent Tabs", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 4b: AgentTabBar + AgentTab, channel-based message filtering" },
+    { "id": "tend-multiple-choice-input", "title": "Multiple-Choice Input Component", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 4c: New component for discrete option selection in input area" },
+    { "id": "tend-status-bar", "title": "Status Bar (Agent Dock)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 5a: Replace ideation StatusBar with planner-ui's (avatars, bubbles, progress)" },
+    { "id": "tend-reply-bar", "title": "Reply Bar (Pending Items)", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-status-bar", "tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 5b: Compact pending question lines above chat input" },
+    { "id": "tend-project-entity", "title": "Backend: Project Entity & API", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-scaffold"], "parent": "tend-app", "component": "planner-core", "note": "Stage 6a: projects table + CRUD API + useProjectEvents composition hook" },
+    { "id": "tend-graduation-bridge", "title": "Graduation Bridge (Blocks → Steps)", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-project-entity", "tend-project-tree"], "parent": "tend-app", "note": "Stage 6b: POST /api/projects/:id/graduate + left→right animation" },
+    { "id": "tend-unified-interviewer", "title": "Unified Tend Interviewer Service", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["tend-project-entity", "tend-conversation-core"], "parent": "tend-app", "note": "Stage 6c: Merge InterviewerService + PlannerLead, unified tools, context focus, trickle layer" },
+    { "id": "tend-dashboard", "title": "Dashboard & First Experience", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["tend-project-entity", "tend-project-tree", "tend-conversation-core"], "parent": "tend-app", "component": "tend", "note": "Stage 7: Project list, AI overview, creation flow, empty states" },
+    { "id": "tend-polish-ux", "title": "UX Polish (Keyboard, Animations, Attention)", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tend-project-tree", "tend-conversation-core", "tend-status-bar"], "parent": "tend-app", "component": "tend", "note": "Stage 8a: Cmd+K palette, crystallizing animation, graduation animation, attention system" },
+    { "id": "tend-error-states", "title": "Error & Failure State UI", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["tend-project-tree", "tend-conversation-core", "tend-status-bar"], "parent": "tend-app", "component": "tend", "note": "Stage 8b: Step/run failures, connection loss, agent stuck states" },
+    { "id": "tend-settings", "title": "Settings Page", "type": "feature", "status": "draft", "priority": "low", "dependencies": ["tend-theming"], "parent": "tend-app", "component": "tend", "note": "Stage 8c: /settings route with theme, timing, thresholds, defaults" },
+
+    { "id": "mull-package", "title": "Mull: Cross-Agent Shared Memory", "type": "epic", "status": "draft", "priority": "high", "component": "mull", "design_reference": "docs/mull-spec.md", "note": "Generic knowledge extraction pipeline. Two-stage: deterministic ($0) + LLM synthesis. Writes topic files to memory/. Built portable for standalone extraction." },
+    { "id": "mull-domain-types", "title": "Core Type System & Schemas", "type": "feature", "status": "draft", "priority": "critical", "dependencies": [], "parent": "mull-package", "component": "mull", "note": "Zod schemas: SessionData, Message, SessionEvent, Decision, Retrospective, Artifact, Entity, Fact, TopicMatch, Nugget, PreExtract, MergeResult. SessionAdapter interface." },
+    { "id": "mull-adapter-system", "title": "Adapter Orchestration System", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types"], "parent": "mull-package", "component": "mull", "note": "createAdapter factory, multi-adapter merge by timestamp, cursor persistence in .mull/, config validation, session listing across adapters." },
+    { "id": "mull-builtin-adapters", "title": "Built-in Generic Adapters", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types", "mull-adapter-system"], "parent": "mull-package", "component": "mull", "note": "3 adapters: trajectory-file (.trajectory.json with chapters/events/retrospective/artifacts), relay-jsonl (YYYY-MM-DD.jsonl), transcript (md/jsonl/txt). Each implements SessionAdapter with cursor tracking." },
+    { "id": "mull-deterministic-extraction", "title": "Deterministic Extraction Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types", "mull-adapter-system"], "parent": "mull-package", "component": "mull", "note": "4 functions: extractEntities (compromise.js + tech lexicon), extractFacts (structural from events), matchTopics (vs memory/ filenames + tags), filterTranscript (decision-adjacent only). Composes into PreExtract. $0, <100ms." },
+    { "id": "mull-llm-synthesis", "title": "LLM Synthesis Layer", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types", "mull-deterministic-extraction"], "parent": "mull-package", "component": "mull", "note": "Prompt construction from PreExtract, single Haiku call, structured nugget parsing, trail decision shortcut (bypass LLM), Tier 0 fallback (no API key). ~$0.001-0.004/session." },
+    { "id": "mull-topic-file-system", "title": "Topic File System & Index Generation", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types"], "parent": "mull-package", "component": "mull", "note": "Markdown + YAML frontmatter (gray-matter). Slug-based merge (never duplicate). Sections: Decisions/Constraints/Patterns/Gotchas/Context. rebuildTOC after every write. readTopicFile for extraction layer." },
+    { "id": "mull-pipeline", "title": "Pipeline Orchestrator", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-adapter-system", "mull-deterministic-extraction", "mull-llm-synthesis", "mull-topic-file-system"], "parent": "mull-package", "component": "mull", "note": "Wires stages: load → extract → synthesize → merge → toc. mull() and mullAll() functions. Incremental processing, idempotency, dry-run, partial failure recovery, config resolution." },
+    { "id": "mull-cli", "title": "CLI Interface", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["mull-pipeline"], "parent": "mull-package", "component": "mull", "note": "commander-based. mull <session-id>, --all, --source, --dir, --dry-run, --force, --memory-dir. Config loading (mull.config.json → package.json → flags). Progress output. Exit codes. bin entry." },
+
+    { "id": "mull-integration", "title": "Mull Plannr Integration", "type": "epic", "status": "draft", "priority": "high", "component": "mull", "dependencies": ["mull-package"], "note": "SQLite adapters for planner.db + forge.db, relay daemon adapter, server plugin at /api/mull, real-time event triggers." },
+    { "id": "mull-planner-db-adapter", "title": "Planner DB Trajectory Adapter", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types", "mull-adapter-system"], "parent": "mull-integration", "component": "mull", "note": "Reads DecisionEvents from planner.db trajectory_events. Sessions by plan_id. Maps question_text + selected_option + reasoning → Decision. Cursor per plan_id." },
+    { "id": "mull-forge-db-adapter", "title": "Forge DB Trajectory & Retrospective Adapter", "type": "feature", "status": "draft", "priority": "critical", "dependencies": ["mull-domain-types", "mull-adapter-system"], "parent": "mull-integration", "component": "mull", "note": "Reads 40+ TrajectoryEvent types (filtered to ~10 high-signal) + Retrospectives (approach, decisions[], learnings[], suggestions[]) + UserTrajectoryEvent + DerivedPreference from forge.db. Sessions by run_id." },
+    { "id": "mull-relay-daemon-adapter", "title": "Relay Daemon Storage Adapter", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["mull-domain-types", "mull-adapter-system"], "parent": "mull-integration", "component": "mull", "note": "Reads from .agent-relay/ SQLite or JSONL with Envelope<T> parsing. Session reconstruction via agent lifecycle (spawn→release) or time windows. Agent/channel filtering." },
+    { "id": "mull-server-plugin", "title": "Server Plugin Mount & REST API", "type": "feature", "status": "draft", "priority": "high", "dependencies": ["mull-pipeline", "mull-planner-db-adapter", "mull-forge-db-adapter"], "parent": "mull-integration", "component": "mull", "note": "createMullRouter() factory. POST /run, POST /run/all, GET /status, GET /topics, GET /topics/:slug. Non-blocking async. @plannr/errors." },
+    { "id": "mull-realtime-triggers", "title": "Event-Driven Real-Time Triggers", "type": "feature", "status": "draft", "priority": "medium", "dependencies": ["mull-server-plugin"], "parent": "mull-integration", "component": "mull", "note": "Deterministic on decision_recorded/retrospective_recorded/chapter_start (<100ms inline). LLM batched on 3+ entities, 20-min timer, or session end (background). Entity accumulator per session." },
+
+    { "id": "cultivate-package", "title": "cultivate: Signal Intake & Processing System", "type": "epic", "status": "approved", "priority": "critical", "component": "cultivate", "design_reference": "docs/flow/features/cultivate-package.json" },
+    { "id": "cultivate-domain", "title": "Domain Types & Zod Schemas", "type": "feature", "status": "approved", "priority": "critical", "dependencies": [], "parent": "cultivate-package", "component": "cultivate", "note": "Signal, Cluster, Greenhouse, Recommendation, ScoringFactors, CultivateWeights, CultivateConfig, CultivateOutcome, FilterRule, SourceConfig, IngestionJob, RawEvent, NormalizedEvent, ExtractionResult, StepProvenance, SignalSource, AuthConfig, AuthorType, AdapterType, SourcePreset, all enums. Model names configurable via CULTIVATE_EXTRACT_MODEL / CULTIVATE_CLUSTER_MODEL." },
+    { "id": "cultivate-errors", "title": "Error Types", "type": "feature", "status": "approved", "priority": "critical", "dependencies": [], "parent": "cultivate-package", "component": "cultivate", "note": "CultivateStartupError (REDIS_UNAVAILABLE, DB_INIT_FAILED, ML_MODEL_LOAD_FAILED, ANTHROPIC_UNAVAILABLE), CultivateInternalError, SignalFilteredError, SignalProcessingError. All errors carry diagnostic context (what broke, why, how to fix)." },
+    { "id": "cultivate-storage", "title": "SQLite Storage Layer", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain", "cultivate-errors"], "parent": "cultivate-package", "component": "cultivate", "note": "CultivateStorage interface + SqliteCultivateStorage extending BaseSqliteStorage. Tables: signals, greenhouses, clusters, source_configs, filter_rules, ingestion_jobs, cultivate_config + indexes. Full CRUD. Default Greenhouse auto-creation on initialize() when none exist (refinement mode, all sources, no keyword filters)." },
+    { "id": "cultivate-sse", "title": "SSE Broadcaster (Shared Infrastructure)", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain"], "parent": "cultivate-package", "component": "cultivate", "note": "SSEBroadcaster class as shared infrastructure — instantiated at startup, injected into pipeline, jobs, and API. NOT owned by API layer. Events: signal:new, signal:updated, cluster:new, cluster:updated, cluster:trending, ingestion:progress, ingestion:complete, source:error, source:auth_expired. Heartbeat every 30s. GET /events endpoint wires SSE to HTTP clients." },
+    { "id": "cultivate-auth-encryption", "title": "Credential Encryption", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["cultivate-domain"], "parent": "cultivate-package", "component": "cultivate", "note": "AES-256-GCM encrypt/decrypt for source credentials. Key derived from CULTIVATE_SECRET env var. Used by source config storage and adapter initialization." },
+    { "id": "cultivate-filter-rules", "title": "Tier 0 + Tier 1 Filtering (Greenhouse Gate + Rule Registry)", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain", "cultivate-storage"], "parent": "cultivate-package", "component": "cultivate", "note": "Greenhouse keyword gate (Tier 0): keyword_require/keyword_exclude per Greenhouse. Rule Registry (Tier 1): FilterRule registry with default rules (noise_reject, bot_reject, length_check, specificity_boost, structure_boost, question_boost). Tuner-managed enable/disable and boost amounts. Effectiveness tracking (signals_matched, false_positive_rate). Greenhouse tier1_strictness gate." },
+    { "id": "cultivate-filter-tier2", "title": "Tier 2 Local ML Classification", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain", "cultivate-errors"], "parent": "cultivate-package", "component": "cultivate", "note": "Transformers.js zero-shot classifier (Xenova/mobilebert-uncased-mnli). loadClassificationModel() at startup — throws CultivateStartupError('ML_MODEL_LOAD_FAILED') on failure. First run downloads ~100MB model. tier2Filter() returns pass/fail + feedback_score + category_hint. Per-signal failure → job fails → BullMQ retry → dead letter. No fallback." },
+    { "id": "cultivate-extractor", "title": "Tier 3 LLM Extraction (Sonnet)", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain"], "parent": "cultivate-package", "component": "cultivate", "note": "Structured extraction via Sonnet (model configurable via CULTIVATE_EXTRACT_MODEL). Returns: summary, keywords, entities, aspects, quotes, reasoning, specificity, emotional_intensity, actionability. On failure: job fails → BullMQ retry → dead letter. No partial extraction stored." },
+    { "id": "cultivate-scorer", "title": "Multi-Factor Scoring Engine", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain", "cultivate-storage"], "parent": "cultivate-package", "component": "cultivate", "note": "8 factors: recency (exponential decay, 90-day half-life), specificity (from extraction), source_authority (channel_authority × author_multiplier + tier/mrr boosts), repetition (cross-source corroboration: diversity 0.45, count 0.30, velocity 0.25), emotional_intensity, strategic_fit (keyword overlap with Greenhouse boost list + active projects), actionability, content_quality (tier1_boost × 0.4 + tier2_score × 0.6). Weight resolution: Greenhouse overrides → Tuner config → mode defaults (refinement/discovery) → DEFAULT_WEIGHTS." },
+    { "id": "cultivate-clusterer", "title": "AI Cluster Assignment (Haiku)", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain", "cultivate-storage"], "parent": "cultivate-package", "component": "cultivate", "note": "Grounded theory clustering via Haiku (configurable via CULTIVATE_CLUSTER_MODEL). Assign to existing cluster or create new. Summary regeneration every 5th signal via Sonnet. Per-Greenhouse cluster space — clusters NEVER span Greenhouses (architectural invariant)." },
+    { "id": "cultivate-dedup", "title": "Deduplication (Exact + Near)", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["cultivate-domain", "cultivate-storage"], "parent": "cultivate-package", "component": "cultivate", "note": "Exact dedup: source_type + external_id uniqueness before pipeline entry. Near dedup: after extraction, same cluster + >80% keyword overlap from same source type within 7 days → marked near_duplicate_of, original gets repetition boost." },
+    { "id": "cultivate-pipeline", "title": "Processing Pipeline Orchestration", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-filter-rules", "cultivate-filter-tier2", "cultivate-extractor", "cultivate-scorer", "cultivate-clusterer", "cultivate-dedup", "cultivate-sse"], "parent": "cultivate-package", "component": "cultivate", "note": "Process-signal pipeline: Greenhouse gate (Tier 0) → Tier 1 rule filter → Tier 2 ML → Tier 3 Sonnet extract → Score → Near dedup → Cluster assign → Store → SSE broadcast. No partial signals — complete or dead-letter. Does NOT handle chunking (that is pre-pipeline in ingest-document worker)." },
+    { "id": "cultivate-adapters", "title": "Generic Adapter Types + Source Health Policy", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-domain", "cultivate-auth-encryption"], "parent": "cultivate-package", "component": "cultivate", "note": "4 adapter types: PollApiAdapter (endpoint template with {cursor}/{since} placeholders, pagination, rate limiting, response mapping), WebhookAdapter (HMAC verification, path mounting under /api/cultivate/webhooks), PushAdapter (text/document/CSV/email, ChunkConfig with recursive/sentence/speaker_aware strategies), StructuredPullAdapter (query template, signal template, thresholds). All implement SourceAdapter interface. Source health escalation: 1 fail → warn, 3 → unhealthy + source:error SSE, 10 → disabled, auth error (401/403) → immediate disable + source:auth_expired." },
+    { "id": "cultivate-presets", "title": "All 30+ Source Presets", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["cultivate-adapters"], "parent": "cultivate-package", "component": "cultivate", "note": "Factory functions producing complete adapter configs. SourcePreset: name, adapter_type, description, required_inputs, optional_inputs, defaults, channel_authority. Tier 1 (0.90-0.95): support_zendesk, support_intercom, support_email, surveys_nps, surveys_csat, interviews. Tier 2 (0.70-0.85): github_issues, github_discussions, appstore_ios, appstore_android, reviews_g2, reviews_capterra, reviews_trustradius, analytics_mixpanel, analytics_amplitude, analytics_posthog, in_app_feedback. Tier 3 (0.45-0.60): slack_channel, discord_channel, teams_channel, crm_hubspot, crm_salesforce, sales_calls. Tier 4 (0.25-0.40): reddit_subreddit, reddit_search, hackernews, twitter_search, rss_feed, web_monitor, competitor_reviews. Tier 5 (0.60): manual_paste, document_upload, csv_import, zapier_webhook." },
+    { "id": "cultivate-jobs", "title": "BullMQ Job Queue System", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-pipeline", "cultivate-adapters", "cultivate-decay-trends", "cultivate-sse"], "parent": "cultivate-package", "component": "cultivate", "note": "6 queues: poll-sources (concurrency 3, retry 3 exponential — worker calls adapter.poll(), exact dedup, per-Greenhouse fan-out: one process-signal job per matching Greenhouse), process-signal (concurrency 5, retry 2 — runs pipeline), ingest-document (concurrency 2, retry 1 — chunks then enqueues N process-signal jobs), recluster (weekly Sun 03:00 UTC), decay (daily 04:00 UTC), trend-detect (hourly). Dead letter for all failed jobs with diagnostic context." },
+    { "id": "cultivate-decay-trends", "title": "Signal Decay + Trend Detection + Weekly Recluster", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["cultivate-storage", "cultivate-clusterer", "cultivate-scorer", "cultivate-sse"], "parent": "cultivate-package", "component": "cultivate", "note": "Decay: daily, 90-day half-life (Tuner-adjustable), linked signals exempt, reinforced signals reset recency, below 0.15 → 'decayed', recalculates cluster avg_relevance. Trends: hourly, weekly (0.7) + monthly (0.3) velocity per cluster, rising (>0.2)/stable/declining (<-0.2), emits cluster:trending SSE on transition to rising. Recluster: weekly via Sonnet, merge/split/rename review, regenerates affected summaries." },
+    { "id": "cultivate-recommender", "title": "Recommendation Engine", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["cultivate-storage", "cultivate-clusterer"], "parent": "cultivate-package", "component": "cultivate", "note": "generateRecommendations(): Top 15 clusters by avg_relevance × (1 + trend_velocity), min 2 signals. One Sonnet call → up to 5 ranked Recommendation[] with title, confidence, reasoning, evidence, cluster_id, greenhouse_id, trend, estimated_impact, overlaps_project. Cached 15 min, invalidated on high-relevance signal. Filterable by Greenhouse." },
+    { "id": "cultivate-tuner", "title": "Tuner Integration", "type": "feature", "status": "approved", "priority": "high", "dependencies": ["cultivate-domain", "cultivate-storage", "cultivate-scorer", "cultivate-filter-rules"], "parent": "cultivate-package", "component": "cultivate", "note": "Config polling: GET /api/tuner/config/cultivate every 5 min — applies scoring_weights, rule_overrides, tier2_threshold, decay_half_life_days, author_multiplier, cluster_summary_interval. Outcome recording: POST /api/tuner/outcomes/cultivate on link/dismiss/ignore/started_project. Learning loop: link → boost, dismiss → dampen, ignore 30+ days → implicit not useful, filter rejection where near-duplicate later scores well → flag rule too aggressive. Falls back to hardcoded defaults on first run (only acceptable default)." },
+    { "id": "cultivate-api", "title": "REST API Layer", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-storage", "cultivate-pipeline", "cultivate-presets", "cultivate-recommender", "cultivate-jobs", "cultivate-sse", "cultivate-tuner"], "parent": "cultivate-package", "component": "cultivate", "note": "createCultivateRouter(deps). Greenhouses CRUD, Signals CRUD + link/dismiss (records CultivateOutcome via Tuner), Clusters read, Sources CRUD, Presets catalog, Ingestion + status, Recommendations, Filter rules CRUD, Dead letter (list/replay/replay-all/discard — needs BullMQ queue access), Webhooks receiver, SSE endpoint (GET /events). All inputs Zod-validated." },
+    { "id": "cultivate-startup", "title": "Fail-Fast Startup Sequence", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-api", "cultivate-jobs", "cultivate-filter-tier2", "cultivate-tuner"], "parent": "cultivate-package", "component": "cultivate", "note": "startCultivate(config): 1. Redis → CultivateStartupError('REDIS_UNAVAILABLE'), 2. SQLite + migrations → ('DB_INIT_FAILED'), 3. Transformers.js model → ('ML_MODEL_LOAD_FAILED'), 4. Anthropic verifyAccess() → ('ANTHROPIC_UNAVAILABLE'), 5. Tuner config (hardcoded defaults on first run), 6. SSE broadcaster, 7. BullMQ queues + workers, 8. Scheduled jobs. createCultivateService() wraps in plugin pattern: { router, initialize, shutdown }. Graceful shutdown: stop workers, close queues, close Redis, close SQLite." },
+    { "id": "cultivate-server-mount", "title": "Server Integration", "type": "feature", "status": "approved", "priority": "critical", "dependencies": ["cultivate-startup"], "parent": "cultivate-package", "component": "server", "note": "Env vars: CULTIVATE_DB_PATH, CULTIVATE_SECRET, CULTIVATE_REDIS_URL, CULTIVATE_EXTRACT_MODEL, CULTIVATE_CLUSTER_MODEL. Import createCultivateService, initialize(), mount at /api/cultivate. Graceful shutdown. Add @huggingface/transformers, bullmq, ioredis to package.json. Update dev.sh for Redis." }
+  ]
+}

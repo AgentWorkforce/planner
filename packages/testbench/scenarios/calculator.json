@@ -1,0 +1,19 @@
+{
+  "id": "calculator",
+  "name": "Calculator CLI with Tests",
+  "difficulty": "moderate",
+  "goal": "Create a CLI calculator that accepts expressions like '2 + 3' or '10 / 2' as command-line arguments and prints the result. Support +, -, *, / operations. Handle division by zero with an error message. Include a comprehensive test suite using a test framework (vitest or jest) that covers all operations, edge cases, and error handling.",
+  "expected": {
+    "language_tier": "s",
+    "complexity_level": "moderate",
+    "step_count": { "min": 4, "max": 10 },
+    "time_minutes": { "min": 10, "max": 30 }
+  },
+  "verification": {
+    "type": "test",
+    "command": "npm test",
+    "expect_exit_code": 0,
+    "timeout_seconds": 60
+  },
+  "tags": ["moderate", "tested"]
+}

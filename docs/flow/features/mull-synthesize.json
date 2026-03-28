@@ -1,0 +1,176 @@
+{
+  "feature_id": "mull-llm-synthesis",
+  "title": "LLM Synthesis Layer",
+  "type": "feature",
+  "status": "draft",
+  "priority": "critical",
+  "dependencies": ["mull-domain-types", "mull-deterministic-extraction"],
+  "parent": "mull-package",
+  "component": "mull",
+  "summary": {
+    "goal": "Implement pipeline Step 7: LLM synthesis that receives a PreExtract (NOT raw transcript) and produces structured Nuggets. The LLM handles semantic synthesis — the 'why', not the 'what'. This includes: prompt construction from PreExtract fields, single API call to Claude Haiku (default), structured output parsing into Nugget[], trail decision shortcut (pre-structured decisions bypass LLM entirely), and Tier 0 fallback mode (no API key = deterministic extraction only, still produces value). The prompt is tightly structured with explicit categories and rules.",
+    "acceptance_criteria": [
+      { "id": "mls-ac1", "description": "synthesizeNuggets(preExtract) returns Nugget[] from one LLM call" },
+      { "id": "mls-ac2", "description": "LLM prompt includes: ENTITIES, TOOL CALLS, FILES MODIFIED, KEY EVENTS, EXISTING TOPICS, DECISIONS, RETROSPECTIVE sections from PreExtract" },
+      { "id": "mls-ac3", "description": "LLM prompt includes filtered transcript excerpt (not raw session data)" },
+      { "id": "mls-ac4", "description": "LLM prompt specifies 5 categories: DECISIONS, CONSTRAINTS, PATTERNS, GOTCHAS, CONTEXT" },
+      { "id": "mls-ac5", "description": "LLM prompt includes rules: self-contained nuggets, 2-4 lines max, ruthlessly selective, no greetings/chatter/tool output, causal links via Caused: slug" },
+      { "id": "mls-ac6", "description": "LLM output parsed into Nugget[] with each nugget assigned to existing or proposed topic slug" },
+      { "id": "mls-ac7", "description": "Pre-structured trail decisions from PreExtract.facts (type: 'decision' with reasoning) become Decision nuggets WITHOUT LLM processing" },
+      { "id": "mls-ac8", "description": "When all extractable knowledge is pre-structured (all trail decisions), LLM call is skipped entirely" },
+      { "id": "mls-ac9", "description": "LLM model and API key are configurable (default: Claude Haiku, @anthropic-ai/sdk)" },
+      { "id": "mls-ac10", "description": "maxTokensIn: 2000, maxTokensOut: 500 — tightly bounded to control cost" },
+      { "id": "mls-ac11", "description": "If no LLM API key is configured, return only pre-structured nuggets from trail decisions (Tier 0 mode)" },
+      { "id": "mls-ac12", "description": "LLM response parsing is resilient to minor format deviations — doesn't fail on imperfect output" },
+      { "id": "mls-ac13", "description": "Cost per session: ~$0.001-0.004 depending on session length" },
+      { "id": "mls-ac14", "description": "PreExtract chunking: if filteredTranscript exceeds maxTokensIn (2000), split into chunks by FilteredExcerpt boundaries and make multiple LLM calls, then concatenate Nugget arrays" },
+      { "id": "mls-ac15", "description": "Fact-to-Nugget transformation: Facts with isPreStructured=true are converted to Nuggets directly — slug from kebab-case of title, category='decision', body from reasoning field" },
+      { "id": "mls-ac16", "description": "LLM output validation: use LlmNuggetOutputSchema.safeParse() on each nugget — drop individual nuggets that fail validation rather than failing the entire LLM call" },
+      { "id": "mls-ac17", "description": "Tier 0 mode: full deterministic extraction produces pre-structured nuggets only (from trail decisions). Non-trail entities/facts are still extracted but not synthesized into nuggets without LLM." }
+    ]
+  },
+  "understanding": {
+    "architect": {
+      "observations": [
+        "The LLM sees ONLY the PreExtract, never raw session data — this is a key design constraint",
+        "Prompt structure is fully specified in spec section 5.2 — not much design work needed, just implement",
+        "Trail decision shortcut (spec 5.3) is elegant: if decision already has title + reasoning, it IS a nugget",
+        "Tier 0 fallback means mull is useful even without an API key — deterministic extraction alone produces trail decision nuggets",
+        "Token limits (2K in, 500 out) keep per-session cost at ~$0.001 for Haiku",
+        "For longer sessions, multiple LLM calls may be needed (2-4) — PreExtract may need chunking",
+        "LLM output format should be structured (JSON or labeled sections) for reliable parsing",
+        "Spec says ~100 lines for synthesize.ts — prompt construction + API call + parsing"
+      ],
+      "concerns": [
+        "LLM output parsing reliability: structured JSON output is more reliable than freeform text, but Haiku may not always comply",
+        "PreExtract chunking for long sessions: when does one call become 2-3? Need clear boundary (token count threshold)"
+      ],
+      "confidence": "confident"
+    }
+  },
+  "plan_implementation": {
+    "plan_id": "mull-llm-synthesis",
+    "version": 1,
+    "status": "draft",
+    "scopes": [
+      {
+        "scope_id": "mull-synth-prompt",
+        "name": "Prompt Construction",
+        "description": "Template construction and PreExtract-to-prompt assembly"
+      },
+      {
+        "scope_id": "mull-synth-llm",
+        "name": "LLM Integration",
+        "description": "API call wrapper, chunking, output parsing and validation"
+      },
+      {
+        "scope_id": "mull-synth-transform",
+        "name": "Deterministic Transforms",
+        "description": "Trail decision shortcut, Tier 0 fallback, Fact-to-Nugget conversion"
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "mls-s1",
+        "title": "Build prompt template from PreExtract",
+        "scope": "mull-synth-prompt",
+        "description": "Create the prompt construction function that assembles a structured prompt from PreExtract fields. Prompt includes labeled sections: ENTITIES, TOOL CALLS, FILES MODIFIED, KEY EVENTS, EXISTING TOPICS, DECISIONS, RETROSPECTIVE, and the filtered transcript excerpt. Specifies 5 nugget categories (DECISIONS, CONSTRAINTS, PATTERNS, GOTCHAS, CONTEXT) and rules (self-contained, 2-4 lines max, ruthlessly selective, no greetings/chatter/tool output, causal links via Caused: slug). Prompt requests JSON output conforming to LlmNuggetOutputSchema.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mls-s1-ac1", "description": "Prompt includes all PreExtract sections: ENTITIES, TOOL CALLS, FILES MODIFIED, KEY EVENTS, EXISTING TOPICS, DECISIONS, RETROSPECTIVE" },
+          { "id": "mls-s1-ac2", "description": "Prompt includes filtered transcript excerpt from PreExtract.filteredTranscript" },
+          { "id": "mls-s1-ac3", "description": "Prompt specifies 5 categories: DECISIONS, CONSTRAINTS, PATTERNS, GOTCHAS, CONTEXT" },
+          { "id": "mls-s1-ac4", "description": "Prompt includes rules: self-contained nuggets, 2-4 lines max, ruthlessly selective, no greetings/chatter/tool output, causal links via Caused: slug" },
+          { "id": "mls-s1-ac5", "description": "Prompt requests structured JSON output for reliable parsing" }
+        ],
+        "specification": "Location: src/synthesize/prompt.ts. Export buildPrompt(preExtract: PreExtract): string. Template is a tagged template literal with sections populated from PreExtract fields. Each section header in CAPS for LLM clarity. Entities listed as comma-separated. Facts formatted as timestamped bullet points. Filtered transcript as quoted blocks. End with explicit JSON output format specification."
+      },
+      {
+        "step_id": "mls-s2",
+        "title": "Implement LLM call wrapper with chunking",
+        "scope": "mull-synth-llm",
+        "description": "Build the LLM call wrapper that sends the constructed prompt to Claude Haiku (default, configurable). Implements PreExtract chunking: if the assembled prompt exceeds maxTokensIn (2000 tokens), split the filteredTranscript into chunks by FilteredExcerpt boundaries and make multiple LLM calls, then concatenate the resulting Nugget arrays. Uses @anthropic-ai/sdk. Model and API key are configurable. maxTokensIn: 2000, maxTokensOut: 500 per call.",
+        "dependencies": ["mls-s1"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mls-s2-ac1", "description": "Calls Claude Haiku by default via @anthropic-ai/sdk, model configurable" },
+          { "id": "mls-s2-ac2", "description": "maxTokensIn: 2000, maxTokensOut: 500 per LLM call" },
+          { "id": "mls-s2-ac3", "description": "When prompt exceeds maxTokensIn, splits by FilteredExcerpt boundaries into multiple chunks" },
+          { "id": "mls-s2-ac4", "description": "Multiple chunk results concatenated into single Nugget[] array" },
+          { "id": "mls-s2-ac5", "description": "Token estimation uses simple heuristic (chars/4) for chunking decisions" },
+          { "id": "mls-s2-ac6", "description": "API key checked before call — returns empty array if missing (caller handles Tier 0)" }
+        ],
+        "specification": "Location: src/synthesize/llm.ts. Export callLlm(prompt: string, opts: LlmConfig): Promise<string>. Export synthesizeWithLlm(preExtract: PreExtract, opts: LlmConfig): Promise<RawLlmNugget[]>. LlmConfig: { model?: string, apiKey?: string, maxTokensIn?: number, maxTokensOut?: number }. Chunk splitting: estimate tokens as prompt.length/4, if > maxTokensIn, split filteredTranscript by FilteredExcerpt array boundaries, rebuild prompt per chunk with shared context (entities, facts, topics) but different transcript excerpts."
+      },
+      {
+        "step_id": "mls-s3",
+        "title": "Implement output parser with safeParse validation",
+        "scope": "mull-synth-llm",
+        "description": "Build the LLM output parser that converts raw LLM response text into validated Nugget[]. Parse JSON from LLM response (handle markdown code fences, trailing commas, common LLM JSON quirks). Validate each nugget individually using LlmNuggetOutputSchema.safeParse() — drop individual nuggets that fail validation rather than failing the entire call. Log warnings for dropped nuggets. Assign each valid nugget to its specified topic slug.",
+        "dependencies": ["mls-s2"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mls-s3-ac1", "description": "Parses JSON from LLM response, handling markdown code fences and common JSON quirks" },
+          { "id": "mls-s3-ac2", "description": "Validates each nugget individually using LlmNuggetOutputSchema.safeParse()" },
+          { "id": "mls-s3-ac3", "description": "Drops individual nuggets that fail validation — does not fail entire call" },
+          { "id": "mls-s3-ac4", "description": "Logs warnings with Zod error details for each dropped nugget" },
+          { "id": "mls-s3-ac5", "description": "Assigns each valid nugget to its specified topic slug from LLM output" },
+          { "id": "mls-s3-ac6", "description": "Resilient to minor format deviations: trailing commas, missing optional fields, extra whitespace" }
+        ],
+        "specification": "Location: src/synthesize/parser.ts. Export parseLlmOutput(raw: string): Nugget[]. Strip markdown code fences (```json...```). Try JSON.parse, fallback to lenient parsing (strip trailing commas, fix unquoted keys). LlmNuggetOutputSchema is a Zod schema matching: { slug: string, category: enum, title: string, body: string, topic?: string, caused?: string }. Use .safeParse() per item, filter out { success: false } entries."
+      },
+      {
+        "step_id": "mls-s4",
+        "title": "Implement trail decision shortcut (Fact-to-Nugget)",
+        "scope": "mull-synth-transform",
+        "description": "Build the deterministic Fact-to-Nugget transformation for pre-structured trail decisions. Facts with isPreStructured=true are converted directly to Nuggets without LLM processing: slug generated from kebab-case of decision title, category set to 'decision', body populated from the reasoning field. This is the highest-signal, lowest-cost path through the pipeline.",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mls-s4-ac1", "description": "Facts with isPreStructured=true converted to Nuggets directly" },
+          { "id": "mls-s4-ac2", "description": "Nugget slug generated from kebab-case of decision title" },
+          { "id": "mls-s4-ac3", "description": "Nugget category set to 'decision'" },
+          { "id": "mls-s4-ac4", "description": "Nugget body populated from fact's reasoning/description field" },
+          { "id": "mls-s4-ac5", "description": "When ALL facts are pre-structured and no non-trail entities need synthesis, LLM call is skipped entirely" }
+        ],
+        "specification": "Location: src/synthesize/trail-shortcut.ts. Export convertPreStructuredFacts(facts: Fact[]): Nugget[]. Filter facts where isPreStructured === true. kebab-case slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''). Export shouldSkipLlm(preExtract: PreExtract): boolean — returns true when all extractable knowledge comes from pre-structured facts (no non-trail entities/facts that would benefit from LLM synthesis)."
+      },
+      {
+        "step_id": "mls-s5",
+        "title": "Implement Tier 0 fallback and synthesizeNuggets orchestrator",
+        "scope": "mull-synth-transform",
+        "description": "Build the main synthesizeNuggets(preExtract, opts) function that orchestrates the full synthesis flow. First, convert pre-structured facts to nuggets via trail shortcut. Then check: if shouldSkipLlm returns true OR no API key configured (Tier 0 mode), return only pre-structured nuggets. Otherwise, build prompt, call LLM (with chunking if needed), parse output, validate, and concatenate with pre-structured nuggets. Tier 0 clarification: non-trail entities/facts are still extracted in the PreExtract but are NOT synthesized into nuggets without LLM — they exist for future LLM processing.",
+        "dependencies": ["mls-s1", "mls-s2", "mls-s3", "mls-s4"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mls-s5-ac1", "description": "synthesizeNuggets(preExtract, opts) returns combined Nugget[] from trail shortcut + LLM" },
+          { "id": "mls-s5-ac2", "description": "Pre-structured trail decision nuggets always included regardless of LLM availability" },
+          { "id": "mls-s5-ac3", "description": "Tier 0 mode (no API key): returns only pre-structured nuggets, non-trail data left unsynthesized" },
+          { "id": "mls-s5-ac4", "description": "When shouldSkipLlm is true, LLM call is skipped even if API key is available" },
+          { "id": "mls-s5-ac5", "description": "LLM nuggets deduplicated against pre-structured nuggets by slug" },
+          { "id": "mls-s5-ac6", "description": "Partial failure: if LLM call throws, pre-structured nuggets are still returned (error logged, not propagated)" }
+        ],
+        "specification": "Location: src/synthesize/index.ts. Export synthesizeNuggets(preExtract: PreExtract, opts?: SynthesizeOpts): Promise<Nugget[]>. SynthesizeOpts: { model?: string, apiKey?: string, maxTokensIn?: number, maxTokensOut?: number }. Flow: 1) trailNuggets = convertPreStructuredFacts(preExtract.facts), 2) if shouldSkipLlm(preExtract) || !opts?.apiKey → return trailNuggets, 3) llmNuggets = synthesizeWithLlm(preExtract, opts), 4) deduplicate by slug (trail wins), 5) return [...trailNuggets, ...llmNuggets]."
+      },
+      {
+        "step_id": "mls-s6",
+        "title": "Write synthesis layer tests",
+        "scope": "mull-synth-llm",
+        "description": "Comprehensive test suite for the synthesis layer. Tests prompt construction completeness, LLM call with chunking behavior, output parser resilience (valid JSON, code-fenced JSON, malformed individual nuggets dropped, trailing commas), trail decision shortcut (slug generation, category assignment, body population), Tier 0 fallback (no API key returns only pre-structured), partial failure (LLM error still returns trail nuggets), and deduplication logic.",
+        "dependencies": ["mls-s1", "mls-s2", "mls-s3", "mls-s4", "mls-s5"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "mls-s6-ac1", "description": "Prompt tests: all PreExtract sections included, categories specified, rules present" },
+          { "id": "mls-s6-ac2", "description": "Chunking tests: large filteredTranscript split by FilteredExcerpt boundaries, results concatenated" },
+          { "id": "mls-s6-ac3", "description": "Parser tests: valid JSON parsed, code fences stripped, individual invalid nuggets dropped with warning, trailing commas handled" },
+          { "id": "mls-s6-ac4", "description": "Trail shortcut tests: isPreStructured facts converted to nuggets with correct slug (kebab-case), category (decision), body (reasoning)" },
+          { "id": "mls-s6-ac5", "description": "Tier 0 tests: no API key returns only pre-structured nuggets; shouldSkipLlm returns true when all facts are pre-structured" },
+          { "id": "mls-s6-ac6", "description": "Partial failure tests: LLM error caught, pre-structured nuggets still returned" },
+          { "id": "mls-s6-ac7", "description": "Deduplication tests: trail nuggets win over LLM nuggets with same slug" }
+        ],
+        "specification": "Location: src/synthesize/__tests__/synthesize.test.ts. Use Vitest. Mock @anthropic-ai/sdk for LLM call tests. Create PreExtract fixtures with various combinations of pre-structured and non-pre-structured facts. Test parser with realistic LLM output strings including edge cases."
+      }
+    ]
+  }
+}

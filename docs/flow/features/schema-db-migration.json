@@ -1,0 +1,120 @@
+{
+  "feature_id": "schema-db-migration",
+  "title": "Database Migration for Understanding & Specification",
+  "type": "feature",
+  "status": "draft",
+  "priority": "high",
+  "dependencies": ["schema-understanding", "schema-specification"],
+  "parent_epic": "schema-enrichment",
+  "summary": {
+    "goal": "Update database schema and storage layer to persist understanding (plan-level) and specification (step-level, stored within steps JSONB)",
+    "context": "SQLite with better-sqlite3 stores JSON as TEXT. Understanding is a new column on plan_versions. Specification is stored within the existing steps JSONB column (no new column needed).",
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Migration adds 'understanding' TEXT column to plan_versions (default '{}')" },
+      { "id": "ac2", "description": "Migration is idempotent (safe to re-run)" },
+      { "id": "ac3", "description": "Existing plan_versions records receive understanding = '{}'" },
+      { "id": "ac4", "description": "Storage layer parses understanding JSON on read" },
+      { "id": "ac5", "description": "Storage layer stringifies understanding JSON on write" },
+      { "id": "ac6", "description": "Storage layer validates understanding against Zod schema" },
+      { "id": "ac7", "description": "Steps with specification field are correctly serialized/deserialized" },
+      { "id": "ac8", "description": "Migration logs count of existing records updated" }
+    ]
+  },
+  "plan_implementation": {
+    "scopes": ["planner-core"],
+    "steps": [
+      {
+        "step_id": "d001",
+        "title": "Add understanding column migration",
+        "scope": "planner-core",
+        "description": "Update src/storage/migration.ts to add understanding TEXT column to versions table",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Migration checks if column exists before adding (idempotent)" },
+          { "id": "ac2", "description": "Column definition: understanding TEXT" },
+          { "id": "ac3", "description": "Migration runs on app startup" }
+        ]
+      },
+      {
+        "step_id": "d001b",
+        "title": "Migrate existing plan version data",
+        "scope": "planner-core",
+        "description": "Set understanding to '{}' for all existing plan versions and log migration count",
+        "dependencies": ["d001"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "UPDATE versions SET understanding = '{}' WHERE understanding IS NULL" },
+          { "id": "ac2", "description": "Migration logs: 'Migrated N existing plan versions with empty understanding'" },
+          { "id": "ac3", "description": "Idempotent: re-running does not affect already-migrated records" }
+        ]
+      },
+      {
+        "step_id": "d002",
+        "title": "Update storage interface",
+        "scope": "planner-core",
+        "description": "Update src/storage/interface.ts to include understanding in PlanVersionRow type",
+        "dependencies": ["d001b"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "PlanVersionRow includes: understanding: string (JSON string)" },
+          { "id": "ac2", "description": "Interface methods handle understanding field" }
+        ]
+      },
+      {
+        "step_id": "d003",
+        "title": "Update SQLite storage - write path",
+        "scope": "planner-core",
+        "description": "Update src/storage/sqlite.ts to stringify understanding on write operations",
+        "dependencies": ["d002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "createPlanVersion() includes understanding in INSERT (default '{}')" },
+          { "id": "ac2", "description": "updatePlanVersion() can update understanding field" },
+          { "id": "ac3", "description": "Understanding is JSON.stringify'd before INSERT/UPDATE" }
+        ]
+      },
+      {
+        "step_id": "d004",
+        "title": "Update SQLite storage - read path",
+        "scope": "planner-core",
+        "description": "Update src/storage/sqlite.ts to parse understanding JSON on read operations",
+        "dependencies": ["d002"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "getPlanVersion() parses understanding JSON and validates against UnderstandingSchema" },
+          { "id": "ac2", "description": "listPlanVersions() includes parsed understanding" },
+          { "id": "ac3", "description": "Invalid JSON falls back to empty object {}" }
+        ]
+      },
+      {
+        "step_id": "d005",
+        "title": "Verify step specification serialization",
+        "scope": "planner-core",
+        "description": "Ensure steps with specification field are correctly handled in existing steps JSONB serialization",
+        "dependencies": [],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Steps with specification field serialize correctly to JSON" },
+          { "id": "ac2", "description": "Steps with specification field deserialize and validate against StepSchema" },
+          { "id": "ac3", "description": "Existing steps without specification continue to work" }
+        ]
+      },
+      {
+        "step_id": "d006",
+        "title": "Add storage tests for understanding",
+        "scope": "planner-core",
+        "description": "Add tests to src/storage/sqlite.test.ts for understanding persistence and data migration",
+        "dependencies": ["d001b", "d003", "d004"],
+        "owner_role": "backend:Coder",
+        "acceptance_criteria": [
+          { "id": "ac1", "description": "Test: Create plan version with understanding, retrieve it, verify understanding matches" },
+          { "id": "ac2", "description": "Test: Update plan version understanding, verify persistence" },
+          { "id": "ac3", "description": "Test: Create plan version without understanding, verify defaults to {}" },
+          { "id": "ac4", "description": "Test: Create step with specification, retrieve plan, verify specification in step" },
+          { "id": "ac5", "description": "Test: Migration sets understanding='{}' for pre-existing versions with NULL understanding" }
+        ]
+      }
+    ]
+  }
+}

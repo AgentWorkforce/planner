@@ -1,0 +1,75 @@
+{
+  "feature_id": "relay-integration",
+  "title": "Agent Relay Integration",
+  "type": "epic",
+  "status": "approved",
+  "priority": "high",
+  "dependencies": ["mcp-tools", "ui-ai-chat", "ui-ai-improvements", "api-change-requests"],
+
+  "summary": {
+    "goal": "Integrate agent-relay to enable real AI-assisted planning via spawned planning agents that use MCP tools to build plans collaboratively with humans",
+    "context": "Currently, AI features (chat, improvements) return mock responses. The architecture docs describe spawning planning agents via relay-pty that connect back to Planner's MCP server to actually create/edit plans. This epic bridges that gap using the Hybrid pattern: HTTP APIs for orchestrator integration + Relay for planning agent features.",
+    "in_scope": [
+      "Relay SDK integration and daemon connection",
+      "Planning agent spawning via relay-pty",
+      "MCP bridge allowing agents to call Planner tools via HTTP",
+      "Session management (start, monitor, terminate planning sessions)",
+      "Connect UI AI chat to real planning agent conversations",
+      "Connect UI silent improvements to agent-driven analysis",
+      "Agent handling for change requests from orchestrator"
+    ],
+    "out_of_scope": [
+      "Orchestrator implementation (consumes plans, separate repo)",
+      "Multi-agent planning teams (future enhancement)",
+      "Handoff meetings with implementation agents (future)",
+      "Real-time collaborative editing (WebSocket sync)",
+      "Agent supervision/monitoring dashboard (use relay-dashboard)"
+    ],
+    "acceptance_criteria": [
+      { "id": "ac1", "description": "Planning agent can be spawned when a plan is created" },
+      { "id": "ac2", "description": "Agent uses MCP tools (add_step, edit_step, etc.) to modify plan via HTTP transport" },
+      { "id": "ac3", "description": "Human edits and agent edits both persist to same SQLite database with version conflict handling" },
+      { "id": "ac4", "description": "UI chat sends messages to planning agent, receives real responses" },
+      { "id": "ac5", "description": "Silent improvements come from agent analysis via suggest_improvement MCP tool" },
+      { "id": "ac6", "description": "Planning session terminates when plan is approved or times out" },
+      { "id": "ac7", "description": "Change requests spawn revision agent to draft plan updates" },
+      { "id": "ac8", "description": "Graceful fallback to mock mode when relay-daemon unavailable" }
+    ]
+  },
+
+  "sub_features": [
+    "relay-core",
+    "relay-planning-agent",
+    "relay-mcp-bridge",
+    "relay-session-management",
+    "relay-ai-chat",
+    "relay-ai-improvements",
+    "relay-change-request-agent"
+  ],
+
+  "plan_implementation": {
+    "scopes": ["planner-core", "planner-ui"],
+    "approach": "Hybrid pattern - HTTP APIs remain for orchestrator, add relay for spawning planning agents",
+    "shared_components": [
+      {
+        "name": "useAIConnectionStatus hook",
+        "description": "Shared UI hook for checking session status, used by both chat and improvements features",
+        "defined_in": "relay-ai-chat.rac005",
+        "used_by": ["relay-ai-chat.rac006", "relay-ai-improvements.rai009"]
+      },
+      {
+        "name": "Planning agent system prompt",
+        "description": "System prompt for planning agents, includes improvement analysis instructions",
+        "defined_in": "relay-planning-agent.rpa001",
+        "used_by": ["relay-ai-improvements.rai007"]
+      }
+    ],
+    "risks": [
+      { "risk": "relay-daemon must be running for planning to work", "mitigation": "Graceful fallback to mock mode when relay unavailable, automatic reconnection" },
+      { "risk": "MCP tool calls from agent could conflict with human edits", "mitigation": "Optimistic locking via version numbers, agent re-reads plan state on conflict" },
+      { "risk": "Planning agent could run indefinitely", "mitigation": "Session timeouts (default 30 min), terminate on approval, explicit kill capability" },
+      { "risk": "Agent spawning could fail silently", "mitigation": "Spawn errors logged but don't fail plan creation, UI shows fallback to demo mode" }
+    ],
+    "steps": []
+  }
+}
